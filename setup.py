@@ -8,7 +8,7 @@ description = 'CI Tool - Continues Integration Swiss Army Knife'
 
 # Fetch version from git tags, and write to version.py.
 # Also, when git is not available (PyPi package), use stored version.py.
-version_py = os.path.join(os.path.dirname(__file__), 'citool/version.py')
+version_py = os.path.join(os.path.dirname(__file__), 'libci/version.py')
 
 try:
     version_git = subprocess.check_output(['git', 'describe', '--tags'])
@@ -41,8 +41,8 @@ if __name__ == '__main__':
     setup(name='citool',
           # we write only the version here, release should be specified only for rpm
           version='{0}'.format(version),
-          install_requires=['pshell', 'pexpect'],
-          packages=['citool'],
+          install_requires=['jenkinsapi'],
+          packages=['libci'],
           include_package_data=True,
           scripts=['bin/citool'],
           description=description,
