@@ -1,10 +1,9 @@
 from libci import Plugin
-from libci import libciError
 
 
-class CIRpmdiff(Plugin):
-    name = 'rpmdiff'
-    desc = 'Schedule RPMdiff run and wait for results'
+class CITestOnBuild(Plugin):
+    name = 'testonbuild'
+    desc = 'Schedule beakerlib tests'
 
     options = {
         'id': {
@@ -28,7 +27,7 @@ class CIRpmdiff(Plugin):
         target = self.option('target')
         scratch = self.option('scratch')
         taskid = self.option('id')
-        msg = 'Running rpmdiff for '
+        msg = 'Running {} for '.format(self.name)
         if scratch == 'true' or scratch == 'True':
             msg += 'scratch'
         msg += 'build of \'{}\' '.format(nvr)
