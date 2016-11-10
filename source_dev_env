@@ -1,0 +1,6 @@
+DIRNAME="$(dirname $(readlink -f $BASH_SOURCE))"
+grep -q $DIRNAME <<< "$PYTHONPATH" || \
+    export PYTHONPATH="$DIRNAME:$PYTHONPATH"
+echo "setting PYTHONPATH to '$PYTHONPATH'"
+export PATH="$DIRNAME/bin:$PATH"
+echo "adding '$DIRNAME/bin' to PATH"
