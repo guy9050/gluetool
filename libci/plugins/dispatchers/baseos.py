@@ -26,7 +26,7 @@ class CIBaseOSDispatcher(Plugin):
         },
         'dispatch-all': {
             'help': 'Dispatch all builds (default false)',
-            'default': False,
+            'action': 'store_true',
         },
         'scratch': {
             'help': 'Scratch build (default false)',
