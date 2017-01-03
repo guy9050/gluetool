@@ -44,10 +44,14 @@ This module requires an available Jenkins connection via 'jenkins' module.
         if not jenkins:
             raise libciError('no jenkins connection found')
 
-        out = subprocess.check_output(['jenkins-jobs',
-                                       'update',
-                                       self.data_path],
-                                      stderr=subprocess.STDOUT)
+        try:
+            out = subprocess.check_output(['jenkins-jobs',
+                                           'update',
+                                           self.data_path],
+                                          stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            msg = 'failed to run jenkins-jobs\n' + e.output
+            raise libciError(msg)
         msg = 'created/updated JJB jobs from \'{}\''.format(self.data_path)
         self.info(msg)
         self.debug(out)

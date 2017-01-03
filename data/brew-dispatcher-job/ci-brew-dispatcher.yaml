@@ -22,6 +22,11 @@
         - string:
             name: target
             description: 'Brew target'
+    triggers:
+      - ci-trigger:
+          jms-selector: |
+            CI_TYPE = 'brew-taskstatechange'
+            AND method = 'build'
     builders:
         - shell: |
             citool brew-dispatcher
