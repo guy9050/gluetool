@@ -6,3 +6,4 @@ version.py
 libatt.egg-info
 *.sw[a-z]
 .ropeproject
+*.egg-info

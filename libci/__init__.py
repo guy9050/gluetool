@@ -1,7 +1,9 @@
-from .libci import Ci
-from .libci import libciError
-from .libci import libciRetryError
-from .libci import Plugin
+from .ci import Ci
+from .ci import libciError
+from .ci import libciRetryError
+from .ci import Module
+import utils
+
 try:
     from .version import __version__
 except ImportError:
@@ -11,5 +13,6 @@ __all__ = ['__version__',
            'Ci',
            'libciError',
            'libciRetryError',
-           'Plugin',
-           'retry']
+           'Module',
+           'retry',
+           'utils']

@@ -1,0 +1,27 @@
+- job:
+    name: 'ci-brew-dispatcher'
+    description: |
+        Runs generic brew dispatcher. Note that the 'brew-dispatcher' module
+        reads all required variables (name, version, release, target and task_id)
+        from the environment.
+    concurrent: true
+    display-name: 'ci-brew-dispatcher'
+    parameters:
+        - string:
+            name: id
+            description: 'Brew task ID'
+        - string: 
+            name: name
+            description: 'Package name'
+        - string: 
+            name: version
+            description: 'Package version'
+        - string: 
+            name: release
+            description: 'Package release'
+        - string:
+            name: target
+            description: 'Brew target'
+    builders:
+        - shell: |
+            citool brew-dispatcher

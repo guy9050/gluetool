@@ -7,7 +7,6 @@ import libci
 from libci import libciError
 from libci import libciRetryError
 
-
 def print_error(string):
     sys.stderr.write('Error: %s\n' % string)
 
@@ -17,77 +16,77 @@ def error(string):
     sys.exit(1)
 
 
-def split_argv(argv_all, plugins):
+def split_argv(argv_all, modules):
     args = []
-    argv_plugins = []
+    argv_modules = []
     argv_ci = []
-    plugin = None
+    module = None
 
     for argv in argv_all:
-        if argv in plugins:
-            if plugin:
-                argv_plugins.append({plugin: args})
+        if argv in modules:
+            if module:
+                argv_modules.append({module: args})
             else:
                 argv_ci = args
             args = []
-            plugin = argv
+            module = argv
         else:
             args.append(argv)
 
     # add last one
-    if plugin:
-        argv_plugins.append({plugin: args})
+    if module:
+        argv_modules.append({module: args})
     else:
         argv_ci = args
 
-    return (argv_ci, argv_plugins)
+    return (argv_ci, argv_modules)
 
 
 def main():
     # init used vars
     ci = None
-    plugin = None
+    module = None
 
     try:
-        # initialize ci, load the plugin list
+        # initialize ci, load the module list
         ci = libci.Ci()
 
         # split the args and parse citool args
-        (ci_args, plugins_args) = split_argv(sys.argv[1:], ci.plugin_list())
+        (ci_args, modules_args) = split_argv(sys.argv[1:], ci.module_list())
         ci.parse_args(ci_args)
 
         ci.debug('Parsed ci args: %s' % ci_args)
-        ci.debug('Parsed plugin args: %s' % plugins_args)
+        ci.debug('Parsed module args: %s' % modules_args)
 
         # version
         if ci.get_config('version'):
             sys.stdout.write('citool %s\n' % libci.__version__.strip())
             sys.exit(0)
 
-        # list plugins
+        # list modules
         groups = ci.get_config('list')
         if groups is not None:
-            sys.stdout.write('%s\n' % ci.plugin_list_usage(groups))
+            sys.stdout.write('%s\n' % ci.module_list_usage(groups))
             sys.exit(0)
 
-        # no plugins
-        if not plugins_args:
-            msg = 'No plugin specified, use -l to list available'
+        # no modules
+        if not modules_args:
+            msg = 'No module specified, use -l to list available'
             raise libciError(msg)
 
         # command-line info
         if ci.get_config('info'):
-            ci.print_cmdline(ci_args, plugins_args)
+            ci.print_cmdline(ci_args, modules_args)
 
         # actually the execution loop is retries+1
         # there is always one execution
         retries = ci.get_config('retries')
         for i in range(retries+1):
             try:
-                # destroy all plugins if they exist
-                # this will call their destructor, where plugins should keep
+                # destroy all modules if they exist
+                # this will call their destructor, where modules should keep
                 # their cleanup procedures
-                ci.destroy_plugins()
+                ci.destroy_modules()
 
                 # print retry info
                 if i:
@@ -95,45 +94,41 @@ def main():
                     ci.info('retrying execution (attempt %s out of %s)' %
                             (i, retries))
 
-                # create a separate parser for each plugin, including ci itself
-                for plugin_args in plugins_args:
-                    for plugin_name, args in plugin_args.iteritems():
-                        plugin = ci.add_plugin_instance(plugin_name)
-                        plugin.init_options_config()
-                        plugin.parse_args(args)
-                        plugin.check_required_options()
-                        plugin.check_options()
+                # create a separate parser for each module, including ci itself
+                for module_args in modules_args:
+                    for module_name, args in module_args.iteritems():
+                        module = ci.init_module(module_name)
+                        module = ci.add_module_instance(module)
+                        module.init_options_config()
+                        module.parse_args(args)
+                        module.sanity()
+                        module.check_required_options()
 
-                # execute all plugins
-                for plugin in ci.plugin_instances:
+                # execute all modules
+                for module in ci.module_instances:
                     # make sure we have a clean state in case of retries
-                    plugin.execute()
-                    plugin.add_shared()
+                    module.execute()
+                    module.add_shared()
             except libciRetryError as e:
-                sys.stderr.write('error in %s: %s\n' % (plugin.name, e))
+                sys.stderr.write('error in %s: %s\n' % (module.name, e))
                 continue
             break
 
     except (SystemExit, KeyboardInterrupt) as e:
         raise e
-    except libci.libciError as e:
+    except Exception as e:
         if ci:
             if ci.get_config('verbose') or ci.get_config('debug'):
                 traceback.print_exc()
-        if plugin:
-            exstr = 'error in %s: %s\n' % (plugin.name, e)
+        if module:
+            exstr = 'error in %s: %s\n' % (module.name, e)
         else:
             exstr = 'error: %s\n' % e
         sys.stderr.write(exstr)
         sys.exit(-1)
-    except Exception, e:
-        traceback.print_exc()
-        exstr = '%s' % e
-        sys.stderr.write(exstr)
-        sys.exit(-1)
     finally:
         if ci:
-            ci.destroy_plugins()
+            ci.destroy_modules()
 
 if __name__ == '__main__':
     main()

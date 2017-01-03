@@ -1,2 +1,2 @@
-graft libci
-recursive-exclude libci  *.pyc *~
+recursive-include plugins *.py
+graft data

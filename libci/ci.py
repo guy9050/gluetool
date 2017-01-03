@@ -1,48 +1,40 @@
+import argparse
+import ast
+import ConfigParser
 import imp
 import os
 import sys
 import traceback
 
-import ConfigParser
+from argparse import ArgumentParser
 from ConfigParser import NoOptionError, NoSectionError
+from os.path import abspath, expanduser, exists, dirname, join
 
-import argparse
 
-CONFIGS = ['/etc/citool', os.path.expanduser('~/.citool')]
-PLUGIN_CONFIG_PATHS = ['/etc/citool.d/config',
-                       os.path.expanduser('~/.citool.d/config')]
-PLUGIN_PATH = [os.path.dirname(os.path.abspath(__file__)) + '/plugins']
+CONFIGS = ['/etc/citool', expanduser('~/.citool.d/citool')]
+MODULE_CONFIG_PATHS = ['/etc/citool.d/config',
+                       expanduser('~/.citool.d/config')]
+MODULE_PATH = [dirname(dirname(abspath(__file__))) + '/modules']
+DATA_PATH = dirname(dirname(abspath(__file__))) + '/data'
 
 
 class libciError(Exception):
-    """ should be used for raising exceptions"""
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        """ decode from utf-8 in case of pshell output in exception """
-        if isinstance(self.value, (str, basestring, unicode)):
-            return self.value.encode('utf-8')
-        else:
-            return self.value
+    """ General libci exception """
+    pass
 
 
 class libciRetryError(libciError):
-    """ should be used for raising exceptions that cause a retry"""
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        """ decode from utf-8 in case of pshell output in exception """
-        if isinstance(self.value, (str, basestring, unicode)):
-            return self.value.encode('utf-8')
-        else:
-            return self.value
+    """ Retry libci exception """
+    pass
 
 
-# retry decorator, use as
-# @retry(exception1, exception2, ..)
 def retry(*args):
+    """ Retry decorator
+    This decorator catches given exceptions and returns
+    libRetryError exception instead.
+
+    usage: @retry(exception1, exception2, ..)
+    """
     def wrap(func):
         def func_wrapper(obj, *fargs, **fkwargs):
             try:
@@ -56,22 +48,21 @@ def retry(*args):
     return wrap
 
 
-class Plugin(object):
+class Module(object):
     #
     # static variables, same in all instances
     #
-    name = None   # default: group-module_name (without .py suffix)
-    desc = None   # description, displayed in plugin list
-    epilog = None  # detailed help for -h, same as description if not specified
+    name = None        # default: group-module_name (without .py suffix)
+    description = None # short description, displayed in module list
 
-    # The options variable defines additional plugin options
-    # the required_options defines a list of required plugin options
+    # The options variable defines additional module options
+    # the required_options defines a list of required module options
     #
-    # Calling the Plugin.add_options function the options defined
+    # Calling the Module.add_options function the options defined
     # here will be added to the passed parser group.
     #
-    # By calling Plugin.init_options you can add options to the
-    # plugin manually
+    # By calling Module.init_options you can add options to the
+    # module manually
     #
     # 'option_name' defines the long option name (i.e. --option_name')
     # {
@@ -106,6 +97,10 @@ class Plugin(object):
         # c) init_options function
         self._config = {}
 
+        # initialize data path if exists, else it will be None
+        dpath = join(self.ci.get_config('data_path') or DATA_PATH, self.name)
+        self.data_path = dpath if exists(dpath) else None
+
     def destroy(self):
         """
         here should go any code that needs to be run on exit.
@@ -124,13 +119,16 @@ class Plugin(object):
 
     def execute(self):
         """
-        execute is a required plugin function
+        execute is a required module function
         """
         raise NotImplementedError
 
-    def check_options(self):
-        """
-        additional plugin options checking
+    def sanity(self):
+        """ Modules can define here additional checks before execution.
+
+        Some examples:
+        - Advanced checks on passed options
+        - Check for additional requirements (tools, data, etc.)
         """
         return None
 
@@ -147,7 +145,7 @@ class Plugin(object):
 
     def option(self, opt):
         """
-        get an option value from the plugin config
+        get an option value from the module config
         """
         try:
             return self._config[opt]
@@ -160,8 +158,10 @@ class Plugin(object):
         """
         if self.options:
             self.config_parser = ConfigParser.ConfigParser()
-            self.debug('Parsing {}'.format([os.path.join(c, self.name) for c in PLUGIN_CONFIG_PATHS]))
-            self.config_parser.read([os.path.join(c, self.name) for c in PLUGIN_CONFIG_PATHS])
+            paths = [os.path.join(c, self.name) for c in MODULE_CONFIG_PATHS]
+            self.debug('Parsing {}'.format(paths))
+            self.config_parser.read(paths)
+
             for opt in list(self.options.keys()):
                 try:
                     value = self.config_parser.get('default', opt)
@@ -174,21 +174,33 @@ class Plugin(object):
                 except NoSectionError:
                     pass
 
+    def shared_functions_help(self):
+        if not self.shared_functions:
+            return ''
+        docs = "\nshared functions:\n"
+        for func in self.shared_functions:
+            if getattr(self, func).__doc__:
+                docs += '  {}\t{}\n'.format(func, getattr(self, func).__doc__)
+            else:
+                docs += '  {}\tno documentation added :(\n'.format(func)
+        return docs
+
     def parse_args(self, args):
         """
         parse options from command line
         """
-        # add plugin's parsed options
-        parser = argparse.ArgumentParser(
+        # add module's parsed options
+        parser = ArgumentParser(
             usage='Usage: %s [options]' % self.name,
-            description=self.desc,
-            epilog=self.epilog)
+            description=self.__doc__,
+            epilog=self.shared_functions_help(),
+            formatter_class=argparse.RawTextHelpFormatter)
         if self.options:
             for opt in sorted(list(self.options.keys())):
                 if 'short' in self.options[opt]:
                     short = self.options[opt].pop('short')
                     parser.add_argument('-%s' % short, '--%s' % opt,
-                                             **self.options[opt])
+                                        **self.options[opt])
                     self.options[opt]['short'] = short
                 else:
                     parser.add_argument('--%s' % opt, **self.options[opt])
@@ -212,13 +224,16 @@ class Plugin(object):
 
     def init_options(self, *args, **kwargs):
         """
-        add options to the plugin manually
+        add options to the module manually
         """
         for key, value in kwargs.iteritems():
             try:
                 self._config['value'] = value
             except KeyError:
-                raise KeyError('option %s not recognized by this plugin')
+                raise KeyError('option %s not recognized by this module')
+
+    def run_module(self, module, args=[]):
+        self.ci.run_module(module, args)
 
     def debug(self, msg):
         self.ci.debug('[%s] %s' % (self.name, msg))
@@ -235,16 +250,16 @@ class Ci(object):
     # configuration
     config_parser = None
 
-    # plugin types dictionary
-    plugins = {}
-    plugin_instances = []
+    # module types dictionary
+    modules = {}
+    module_instances = []
 
     # shared functions
     shared_functions = {}
 
     # add a shared function, overwrite if exists
-    def add_shared(self, funcname, plugin):
-        self.shared_functions.update({funcname: plugin})
+    def add_shared(self, funcname, module):
+        self.shared_functions.update({funcname: module})
 
     # delete a shared function if exists
     def del_shared(self, funcname):
@@ -263,7 +278,7 @@ class Ci(object):
     def _load_config(self):
         self.config_parser = ConfigParser.ConfigParser()
         self.config_parser.read(CONFIGS)
-        if self.config_parser.has_section('citool'):
+        if self.config_parser.has_section('default'):
             for item in list(self.config.keys()):
                 if self.config_parser.has_option('default', item):
                     self.config[item] = self.config_parser.get('default', item)
@@ -271,27 +286,87 @@ class Ci(object):
     def get_config(self, key):
         return self.config[key]
 
-    def _load_plugins(self):
-        ppaths = PLUGIN_PATH + self.get_config('plugin_path')
-        self.debug('loading plugins from these paths: {}'.format(ppaths))
+    def _load_modules(self):
+        ppaths = self.get_config('module_path') or MODULE_PATH
+        self.debug('loading modules from these paths: {}'.format(ppaths))
         for ppath in ppaths:
-            self._load_plugin_path(ppath)
+            self._load_module_path(ppath)
 
-    def _load_plugin_path(self, ppath):
+    @staticmethod
+    def _check_module_file(mfile):
+        """ Return True if if module file contains libci import and Module
+            class definition """
+        libci_found = False
 
-        # load all .py files in plugins path
-        # load them as libci.name
-        # all Plugins subclasses are added to the self.plugins dictionary
+        libci_module_found = False
+
+        # print 'processing file: {}'.format(mfile)
+        with open(mfile) as f:
+            t = ast.parse(f.read())
+            # print 'body: {}'.format(t.__dict__['body'])
+
+            # check for libci import
+            for item in t.__dict__['body']:
+                # print 'processing item: {}'.format(item)
+                if item.__class__.__name__ == 'Import':
+                    if item.names[0].name == 'libci':
+                        libci_found = True
+                        break
+
+                if item.__class__.__name__ == 'ImportFrom':
+                    if item.module == 'libci':
+                        libci_found = True
+                        break
+
+            # check for libci.Module class definition
+            for item in t.__dict__['body']:
+                # print 'processing item: {}'.format(item)
+                if item.__class__.__name__ == 'ClassDef':
+                    for base in item.bases:
+                        try:
+                            if base.id == 'Module':
+                                libci_module_found = True
+                                break
+                        except AttributeError:
+                            pass
+                        try:
+                            if base.attr == 'Module':
+                                libci_module_found = True
+                                break
+                        except AttributeError:
+                            pass
+
+        # print 'found: {} {}'.format(libci_found, libci_module_found)
+        if libci_found and libci_module_found:
+            return True
+
+        return False
+
+    def _load_module_path(self, ppath):
+        """ Load modules from modules directory """
         for root, dirs, files in os.walk(ppath):
             for file in sorted(files):
                 if not file.endswith('.py'):
                     continue
                 group = root.replace(ppath + '/', '')
                 mname, _ = os.path.splitext(file)
+                mfile = os.path.join(root, file)
+                # check if the file contains a valid libci module
+                # note that various errors can happen here, just ignore
+                # them (like permission denied, syntax error, ...)
                 try:
-                    module = imp.load_source('libci.%s-%s' %
+                    if not self._check_module_file(mfile):
+                        continue
+                except Exception as e:
+                    self.info('ignoring module \'%s\' ' % mname +
+                              'from \'%s\' group' % group +
+                              ' (error: %s)' % str(e))
+                    continue
+                # try to import the module
+                try:
+                    module = imp.load_source('libci.ci.%s-%s' %
                                              (group, mname),
-                                             os.path.join(root, file))
+                                             mfile)
                 except Exception as e:
                     self.info('ignoring module \'%s\' ' % mname +
                                 'from \'%s\' group' % group +
@@ -300,80 +375,96 @@ class Ci(object):
                 for name in dir(module):
                     cls = getattr(module, name)
                     try:
-                        if issubclass(cls, Plugin) and cls != Plugin:
+                        if issubclass(cls, Module) and cls != Module:
                             if not cls.name:
-                                error = 'no plugin name specified'
+                                error = 'no module name specified'
                                 raise libciError(error)
-                            if cls.name in self.plugins:
-                                # pprint.pprint(self.plugins)
+                            if cls.name in self.modules:
+                                # pprint.pprint(self.modules)
                                 msg = '\'%s\' is a duplicate' % cls.name
-                                msg += ' plugin name \'%s/' % group
+                                msg += ' module name \'%s/' % group
                                 msg += '%s\'' % file
                                 raise libciError(msg)
-                            # add to plugins dictionary
-                            self.plugins[cls.name] = {
+                            # add to modules dictionary
+                            self.modules[cls.name] = {
                                 'class': cls,
-                                'desc': cls.desc,
+                                'description': cls.description,
                                 'group': group,
                             }
                     except TypeError:
                         pass
 
-    # find all available plugins
+    # find all available modules
     def __init__(self):
         # configuration defaults
         self.config = {
+            'data_path': None,
             'debug': False,
             'info': True,
+            'list': None,
+            'module_path': None,
             'quiet': False,
             'retries': 0,
             'verbose': False,
             'version': False,
-            'list': None,
-            'plugin_path': [],
         }
 
-        # load config and create plugin list
+        # load config and create module list
         self._load_config()
-        self._load_plugins()
+        self._load_modules()
 
-    def call_plugin_destroy(self, plugin):
+    def call_module_destroy(self, module):
         try:
-            plugin.debug('destroying myself')
-            plugin.destroy()
+            module.debug('destroying myself')
+            module.destroy()
         except Exception as e:
             exstr = 'error in destroy function: %s\n' % str(e)
             sys.stderr.write(exstr)
             if self.get_config('verbose') or self.get_config('debug'):
                 traceback.print_exc()
 
-    def destroy_plugins(self):
-        if self.plugin_instances:
-            self.verbose('destroying all plugins in reverse order')
-            # we will destroy plugins in reverse order, which makes more sense
-            for plugin in reversed(self.plugin_instances):
-                self.call_plugin_destroy(plugin)
-        self.plugin_instances = []
+    def destroy_modules(self):
+        if self.module_instances:
+            self.verbose('destroying all modules in reverse order')
+            # we will destroy modules in reverse order, which makes more sense
+            for module in reversed(self.module_instances):
+                self.call_module_destroy(module)
+        self.module_instances = []
 
-    def add_plugin_instance(self, plugin_name):
-        plugin = self.plugins[plugin_name]['class'](self)
-        self.plugin_instances.append(plugin)
-        return plugin
+    def add_module_instance(self, module):
+        self.module_instances.append(module)
+        return module
+
+    def init_module(self, module):
+        return self.modules[module]['class'](self)
+
+    def run_module(self, module_name, args):
+        module = self.init_module(module_name)
+        module.init_options_config()
+        module.parse_args(args)
+        module.check_required_options()
+        module.sanity()
+        module.execute()
+        module.add_shared()
 
     def parse_args(self, args):
-        usage = '%(prog)s [opts] plugin1 [opts] [args] plugin2 ...'
+        usage = '%(prog)s [opts] module1 [opts] [args] module2 ...'
 
-        parser = argparse.ArgumentParser(usage=usage,
-                                         epilog=self.plugin_group_list_usage())
+        parser = ArgumentParser(usage=usage,
+                                epilog=self.module_group_list_usage(),
+                                formatter_class=argparse.RawTextHelpFormatter)
+        parser.add_argument('--data-path', help='Specify data path')
         parser.add_argument('-d', '--debug', action='store_true',
                             default=False, help='Debug output')
         parser.add_argument('-i', '--info', action='store_true',
                             default=False,
                             help='Print information about commandline')
         parser.add_argument('-l', '--list', nargs='*', metavar='GROUP',
-                            help='List all available plugins or given GROUPs')
-        parser.add_argument('-p', '--plugin-path', action='append',
-                            default=[], help='Specify plugin path')
+                            help='List all available modules or given GROUPs')
+        # module path can be specified only from configuration file
+        # suppress it from help
+        parser.add_argument('--module-path', action='append',
+                            default=[], help=argparse.SUPPRESS)
         parser.add_argument('-q', '--quiet', action='store_true',
                             default=False, help='Silence info messages')
         parser.add_argument('-r', '--retries', default=0,
@@ -391,19 +482,19 @@ class Ci(object):
             value = getattr(parsed_args, opt.replace('-', '_'))
             self.config[opt] = value
 
-    def plugin_list(self):
-        return sorted(list(self.plugins.keys()))
+    def module_list(self):
+        return sorted(list(self.modules.keys()))
 
-    def plugin_list_usage(self, groups):
-        """ Returns a string with plugins description """
-        ret = 'Available plugins'
+    def module_list_usage(self, groups):
+        """ Returns a string with modules description """
+        ret = 'Available modules'
         if groups:
             ret += ' in %s group(s)' % ', '.join(groups)
         ret += ':'
-        # get plugin list
-        plist = self.plugin_group_list()
+        # get module list
+        plist = self.module_group_list()
         if not plist:
-            ret += '\n  -- no plugins found --'
+            ret += '\n  -- no modules found --'
         else:
             for group in sorted(list(plist.keys())):
                 # skip groups that are not in the list
@@ -412,39 +503,39 @@ class Ci(object):
                     continue
                 ret += '\n%-2s%s\n' % (' ', group)
                 for key, val in sorted(plist[group].iteritems()):
-                    ret += '%-4s%-16s %s\n' % ('', key, val)
+                    ret += '%-4s%-32s %s\n' % ('', key, val)
         return ret
 
-    def plugin_group_list(self):
-        """ Returns a dictionary of groups of plugins with description """
-        plugin_groups = {}
-        for plugin in self.plugin_list():
-            group = self.plugins[plugin]['group']
+    def module_group_list(self):
+        """ Returns a dictionary of groups of modules with description """
+        module_groups = {}
+        for module in self.module_list():
+            group = self.modules[module]['group']
             try:
-                plugin_groups[group].update({
-                    plugin: self.plugins[plugin]['desc']
+                module_groups[group].update({
+                    module: self.modules[module]['description']
                 })
             except KeyError:
-                plugin_groups[group] = {
-                    plugin: self.plugins[plugin]['desc']
+                module_groups[group] = {
+                    module: self.modules[module]['description']
                 }
-        return plugin_groups
+        return module_groups
 
-    def plugin_group_list_usage(self):
+    def module_group_list_usage(self):
         """ Returns a string with all available groups """
-        ret = 'Available plugin groups: '
+        ret = 'Available module groups: '
 
-        # get plugin list
-        glist = self.plugin_group_list()
+        # get module list
+        glist = self.module_group_list()
         return ret + ', '.join(glist)
 
-    def print_cmdline(self, ci_args, plugins_args):
+    def print_cmdline(self, ci_args, modules_args):
         """ prints info about current run """
         self.info('command-line info')
         sys.stdout.write('{0} {1}'.format(sys.argv[0], ' '.join(ci_args)))
-        for plugin in plugins_args:
-            sys.stdout.write(' \\\n  {0} {1}'.format(plugin.keys()[0],
-                             ' '.join(plugin.values()[0])))
+        for module in modules_args:
+            sys.stdout.write(' \\\n  {0} {1}'.format(module.keys()[0],
+                             ' '.join(module.values()[0])))
         sys.stdout.write('\n')
 
     def debug(self, string):
@@ -452,7 +543,7 @@ class Ci(object):
             sys.stderr.write('[D] {}\n'.format(string))
 
     def verbose(self, string):
-        if self.config['verbose']:
+        if self.config['verbose'] or self.config['debug']:
             sys.stderr.write('[V] {}\n'.format(string))
 
     def info(self, string):

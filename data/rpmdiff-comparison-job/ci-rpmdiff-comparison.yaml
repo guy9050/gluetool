@@ -1,0 +1,14 @@
+- job:
+    name: 'ci-rpmdiff-comparison'
+    description: |
+        RPMdiff comparison job.
+    concurrent: true
+    display-name: 'ci-rpmdiff-comparison'
+    parameters:
+        - string:
+            name: id
+            default: ''
+            description: 'Brew task ID'
+    builders:
+        - shell: |
+            citool brew rpmdiff --type comparison --id $id
