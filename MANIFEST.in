@@ -1,2 +1,2 @@
-recursive-include modules *.py
-recursive-include data *
+recursive-include libci/modules *.py
+recursive-include libci/data *
