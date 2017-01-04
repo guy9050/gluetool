@@ -1,2 +1,2 @@
-recursive-include plugins *.py
-graft data
+recursive-include modules *.py
+recursive-include data *
