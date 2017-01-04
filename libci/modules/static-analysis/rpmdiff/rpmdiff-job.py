@@ -67,7 +67,7 @@ This module requires an available Jenkins connection - via the jenkins module.
 
     def execute(self):
         jenkins = self.shared('jenkins')
-        if not jenkins:
+        if jenkins is None:
             raise libciError('no jenkins connection found')
 
         out = subprocess.check_output(['jenkins-jobs', 'update',
