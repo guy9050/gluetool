@@ -15,7 +15,7 @@ CONFIGS = ['/etc/citool', expanduser('~/.citool.d/citool')]
 MODULE_CONFIG_PATHS = ['/etc/citool.d/config',
                        expanduser('~/.citool.d/config')]
 MODULE_PATH = [dirname(abspath(__file__)) + '/modules']
-DATA_PATH = dirname(dirname(abspath(__file__))) + '/data'
+DATA_PATH = dirname(abspath(__file__)) + '/data'
 
 
 class libciError(Exception):
