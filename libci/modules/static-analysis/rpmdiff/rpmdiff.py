@@ -163,7 +163,7 @@ This module schedules an RPMdiff comparison waits until it is finished.
         self.debug("stdout: {}".format(p_out or "no output"))
         self.debug("stderr: {}".format(p_err or "no output"))
         if p_status > 0:
-            msg = "Failure during 'rpmdiff' command execution, return code: %s"
+            msg = "Failure during 'rpmdiff' command execution: {}".format(p_err)
             raise libciError(msg)
         task_id = self._parse_task_id(p_out, self.brew_task.scratch)
         self.info("web url: {}".format(self._parse_web_url(p_out)))
