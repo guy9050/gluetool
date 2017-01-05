@@ -8,16 +8,20 @@ from libci import libciError
 from requests.exceptions import RequestException
 
 JJB_CONFIG = os.path.expanduser('~/.config/jenkins_jobs/jenkins_jobs.ini')
+JJB_GLOBAL_CONFIG= os.path.expanduser('/etc/jenkins_jobs/jenkins_jobs.ini')
 
 
 class CIJenkins(libci.Module,object):
-    """This modules provides connection to a jenkins instance via jenkinsapi module:
+    """This modules provides connection to a jenkins instance via jenkinsapi
+module:
     https://jenkinsapi.readthedocs.io/en/latest/
 
-It is also able to create/replace Jenkins Job Builder configuration file
+This module will also create Jenkins Job Builder configuration file
     {0}
-with option '--create-jjb-config'.
-""".format(JJB_CONFIG)
+if not found in paths '{0}' or '{1}'.
+
+You can use the option '--create-jjb-config' to force creation of \'{0}\' file.
+""".format(JJB_CONFIG, JJB_GLOBAL_CONFIG)
 
     name = 'jenkins'
     description = 'Connect to a jenkins instance via jenkinsapi'
@@ -28,7 +32,7 @@ with option '--create-jjb-config'.
 
     options = {
         'create-jjb-config': {
-            'help': 'Create/Replace Jenkins Job Builder configuration',
+            'help': 'Force creation Jenkins Job Builder configuration',
             'action': 'store_true',
         },
         'password': {
@@ -95,8 +99,13 @@ with option '--create-jjb-config'.
         create_config = self.option('create-jjb-config')
         url = self.option('url')
 
-        # create JJB configuration file if needed
+        # create JJB configuration file if forced
         if create_config:
+            self.create_jjb_config()
+
+        # create JJB configuration file if it does not exist
+        if not os.path.exists(JJB_CONFIG) and \
+                not os.path.exists(JJB_GLOBAL_CONFIG):
             self.create_jjb_config()
 
         # connecto to jenkins
