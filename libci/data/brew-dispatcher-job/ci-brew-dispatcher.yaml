@@ -29,4 +29,4 @@
             AND method = 'build'
     builders:
         - shell: |
-            citool brew-dispatcher
+            citool brew-dispatcher --dispatch-all
