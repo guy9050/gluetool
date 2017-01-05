@@ -93,7 +93,7 @@ This module schedules an RPMdiff comparison waits until it is finished.
     description = 'Run RPMdiff analysis or comparison'
 
     options = {
-        'task-id': {
+        'id': {
             'help': 'Brew task id',
             'type': int,
         },
@@ -102,7 +102,7 @@ This module schedules an RPMdiff comparison waits until it is finished.
             'choices': ['analysis', 'comparison'],
         }
     }
-    required_options = ['task-id', 'type']
+    required_options = ['id', 'type']
 
     brew_task = None
     check_interval = 60
@@ -182,7 +182,7 @@ This module schedules an RPMdiff comparison waits until it is finished.
         return RPMDiffTask(task_id)
 
     def execute(self):
-        task_id = self.option('task-id')
+        task_id = self.option('id')
         test_type = self.option('type')
 
         # get a brew task instance
