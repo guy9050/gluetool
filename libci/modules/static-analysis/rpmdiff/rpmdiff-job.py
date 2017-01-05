@@ -3,6 +3,7 @@ import subprocess
 from libci import Module
 from libci import libciError
 from libci import utils
+from jenkinsapi.custom_exceptions import UnknownJob
 
 # Jenkins Job Builder YAML
 CMP_JOB_NAME = 'ci-rpmdiff-comparison'
@@ -65,20 +66,31 @@ This module requires an available Jenkins connection - via the jenkins module.
         if not self.id:
             raise libciError('id not found in environment')
 
-    def execute(self):
-        jenkins = self.shared('jenkins')
-        if jenkins is None:
-            raise libciError('no jenkins connection found')
-
-        out = subprocess.check_output(['jenkins-jobs', 'update',
+    def update_job(self):
+        out = subprocess.check_output(['jenkins-jobs',
+                                       '--flush-cache',
+                                       'update',
                                        self.yaml],
                                       stderr=subprocess.STDOUT)
         # TODO parse JJB output and inform about the update
         self.debug(out)
+        # reconnect to jenkins
+        self.jenkins = self.shared('jenkins', reconnect=True)
 
-        jenkins[self.job_name].invoke(self.id, build_params={
-                                        'id': self.id
-                                     })
+    def execute(self):
+        self.jenkins = self.shared('jenkins')
+        if self.jenkins is None:
+            raise libciError('no jenkins connection found')
+
+        try:
+            self.jenkins[self.job_name]
+        except UnknownJob:
+            self.update_job()
+
+        self.jenkins[self.job_name].invoke(self.id,
+                                           build_params={
+                                               'id': self.id
+                                           })
         msg = 'invoked job \'{}\' with build params '.format(self.job_name)
         msg += '\'id={}\''.format(self.id)
         self.info(msg)
