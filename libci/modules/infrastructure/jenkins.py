@@ -45,8 +45,10 @@ with option '--create-jjb-config'.
     required_options = ['url']
     shared_functions = ['jenkins']
 
-    def jenkins(self):
+    def jenkins(self, reconnect=False):
         """ return jenkinsapi.Jenkins object instance """
+        if reconnect:
+            self.connect()
         return self.jenkins_instance
 
     def create_jjb_config(self):
@@ -73,8 +75,7 @@ with option '--create-jjb-config'.
             config.write(f)
         self.info('created jjb configuration in \'{}\''.format(JJB_CONFIG))
 
-    def execute(self):
-        create_config = self.option('create-jjb-config')
+    def connect(self):
         password = self.option('password')
         url = self.option('url')
         user = self.option('username')
@@ -90,9 +91,16 @@ with option '--create-jjb-config'.
             error += ': {}'.format(str(e))
             raise libciError(error)
 
+    def execute(self):
+        create_config = self.option('create-jjb-config')
+        url = self.option('url')
+
         # create JJB configuration file if needed
         if create_config:
             self.create_jjb_config()
+
+        # connecto to jenkins
+        self.connect()
 
         # be informative about the jenkins connection
         version = self.jenkins_instance.version
