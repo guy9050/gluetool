@@ -4,6 +4,7 @@ import ConfigParser
 import imp
 import os
 import sys
+import datetime
 import traceback
 
 from argparse import ArgumentParser
@@ -540,11 +541,17 @@ class Ci(object):
 
     def debug(self, string):
         if self.config['debug']:
-            sys.stderr.write('[D] {}\n'.format(string))
+            sys.stderr.write('[D] [{}] {}\n'.format(
+                datetime.datetime.now().strftime('%X.%f'),
+                string,
+            ))
 
     def verbose(self, string):
         if self.config['verbose'] or self.config['debug']:
-            sys.stderr.write('[V] {}\n'.format(string))
+            sys.stderr.write('[V] [{}] {}\n'.format(
+                datetime.datetime.now().strftime('%X.%f'),
+                string,
+            ))
 
     def info(self, string):
         if not self.config['quiet']:
