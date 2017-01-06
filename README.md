@@ -1,4 +1,4 @@
-citool - Continues Integration Swiss Army Knife
+citool - Continuous Integration Swiss Army Knife
 -----------------------------------------------
 
 Installation

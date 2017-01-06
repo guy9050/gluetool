@@ -4,7 +4,7 @@ import subprocess
 
 from setuptools import setup
 
-description = 'CI Tool - Continues Integration Swiss Army Knife'
+description = 'CI Tool - Continuous Integration Swiss Army Knife'
 
 # Fetch version from git tags, and write to version.py.
 # Also, when git is not available (PyPi package), use stored version.py.
