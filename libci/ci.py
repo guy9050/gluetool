@@ -491,7 +491,7 @@ class Ci(object):
         ret = 'Available modules'
         if groups:
             ret += ' in %s group(s)' % ', '.join(groups)
-        ret += ':'
+        ret += ':\n'
         # get module list
         plist = self.module_group_list()
         if not plist:
