@@ -10,31 +10,31 @@ class BrewTask(object):
     """ Brew task class """
     def __init__(self, brew_task_id, session):
         self.task_id = brew_task_id
-        self.task_info = None
+        self._task_info = None
         self.brew = session
         self._srcrpm = None
 
-    def _get_task_info(self):
-        if self.task_info is None:
-            self.task_info = self.brew.getTaskInfo(self.task_id, request=True)
-            if not self.task_info:
+    @property
+    def task_info(self):
+        if self._task_info is None:
+            self._task_info = self.brew.getTaskInfo(self.task_id, request=True)
+            if not self._task_info:
                 raise libciError("failed to obtain information about Brew task: %s" % self.task_id)
+
+        return self._task_info
 
     @property
     def owner(self):
-        self._get_task_info()
         owner_id = self.task_info["owner"]
         return self.brew.getUser(owner_id)["name"]
 
     @property
     def target(self):
-        self._get_task_info()
         target = self.task_info["request"][1]
         return BrewTarget(target, session=self.brew)
 
     @property
     def scratch(self):
-        self._get_task_info()
         if "scratch" in self.task_info["request"][2]:
             return self.task_info["request"][2]["scratch"]
 
@@ -60,8 +60,6 @@ class BrewTask(object):
 
     @property
     def srcrpm(self):
-        self._get_task_info()
-
         if self._srcrpm:
             return self._srcrpm
 
