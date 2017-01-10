@@ -58,8 +58,8 @@ class CIBrewDispatcher(Module):
             raise libciError('file \'{}\' does not exist'.format(config))
 
         # read yaml configuration
-        stream = file(config, 'r')
-        self.config = yaml.load(stream)
+        with open(config, 'r') as stream:
+            self.config = yaml.load(stream)
         self.debug('config: {}'.format(self.config))
 
         # enabled packages
