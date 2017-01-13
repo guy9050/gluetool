@@ -401,6 +401,7 @@ class Ci(object):
         self.config = {
             'data_path': None,
             'debug': False,
+            'output': None,
             'info': True,
             'list': None,
             'module_path': None,
@@ -409,6 +410,8 @@ class Ci(object):
             'verbose': False,
             'version': False,
         }
+
+        self.output_file = None
 
         # load config and create module list
         self._load_config()
@@ -466,6 +469,8 @@ class Ci(object):
         # suppress it from help
         parser.add_argument('--module-path', action='append',
                             default=[], help=argparse.SUPPRESS)
+        parser.add_argument('-o', '--output',
+                            help='Output debug/verbose/info to given file')
         parser.add_argument('-q', '--quiet', action='store_true',
                             default=False, help='Silence info messages')
         parser.add_argument('-r', '--retries', default=0,
@@ -482,6 +487,11 @@ class Ci(object):
         for opt in list(self.config.keys()):
             value = getattr(parsed_args, opt.replace('-', '_'))
             self.config[opt] = value
+
+        # open output file if needed
+        if self.config['output']:
+            self.output_file = open(self.config['output'], 'w')
+
 
     def module_list(self):
         return sorted(list(self.modules.keys()))
@@ -540,19 +550,40 @@ class Ci(object):
         sys.stdout.write('\n')
 
     def debug(self, string):
-        if self.config['debug']:
-            sys.stderr.write('[D] [{}] {}\n'.format(
+        msg = '[D] [{}] {}\n'.format(
                 datetime.datetime.now().strftime('%X.%f'),
                 string,
-            ))
+              )
+
+        if self.config['debug']:
+            sys.stderr.write(msg)
+
+        if self.output_file:
+            self.output_file.write(msg)
 
     def verbose(self, string):
-        if self.config['verbose'] or self.config['debug']:
-            sys.stderr.write('[V] [{}] {}\n'.format(
+        msg = '[V] [{}] {}\n'.format(
                 datetime.datetime.now().strftime('%X.%f'),
                 string,
-            ))
+              )
+
+        if self.config['verbose'] or self.config['debug']:
+            sys.stderr.write(msg)
+
+        if self.output_file:
+            self.output_file.write(msg)
 
     def info(self, string):
+        msg = sys.stdout.write('[+] {}\n'.format(string))
+
         if not self.config['quiet']:
-            sys.stdout.write('[+] {}\n'.format(string))
+            sys.stdout.write(msg)
+
+        if self.output_file:
+            self.output_file.write(msg)
+
+    def __del__(self):
+        if self.output_file:
+            msg = 'closing output file \'{}\''.format(self.config['output'])
+            self.debug(msg)
+            self.output_file.close()
