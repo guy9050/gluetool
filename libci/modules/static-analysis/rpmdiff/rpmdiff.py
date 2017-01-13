@@ -93,6 +93,9 @@ This module schedules an RPMdiff comparison waits until it is finished.
     description = 'Run RPMdiff analysis or comparison'
 
     options = {
+        'blacklist': {
+            'help': 'A comma seaparted list of blacklisted package names',
+        },
         'id': {
             'help': 'Brew task id',
             'type': int,
@@ -184,12 +187,24 @@ This module schedules an RPMdiff comparison waits until it is finished.
     def execute(self):
         task_id = self.option('id')
         test_type = self.option('type')
+        blacklist = self.option('blacklist')
 
         # get a brew task instance
         self.brew_task = self.shared('brew_task', task_id)
         if not self.brew_task:
             raise libciError('no brew connection found')
+
+        # get target from the brewtask
         target = self.brew_task.target.target
+
+        # blacklist packages
+        if blacklist is not None:
+            self.verbose('blacklisted packages: {}'.format(blacklist))
+            if self.brew_task.name in blacklist.split(','):
+                msg = 'skipping blacklisted package'
+                msg += ' \'{}\''.format(self.brew_task.name)
+                self.info(msg)
+                return
 
         if test_type == 'analysis':
             msg = 'running {} for '.format(test_type)
