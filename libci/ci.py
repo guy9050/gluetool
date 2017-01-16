@@ -1,5 +1,6 @@
 import argparse
 import ast
+import atexit
 import ConfigParser
 import imp
 import os
@@ -10,6 +11,7 @@ import traceback
 from argparse import ArgumentParser
 from ConfigParser import NoOptionError, NoSectionError
 from os.path import abspath, expanduser, exists, dirname, join
+from functools import partial
 
 
 CONFIGS = ['/etc/citool', expanduser('~/.citool.d/citool')]
@@ -87,6 +89,12 @@ class Module(object):
 
         # initialize citool
         self.ci = ci
+
+        # initialize logging helpers
+        self.debug = partial(self._log, level = 'D')
+        self.verbose = partial(self._log, level = 'V')
+        self.info = partial(self._log)
+        self.warn = partial(self._log, level = 'W')
 
         # configuration parser
         self.config_parser = None
@@ -236,16 +244,18 @@ class Module(object):
     def run_module(self, module, args=[]):
         self.ci.run_module(module, args)
 
-    def debug(self, msg):
-        self.ci.debug('[%s] %s' % (self.name, msg))
+    def _log(self, msg, level = None):
+        """
+        Implements the actual output of logging messages. Prefixes each message
+        with module name, and passes it to parent's `_log` method.
 
-    def verbose(self, msg):
-        self.ci.verbose('[%s] %s' % (self.name, msg))
+        :param string level: If set, denotes debug level other than "info". 'D' as "debug",
+            'V' as "verbose", and "W" as "warning" are supported.
+        :param string msg: the actual message.
 
-    def info(self, msg):
-        if not self.ci.config['quiet']:
-            sys.stdout.write('[+ %s] %s\n' % (self.name, msg))
+        """
 
+        self.ci._log('[%s] %s' % (self.name, msg), level = level)
 
 class Ci(object):
     # configuration
@@ -411,6 +421,12 @@ class Ci(object):
             'version': False,
         }
 
+        # Initialize logging methods before douing anything else
+        self.debug = partial(self._log, level = 'D')
+        self.verbose = partial(self._log, level = 'V')
+        self.info = self._log
+        self.warn = partial(self._log, level = 'W')
+
         self.output_file = None
 
         # load config and create module list
@@ -491,6 +507,7 @@ class Ci(object):
         # open output file if needed
         if self.config['output']:
             self.output_file = open(self.config['output'], 'w')
+            atexit.register(self._close_output_file)
 
 
     def module_list(self):
@@ -549,41 +566,52 @@ class Ci(object):
                              ' '.join(module.values()[0])))
         sys.stdout.write('\n')
 
-    def debug(self, string):
-        msg = '[D] [{}] {}\n'.format(
-                datetime.datetime.now().strftime('%X.%f'),
-                string,
-              )
+    def _log(self, msg, level = None):
+        """
+        Implements the actual output of logging messages. Based on its level,
+        writes the message to proper stream, and adds a copy to output file
+        if it's opened.
 
-        if self.config['debug']:
+        :param string level: If set, denotes debug level other than "info". 'D' as "debug",
+            'V' as "verbose", and "W" as "warning" are supported.
+        :param string msg: the actual message.
+        """
+
+        msg = '[{0}] [{1}] {2}\n'.format(
+                '+' if level is None else level,
+                datetime.datetime.now().strftime('%X.%f'),
+                msg)
+
+        if level == 'D' and self.config['debug']:
             sys.stderr.write(msg)
 
-        if self.output_file:
-            self.output_file.write(msg)
-
-    def verbose(self, string):
-        msg = '[V] [{}] {}\n'.format(
-                datetime.datetime.now().strftime('%X.%f'),
-                string,
-              )
-
-        if self.config['verbose'] or self.config['debug']:
+        elif level == 'V' and (self.config['verbose'] or self.config['debug']):
             sys.stderr.write(msg)
 
-        if self.output_file:
-            self.output_file.write(msg)
+        elif level == 'W':
+            sys.stderr.write(msg)
 
-    def info(self, string):
-        msg = sys.stdout.write('[+] {}\n'.format(string))
-
-        if not self.config['quiet']:
+        elif level is None and not self.config['quiet']:
             sys.stdout.write(msg)
 
         if self.output_file:
             self.output_file.write(msg)
 
-    def __del__(self):
-        if self.output_file:
-            msg = 'closing output file \'{}\''.format(self.config['output'])
-            self.debug(msg)
-            self.output_file.close()
+    def _close_output_file(self):
+        """
+        If opened, close output file used for logging.
+
+        This method was registered with atexit.
+        """
+
+        if self.output_file is None:
+            return
+
+        self.debug('closing output file \'{}\''.format(self.config['output']))
+
+        # To make sure we have all buffered output written - close() does *not* guarantee
+        # flushing of internal buffer(s).
+        self.output_file.flush()
+        self.output_file.close()
+
+        self.output_file = None
