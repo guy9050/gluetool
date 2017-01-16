@@ -1,13 +1,17 @@
-from libci import Module
-from libci import libciError
+"""
+Configuration module providing various common configurations for citool.
+"""
+
 import os
 import tarfile
+
+from libci import Module, libciError
 
 
 class CIConfig(Module):
     """
-Configuration module provides various common configurations for citool.
-"""
+    Configuration module providing various common configurations for citool.
+    """
 
     name = 'config'
     description = 'Configure citool'
@@ -23,16 +27,18 @@ Configuration module provides various common configurations for citool.
 
         if not fname:
             try:
-                dc = os.listdir(self.data_path)
-                if not dc:
-                    msg = 'no configuration files found in '
-                    msg += '\'{}\''.format(self.data_path)
+                config_files = os.listdir(self.data_path)
+                if not config_files:
+                    self.info('no configuration files found in \'{0}\''.format(self.data_path))
+
                 else:
-                    msg = 'available configuration files:\n'
-                    msg += '\n'.join(dc)
+                    self.info('available configuration files:\n')
+                    for config_file in config_files:
+                        self.info('  ' + config_file)
+
             except TypeError:
-                    msg = 'no configuration files found'
-            self.info(msg)
+                self.info('no configuration files found')
+
             return
 
         # check if config file exists
@@ -48,4 +54,3 @@ Configuration module provides various common configurations for citool.
         tar.close()
 
         self.info('file \'{}\' extracted to \'{}\''.format(fname, tdir))
-

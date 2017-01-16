@@ -1,14 +1,16 @@
+import re
 import koji
 import libci
-import re
 from libci import libciError
 
 BREW_API_TOPURL = "http://download.eng.bos.redhat.com/brewroot"
 BREW_WEB_URL = 'https://brewweb.engineering.redhat.com/brew/'
 
+
 class BrewTask(object):
     """ Brew task class """
-    def __init__(self, brew_task_id, session):
+    def __init__(self, module, brew_task_id, session):
+        self._module = module
         self.task_id = brew_task_id
         self._task_info = None
         self.brew = session
@@ -46,15 +48,14 @@ class BrewTask(object):
 
     @property
     def latest(self):
-        builds = self.brew.listTagged(self.target.tag, None, True,
-                                       latest=2, package=self.name)
+        builds = self.brew.listTagged(self.target.tag, None, True, latest=2, package=self.name)
         if self.scratch:
             latest = builds[0]["nvr"] if builds else None
         else:
             latest = builds[1]["nvr"] if builds and len(builds) > 1 else None
 
         if not latest:
-            self.info('could not find latest released package from brew')
+            self._module.info('could not find latest released package from brew')
 
         return latest
 
@@ -180,7 +181,8 @@ class BrewTarget(object):
     def is_extras_target(target):
         return target.startswith("extras")
 
-class CIBrew(libci.Module,object):
+
+class CIBrew(libci.Module):
     """Provide connection to Brew via koji python module"""
 
     name = 'brew'
@@ -205,7 +207,7 @@ class CIBrew(libci.Module,object):
 
     def brew_task(self, task_id):
         """ return a BrewTask instance for given task_id """
-        return BrewTask(task_id, self.brew_instance)
+        return BrewTask(self, task_id, self.brew_instance)
 
     def execute(self):
         url = self.option('url')

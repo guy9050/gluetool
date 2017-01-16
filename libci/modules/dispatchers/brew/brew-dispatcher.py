@@ -24,9 +24,9 @@ class CIBrewDispatcher(Module):
         'name': {
             'help': 'Package name',
         },
-        #'list': {
+        # 'list': {
         #    'help': 'List dispatcher configuration',
-        #},
+        # },
         'dispatch-all': {
             'help': 'Dispatch all builds (default: false)',
             'action': 'store_true',
@@ -44,9 +44,9 @@ class CIBrewDispatcher(Module):
         'version': {
             'help': 'Package version',
         },
-        #'verify': {
+        # 'verify': {
         #    'help': 'Verify dispatcher configuration',
-        #},
+        # },
     }
     required_options = ['config']
 
@@ -83,8 +83,8 @@ class CIBrewDispatcher(Module):
         except (KeyError, TypeError):
             targets = self.default_targets
 
-        for t in targets:
-            if re.search(t, self.build['target']):
+        for target in targets:
+            if re.search(target, self.build['target']):
                 return True
         return False
 
@@ -130,7 +130,7 @@ class CIBrewDispatcher(Module):
                         args[i] = value
                     except KeyError:
                         msg = 'could not replace \'{}\''.format(arg)
-                        msg += ', not found among \'{}\''.self.build.keys()
+                        msg += ', not found among \'{}\''.format(','.join(self.build.keys()))
                         raise libciError('could not replace \'{}\''.format(arg))
 
             self.run_module(module, args)

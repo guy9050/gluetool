@@ -8,17 +8,14 @@ import sys
 import datetime
 import traceback
 
-from argparse import ArgumentParser
-from ConfigParser import NoOptionError, NoSectionError
-from os.path import abspath, expanduser, exists, dirname, join
 from functools import partial
 
 
-CONFIGS = ['/etc/citool', expanduser('~/.citool.d/citool')]
+CONFIGS = ['/etc/citool', os.path.expanduser('~/.citool.d/citool')]
 MODULE_CONFIG_PATHS = ['/etc/citool.d/config',
-                       expanduser('~/.citool.d/config')]
-MODULE_PATH = [dirname(abspath(__file__)) + '/modules']
-DATA_PATH = dirname(abspath(__file__)) + '/data'
+                       os.path.expanduser('~/.citool.d/config')]
+MODULE_PATH = [os.path.dirname(os.path.abspath(__file__)) + '/modules']
+DATA_PATH = os.path.dirname(os.path.abspath(__file__)) + '/data'
 
 
 class libciError(Exception):
@@ -55,8 +52,8 @@ class Module(object):
     #
     # static variables, same in all instances
     #
-    name = None        # default: group-module_name (without .py suffix)
-    description = None # short description, displayed in module list
+    name = None         # default: group-module_name (without .py suffix)
+    description = None  # short description, displayed in module list
 
     # The options variable defines additional module options
     # the required_options defines a list of required module options
@@ -91,10 +88,10 @@ class Module(object):
         self.ci = ci
 
         # initialize logging helpers
-        self.debug = partial(self._log, level = 'D')
-        self.verbose = partial(self._log, level = 'V')
-        self.info = partial(self._log)
-        self.warn = partial(self._log, level = 'W')
+        self.debug = partial(self.log, level='D')
+        self.verbose = partial(self.log, level='V')
+        self.info = partial(self.log)
+        self.warn = partial(self.log, level='W')
 
         # configuration parser
         self.config_parser = None
@@ -107,14 +104,16 @@ class Module(object):
         self._config = {}
 
         # initialize data path if exists, else it will be None
-        dpath = join(self.ci.get_config('data_path') or DATA_PATH, self.name)
-        self.data_path = dpath if exists(dpath) else None
+        dpath = os.path.join(self.ci.get_config('data_path') or DATA_PATH, self.name)
+        self.data_path = dpath if os.path.exists(dpath) else None
 
     def destroy(self):
+        # pylint: disable-msg=no-self-use
+
         """
-        here should go any code that needs to be run on exit.
-        like job cleanup etc.
+        Here should go any code that needs to be run on exit, like job cleanup etc.
         """
+
         return None
 
     def add_shared(self):
@@ -133,12 +132,15 @@ class Module(object):
         raise NotImplementedError
 
     def sanity(self):
-        """ Modules can define here additional checks before execution.
+        # pylint: disable-msg=no-self-use
+        """
+        In this method, modules can define additional checks before execution.
 
         Some examples:
         - Advanced checks on passed options
         - Check for additional requirements (tools, data, etc.)
         """
+
         return None
 
     def check_required_options(self):
@@ -178,9 +180,9 @@ class Module(object):
                     dmsg += ' from config'
                     self._config[opt] = value
                     self.debug(dmsg)
-                except NoOptionError:
+                except ConfigParser.NoOptionError:
                     pass
-                except NoSectionError:
+                except ConfigParser.NoSectionError:
                     pass
 
     def shared_functions_help(self):
@@ -199,7 +201,7 @@ class Module(object):
         parse options from command line
         """
         # add module's parsed options
-        parser = ArgumentParser(
+        parser = argparse.ArgumentParser(
             usage='Usage: %s [options]' % self.name,
             description=self.__doc__,
             epilog=self.shared_functions_help(),
@@ -231,10 +233,11 @@ class Module(object):
                 except AttributeError:
                     pass
 
-    def init_options(self, *args, **kwargs):
+    def init_options(self, **kwargs):
         """
         add options to the module manually
         """
+        # TODO: check self._config['value'] - shouldn't there be key instead?
         for key, value in kwargs.iteritems():
             try:
                 self._config['value'] = value
@@ -242,12 +245,13 @@ class Module(object):
                 raise KeyError('option %s not recognized by this module')
 
     def run_module(self, module, args=[]):
+        # FIXME: args=None, args = args or [], unless it's really intended
         self.ci.run_module(module, args)
 
-    def _log(self, msg, level = None):
+    def log(self, msg, level=None):
         """
         Implements the actual output of logging messages. Prefixes each message
-        with module name, and passes it to parent's `_log` method.
+        with module name, and passes it to parent's `log` method.
 
         :param string level: If set, denotes debug level other than "info". 'D' as "debug",
             'V' as "verbose", and "W" as "warning" are supported.
@@ -255,7 +259,8 @@ class Module(object):
 
         """
 
-        self.ci._log('[%s] %s' % (self.name, msg), level = level)
+        self.ci.log('[%s] %s' % (self.name, msg), level=level)
+
 
 class Ci(object):
     # configuration
@@ -313,11 +318,11 @@ class Ci(object):
 
         # print 'processing file: {}'.format(mfile)
         with open(mfile) as f:
-            t = ast.parse(f.read())
-            # print 'body: {}'.format(t.__dict__['body'])
+            node = ast.parse(f.read())
+            # print 'body: {}'.format(node.__dict__['body'])
 
             # check for libci import
-            for item in t.__dict__['body']:
+            for item in node.__dict__['body']:
                 # print 'processing item: {}'.format(item)
                 if item.__class__.__name__ == 'Import':
                     if item.names[0].name == 'libci':
@@ -330,7 +335,7 @@ class Ci(object):
                         break
 
             # check for libci.Module class definition
-            for item in t.__dict__['body']:
+            for item in node.__dict__['body']:
                 # print 'processing item: {}'.format(item)
                 if item.__class__.__name__ == 'ClassDef':
                     for base in item.bases:
@@ -355,13 +360,13 @@ class Ci(object):
 
     def _load_module_path(self, ppath):
         """ Load modules from modules directory """
-        for root, dirs, files in os.walk(ppath):
-            for file in sorted(files):
-                if not file.endswith('.py'):
+        for root, _, files in os.walk(ppath):
+            for filepath in sorted(files):
+                if not filepath.endswith('.py'):
                     continue
                 group = root.replace(ppath + '/', '')
-                mname, _ = os.path.splitext(file)
-                mfile = os.path.join(root, file)
+                mname, _ = os.path.splitext(filepath)
+                mfile = os.path.join(root, filepath)
                 # check if the file contains a valid libci module
                 # note that various errors can happen here, just ignore
                 # them (like permission denied, syntax error, ...)
@@ -379,10 +384,10 @@ class Ci(object):
                                              (group, mname),
                                              mfile)
                 except Exception as e:
-                    self.info('ignoring module \'%s\' ' % mname +
-                                'from \'%s\' group' % group +
-                                ' (error: %s)' % str(e))
+                    self.info('ignoring module \'{0}\' from \'{1}\' group (error: {2})'.format(
+                        mname, group, str(e)))
                     continue
+
                 for name in dir(module):
                     cls = getattr(module, name)
                     try:
@@ -394,7 +399,7 @@ class Ci(object):
                                 # pprint.pprint(self.modules)
                                 msg = '\'%s\' is a duplicate' % cls.name
                                 msg += ' module name \'%s/' % group
-                                msg += '%s\'' % file
+                                msg += '%s\'' % filepath
                                 raise libciError(msg)
                             # add to modules dictionary
                             self.modules[cls.name] = {
@@ -422,10 +427,10 @@ class Ci(object):
         }
 
         # Initialize logging methods before douing anything else
-        self.debug = partial(self._log, level = 'D')
-        self.verbose = partial(self._log, level = 'V')
-        self.info = self._log
-        self.warn = partial(self._log, level = 'W')
+        self.debug = partial(self.log, level='D')
+        self.verbose = partial(self.log, level='V')
+        self.info = self.log
+        self.warn = partial(self.log, level='W')
 
         self.output_file = None
 
@@ -470,9 +475,9 @@ class Ci(object):
     def parse_args(self, args):
         usage = '%(prog)s [opts] module1 [opts] [args] module2 ...'
 
-        parser = ArgumentParser(usage=usage,
-                                epilog=self.module_group_list_usage(),
-                                formatter_class=argparse.RawTextHelpFormatter)
+        parser = argparse.ArgumentParser(usage=usage,
+                                         epilog=self.module_group_list_usage(),
+                                         formatter_class=argparse.RawTextHelpFormatter)
         parser.add_argument('--data-path', help='Specify data path')
         parser.add_argument('-d', '--debug', action='store_true',
                             default=False, help='Debug output')
@@ -508,7 +513,6 @@ class Ci(object):
         if self.config['output']:
             self.output_file = open(self.config['output'], 'w')
             atexit.register(self._close_output_file)
-
 
     def module_list(self):
         return sorted(list(self.modules.keys()))
@@ -562,11 +566,11 @@ class Ci(object):
         self.info('command-line info')
         sys.stdout.write('{0} {1}'.format(sys.argv[0], ' '.join(ci_args)))
         for module in modules_args:
-            sys.stdout.write(' \\\n  {0} {1}'.format(module.keys()[0],
-                             ' '.join(module.values()[0])))
+            sys.stdout.write(' \\\n  {0} {1}'.format(
+                module.keys()[0], ' '.join(module.values()[0])))
         sys.stdout.write('\n')
 
-    def _log(self, msg, level = None):
+    def log(self, msg, level=None):
         """
         Implements the actual output of logging messages. Based on its level,
         writes the message to proper stream, and adds a copy to output file
@@ -578,9 +582,9 @@ class Ci(object):
         """
 
         msg = '[{0}] [{1}] {2}\n'.format(
-                '+' if level is None else level,
-                datetime.datetime.now().strftime('%X.%f'),
-                msg)
+            '+' if level is None else level,
+            datetime.datetime.now().strftime('%X.%f'),
+            msg)
 
         if level == 'D' and self.config['debug']:
             sys.stderr.write(msg)

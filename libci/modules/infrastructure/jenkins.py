@@ -1,17 +1,17 @@
 import ConfigParser
-import libci
 import os
 
 from jenkinsapi.jenkins import Jenkins
 # from libci import Module
-from libci import libciError
 from requests.exceptions import RequestException
 
+import libci
+
 JJB_CONFIG = os.path.expanduser('~/.config/jenkins_jobs/jenkins_jobs.ini')
-JJB_GLOBAL_CONFIG= os.path.expanduser('/etc/jenkins_jobs/jenkins_jobs.ini')
+JJB_GLOBAL_CONFIG = os.path.expanduser('/etc/jenkins_jobs/jenkins_jobs.ini')
 
 
-class CIJenkins(libci.Module,object):
+class CIJenkins(libci.Module):
     """This modules provides connection to a jenkins instance via jenkinsapi
 module:
     https://jenkinsapi.readthedocs.io/en/latest/
@@ -93,7 +93,7 @@ You can use the option '--create-jjb-config' to force creation of \'{0}\' file.
             self.debug('Connection error: {}'.format(e))
             error = 'could not connect to jenkins \'{}\''.format(url)
             error += ': {}'.format(str(e))
-            raise libciError(error)
+            raise libci.libciError(error)
 
     def execute(self):
         create_config = self.option('create-jjb-config')
