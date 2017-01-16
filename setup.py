@@ -7,6 +7,7 @@ from setuptools import setup
 description = 'CI Tool - Continuous Integration Swiss Army Knife'
 
 setup_requires = [
+    'pytest',
     'pytest-runner'
 ]
 
@@ -15,7 +16,6 @@ install_requires = [
 ]
 
 tests_require = [
-    'pytest',
     'pytest-pylint',
     'pytest-flake8'
 ]
