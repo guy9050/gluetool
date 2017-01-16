@@ -1,6 +1,6 @@
 before_script:
     - apt-get update -qy
-    - apt-get install python-pytest
+    - apt-get install -qy python-pytest
 
 tests:
   script:
