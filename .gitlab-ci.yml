@@ -1,5 +1,4 @@
 before_script:
-  - yum -y install python python-virtualenv
   - virtualenv citool
   - source citool/bin/activate
 
