@@ -17,7 +17,8 @@ install_requires = [
 
 tests_require = [
     'pytest-pylint',
-    'pytest-flake8'
+    'pytest-flake8',
+    'pytest'
 ]
 
 # Fetch version from git tags, and write to version.py.
