@@ -1,7 +1,3 @@
-before_script:
-  - virtualenv citool
-  - source citool/bin/activate
-
 tests:
   script:
     - python setup.py test
