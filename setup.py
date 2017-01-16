@@ -6,6 +6,20 @@ from setuptools import setup
 
 description = 'CI Tool - Continuous Integration Swiss Army Knife'
 
+setup_requires = [
+    'pytest-runner'
+]
+
+install_requires = [
+    'jenkinsapi'
+]
+
+tests_require = [
+    'pytest',
+    'pytest-pylint',
+    'pytest-flake8'
+]
+
 # Fetch version from git tags, and write to version.py.
 # Also, when git is not available (PyPi package), use stored version.py.
 version_py = os.path.join(os.path.dirname(__file__), 'libci/version.py')
@@ -41,7 +55,9 @@ if __name__ == '__main__':
     setup(name='citool',
           # we write only the version here, release should be specified only for rpm
           version='{0}'.format(version),
-          install_requires=['jenkinsapi'],
+          setup_requires = setup_requires,
+          install_requires=install_requires,
+          tests_require = tests_require,
           packages=['libci'],
           include_package_data=True,
           scripts=['bin/citool'],
