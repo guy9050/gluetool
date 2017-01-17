@@ -166,7 +166,7 @@ class Module(object):
             self.debug('Parsing {}'.format(paths))
             self.config_parser.read(paths)
 
-            for opt in list(self.options.keys()):
+            for opt in self.options:
                 try:
                     value = self.config_parser.get('default', opt)
                     dmsg = 'Added option \'%s\' value \'%s\'' % (opt, value)
@@ -245,7 +245,7 @@ class Module(object):
             epilog=self.shared_functions_help(),
             formatter_class=argparse.RawTextHelpFormatter)
         if self.options:
-            for opt in sorted(list(self.options.keys())):
+            for opt in sorted(self.options):
                 if 'short' in self.options[opt]:
                     short = self.options[opt].pop('short')
                     parser.add_argument('-%s' % short, '--%s' % opt,
@@ -259,7 +259,7 @@ class Module(object):
 
         # add the parsed args to options
         if self.options:
-            for opt in list(self.options.keys()):
+            for opt in self.options:
                 try:
                     value = getattr(options, opt.replace('-', '_'))
                     if value is None and opt in self._config:
@@ -321,7 +321,7 @@ class Ci(object):
         self.config_parser = ConfigParser.ConfigParser()
         self.config_parser.read(CONFIGS)
         if self.config_parser.has_section('default'):
-            for item in list(self.config.keys()):
+            for item in self.config:
                 if self.config_parser.has_option('default', item):
                     self.config[item] = self.config_parser.get('default', item)
 
@@ -534,7 +534,7 @@ class Ci(object):
         parsed_args = parser.parse_args(args)
 
         # set the config dictionary from the parsed arguments
-        for opt in list(self.config.keys()):
+        for opt in self.config:
             value = getattr(parsed_args, opt.replace('-', '_'))
             self.config[opt] = value
 
@@ -544,7 +544,7 @@ class Ci(object):
             atexit.register(self._close_output_file)
 
     def module_list(self):
-        return sorted(list(self.modules.keys()))
+        return sorted(self.modules)
 
     def module_list_usage(self, groups):
         """ Returns a string with modules description """
@@ -557,7 +557,7 @@ class Ci(object):
         if not plist:
             ret += '\n  -- no modules found --'
         else:
-            for group in sorted(list(plist.keys())):
+            for group in sorted(plist):
                 # skip groups that are not in the list
                 # note that groups is [] if all groups should be shown
                 if groups and group not in groups:
