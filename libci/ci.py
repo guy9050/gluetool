@@ -185,13 +185,58 @@ class Module(object):
                 except ConfigParser.NoSectionError:
                     pass
 
+    def _trim_docstring(self, docstring):
+        """
+        Quoting `PEP 257 <https://www.python.org/dev/peps/pep-0257/#handling-docstring-indentation>`:
+
+        *Docstring processing tools will strip a uniform amount of indentation from
+        the second and further lines of the docstring, equal to the minimum indentation
+        of all non-blank lines after the first line. Any indentation in the first line
+        of the docstring (i.e., up to the first newline) is insignificant and removed.
+        Relative indentation of later lines in the docstring is retained. Blank lines
+        should be removed from the beginning and end of the docstring.*
+
+        Code bellow follows the quote.
+
+        This method does exactly that, therefore we can keep properly aligned docstrings
+        while still use them for reasonably formatted help texts.
+
+        :param str docstring: raw docstring.
+        :rtype: str
+        :returns: docstring with lines stripped of leading whitespace.
+        """
+
+        if not docstring:
+            return ''
+        # Convert tabs to spaces (following the normal Python rules)
+        # and split into a list of lines:
+        lines = docstring.expandtabs().splitlines()
+        # Determine minimum indentation (first line doesn't count):
+        indent = sys.maxint
+        for line in lines[1:]:
+            stripped = line.lstrip()
+            if stripped:
+                indent = min(indent, len(line) - len(stripped))
+        # Remove indentation (first line is special):
+        trimmed = [lines[0].strip()]
+        if indent < sys.maxint:
+            for line in lines[1:]:
+                trimmed.append(line[indent:].rstrip())
+        # Strip off trailing and leading blank lines:
+        while trimmed and not trimmed[-1]:
+            trimmed.pop()
+        while trimmed and not trimmed[0]:
+            trimmed.pop(0)
+        # Return a single string:
+        return '\n'.join(trimmed)
+
     def shared_functions_help(self):
         if not self.shared_functions:
             return ''
         docs = "\nshared functions:\n"
         for func in self.shared_functions:
             if getattr(self, func).__doc__:
-                docs += '  {}\t{}\n'.format(func, getattr(self, func).__doc__)
+                docs += '  {}\t{}\n'.format(func, self._trim_docstring(getattr(self, func).__doc__))
             else:
                 docs += '  {}\tno documentation added :(\n'.format(func)
         return docs
@@ -203,7 +248,7 @@ class Module(object):
         # add module's parsed options
         parser = argparse.ArgumentParser(
             usage='Usage: %s [options]' % self.name,
-            description=self.__doc__,
+            description=self._trim_docstring(self.__doc__),
             epilog=self.shared_functions_help(),
             formatter_class=argparse.RawTextHelpFormatter)
         if self.options:
