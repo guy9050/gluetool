@@ -418,6 +418,7 @@ class Ci(object):
                 try:
                     if not self._check_module_file(mfile):
                         continue
+                # pylint: disable=broad-except
                 except Exception as e:
                     self.info('ignoring module \'%s\' ' % mname +
                               'from \'%s\' group' % group +
@@ -428,6 +429,7 @@ class Ci(object):
                     module = imp.load_source('libci.ci.%s-%s' %
                                              (group, mname),
                                              mfile)
+                # pylint: disable=broad-except
                 except Exception as e:
                     self.info('ignoring module \'{0}\' from \'{1}\' group (error: {2})'.format(
                         mname, group, str(e)))
@@ -487,6 +489,7 @@ class Ci(object):
         try:
             module.debug('destroying myself')
             module.destroy()
+        # pylint: disable=broad-except
         except Exception as e:
             exstr = 'error in destroy function: %s\n' % str(e)
             sys.stderr.write(exstr)

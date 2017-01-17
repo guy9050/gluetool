@@ -116,6 +116,7 @@ def main():
 
     except (SystemExit, KeyboardInterrupt) as e:
         raise e
+    # pylint: disable=broad-except
     except Exception as e:
         if ci:
             if ci.get_config('verbose') or ci.get_config('debug'):
