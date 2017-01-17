@@ -1,7 +1,7 @@
 import os
 import subprocess
 from libci import Module
-from libci import libciError
+from libci import CiError
 from libci import utils
 from jenkinsapi.custom_exceptions import UnknownJob
 
@@ -59,12 +59,12 @@ This module requires an available Jenkins connection - via the jenkins module.
             self.job_name = ANL_JOB_NAME
             self.yaml = os.path.join(self.data_path, ANL_JJB_YAML)
         if not os.path.exists(self.yaml):
-            raise libciError('job yaml not found in \'{}\''.format(self.yaml))
+            raise CiError('job yaml not found in \'{}\''.format(self.yaml))
 
         # check for available id
         self.id = self.option('id') or os.environ['id']
         if not self.id:
-            raise libciError('id not found in environment')
+            raise CiError('id not found in environment')
 
     def update_job(self):
         out = subprocess.check_output(['jenkins-jobs',
@@ -80,7 +80,7 @@ This module requires an available Jenkins connection - via the jenkins module.
     def execute(self):
         self.jenkins = self.shared('jenkins')
         if self.jenkins is None:
-            raise libciError('no jenkins connection found')
+            raise CiError('no jenkins connection found')
 
         try:
             self.jenkins[self.job_name]

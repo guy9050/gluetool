@@ -5,7 +5,7 @@ Configuration module providing various common configurations for citool.
 import os
 import tarfile
 
-from libci import Module, libciError
+from libci import Module, CiError
 
 
 class CIConfig(Module):
@@ -45,7 +45,7 @@ class CIConfig(Module):
         fpath = os.path.join(self.data_path, fname)
         if not os.path.exists(fpath):
             msg = 'configuration file \'{}\' not found'.format(fpath)
-            raise libciError(msg)
+            raise CiError(msg)
 
         # extract configuration
         tdir = os.path.expanduser('~')

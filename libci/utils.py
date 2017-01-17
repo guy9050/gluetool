@@ -3,7 +3,7 @@ Various helpers.
 """
 
 import subprocess
-from libci import libciError
+from libci import CiError
 
 try:
     from subprocess import DEVNULL
@@ -20,4 +20,4 @@ def check_for_commands(cmds):
         p.communicate()
         if retcode != 0:
             msg = '\'{}\' command not found on the system'.format(cmd)
-            raise libciError(msg)
+            raise CiError(msg)

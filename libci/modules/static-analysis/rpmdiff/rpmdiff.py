@@ -5,7 +5,7 @@ import kerberos
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from libci import Module
-from libci import libciError
+from libci import CiError
 from libci import utils
 
 RPMDIFF_URL = "https://rpmdiff.engineering.redhat.com"
@@ -47,7 +47,7 @@ class RPMDiffTask(object):
         if request.status_code != 200:
             msg = "Http status code {} ".format(request.status_code)
             msg += "in 'rpmdiff' execution"
-            raise libciError("Http status code %s in 'rpmdiff' execution" % request.status_code)
+            raise CiError("Http status code %s in 'rpmdiff' execution" % request.status_code)
         self._json_data = request.json()
 
     def _json(self):
@@ -120,7 +120,7 @@ This module schedules an RPMdiff comparison waits until it is finished.
         match = re.search(r"u'run_id': (\d+)", string)
         if not match:
             msg = "could not find rpmdiff run id in rpmdiff-remote output"
-            raise libciError(msg)
+            raise CiError(msg)
         return match.group(1)
 
     @staticmethod
@@ -129,7 +129,7 @@ This module schedules an RPMdiff comparison waits until it is finished.
         match = re.search(r"u'web_url': u'([^'']*)", string)
         if not match:
             msg = "could not find rpmdiff web url in rpmdiff-remote output"
-            raise libciError(msg)
+            raise CiError(msg)
         return match.group(1)
 
     def _wait_until_finished(self, task_id):
@@ -139,7 +139,7 @@ This module schedules an RPMdiff comparison waits until it is finished.
         while not task.finished:
             task = RPMDiffTask(task_id)
             if (time.time() - start_time) > self.max_timeout:
-                raise libciError("Timeout of 'rpmdiff' execution")
+                raise CiError("Timeout of 'rpmdiff' execution")
             time.sleep(self.check_interval)
 
     def _comparison_command(self, nvr_baseline):
@@ -167,7 +167,7 @@ This module schedules an RPMdiff comparison waits until it is finished.
         self.debug("stderr: {}".format(p_err or "no output"))
         if p_status > 0:
             msg = "Failure during 'rpmdiff' command execution: {}".format(p_err)
-            raise libciError(msg)
+            raise CiError(msg)
         task_id = self._parse_task_id(p_out, self.brew_task.scratch)
         self.info("web url: {}".format(self._parse_web_url(p_out)))
         if wait_until_finished:
@@ -192,7 +192,7 @@ This module schedules an RPMdiff comparison waits until it is finished.
         # get a brew task instance
         self.brew_task = self.shared('brew_task', task_id)
         if not self.brew_task:
-            raise libciError('no brew connection found')
+            raise CiError('no brew connection found')
 
         # get target from the brewtask
         target = self.brew_task.target.target
@@ -217,7 +217,7 @@ This module schedules an RPMdiff comparison waits until it is finished.
         else:
             latest = self.brew_task.latest
             if not latest:
-                raise libciError('could not find baseline for this build')
+                raise CiError('could not find baseline for this build')
             msg = 'running {} for '.format(test_type)
             if self.brew_task.scratch is True:
                 msg += 'scratch '

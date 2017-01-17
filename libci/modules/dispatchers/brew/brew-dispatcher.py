@@ -3,7 +3,7 @@ import re
 import yaml
 
 from libci import Module
-from libci import libciError
+from libci import CiError
 
 
 class CIBrewDispatcher(Module):
@@ -55,7 +55,7 @@ class CIBrewDispatcher(Module):
 
         # check if configuration exists
         if not os.path.exists(config):
-            raise libciError('file \'{}\' does not exist'.format(config))
+            raise CiError('file \'{}\' does not exist'.format(config))
 
         # read yaml configuration
         with open(config, 'r') as stream:
@@ -108,7 +108,7 @@ class CIBrewDispatcher(Module):
                 if not self.option(option):
                     msg = 'Required option \'{}\' not found'.format(option)
                     msg += ' in the environment or command line'
-                    raise libciError(msg)
+                    raise CiError(msg)
                 self.build[option] = self.option(option)
 
     def dispatch_tests(self):
@@ -131,7 +131,7 @@ class CIBrewDispatcher(Module):
                     except KeyError:
                         msg = 'could not replace \'{}\''.format(arg)
                         msg += ', not found among \'{}\''.format(','.join(self.build.keys()))
-                        raise libciError('could not replace \'{}\''.format(arg))
+                        raise CiError('could not replace \'{}\''.format(arg))
 
             self.run_module(module, args)
 

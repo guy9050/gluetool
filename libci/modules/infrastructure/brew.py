@@ -1,7 +1,7 @@
 import re
 import koji
 import libci
-from libci import libciError
+from libci import CiError
 
 BREW_API_TOPURL = "http://download.eng.bos.redhat.com/brewroot"
 BREW_WEB_URL = 'https://brewweb.engineering.redhat.com/brew/'
@@ -21,7 +21,7 @@ class BrewTask(object):
         if self._task_info is None:
             self._task_info = self.brew.getTaskInfo(self.task_id, request=True)
             if not self._task_info:
-                raise libciError("failed to obtain information about Brew task: %s" % self.task_id)
+                raise CiError("failed to obtain information about Brew task: %s" % self.task_id)
 
         return self._task_info
 
@@ -67,7 +67,7 @@ class BrewTask(object):
         base_url = "{0}/work".format(BREW_API_TOPURL)
 
         if self.task_info['state'] != koji.TASK_STATES["CLOSED"]:
-            raise libciError("Brew task [%s] is not a successfully completed task" % self.task_id)
+            raise CiError("Brew task [%s] is not a successfully completed task" % self.task_id)
 
         # For standard (non-scratch) builds, we may fetch an associated build and dig info from it
         builds = self.brew.listBuilds(taskID=self.task_id)
@@ -84,7 +84,7 @@ class BrewTask(object):
         elif self.task_info['method'] == 'buildArch':
             tasks = [self.task_info]
         else:
-            raise libciError('brew task [%i] is not a build or buildArch task' % self.task_id)
+            raise CiError('brew task [%i] is not a build or buildArch task' % self.task_id)
 
         # Gather list of files for each (sub-)task. We'll end up with this list:
         #  [(task1, file1), (task1, file2), ..., (taskN, fileM)]
@@ -96,7 +96,7 @@ class BrewTask(object):
             msg = "no artifacts found for the task [{}]".format(self.task_id)
             msg += ", builds already gone for scratch build?"
 
-            raise libciError(msg)
+            raise CiError(msg)
 
         self._srcrpm = None
 
@@ -108,7 +108,7 @@ class BrewTask(object):
             self._srcrpm = "/".join([base_url, base_path, filename])
             break
         else:
-            raise libciError("Source RPM not found in Brew task [%s]." % self.task_id)
+            raise CiError("Source RPM not found in Brew task [%s]." % self.task_id)
 
         return self._srcrpm
 
@@ -157,7 +157,7 @@ class BrewTarget(object):
         else:
             print "ERROR: rhscl_ver() is only for RHSCL targets"
             msg = "Called method BrewTarget.rhscl_ver() is only for rhscl targets. Run on target %s" % (self.target)
-            raise libciError(msg)
+            raise CiError(msg)
 
     def dts_ver(self):
         if self.is_dts():
@@ -165,7 +165,7 @@ class BrewTarget(object):
         else:
             print "ERROR: dts_ver() is only for DTS targets"
             msg = "Called method BrewTarget.dts_ver() is only for dts targets. Run on target %s" % (self.target)
-            raise libciError(msg)
+            raise CiError(msg)
 
     def collection(self):
         if self.is_rhscl():
@@ -175,7 +175,7 @@ class BrewTarget(object):
         else:
             print "ERROR: collection() is only for RHSCL"
             msg = "Called method BrewTarget.collection() is only for rhscl targets. Run on target %s" % (self.target)
-            raise libciError(msg)
+            raise CiError(msg)
 
     @staticmethod
     def is_extras_target(target):

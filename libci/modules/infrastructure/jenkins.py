@@ -93,7 +93,7 @@ You can use the option '--create-jjb-config' to force creation of \'{0}\' file.
             self.debug('Connection error: {}'.format(e))
             error = 'could not connect to jenkins \'{}\''.format(url)
             error += ': {}'.format(str(e))
-            raise libci.libciError(error)
+            raise libci.CiError(error)
 
     def execute(self):
         create_config = self.option('create-jjb-config')

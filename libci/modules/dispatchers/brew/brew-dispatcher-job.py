@@ -1,7 +1,7 @@
 import os
 import subprocess
 from libci import Module
-from libci import libciError
+from libci import CiError
 from libci import utils
 
 # Jenkins Job Builder YAML
@@ -37,12 +37,12 @@ This module requires an available Jenkins connection via 'jenkins' module.
         # check if jjb yaml exists
         self.yaml = os.path.join(self.data_path, JJB_YAML)
         if not os.path.exists(self.yaml):
-            raise libciError('job yaml not found in \'{}\''.format(self.yaml))
+            raise CiError('job yaml not found in \'{}\''.format(self.yaml))
 
     def execute(self):
         jenkins = self.shared('jenkins')
         if jenkins is None:
-            raise libciError('no jenkins connection found')
+            raise CiError('no jenkins connection found')
 
         try:
             out = subprocess.check_output(['jenkins-jobs',
@@ -51,7 +51,7 @@ This module requires an available Jenkins connection via 'jenkins' module.
                                           stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             msg = 'failed to run jenkins-jobs\n' + e.output
-            raise libciError(msg)
+            raise CiError(msg)
         msg = 'created/updated JJB jobs from \'{}\''.format(self.data_path)
         self.info(msg)
         self.debug(out)
