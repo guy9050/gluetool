@@ -1,8 +1,8 @@
-import kerberos
 import re
-import requests
 import subprocess
 import time
+import kerberos
+import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from libci import Module
 from libci import libciError

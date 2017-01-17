@@ -1,3 +1,7 @@
+"""
+Various helpers.
+"""
+
 import subprocess
 from libci import libciError
 

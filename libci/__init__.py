@@ -2,7 +2,8 @@ from .ci import Ci
 from .ci import libciError
 from .ci import libciRetryError
 from .ci import Module
-import utils
+from .ci import retry
+from . import utils
 
 try:
     from .version import __version__

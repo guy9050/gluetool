@@ -1,0 +1,10 @@
+[BASIC]
+max-branches=15
+max-attributes=10
+good-names=_,e,f,i,p,ci
+defining-attr-methods=__init__,sanity
+max-line-length=120
+
+[MESSAGES CONTROL]
+# Re-enable these ASAP
+disable=missing-docstring
