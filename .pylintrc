@@ -4,6 +4,7 @@ max-attributes=10
 good-names=_,e,f,i,p,ci
 defining-attr-methods=__init__,sanity
 max-line-length=120
+module-rgx = (([a-z_][a-z0-9_-]*)|([A-Z][a-zA-Z0-9-]+))$
 
 [MESSAGES CONTROL]
 # Re-enable these ASAP
