@@ -46,6 +46,7 @@ This module requires an available Jenkins connection - via the jenkins module.
         }
     }
     required_options = ['type']
+    jenkins = None
 
     def sanity(self):
         # check for jjb
@@ -62,8 +63,8 @@ This module requires an available Jenkins connection - via the jenkins module.
             raise CiError('job yaml not found in \'{}\''.format(self.yaml))
 
         # check for available id
-        self.id = self.option('id') or os.environ['id']
-        if not self.id:
+        self.tid = self.option('id') or os.environ['id']
+        if not self.tid:
             raise CiError('id not found in environment')
 
     def update_job(self):
@@ -72,7 +73,6 @@ This module requires an available Jenkins connection - via the jenkins module.
                                        'update',
                                        self.yaml],
                                       stderr=subprocess.STDOUT)
-        # TODO parse JJB output and inform about the update
         self.debug(out)
         # reconnect to jenkins
         self.jenkins = self.shared('jenkins', reconnect=True)
@@ -87,10 +87,10 @@ This module requires an available Jenkins connection - via the jenkins module.
         except UnknownJob:
             self.update_job()
 
-        self.jenkins[self.job_name].invoke(self.id,
+        self.jenkins[self.job_name].invoke(self.tid,
                                            build_params={
-                                               'id': self.id
+                                               'id': self.tid
                                            })
         msg = 'invoked job \'{}\' with build params '.format(self.job_name)
-        msg += '\'id={}\''.format(self.id)
+        msg += '\'id={}\''.format(self.tid)
         self.info(msg)
