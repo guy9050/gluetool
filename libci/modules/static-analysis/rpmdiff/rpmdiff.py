@@ -115,8 +115,8 @@ This module schedules an RPMdiff comparison waits until it is finished.
         utils.check_for_commands(REQUIRED_CMDS)
 
     @staticmethod
-    def _parse_task_id(string, is_scratch):
-        # TODO parse JSON once BZ#1405962 is fixed
+    def _parse_task_id(string):
+        # parse JSON once BZ#1405962 is fixed
         match = re.search(r"u'run_id': (\d+)", string)
         if not match:
             msg = "could not find rpmdiff run id in rpmdiff-remote output"
@@ -125,7 +125,7 @@ This module schedules an RPMdiff comparison waits until it is finished.
 
     @staticmethod
     def _parse_web_url(string):
-        # TODO parse JSON once BZ#1405962 is fixed
+        # parse JSON once BZ#1405962 is fixed
         match = re.search(r"u'web_url': u'([^'']*)", string)
         if not match:
             msg = "could not find rpmdiff web url in rpmdiff-remote output"
@@ -168,7 +168,7 @@ This module schedules an RPMdiff comparison waits until it is finished.
         if p_status > 0:
             msg = "Failure during 'rpmdiff' command execution: {}".format(p_err)
             raise CiError(msg)
-        task_id = self._parse_task_id(p_out, self.brew_task.scratch)
+        task_id = self._parse_task_id(p_out)
         self.info("web url: {}".format(self._parse_web_url(p_out)))
         if wait_until_finished:
             self._wait_until_finished(task_id)
