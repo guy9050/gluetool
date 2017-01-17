@@ -9,3 +9,9 @@ module-rgx = (([a-z_][a-z0-9_-]*)|([A-Z][a-zA-Z0-9-]+))$
 [MESSAGES CONTROL]
 # Re-enable these ASAP
 disable=missing-docstring
+
+[TYPECHECK]
+# ignore kerberos module
+# it shows issues like
+# Module 'kerberos' has no 'authGSSClientInit' member (no-member)
+ignored-modules = kerberos
