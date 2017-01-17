@@ -1,6 +1,8 @@
 before_script:
     - apt-get update -qy
     - apt-get install -qy python-pytest
+    - git clone https://pagure.io/koji.git ~/koji
+    - cd ~/koji/koji && make install
 
 tests:
   script:
