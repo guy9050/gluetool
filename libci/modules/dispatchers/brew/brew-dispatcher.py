@@ -142,8 +142,7 @@ class CIBrewDispatcher(Module):
             self.info('package \'{}\' not enabled'.format(self.build['name']))
             return
 
-        if dispatch_all or self.check_target(self.build['name'],
-                                             self.build['target']):
+        if dispatch_all or self.check_target():
             self.dispatch_tests()
         else:
             msg = 'package \'{}\' not enabled for '.format(self.build['name'])
