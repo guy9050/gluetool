@@ -1,6 +1,5 @@
 before_script:
-    - apt-get update -qy
-    - apt-get install -qy python-pytest
+    - yum -y install git make python-setuptools gcc python-devel krb5-devel
     - git clone https://pagure.io/koji.git ~/koji
     - (cd ~/koji/koji && make install)
 
