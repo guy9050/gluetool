@@ -18,9 +18,9 @@ SETUP_REQUIRES = [
 ]
 
 INSTALL_REQUIRES = [
+    'kerberos',
     'jenkinsapi',
-    'PyYAML',
-    'kerberos'
+    'PyYAML'
 ]
 
 TESTS_REQUIRE = [
