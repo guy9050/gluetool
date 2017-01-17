@@ -18,7 +18,9 @@ SETUP_REQUIRES = [
 ]
 
 INSTALL_REQUIRES = [
-    'jenkinsapi'
+    'jenkinsapi',
+    'PyYAML',
+    'python-krbV'
 ]
 
 TESTS_REQUIRE = [
