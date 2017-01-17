@@ -58,12 +58,6 @@ class Module(object):
     # The options variable defines additional module options
     # the required_options defines a list of required module options
     #
-    # Calling the Module.add_options function the options defined
-    # here will be added to the passed parser group.
-    #
-    # By calling Module.init_options you can add options to the
-    # module manually
-    #
     # 'option_name' defines the long option name (i.e. --option_name')
     # {
     #    'option_name' : {
@@ -100,7 +94,6 @@ class Module(object):
         # Here are stored configuration values passed via (in this order)
         # a) configuration file
         # b) command line arguments
-        # c) init_options function
         self._config = {}
 
         # initialize data path if exists, else it will be None
@@ -278,20 +271,8 @@ class Module(object):
                 except AttributeError:
                     pass
 
-    def init_options(self, **kwargs):
-        """
-        add options to the module manually
-        """
-        # TODO: check self._config['value'] - shouldn't there be key instead?
-        for key, value in kwargs.iteritems():
-            try:
-                self._config['value'] = value
-            except KeyError:
-                raise KeyError('option %s not recognized by this module')
-
-    def run_module(self, module, args=[]):
-        # FIXME: args=None, args = args or [], unless it's really intended
-        self.ci.run_module(module, args)
+    def run_module(self, module, args=None):
+        self.ci.run_module(module, args or [])
 
     def log(self, msg, level=None):
         """
