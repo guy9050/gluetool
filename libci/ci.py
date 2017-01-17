@@ -385,6 +385,29 @@ class Ci(object):
 
         return False
 
+    def _load_module(self, module, group, filepath):
+        for name in dir(module):
+            cls = getattr(module, name)
+            try:
+                if issubclass(cls, Module) and cls != Module:
+                    if not cls.name:
+                        error = 'no module name specified'
+                        raise CiError(error)
+                    if cls.name in self.modules:
+                        # pprint.pprint(self.modules)
+                        msg = '\'%s\' is a duplicate' % cls.name
+                        msg += ' module name \'%s/' % group
+                        msg += '%s\'' % filepath
+                        raise CiError(msg)
+                    # add to modules dictionary
+                    self.modules[cls.name] = {
+                        'class': cls,
+                        'description': cls.description,
+                        'group': group,
+                    }
+            except TypeError:
+                pass
+
     def _load_module_path(self, ppath):
         """ Load modules from modules directory """
         for root, _, files in os.walk(ppath):
@@ -417,27 +440,7 @@ class Ci(object):
                         mname, group, str(e)))
                     continue
 
-                for name in dir(module):
-                    cls = getattr(module, name)
-                    try:
-                        if issubclass(cls, Module) and cls != Module:
-                            if not cls.name:
-                                error = 'no module name specified'
-                                raise CiError(error)
-                            if cls.name in self.modules:
-                                # pprint.pprint(self.modules)
-                                msg = '\'%s\' is a duplicate' % cls.name
-                                msg += ' module name \'%s/' % group
-                                msg += '%s\'' % filepath
-                                raise CiError(msg)
-                            # add to modules dictionary
-                            self.modules[cls.name] = {
-                                'class': cls,
-                                'description': cls.description,
-                                'group': group,
-                            }
-                    except TypeError:
-                        pass
+                self._load_module(module, group, filepath)
 
     # find all available modules
     def __init__(self):
