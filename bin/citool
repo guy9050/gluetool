@@ -4,8 +4,8 @@ import traceback
 
 import libci
 
-from libci import LibciError
-from libci import LibciRetryError
+from libci import CiError
+from libci import CiRetryError
 
 def print_error(string):
     sys.stderr.write('Error: %s\n' % string)
@@ -72,7 +72,7 @@ def main():
         # no modules
         if not modules_args:
             msg = 'No module specified, use -l to list available'
-            raise LibciError(msg)
+            raise CiError(msg)
 
         # command-line info
         if ci.get_config('info'):
@@ -109,7 +109,7 @@ def main():
                     # make sure we have a clean state in case of retries
                     module.execute()
                     module.add_shared()
-            except LibciRetryError as e:
+            except CiRetryError as e:
                 sys.stderr.write('error in %s: %s\n' % (module.name, e))
                 continue
             break
