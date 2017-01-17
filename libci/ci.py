@@ -178,7 +178,8 @@ class Module(object):
                 except ConfigParser.NoSectionError:
                     pass
 
-    def _trim_docstring(self, docstring):
+    @staticmethod
+    def _trim_docstring(docstring):
         """
         Quoting `PEP 257 <https://www.python.org/dev/peps/pep-0257/#handling-docstring-indentation>`:
 
