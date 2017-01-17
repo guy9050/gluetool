@@ -22,7 +22,6 @@ INSTALL_REQUIRES = [
 ]
 
 TESTS_REQUIRE = [
-    'pytest',
     'pytest-pylint',
     'pytest-flake8',
     'pytest'
