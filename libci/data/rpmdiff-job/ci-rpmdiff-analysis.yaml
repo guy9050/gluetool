@@ -1,5 +1,6 @@
 - job:
     name: 'ci-rpmdiff-analysis'
+    node: rpmdiff
     description: |
         RPMdiff analysis job
 

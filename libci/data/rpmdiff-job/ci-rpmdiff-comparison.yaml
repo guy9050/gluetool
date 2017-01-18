@@ -1,5 +1,6 @@
 - job:
     name: 'ci-rpmdiff-comparison'
+    node: rpmdiff
     description: |
         RPMdiff comparison job.
     concurrent: true
