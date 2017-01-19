@@ -21,7 +21,7 @@ class BrewTask(object):
         if self._task_info is None:
             self._task_info = self.brew.getTaskInfo(self.task_id, request=True)
             if not self._task_info:
-                raise CiError("failed to obtain information about Brew task: %s" % self.task_id)
+                raise CiError("brew task '{}' not found".format(self.task_id))
 
         return self._task_info
 
@@ -32,7 +32,10 @@ class BrewTask(object):
 
     @property
     def target(self):
-        target = self.task_info["request"][1]
+        try:
+            target = self.task_info["request"][1]
+        except IndexError:
+            raise CiError('invalid build task id')
         return BrewTarget(target, session=self.brew)
 
     @property
@@ -136,7 +139,10 @@ class BrewTarget(object):
 
     @property
     def tag(self):
-        return self.brew.getBuildTarget(self.target)["dest_tag_name"]
+        try:
+            return self.brew.getBuildTarget(self.target)["dest_tag_name"]
+        except TypeError:
+            raise CiError('invalid build task id')
 
     def is_rhscl(self):
         return self.target[:6] == "rhscl-"
@@ -189,31 +195,34 @@ class CIBrew(libci.Module):
     description = 'Connect to Brew instance via koji python module'
     requires = 'jenkinsapi'
 
-    # shared jenkins object
-    brew_instance = None
+    brew_task_instance = None
 
     options = {
         'url': {
             'help': 'Brew API server URL',
         },
+        'id': {
+            'help': 'Brew task ID',
+            'type': int,
+        }
     }
-    required_options = ['url']
+    required_options = ['url', 'id']
 
-    shared_functions = ['brew', 'brew_task']
+    shared_functions = ['brew_task']
 
-    def brew(self):
-        """ return brew instance """
-        return self.brew_instance
-
-    def brew_task(self, task_id):
-        """ return a BrewTask instance for given task_id """
-        return BrewTask(self, task_id, self.brew_instance)
+    def brew_task(self):
+        """ return a BrewTask instance of passed task_id """
+        return self.brew_task_instance
 
     def execute(self):
         url = self.option('url')
-        self.brew_instance = koji.ClientSession(url)
-        version = self.brew_instance.getAPIVersion()
+        task_id = self.option('id')
 
-        msg = 'connected to brew instance \'{}\' API'.format(url)
-        msg += ' version {}'.format(version)
-        self.info(msg)
+        brew_instance = koji.ClientSession(url)
+        version = brew_instance.getAPIVersion()
+        self.info('connected to brew instance \'{}\' API version {}'.format(url, version))
+
+        self.brew_task_instance = BrewTask(self, task_id, brew_instance)
+        # just test if connection found
+        if self.brew_task_instance.task_info:
+            pass
