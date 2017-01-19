@@ -14,4 +14,4 @@
             description: 'Brew task ID.'
     builders:
         - shell: |
-            citool brew rpmdiff --type analysis --id $id
+            citool brew --id $id rpmdiff --type analysis
