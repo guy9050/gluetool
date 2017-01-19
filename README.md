@@ -53,18 +53,18 @@ The core - libci.py
 -------------------
 The libci.py itself is actually a simple plugin manager. It tries to be decoupled from the plugins as much as possible. The libcitool provides two classes:
 
-Ci class
+CI class
 ---------
 The citool class implementes various functions for managing plugins, parsing the configuration file, shared functions functionality and other convienence tools.
 
   * Plugin management
-    * Importing plugins - At Ci instance initialization all plugins from the plugins subfolder in the module directory are imported - see _load_plugins(self) function. At the import a dictionary self.plugins with information about class, description and specific group of all plugin is created. This is used for generation of plugins list. At import not plugins object instance is created.
+    * Importing plugins - At CI instance initialization all plugins from the plugins subfolder in the module directory are imported - see _load_plugins(self) function. At the import a dictionary self.plugins with information about class, description and specific group of all plugin is created. This is used for generation of plugins list. At import not plugins object instance is created.
 
     * Initialization of plugins objects - To initialize a new plugin object the class provides the method add_plugin_instance(self, plugin_name) which initializes a new plugin instance according to given plugin name and adds it to self.plugin_instances list. This list will contain all initialized plugin and can be iterated over.
 
     * Destroying of plugins - The plugins can define a destroy function which is intended to be run at the end of citool execution like a cleanup. The function destroy_plugins calls destroy functions of all initialised plugins.  
 
-  * Configuration file parser - Ci initializes the configuration file parser (self.cparser) from file '~/.citool' which is used by a Plugins method to initialize plugins from the configuration file. See section "Configuration" for more information.
+  * Configuration file parser - CI initializes the configuration file parser (self.cparser) from file '~/.citool' which is used by a Plugins method to initialize plugins from the configuration file. See section "Configuration" for more information.
 
   * Shared functions - Shared functions provide a simple way of sharing data between plugins. Each plugin can share an unlimited amount of it's own functions for other plugins. Note that the shared functions dictionary key is the function name, thus the last executed plugin will overwrite references to previous shared functions of the same name. This is useful as the same data can be provided by multiple plugins and the other plugins consuming the data simply do not care which plugin made the data available.
 

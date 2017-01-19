@@ -18,12 +18,12 @@ MODULE_PATH = [os.path.dirname(os.path.abspath(__file__)) + '/modules']
 DATA_PATH = os.path.dirname(os.path.abspath(__file__)) + '/data'
 
 
-class CiError(Exception):
+class CIError(Exception):
     """ General libci exception """
     pass
 
 
-class CiRetryError(CiError):
+class CIRetryError(CIError):
     """ Retry libci exception """
     pass
 
@@ -40,10 +40,10 @@ def retry(*args):
             try:
                 func(obj, *fargs, **fkwargs)
             except args as e:
-                if isinstance(e, CiError):
-                    raise CiRetryError(e.value)
+                if isinstance(e, CIError):
+                    raise CIRetryError(e.value)
                 else:
-                    raise CiRetryError(e)
+                    raise CIRetryError(e)
         return func_wrapper
     return wrap
 
@@ -142,7 +142,7 @@ class Module(object):
             return
         for opt in self.required_options:
             if opt not in self._config or not self._config[opt]:
-                raise CiError('Missing required \'{}\' option'.format(opt))
+                raise CIError('Missing required \'{}\' option'.format(opt))
 
     def shared(self, *args, **kwargs):
         return self.ci.shared(*args, **kwargs)
@@ -289,7 +289,7 @@ class Module(object):
         self.ci.log('[%s] %s' % (self.name, msg), level=level)
 
 
-class Ci(object):
+class CI(object):
     # configuration
     config_parser = None
 
@@ -392,13 +392,13 @@ class Ci(object):
                 if issubclass(cls, Module) and cls != Module:
                     if not cls.name:
                         error = 'no module name specified'
-                        raise CiError(error)
+                        raise CIError(error)
                     if cls.name in self.modules:
                         # pprint.pprint(self.modules)
                         msg = '\'%s\' is a duplicate' % cls.name
                         msg += ' module name \'%s/' % group
                         msg += '%s\'' % filepath
-                        raise CiError(msg)
+                        raise CIError(msg)
                     # add to modules dictionary
                     self.modules[cls.name] = {
                         'class': cls,
