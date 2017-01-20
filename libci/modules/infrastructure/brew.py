@@ -1,7 +1,7 @@
 import re
 import koji
 import libci
-from libci import CiError
+from libci import CIError
 
 BREW_API_TOPURL = "http://download.eng.bos.redhat.com/brewroot"
 BREW_WEB_URL = 'https://brewweb.engineering.redhat.com/brew/'
@@ -21,7 +21,7 @@ class BrewTask(object):
         if self._task_info is None:
             self._task_info = self.brew.getTaskInfo(self.task_id, request=True)
             if not self._task_info:
-                raise CiError("brew task '{}' not found".format(self.task_id))
+                raise CIError("brew task '{}' not found".format(self.task_id))
 
         return self._task_info
 
@@ -35,7 +35,7 @@ class BrewTask(object):
         try:
             target = self.task_info["request"][1]
         except IndexError:
-            raise CiError('invalid build task id')
+            raise CIError('invalid build task id')
         return BrewTarget(target, session=self.brew)
 
     @property
@@ -70,7 +70,7 @@ class BrewTask(object):
         base_url = "{0}/work".format(BREW_API_TOPURL)
 
         if self.task_info['state'] != koji.TASK_STATES["CLOSED"]:
-            raise CiError("Brew task [%s] is not a successfully completed task" % self.task_id)
+            raise CIError("Brew task [%s] is not a successfully completed task" % self.task_id)
 
         # For standard (non-scratch) builds, we may fetch an associated build and dig info from it
         builds = self.brew.listBuilds(taskID=self.task_id)
@@ -87,7 +87,7 @@ class BrewTask(object):
         elif self.task_info['method'] == 'buildArch':
             tasks = [self.task_info]
         else:
-            raise CiError('brew task [%i] is not a build or buildArch task' % self.task_id)
+            raise CIError('brew task [%i] is not a build or buildArch task' % self.task_id)
 
         # Gather list of files for each (sub-)task. We'll end up with this list:
         #  [(task1, file1), (task1, file2), ..., (taskN, fileM)]
@@ -99,7 +99,7 @@ class BrewTask(object):
             msg = "no artifacts found for the task [{}]".format(self.task_id)
             msg += ", builds already gone for scratch build?"
 
-            raise CiError(msg)
+            raise CIError(msg)
 
         self._srcrpm = None
 
@@ -111,7 +111,7 @@ class BrewTask(object):
             self._srcrpm = "/".join([base_url, base_path, filename])
             break
         else:
-            raise CiError("Source RPM not found in Brew task [%s]." % self.task_id)
+            raise CIError("Source RPM not found in Brew task [%s]." % self.task_id)
 
         return self._srcrpm
 
@@ -142,7 +142,7 @@ class BrewTarget(object):
         try:
             return self.brew.getBuildTarget(self.target)["dest_tag_name"]
         except TypeError:
-            raise CiError('invalid build task id')
+            raise CIError('invalid build task id')
 
     def is_rhscl(self):
         return self.target[:6] == "rhscl-"
@@ -163,7 +163,7 @@ class BrewTarget(object):
         else:
             print "ERROR: rhscl_ver() is only for RHSCL targets"
             msg = "Called method BrewTarget.rhscl_ver() is only for rhscl targets. Run on target %s" % (self.target)
-            raise CiError(msg)
+            raise CIError(msg)
 
     def dts_ver(self):
         if self.is_dts():
@@ -171,7 +171,7 @@ class BrewTarget(object):
         else:
             print "ERROR: dts_ver() is only for DTS targets"
             msg = "Called method BrewTarget.dts_ver() is only for dts targets. Run on target %s" % (self.target)
-            raise CiError(msg)
+            raise CIError(msg)
 
     def collection(self):
         if self.is_rhscl():
@@ -181,7 +181,7 @@ class BrewTarget(object):
         else:
             print "ERROR: collection() is only for RHSCL"
             msg = "Called method BrewTarget.collection() is only for rhscl targets. Run on target %s" % (self.target)
-            raise CiError(msg)
+            raise CIError(msg)
 
     @staticmethod
     def is_extras_target(target):

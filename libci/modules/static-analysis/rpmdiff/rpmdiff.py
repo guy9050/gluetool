@@ -3,7 +3,7 @@ import re
 import subprocess
 import time
 from libci import Module
-from libci import CiError
+from libci import CIError
 from libci import utils
 
 RPMDIFF_PASS_STATES = ["Passed", "Info", "Waived", "Needs inspection"]
@@ -50,7 +50,7 @@ class CIRpmdiff(Module):
         match = re.search(r"u'run_id': (\d+)", string)
         if not match:
             msg = "could not find rpmdiff run id in rpmdiff-remote output"
-            raise CiError(msg)
+            raise CIError(msg)
         return match.group(1)
 
     @staticmethod
@@ -59,7 +59,7 @@ class CIRpmdiff(Module):
         match = re.search(r"u'web_url': u'([^'']*)", string)
         if not match:
             msg = "could not find rpmdiff web url in rpmdiff-remote output"
-            raise CiError(msg)
+            raise CIError(msg)
         return match.group(1)
 
     def _get_runinfo(self, task_id):
@@ -72,7 +72,7 @@ class CIRpmdiff(Module):
         self.verbose("RPMdiff task [{}] state: {}".format(task_id, runinfo['overall_score']['description']))
         while runinfo['overall_score']['description'] in ['Running', 'Queued for test']:
             if (time.time() - start_time) > self.max_timeout:
-                raise CiError("Waiting for RPMdiff results timed out ")
+                raise CIError("Waiting for RPMdiff results timed out ")
             time.sleep(self.check_interval)
             runinfo = self._get_runinfo(task_id)
         return runinfo
@@ -88,7 +88,7 @@ class CIRpmdiff(Module):
         self.debug("stderr: {}".format(p_err or "no output"))
         if p_status > 0:
             msg = "Failure during command execution: {}".format(p_err)
-            raise CiError(msg)
+            raise CIError(msg)
         return p_out
 
     def _run_rpmdiff(self, test_type, nvr_baseline=None):
@@ -120,7 +120,7 @@ class CIRpmdiff(Module):
         # get a brew task instance
         self.brew_task = self.shared('brew_task')
         if not self.brew_task:
-            raise CiError('no brew build found, did you run brew module?')
+            raise CIError('no brew build found, did you run brew module?')
 
         # get target from the brewtask
         target = self.brew_task.target.target
@@ -142,7 +142,7 @@ class CIRpmdiff(Module):
         if test_type == 'comparison':
             latest = self.brew_task.latest
             if not latest:
-                raise CiError('could not find baseline for this build')
+                raise CIError('could not find baseline for this build')
             msg += 'build of \'{}\' '.format(self.brew_task.nvr)
             msg += 'compared to \'{}\' '.format(latest)
 
