@@ -8,14 +8,12 @@ Run `setup.py` to perfor various actions:
 import os
 import re
 import subprocess
+import sys
 
 from setuptools import setup
+from setuptools.command.test import test as TestCommand
 
 DESCRIPTION = 'CI Tool - Continuous Integration Swiss Army Knife'
-
-SETUP_REQUIRES = [
-    'pytest-runner'
-]
 
 INSTALL_REQUIRES = [
     'kerberos',
@@ -83,6 +81,22 @@ def update_version(version, release):
             f.write('{0}\n__version__ = \'{1}\'\n'.format(version_msg, version))
 
 
+class PyTest(TestCommand):
+    pytest_args = ['-s', '--pylint', '--flake8', '--cov=libci']
+
+    def run_tests(self):
+        # Clear importer cache - with any luck, this will get rid of (by now not existing
+        # anymore) /tmp/easy_install-* paths that, for reasons unknown to mere mortals, were
+        # given priority over the correct locations in .eggs/.
+        # This behavior affected mostly jenkinsapi module, and pylint reported misleading
+        # "Unable to import" error.
+        sys.path_importer_cache.clear()
+
+        import pytest
+        errno = pytest.main(self.pytest_args)
+        sys.exit(errno)
+
+
 VERSION, RELEASE = get_version()
 
 if __name__ == '__main__':
@@ -91,9 +105,11 @@ if __name__ == '__main__':
     setup(name='citool',
           # we write only the version here, release should be specified only for rpm
           version='{0}'.format(VERSION),
-          setup_requires=SETUP_REQUIRES,
           install_requires=INSTALL_REQUIRES,
           tests_require=TESTS_REQUIRE,
+          cmdclass={
+              'test': PyTest
+          },
           packages=['libci'],
           include_package_data=True,
           scripts=['bin/citool'],
