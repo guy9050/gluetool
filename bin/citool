@@ -55,8 +55,8 @@ def main():
         (ci_args, modules_args) = split_argv(sys.argv[1:], ci.module_list())
         ci.parse_args(ci_args)
 
-        ci.debug('Parsed ci args: %s' % ci_args)
-        ci.debug('Parsed module args: %s' % modules_args)
+        ci.debug('parsed ci args: %s' % ci_args)
+        ci.debug('parsed module args: %s' % modules_args)
 
         # version
         if ci.get_config('version'):

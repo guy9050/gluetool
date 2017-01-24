@@ -447,15 +447,15 @@ class CI(object):
         # configuration defaults
         self.config = {
             'data_path': None,
-            'debug': False,
+            'debug': None,
             'output': None,
-            'info': True,
+            'info': None,
             'list': None,
             'module_path': None,
-            'quiet': False,
-            'retries': 0,
-            'verbose': False,
-            'version': False,
+            'quiet': None,
+            'retries': None,
+            'verbose': None,
+            'version': None,
         }
 
         # Initialize logging methods before douing anything else
@@ -540,11 +540,13 @@ class CI(object):
         # set the config dictionary from the parsed arguments
         for opt in self.config:
             value = getattr(parsed_args, opt.replace('-', '_'))
-            self.config[opt] = value
+            if value is not None:
+                self.config[opt] = value
 
         # open output file if needed
         if self.config['output']:
             self.output_file = open(self.config['output'], 'w')
+            self.debug('created output file \'{}\''.format(self.config['output']))
             atexit.register(self._close_output_file)
 
     def module_list(self):
