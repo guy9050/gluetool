@@ -15,7 +15,7 @@ except ImportError:
 def check_for_commands(cmds):
     """ Checks if all commands in list cmds are valid """
     for cmd in cmds:
-        p = subprocess.Popen(['command', '-v', cmd], stdout=DEVNULL, shell=True)
+        p = subprocess.Popen(['bash', '-c', 'command -v {}'.format(cmd)], stdout=DEVNULL)
         retcode = p.wait()
         p.communicate()
         if retcode != 0:
