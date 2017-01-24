@@ -129,23 +129,25 @@ class CIRpmdiff(Module):
         if blacklist is not None:
             self.verbose('blacklisted packages: {}'.format(blacklist))
             if self.brew_task.name in blacklist.split(','):
-                msg = 'skipping blacklisted package'
-                msg += ' \'{}\''.format(self.brew_task.name)
-                self.info(msg)
+                self.info("skipping blacklisted package '{}'".format(self.brew_task.name))
                 return
 
-        msg = '{} for '.format(test_type)
-        if self.brew_task.scratch is True:
-            msg += 'scratch '
-        msg += 'build of \'{}\' '.format(self.brew_task.nvr)
+        # Build log message
+        comparison_msg = ''
 
         if test_type == 'comparison':
-            latest = self.brew_task.latest
-            if not latest:
+            if not self.brew_task.latest:
                 raise CIError('could not find baseline for this build')
-            msg += 'compared to \'{}\' '.format(latest)
 
-        msg += 'with build-target \'{}\''.format(target)
+            comparison_msg = "build of '{}' compared to '{}'".format(self.brew_task.nvr, self.brew_task.latest)
+
+        msg = "{test_type} for {is_scratch} build of '{build}' {comparison} with build-target {target}".format(
+            test_type=test_type,
+            is_scratch=('scratch' if self.brew_task.scratch else ''),
+            build=self.brew_task.nvr,
+            comparison=comparison_msg,
+            target=target)
+
         self.info(msg)
 
         runinfo = self._run_rpmdiff(test_type, latest)

@@ -169,10 +169,8 @@ class Module(object):
             for opt in self.options:
                 try:
                     value = self.config_parser.get('default', opt)
-                    dmsg = 'Added option \'%s\' value \'%s\'' % (opt, value)
-                    dmsg += ' from config'
                     self._config[opt] = value
-                    self.debug(dmsg)
+                    self.debug("Added option '{}' value '{}' from config".format(opt, value))
                 except ConfigParser.NoOptionError:
                     pass
                 except ConfigParser.NoSectionError:
@@ -227,13 +225,15 @@ class Module(object):
     def shared_functions_help(self):
         if not self.shared_functions:
             return ''
-        docs = "\nshared functions:\n"
+
+        functions = []
         for func in self.shared_functions:
             if getattr(self, func).__doc__:
-                docs += '  {}\t{}\n'.format(func, self._trim_docstring(getattr(self, func).__doc__))
+                functions.append('  {}\t{}'.format(func, self._trim_docstring(getattr(self, func).__doc__)))
             else:
-                docs += '  {}\tno documentation added :(\n'.format(func)
-        return docs
+                functions.append('  {}\tno documentation added :('.format(func))
+
+        return '\nshared functions:\n{}\n'.format('\n'.join(functions))
 
     def parse_args(self, args):
         """
@@ -265,10 +265,8 @@ class Module(object):
                     value = getattr(options, opt.replace('-', '_'))
                     if value is None and opt in self._config:
                         continue
-                    dmsg = 'Added option \'%s\' value \'%s\'' % (opt, value)
-                    dmsg += ' from commandline'
                     self._config[opt] = value
-                    self.debug(dmsg)
+                    self.debug("Added option '{}' value '{}' from commandline".format(opt, value))
                 except AttributeError:
                     pass
 
@@ -395,10 +393,7 @@ class CI(object):
                         raise CIError(error)
                     if cls.name in self.modules:
                         # pprint.pprint(self.modules)
-                        msg = '\'%s\' is a duplicate' % cls.name
-                        msg += ' module name \'%s/' % group
-                        msg += '%s\'' % filepath
-                        raise CIError(msg)
+                        raise CIError("{}' is a duplicate module name '{}/{}'".format(cls.name, group, filepath))
                     # add to modules dictionary
                     self.modules[cls.name] = {
                         'class': cls,
@@ -554,24 +549,33 @@ class CI(object):
 
     def module_list_usage(self, groups):
         """ Returns a string with modules description """
-        ret = 'Available modules'
+
         if groups:
-            ret += ' in %s group(s)' % ', '.join(groups)
-        ret += ':\n'
+            usage = [
+                'Available modules in {} group(s)'.format(', '.join(groups))
+            ]
+        else:
+            usage = [
+                'Available modules'
+            ]
+
         # get module list
         plist = self.module_group_list()
         if not plist:
-            ret += '\n  -- no modules found --'
+            usage.append('')
+            usage.append('  -- no modules found --')
         else:
             for group in sorted(plist):
                 # skip groups that are not in the list
                 # note that groups is [] if all groups should be shown
                 if groups and group not in groups:
                     continue
-                ret += '\n%-2s%s\n' % (' ', group)
+                usage.append('')
+                usage.append('%-2s%s' % (' ', group))
                 for key, val in sorted(plist[group].iteritems()):
-                    ret += '%-4s%-32s %s\n' % ('', key, val)
-        return ret
+                    usage.append('%-4s%-32s %s' % ('', key, val))
+
+        return '\n'.join(usage)
 
     def module_group_list(self):
         """ Returns a dictionary of groups of modules with description """

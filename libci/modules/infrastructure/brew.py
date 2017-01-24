@@ -96,10 +96,10 @@ class BrewTask(object):
             tasks_outputs += [(task, filename) for filename in self.brew.listTaskOutput(task['id'])]
 
         if not any(tasks_outputs):
-            msg = "no artifacts found for the task [{}]".format(self.task_id)
-            msg += ", builds already gone for scratch build?"
+            msg = "no artifacts found for the task '{}', builds already gone for scratch build?".format(self.task_id)
+            self._module.warn(msg)
 
-            raise CIError(msg)
+            raise CIError("no brew artifacts found for the task '{}'".format(self.task_id))
 
         self._srcrpm = None
 
@@ -224,9 +224,8 @@ class CIBrew(libci.Module):
 
         # print information about the task
         self.brew_task_instance = BrewTask(self, task_id, brew_instance)
-        msg = "task '{}' ".format(task_id)
-        if self.brew_task_instance.scratch:
-            msg += "scratch "
-        msg += "build with nvr '{}' ".format(self.brew_task_instance.nvr)
-        msg += "build-target '{}'".format(self.brew_task_instance.target.target)
-        self.info(msg)
+        self.info("task '{}' {} build with nvr '{}' build-target '{}'".format(
+            task_id,
+            'scratch' if self.brew_task_instance.scratch else '',
+            self.brew_task_instance.nvr,
+            self.brew_task_instance.target.target))

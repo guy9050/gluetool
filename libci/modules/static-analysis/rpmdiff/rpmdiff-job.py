@@ -91,6 +91,4 @@ This module requires an available Jenkins connection - via the jenkins module.
                                            build_params={
                                                'id': self.tid
                                            })
-        msg = 'invoked job \'{}\' with build params '.format(self.job_name)
-        msg += '\'id={}\''.format(self.tid)
-        self.info(msg)
+        self.info("invoked job '{}' with build params id='{}'".format(self.job_name, self.tid))
