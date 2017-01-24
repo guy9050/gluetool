@@ -87,13 +87,10 @@ This module requires an available Jenkins connection - via the jenkins module.
         except UnknownJob:
             self.update_job()
 
-        try:
-            self.jenkins[self.job_name].invoke(self.tid,
-                                               build_params={
-                                                   'id': self.tid
-                                               })
-        except ValueError:
-            pass
+        self.jenkins[self.job_name].invoke(self.tid,
+                                           build_params={
+                                               'id': self.tid
+                                           })
         msg = 'invoked job \'{}\' with build params '.format(self.job_name)
         msg += '\'id={}\''.format(self.tid)
         self.info(msg)
