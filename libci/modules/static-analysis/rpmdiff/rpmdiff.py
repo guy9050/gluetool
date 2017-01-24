@@ -143,7 +143,6 @@ class CIRpmdiff(Module):
             latest = self.brew_task.latest
             if not latest:
                 raise CIError('could not find baseline for this build')
-            msg += 'build of \'{}\' '.format(self.brew_task.nvr)
             msg += 'compared to \'{}\' '.format(latest)
 
         msg += 'with build-target \'{}\''.format(target)
