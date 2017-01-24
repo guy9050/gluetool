@@ -222,7 +222,11 @@ class CIBrew(libci.Module):
         version = brew_instance.getAPIVersion()
         self.info('connected to brew instance \'{}\' API version {}'.format(url, version))
 
+        # print information about the task
         self.brew_task_instance = BrewTask(self, task_id, brew_instance)
-        # just test if connection found
-        if self.brew_task_instance.task_info:
-            pass
+        msg = "task '{}' ".format(task_id)
+        if self.brew_task_instance.scratch:
+            msg += "scratch "
+        msg += "build with nvr '{}' ".format(self.brew_task_instance.nvr)
+        msg += "build-target '{}'".format(self.brew_task_instance.target.target)
+        self.info(msg)
