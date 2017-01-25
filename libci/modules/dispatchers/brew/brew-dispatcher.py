@@ -106,16 +106,14 @@ class CIBrewDispatcher(Module):
             except KeyError:
                 # for cmdline options replace '_' with '-'
                 if not self.option(option):
-                    msg = 'Required option \'{}\' not found'.format(option)
-                    msg += ' in the environment or command line'
-                    raise CIError(msg)
+                    raise CIError("Required option '{}' not found in the environment or command line".format(option))
                 self.build[option] = self.option(option)
 
     def dispatch_tests(self):
         for test in self.get_tests():
-            msg = 'dispatching module \'{}\''.format(test)
-            msg += ' for enabled package \'{}\''.format(self.build['name'])
-            msg += ' for target \'{}\''.format(self.build['target'])
+            self.verbose("dispatching module '{}' for enabled package '{}' for target '{}'".format(
+                test, self.build['name'], self.build['target']))
+
             module = test.split()[0]
             args = test.split()[1:]
 
@@ -124,14 +122,10 @@ class CIBrewDispatcher(Module):
                 if arg[0] == '$':
                     try:
                         value = self.build[arg[1:]]
-                        msg = 'replacing \'{}\' with internal value'.format(arg)
-                        msg += ' \'{}\' of \'{}\''.format(arg[1:], value)
-                        self.verbose(msg)
+                        self.verbose("replacing '{}' with internal value '{}'".format(arg, value))
                         args[i] = value
                     except KeyError:
-                        msg = 'could not replace \'{}\''.format(arg)
-                        msg += ', not found among \'{}\''.format(','.join(self.build.keys()))
-                        raise CIError('could not replace \'{}\''.format(arg))
+                        raise CIError("could not replace '{}'".format(arg))
 
             self.run_module(module, args)
 
@@ -145,6 +139,4 @@ class CIBrewDispatcher(Module):
         if dispatch_all or self.check_target():
             self.dispatch_tests()
         else:
-            msg = 'package \'{}\' not enabled for '.format(self.build['name'])
-            msg += 'target \'{}\''.format(self.build['target'])
-            self.info(msg)
+            self.info("package '{}' not enabled for target '{}'".format(self.build['name'], self.build['target']))
