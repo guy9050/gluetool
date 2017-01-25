@@ -70,8 +70,8 @@ class Module(object):
     options = {}
     required_options = None
 
-    # a list of shared function names
-    shared_functions = None
+    #: A list of names of module's shared functions
+    shared_functions = []
 
     def __init__(self, ci):
         #
@@ -110,10 +110,13 @@ class Module(object):
         return None
 
     def add_shared(self):
-        # add/update shared functions
-        if self.shared_functions:
-            for func in self.shared_functions:
-                self.ci.add_shared(func, self)
+        """
+        Register module's shared functions with CI, to allow other modules
+        to use them.
+        """
+
+        for func in self.shared_functions:
+            self.ci.add_shared(func, self)
 
     def del_shared(self, funcname):
         self.ci.del_shared(funcname)
@@ -227,11 +230,14 @@ class Module(object):
             return ''
 
         functions = []
-        for func in self.shared_functions:
-            if getattr(self, func).__doc__:
-                functions.append('  {}\t{}'.format(func, self._trim_docstring(getattr(self, func).__doc__)))
+
+        for funcname in self.shared_functions:
+            func = getattr(self, funcname)
+
+            if func.__doc__:
+                functions.append('  {}\t{}\n'.format(funcname, self._trim_docstring(func.__doc__)))
             else:
-                functions.append('  {}\tno documentation added :('.format(func))
+                functions.append('  {}\tno documentation added :(\n'.format(funcname))
 
         return '\nshared functions:\n{}\n'.format('\n'.join(functions))
 
@@ -295,26 +301,38 @@ class CI(object):
     modules = {}
     module_instances = []
 
-    # shared functions
+    #: Shared function registry.
+    #: funcname: (module, fn)
     shared_functions = {}
 
     # add a shared function, overwrite if exists
     def add_shared(self, funcname, module):
-        self.shared_functions.update({funcname: module})
+        """
+        Register a shared function. Overwrite previously registered function
+        with the same name, if there was any such.
+
+        :param str funcname: Name of the shared function.
+        :param libci.Module module: Module instance providing the shared function.
+        """
+
+        if not hasattr(module, funcname):
+            raise CIError("No such shared function '{}' of module '{}'".format(funcname, module.name))
+
+        self.shared_functions[funcname] = (module, getattr(module, funcname))
 
     # delete a shared function if exists
     def del_shared(self, funcname):
-        try:
-            self.shared_functions.pop(funcname, None)
-        except KeyError:
-            pass
+        if funcname not in self.shared_functions:
+            return
+
+        del self.shared_functions[funcname]
 
     # call a shared function
     def shared(self, funcname, *args, **kwargs):
         if funcname not in self.shared_functions:
             return None
-        function = getattr(self.shared_functions[funcname], funcname)
-        return function(*args, **kwargs)
+
+        return self.shared_functions[funcname][1](*args, **kwargs)
 
     def _load_config(self):
         self.config_parser = ConfigParser.ConfigParser()
