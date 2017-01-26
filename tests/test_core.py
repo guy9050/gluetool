@@ -63,30 +63,17 @@ def test_module_instantiate():
     Try to instantiate a module, and check some of its properties.
     """
 
-    import functools
-
     ci = NonLoadingCI()
     mod = DummyModule(ci)
 
     assert mod.ci == ci
 
-    def assert_logging_helper(name, level=None):
-        helper = getattr(mod, name)
-
-        assert isinstance(helper, functools.partial)
-        assert helper.func == mod.log
-        assert helper.args == ()
-
-        if level is None:
-            assert not helper.keywords
-        else:
-            assert 'level' in helper.keywords
-            assert helper.keywords['level'] == level
-
-    assert_logging_helper('debug', level='D')
-    assert_logging_helper('verbose', level='V')
-    assert_logging_helper('info')
-    assert_logging_helper('warn', level='W')
+    assert mod.debug == libci.Logging.get_logger().debug
+    assert mod.verbose == libci.Logging.get_logger().verbose
+    assert mod.info == libci.Logging.get_logger().info
+    assert mod.warn == libci.Logging.get_logger().warn
+    assert mod.error == libci.Logging.get_logger().error
+    assert mod.exception == libci.Logging.get_logger().exception
 
     assert mod.config_parser is None
     # pylint: disable-msg=protected-access

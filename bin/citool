@@ -118,15 +118,17 @@ def main():
         raise e
     # pylint: disable=broad-except
     except Exception as e:
-        if ci:
-            if ci.get_config('verbose') or ci.get_config('debug'):
-                traceback.print_exc()
+        exc_info = sys.exc_info()
+
         if module:
-            exstr = 'error in %s: %s\n' % (module.name, e)
+            msg = "Exception raised in module '{}': {}".format(module.name, e.message)
         else:
-            exstr = 'error: %s\n' % e
-        sys.stderr.write(exstr)
+            msg = "Exception raised: {}".format(e.message)
+
+        libci.Logging.get_logger().exception(msg, exc_info=exc_info)
+
         sys.exit(-1)
+
     finally:
         if ci:
             ci.destroy_modules()

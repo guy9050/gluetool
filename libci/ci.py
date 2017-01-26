@@ -1,14 +1,12 @@
 import argparse
 import ast
-import atexit
 import ConfigParser
 import imp
+import logging
 import os
 import sys
-import datetime
-import traceback
 
-from functools import partial
+from .log import Logging
 
 
 CONFIGS = ['/etc/citool', os.path.expanduser('~/.citool.d/citool')]
@@ -82,10 +80,14 @@ class Module(object):
         self.ci = ci
 
         # initialize logging helpers
-        self.debug = partial(self.log, level='D')
-        self.verbose = partial(self.log, level='V')
-        self.info = partial(self.log)
-        self.warn = partial(self.log, level='W')
+        # definitely could be done in loop + setattr but pylint can't decode that :(
+        logger = Logging.get_logger()
+        self.verbose = logger.verbose
+        self.debug = logger.debug
+        self.info = logger.info
+        self.warn = logger.warn
+        self.error = logger.error
+        self.exception = logger.exception
 
         # configuration parser
         self.config_parser = None
@@ -279,19 +281,6 @@ class Module(object):
     def run_module(self, module, args=None):
         self.ci.run_module(module, args or [])
 
-    def log(self, msg, level=None):
-        """
-        Implements the actual output of logging messages. Prefixes each message
-        with module name, and passes it to parent's `log` method.
-
-        :param string level: If set, denotes debug level other than "info". 'D' as "debug",
-            'V' as "verbose", and "W" as "warning" are supported.
-        :param string msg: the actual message.
-
-        """
-
-        self.ci.log('[%s] %s' % (self.name, msg), level=level)
-
 
 class CI(object):
     # configuration
@@ -455,6 +444,15 @@ class CI(object):
 
                 self._load_module(module, group, filepath)
 
+    def _init_logging(self, logger):
+        # definitely could be done in loop + setattr but pylint can't decode that :(
+        self.verbose = logger.verbose
+        self.debug = logger.debug
+        self.info = logger.info
+        self.warn = logger.warn
+        self.error = logger.error
+        self.exception = logger.exception
+
     # find all available modules
     def __init__(self):
         # configuration defaults
@@ -471,13 +469,11 @@ class CI(object):
             'version': None,
         }
 
-        # Initialize logging methods before douing anything else
-        self.debug = partial(self.log, level='D')
-        self.verbose = partial(self.log, level='V')
-        self.info = self.log
-        self.warn = partial(self.log, level='W')
-
-        self.output_file = None
+        # Initialize logging methods before doing anything else.
+        # Right now, we don't know the desired log level, or if
+        # output file is in play, just get simple logger before
+        # the actual configuration is known.
+        self._init_logging(Logging.create_logger())
 
         # load config and create module list
         self._load_config()
@@ -488,11 +484,8 @@ class CI(object):
             module.debug('destroying myself')
             module.destroy()
         # pylint: disable=broad-except
-        except Exception as e:
-            exstr = 'error in destroy function: %s\n' % str(e)
-            sys.stderr.write(exstr)
-            if self.get_config('verbose') or self.get_config('debug'):
-                traceback.print_exc()
+        except Exception:
+            self.exception('error in destroy function')
 
     def destroy_modules(self):
         if self.module_instances:
@@ -556,11 +549,19 @@ class CI(object):
             if value is not None:
                 self.config[opt] = value
 
-        # open output file if needed
-        if self.config['output']:
-            self.output_file = open(self.config['output'], 'w')
-            self.debug('created output file \'{}\''.format(self.config['output']))
-            atexit.register(self._close_output_file)
+        # re-create logger - now we have all necessary configuration
+        level = logging.INFO
+        if self.config['debug'] or self.config['verbose']:
+            level = logging.VERBOSE
+
+            if not self.config['verbose']:
+                level = logging.DEBUG
+
+        elif self.config['quiet']:
+            level = logging.WARNING
+
+        logger = Logging.create_logger(output_file=self.config['output'], level=level)
+        self._init_logging(logger)
 
     def module_list(self):
         return sorted(self.modules)
@@ -626,53 +627,3 @@ class CI(object):
             sys.stdout.write(' \\\n  {0} {1}'.format(
                 module.keys()[0], ' '.join(module.values()[0])))
         sys.stdout.write('\n')
-
-    def log(self, msg, level=None):
-        """
-        Implements the actual output of logging messages. Based on its level,
-        writes the message to proper stream, and adds a copy to output file
-        if it's opened.
-
-        :param string level: If set, denotes debug level other than "info". 'D' as "debug",
-            'V' as "verbose", and "W" as "warning" are supported.
-        :param string msg: the actual message.
-        """
-
-        msg = '[{0}] [{1}] {2}\n'.format(
-            '+' if level is None else level,
-            datetime.datetime.now().strftime('%X.%f'),
-            msg)
-
-        if level == 'D' and self.config['debug']:
-            sys.stderr.write(msg)
-
-        elif level == 'V' and (self.config['verbose'] or self.config['debug']):
-            sys.stderr.write(msg)
-
-        elif level == 'W':
-            sys.stderr.write(msg)
-
-        elif level is None and not self.config['quiet']:
-            sys.stdout.write(msg)
-
-        if self.output_file:
-            self.output_file.write(msg)
-
-    def _close_output_file(self):
-        """
-        If opened, close output file used for logging.
-
-        This method was registered with atexit.
-        """
-
-        if self.output_file is None:
-            return
-
-        self.debug('closing output file \'{}\''.format(self.config['output']))
-
-        # To make sure we have all buffered output written - close() does *not* guarantee
-        # flushing of internal buffer(s).
-        self.output_file.flush()
-        self.output_file.close()
-
-        self.output_file = None

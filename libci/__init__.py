@@ -3,6 +3,7 @@ from .ci import CIError
 from .ci import CIRetryError
 from .ci import Module
 from .ci import retry
+from .log import Logging
 from . import utils
 
 try:
@@ -15,5 +16,6 @@ __all__ = ['__version__',
            'CIError',
            'CIRetryError',
            'Module',
+           'Logging',
            'retry',
            'utils']
