@@ -15,3 +15,7 @@
     builders:
         - shell: |
             citool brew --id $id rpmdiff --type analysis
+    publishers:
+        - archive:
+            artifacts: '**/**'
+            allow-empty: 'true'

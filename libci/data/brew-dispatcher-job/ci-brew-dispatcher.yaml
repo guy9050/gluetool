@@ -30,3 +30,7 @@
     builders:
         - shell: |
             citool jenkins brew-dispatcher --dispatch-all
+    publishers:
+        - archive:
+            artifacts: '**/**'
+            allow-empty: 'true'
