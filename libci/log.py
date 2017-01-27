@@ -134,7 +134,7 @@ class Logging(object):
 
         if output_file is not None:
             # catch-everything file requested
-            handler = logging.FileHandler(output_file)
+            handler = logging.FileHandler(output_file, 'w')
             handler.setLevel(logging.VERBOSE)
 
             formatter = LoggingFormatter()
