@@ -110,7 +110,6 @@ class CIRpmdiff(Module):
         test_type = self.option('type')
         blacklist = self.option('blacklist')
         url = self.option('url')
-        comparison_msg = ''
 
         # override url if requested
         self.rpmdiff_cmd = ['rpmdiff-remote']
@@ -129,6 +128,7 @@ class CIRpmdiff(Module):
                 self.info('skipping blacklisted package {}'.format(self.brew_task.name))
                 return
 
+        comparison_msg = ''
         if test_type == 'comparison':
             if self.brew_task.latest is None:
                 raise CIError('could not find baseline for this build')

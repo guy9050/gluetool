@@ -4,7 +4,7 @@
     description: |
         RPMdiff analysis job
 
-        Runs RPMdiff analysis for given brew build.
+        Runs RPMdiff analysis of given brew task.
     concurrent: true
     display-name: 'ci-rpmdiff-analysis'
     parameters:
@@ -14,8 +14,13 @@
             description: 'Brew task ID.'
     builders:
         - shell: |
-            citool brew --id $id rpmdiff --type analysis
-    publishers:
+            citool brew --id $id rpmdiff --type analysis brew-build-name
+        - inject:
+            properties-file: build-name.props
+   publishers:
         - archive:
             artifacts: '**/**'
             allow-empty: 'true'
+    wrappers:
+        - build-name:
+            name: ${BUILD_NAME}

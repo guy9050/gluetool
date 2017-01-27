@@ -8,7 +8,10 @@ BREW_WEB_URL = 'https://brewweb.engineering.redhat.com/brew/'
 
 
 class BrewTask(object):
-    """ Brew task class """
+    """
+    This class provides details about a brew task resolved from internal Brew
+    instance.
+    """
     def __init__(self, module, brew_task_id, session):
         self._module = module
         self.task_id = brew_task_id
@@ -36,13 +39,15 @@ class BrewTask(object):
             target = self.task_info["request"][1]
         except IndexError:
             raise CIError('invalid build task id')
-        return BrewTarget(target, session=self.brew)
+        return BrewBuildTarget(target, session=self.brew)
 
     @property
     def scratch(self):
-        if "scratch" in self.task_info["request"][2]:
-            return self.task_info["request"][2]["scratch"]
-
+        try:
+            if "scratch" in self.task_info["request"][2]:
+                return self.task_info["request"][2]["scratch"]
+        except TypeError:
+            raise CIError('invalid build task id')
         return False
 
     @property
@@ -51,7 +56,7 @@ class BrewTask(object):
 
     @property
     def latest(self):
-        builds = self.brew.listTagged(self.target.tag, None, True, latest=2, package=self.name)
+        builds = self.brew.listTagged(self.target.destination_tag, None, True, latest=2, package=self.name)
         if self.scratch:
             latest = builds[0]["nvr"] if builds else None
         else:
@@ -131,14 +136,29 @@ class BrewTask(object):
     def release(self):
         return self.nvr.split("-")[-1]
 
+    @property
+    def full_name(self):
+        msg = ["task '{}'".format(self.task_id)]
+        if self.scratch:
+            msg.append("scratch")
+        msg.append("build '{}'".format(self.nvr))
+        msg.append("destination tag '{}'".format(self.target.destination_tag))
+        return ' '.join(msg)
 
-class BrewTarget(object):
+    @property
+    def short_name(self):
+        msg = ['S:'] if self.scratch else []
+        msg.append("{t.task_id}:{t.nvr}".format(t=self))
+        return ''.join(msg)
+
+
+class BrewBuildTarget(object):
     def __init__(self, target_name, session):
         self.target = target_name
         self.brew = session
 
     @property
-    def tag(self):
+    def destination_tag(self):
         try:
             return self.brew.getBuildTarget(self.target)["dest_tag_name"]
         except TypeError:
@@ -161,17 +181,13 @@ class BrewTarget(object):
         if self.is_rhscl():
             return re.sub("rhscl-([^-]*).*", "\\1", self.target)
         else:
-            print "ERROR: rhscl_ver() is only for RHSCL targets"
-            msg = "Called method BrewTarget.rhscl_ver() is only for rhscl targets. Run on target %s" % (self.target)
-            raise CIError(msg)
+            raise CIError("build target '{}' is not an RHSCL target".format(self.target))
 
     def dts_ver(self):
         if self.is_dts():
             return re.sub("devtoolset-([^-]*).*", "\\1", self.target)
         else:
-            print "ERROR: dts_ver() is only for DTS targets"
-            msg = "Called method BrewTarget.dts_ver() is only for dts targets. Run on target %s" % (self.target)
-            raise CIError(msg)
+            raise CIError("build target '{}' is not a DTS target".format(self.target))
 
     def collection(self):
         if self.is_rhscl():
@@ -179,9 +195,7 @@ class BrewTarget(object):
         elif self.is_dts():
             return re.sub("(devtoolset-[^.-]*).*", "\\1", self.target)
         else:
-            print "ERROR: collection() is only for RHSCL"
-            msg = "Called method BrewTarget.collection() is only for rhscl targets. Run on target %s" % (self.target)
-            raise CIError(msg)
+            raise CIError("build target '{}' is not a RHSCL target".format(self.target))
 
     @staticmethod
     def is_extras_target(target):
@@ -224,8 +238,4 @@ class CIBrew(libci.Module):
 
         # print information about the task
         self.brew_task_instance = BrewTask(self, task_id, brew_instance)
-        self.info("task '{}' {} build with nvr '{}' build-target '{}'".format(
-            task_id,
-            'scratch' if self.brew_task_instance.scratch else '',
-            self.brew_task_instance.nvr,
-            self.brew_task_instance.target.target))
+        self.info(self.brew_task_instance.full_name)

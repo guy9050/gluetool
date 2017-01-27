@@ -29,8 +29,13 @@
             AND method = 'build'
     builders:
         - shell: |
-            citool jenkins brew-dispatcher --dispatch-all
+            citool jenkins brew-dispatcher --dispatch-all brew --id $id brew-build-name
+        - inject:
+            properties-file: build-name.props
     publishers:
         - archive:
             artifacts: '**/**'
             allow-empty: 'true'
+    wrappers:
+        - build-name:
+            name: ${BUILD_NAME}
