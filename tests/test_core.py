@@ -1,5 +1,6 @@
 # pylint: disable=blacklisted-name
 
+import logging
 import pytest
 
 import libci
@@ -7,6 +8,146 @@ import libci
 
 def test_import_sanity():
     libci.CI()
+
+
+def test_run_command(monkeypatch, caplog):
+    # pylint: disable-msg=line-too-long,too-many-statements
+
+    import errno
+    import subprocess
+    from libci.utils import run_command, DEVNULL
+
+    def caplog_clear():
+        caplog.handler.records = []
+
+    def assert_logging(record_count, cmd, stdout=None, stderr=None):
+        assert len(caplog.records) == record_count
+        assert all([r.levelno == logging.DEBUG for r in caplog.records])
+
+        assert caplog.records[0].message == cmd
+
+        if stdout is not None:
+            assert caplog.records[1].message == stdout
+
+        if stderr is not None:
+            assert caplog.records[2].message == stderr
+
+    # Accept lists only
+    caplog_clear()
+    with pytest.raises(AssertionError, message='Only list of strings accepted as a command'):
+        run_command('/bin/ls')
+
+    with pytest.raises(AssertionError, message='Only list of strings accepted as a command'):
+        run_command(['/bin/ls', 13])
+
+    # Test some common binary
+    caplog_clear()
+    output = run_command(['/bin/ls', '/'])
+    assert output.exit_code == 0
+    assert 'bin' in output.stdout
+    assert output.stderr == ''
+    assert_logging(3, "run command: cmd='['/bin/ls', '/']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}",
+                   stderr='stderr:\n------------------\n\n------------------')
+
+    assert caplog.records[1].message.startswith('stdout:\n------------------\n')
+    assert caplog.records[1].message.endswith('\n------------------')
+    assert len(caplog.records[1].message.split('\n')) >= 5
+
+    # Test non-existent binary
+    caplog_clear()
+    with pytest.raises(libci.CIError, message="Command '/bin/non-existent-binary' not found"):
+        run_command(['/bin/non-existent-binary'])
+
+    assert_logging(1, "run command: cmd='['/bin/non-existent-binary']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
+
+    # Test existing but failing binary
+    with pytest.raises(libci.CICommandError, message="Command '/bin/false' failed with exit code 1") as excinfo:
+        run_command(['/bin/false'])
+
+    assert_logging(4, "run command: cmd='['/bin/non-existent-binary']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
+    assert excinfo.value.output.exit_code == 1
+    assert excinfo.value.output.stdout == ''
+    assert excinfo.value.output.stderr == ''
+
+    # Test stdout and stderr are not mixed together
+    caplog_clear()
+    cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
+    output = run_command(cmd)
+    assert output.exit_code == 0
+    assert output.stdout == 'This goes to stdout\n'
+    assert output.stderr == 'This goes to stderr\n'
+    assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}",
+                   stdout='stdout:\n------------------\nThis goes to stdout\n\n------------------',
+                   stderr='stderr:\n------------------\nThis goes to stderr\n\n------------------')
+
+    # Test overriding stdout and stderr
+    caplog_clear()
+    cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
+    output = run_command(cmd, stdout=DEVNULL)
+    assert output.exit_code == 0
+    assert output.stdout is None
+    assert output.stderr == 'This goes to stderr\n'
+    assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'DEVNULL'}",
+                   stdout='  command produced no output on stdout',
+                   stderr='stderr:\n------------------\nThis goes to stderr\n\n------------------')
+
+    caplog_clear()
+    cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
+    output = run_command(cmd, stderr=DEVNULL)
+    assert output.exit_code == 0
+    assert output.stdout == 'This goes to stdout\n'
+    assert output.stderr is None
+    assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', args=(), kwargs={'stderr': 'DEVNULL', 'stdout': 'PIPE'}",
+                   stdout='stdout:\n------------------\nThis goes to stdout\n\n------------------',
+                   stderr='  command produced no output on stderr')
+
+    # Test merging stdout & stderr into one
+    caplog_clear()
+    cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
+    output = run_command(cmd, stderr=subprocess.STDOUT)
+    assert output.exit_code == 0
+    assert output.stdout == 'This goes to stdout\nThis goes to stderr\n'
+    assert output.stderr is None
+    assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', args=(), kwargs={'stderr': 'STDOUT', 'stdout': 'PIPE'}",
+                   stdout='stdout:\n------------------\nThis goes to stdout\nThis goes to stderr\n\n------------------',
+                   stderr='  command produced no output on stderr')
+
+    # Pass weird stdout value, and test its formatting in log
+    stdout = (13, 17)
+    caplog_clear()
+    cmd = ['/bin/ls']
+    with pytest.raises(AttributeError, message="'tuple' object has no attribute 'fileno'"):
+        run_command(cmd, stdout=stdout)
+
+    assert_logging(1, "run command: cmd='['/bin/ls']', args=(), kwargs={'stderr': 'PIPE', 'stdout': (13, 17)}")
+
+    # OSError(ENOENT) raised by Popen should be translated to CIError
+    def faulty_popen_enoent(*args, **kwargs):
+        # pylint: disable=unused-argument
+        raise OSError(errno.ENOENT, '')
+
+    caplog_clear()
+    monkeypatch.setattr(subprocess, 'Popen', faulty_popen_enoent)
+
+    with pytest.raises(libci.CIError, message="Command '/bin/ls' not found"):
+        run_command(['/bin/ls'])
+
+    assert_logging(1, "run command: cmd='['/bin/ls']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
+    monkeypatch.undo()
+
+    # While other OSError instances simply pass through
+    def faulty_popen_foo(*args, **kwargs):
+        # pylint: disable=unused-argument
+        raise OSError('foo')
+
+    caplog_clear()
+    monkeypatch.setattr(subprocess, 'Popen', faulty_popen_foo)
+
+    with pytest.raises(OSError, message='foo'):
+        run_command(['/bin/ls'])
+
+    assert_logging(1, "run command: cmd='['/bin/ls']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
+    monkeypatch.undo()
 
 
 def test_check_for_commands():

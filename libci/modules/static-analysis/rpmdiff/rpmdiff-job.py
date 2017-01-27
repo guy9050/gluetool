@@ -1,9 +1,10 @@
 import os
-import subprocess
 from libci import Module
 from libci import CIError
 from libci import utils
+from libci.utils import run_command
 from jenkinsapi.custom_exceptions import UnknownJob
+
 
 # Jenkins Job Builder YAML
 CMP_JOB_NAME = 'ci-rpmdiff-comparison'
@@ -68,12 +69,8 @@ This module requires an available Jenkins connection - via the jenkins module.
             raise CIError('id not found in environment')
 
     def update_job(self):
-        out = subprocess.check_output(['jenkins-jobs',
-                                       '--flush-cache',
-                                       'update',
-                                       self.yaml],
-                                      stderr=subprocess.STDOUT)
-        self.debug(out)
+        run_command(['jenkins-jobs', '--flush-cache', 'update', self.yaml])
+
         # reconnect to jenkins
         self.jenkins = self.shared('jenkins', reconnect=True)
 

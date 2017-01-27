@@ -1,10 +1,11 @@
 import json
 import re
-import subprocess
 import time
 from libci import Module
-from libci import CIError
+from libci import CIError, CICommandError
 from libci import utils
+from libci.utils import run_command
+
 
 RPMDIFF_PASS_STATES = ["Passed", "Info", "Waived", "Needs inspection"]
 REQUIRED_CMDS = ['rpmdiff-remote']
@@ -62,9 +63,18 @@ class CIRpmdiff(Module):
             raise CIError(msg)
         return match.group(1)
 
+    @staticmethod
+    def _run_command(command):
+        try:
+            return run_command(command)
+
+        except CICommandError as exc:
+            raise CIError("Failure during 'rpmdiff-remote' execution: {}".format(exc.output.stderr))
+
     def _get_runinfo(self, task_id):
         command = self.rpmdiff_cmd + ["runinfo", task_id]
-        return json.loads(self._run_command(command))
+
+        return json.loads(CIRpmdiff._run_command(command).stdout)
 
     def _wait_until_finished(self, task_id):
         start_time = time.time()
@@ -77,20 +87,6 @@ class CIRpmdiff(Module):
             runinfo = self._get_runinfo(task_id)
         return runinfo
 
-    def _run_command(self, command):
-        msg = "command: {}".format(subprocess.list2cmdline(command))
-        self.verbose(msg)
-        process = subprocess.Popen(command, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
-        p_status = process.wait()
-        (p_out, p_err) = process.communicate()
-        self.debug("stdout: {}".format(p_out or "no output"))
-        self.debug("stderr: {}".format(p_err or "no output"))
-        if p_status > 0:
-            msg = "Failure during command execution: {}".format(p_err)
-            raise CIError(msg)
-        return p_out
-
     def _run_rpmdiff(self, test_type, nvr_baseline=None):
         if self.brew_task.scratch:
             command = self.rpmdiff_cmd + ["schedule", str(self.brew_task.task_id)]
@@ -100,7 +96,7 @@ class CIRpmdiff(Module):
         if test_type == 'comparison':
             command += ["--baseline", nvr_baseline]
 
-        out = self._run_command(command)
+        out = CIRpmdiff._run_command(command).stdout
         # once we have valid JSON, we can parse taht here
         self.info("web url: {}".format(self._parse_web_url(out)))
         run_id = self._parse_run_id(out)
