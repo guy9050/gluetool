@@ -110,7 +110,7 @@ class CIRpmdiff(Module):
         test_type = self.option('type')
         blacklist = self.option('blacklist')
         url = self.option('url')
-        latest = None
+        comparison_msg = ''
 
         # override url if requested
         self.rpmdiff_cmd = ['rpmdiff-remote']
@@ -119,38 +119,24 @@ class CIRpmdiff(Module):
 
         # get a brew task instance
         self.brew_task = self.shared('brew_task')
-        if not self.brew_task:
+        if self.brew_task is None:
             raise CIError('no brew build found, did you run brew module?')
-
-        # get target from the brewtask
-        target = self.brew_task.target.target
 
         # blacklist packages
         if blacklist is not None:
             self.verbose('blacklisted packages: {}'.format(blacklist))
             if self.brew_task.name in blacklist.split(','):
-                self.info("skipping blacklisted package '{}'".format(self.brew_task.name))
+                self.info('skipping blacklisted package {}'.format(self.brew_task.name))
                 return
 
-        # Build log message
-        comparison_msg = ''
-
         if test_type == 'comparison':
-            if not self.brew_task.latest:
+            if self.brew_task.latest is None:
                 raise CIError('could not find baseline for this build')
+            comparison_msg = 'compared to {}'.format(self.brew_task.latest)
 
-            comparison_msg = "build of '{}' compared to '{}'".format(self.brew_task.nvr, self.brew_task.latest)
+        self.info("running {} for task '{}'{}".format(test_type, self.brew_task.task_id, comparison_msg))
 
-        msg = "{test_type} for {is_scratch} build of '{build}' {comparison} with build-target {target}".format(
-            test_type=test_type,
-            is_scratch=('scratch' if self.brew_task.scratch else ''),
-            build=self.brew_task.nvr,
-            comparison=comparison_msg,
-            target=target)
-
-        self.info(msg)
-
-        runinfo = self._run_rpmdiff(test_type, latest)
+        runinfo = self._run_rpmdiff(test_type, self.brew_task.latest)
         if runinfo['overall_score']['description'] in RPMDIFF_PASS_STATES:
             result = 'Passed'
         else:
