@@ -9,3 +9,6 @@ libatt.egg-info
 *.egg-info
 .eggs
 .cache
+
+# coverage data files
+**/.coverage*
