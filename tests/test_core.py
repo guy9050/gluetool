@@ -165,6 +165,67 @@ def test_check_for_commands():
             libci.utils.check_for_commands([cmd])
 
 
+def test_cached_property():
+    from libci.utils import cached_property
+
+    counter = {
+        'count': 0
+    }
+
+    class DummyClass(object):
+        # pylint: disable=too-few-public-methods
+        @cached_property
+        def foo(self):
+            # pylint: disable=no-self-use
+            counter['count'] += 1
+            return counter['count']
+
+        @cached_property
+        def bar(self):
+            # pylint: disable=no-self-use
+            raise Exception('This property raised an exception')
+
+    obj = DummyClass()
+    assert counter['count'] == 0
+    assert 'foo' not in obj.__dict__
+    assert 'bar' not in obj.__dict__
+
+    # first access should increase the counter
+    assert 'bar' not in obj.__dict__
+    assert obj.foo == 1
+    assert counter['count'] == 1
+    assert obj.__dict__['foo'] == 1
+
+    # the second access should return cached value
+    assert 'bar' not in obj.__dict__
+    assert obj.foo == 1
+    assert counter['count'] == 1
+    assert obj.__dict__['foo'] == 1
+
+    # increase counter, and observe property
+    counter['count'] += 1
+    assert 'bar' not in obj.__dict__
+    assert obj.foo == 1
+    assert obj.__dict__['foo'] == 1
+
+    # remove attribute, and try again - this should clear the cache
+    del obj.foo
+    assert 'bar' not in obj.__dict__
+    assert obj.foo == 3
+    assert counter['count'] == 3
+    assert obj.__dict__['foo'] == 3
+
+    # when exception is raised, there should be no changes in __dict__
+    with pytest.raises(Exception, message='This property raised an exception'):
+        # pylint: disable=pointless-statement
+        obj.bar
+
+    assert obj.foo == 3
+    assert counter['count'] == 3
+    assert obj.__dict__['foo'] == 3
+    assert 'bar' not in obj.__dict__
+
+
 #
 # Modules
 #

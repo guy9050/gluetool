@@ -109,3 +109,37 @@ def check_for_commands(cmds):
 
         except CIError:
             raise CIError("Command '{}' not found on the system".format(cmd))
+
+
+class cached_property(object):
+    # pylint: disable=invalid-name,too-few-public-methods
+    """
+    `property`-like decorator - at first access, it calls decorated
+    method to acquire the real value, and then replaces itself with
+    this value, making it effectively "cached". Useful for properties
+    whose value does not change over time, and where getting the real
+    value could penalize execution with unnecessary (network, memory)
+    overhead.
+
+    Delete attribute to clear the cached value - on next access, decorated
+    method will be called again, to acquire the real value.
+
+    Of possible options, only read-only instance attribute access is
+    supported so far.
+    """
+
+    def __init__(self, method):
+        self._method = method
+        self.__doc__ = getattr(method, '__doc__')
+
+    def __get__(self, obj, cls):
+        # does not support class attribute access, only instance
+        assert obj is not None
+
+        # get the real value of this property
+        value = self._method(obj)
+
+        # replace cached_property instance with the value
+        obj.__dict__[self._method.__name__] = value
+
+        return value
