@@ -13,13 +13,30 @@ logging.VERBOSE = 5
 logging.addLevelName(logging.VERBOSE, 'VERBOSE')
 
 
-def verbose(self, message, *args, **kwargs):
+def verbose_logger(self, message, *args, **kwargs):
     if self.isEnabledFor(logging.VERBOSE):
         # pylint: disable-msg=protected-access
         self._log(logging.VERBOSE, message, args, **kwargs)
 
 
-logging.Logger.verbose = verbose
+def verbose_adapter(self, message, *args, **kwargs):
+    message, kwargs = self.process(message, kwargs)
+    self.logger.verbose(message, *args, **kwargs)
+
+
+logging.Logger.verbose = verbose_logger
+logging.LoggerAdapter.verbose = verbose_adapter
+
+
+class ModuleAdapter(logging.LoggerAdapter):
+    """
+    Custom logger adapter, adding context (module) info to the messages.
+
+    So far, we're interested only in module name.
+    """
+
+    def __init__(self, logger, module):
+        super(ModuleAdapter, self).__init__(logger, {'module_name': module.name})
 
 
 class LoggingFormatter(logging.Formatter):
@@ -41,17 +58,24 @@ class LoggingFormatter(logging.Formatter):
     log_tracebacks = False
 
     def format(self, record):
-        exc_text = ''
+        fmt = ['[{stamp}]', '[{level}]', '{msg}']
+        values = {
+            'stamp': self.formatTime(record, datefmt='%H:%M:%S'),
+            'level': LoggingFormatter._level_tags[record.levelno],
+            'msg': record.getMessage()
+        }
 
         if record.exc_info \
                 and (self.log_tracebacks is True or Logging.stderr_handler.level in (logging.DEBUG, logging.VERBOSE)):
-            exc_text = '\n' + self.formatException(record.exc_info)
+            fmt.append('{exc_text}')
+            values['exc_text'] = '\n' + self.formatException(record.exc_info)
 
-        return '[{stamp}] [{level}] {msg} {exc_text}'.format(
-            stamp=self.formatTime(record, datefmt='%H:%M:%S'),
-            level=LoggingFormatter._level_tags[record.levelno],
-            msg=record.getMessage(),
-            exc_text=exc_text)
+        if hasattr(record, 'module_name'):
+            # add module name between level and message
+            fmt.insert(2, '[{module_name}]')
+            values['module_name'] = record.module_name
+
+        return ' '.join(fmt).format(**values)
 
 
 class Logging(object):

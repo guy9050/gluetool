@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 
-from .log import Logging
+from .log import Logging, ModuleAdapter
 
 
 CONFIGS = ['/etc/citool', os.path.expanduser('~/.citool.d/citool')]
@@ -93,13 +93,14 @@ class Module(object):
 
         # initialize logging helpers
         # definitely could be done in loop + setattr but pylint can't decode that :(
-        logger = Logging.get_logger()
-        self.verbose = logger.verbose
-        self.debug = logger.debug
-        self.info = logger.info
-        self.warn = logger.warn
-        self.error = logger.error
-        self.exception = logger.exception
+        self._logger_adapter = adapter = ModuleAdapter(Logging.get_logger(), self)
+
+        self.verbose = adapter.verbose
+        self.debug = adapter.debug
+        self.info = adapter.info
+        self.warn = adapter.warning
+        self.error = adapter.error
+        self.exception = adapter.exception
 
         # configuration parser
         self.config_parser = None
