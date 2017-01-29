@@ -346,115 +346,196 @@ class CI(object):
     def get_config(self, key):
         return self.config[key]
 
-    def _load_modules(self):
-        ppaths = self.get_config('module_path') or MODULE_PATH
-        self.debug('loading modules from these paths: {}'.format(ppaths))
-        for ppath in ppaths:
-            self._load_module_path(ppath)
+    #
+    # Module loading
+    #
+    def _check_module_file(self, mfile):
+        """
+        Make sure the file looks like a `citool` module:
+          - can be processed by Python parser,
+          - imports `libci.CI` and `libci.Module`,
+          - contains child class of `libci.Module`.
 
-    @staticmethod
-    def _check_module_file(mfile):
-        """ Return True if if module file contains libci import and Module
-            class definition """
-        libci_found = False
+        :param str mfile: path to a file.
+        :returns: `True` if file contains `citool` module, `False` otherwise.
+        :raises libci.CIError: when it's not possible to finish the check.
+        """
 
-        libci_module_found = False
+        self.debug("check possible module file '{}'".format(mfile))
 
-        # print 'processing file: {}'.format(mfile)
-        with open(mfile) as f:
-            node = ast.parse(f.read())
-            # print 'body: {}'.format(node.__dict__['body'])
+        try:
+            with open(mfile) as f:
+                node = ast.parse(f.read())
 
             # check for libci import
-            for item in node.__dict__['body']:
-                # print 'processing item: {}'.format(item)
-                if item.__class__.__name__ == 'Import':
-                    if item.names[0].name == 'libci':
-                        libci_found = True
-                        break
+            def imports_libci(item):
+                """
+                Return `True` if item is an `import` statement, and imports `libci`.
+                """
 
-                if item.__class__.__name__ == 'ImportFrom':
-                    if item.module == 'libci':
-                        libci_found = True
-                        break
+                return (item.__class__.__name__ == 'Import' and item.names[0].name == 'libci') \
+                    or (item.__class__.__name__ == 'ImportFrom' and item.module == 'libci')
+
+            if not any((imports_libci(item) for item in node.__dict__['body'])):
+                self.debug("  no 'import libci' found")
+                return False
 
             # check for libci.Module class definition
-            for item in node.__dict__['body']:
-                # print 'processing item: {}'.format(item)
-                if item.__class__.__name__ == 'ClassDef':
-                    for base in item.bases:
-                        try:
-                            if base.id == 'Module':
-                                libci_module_found = True
-                                break
-                        except AttributeError:
-                            pass
-                        try:
-                            if base.attr == 'Module':
-                                libci_module_found = True
-                                break
-                        except AttributeError:
-                            pass
+            def has_module_class(item):
+                """
+                Return `True` if item is a class definition, and any of the base classes
+                is `libci.Module`.
+                """
 
-        # print 'found: {} {}'.format(libci_found, libci_module_found)
-        if libci_found and libci_module_found:
+                if item.__class__.__name__ != 'ClassDef':
+                    return False
+
+                for base in item.bases:
+                    if (hasattr(base, 'id') and base.id == 'Module') \
+                            or (hasattr(base, 'attr') and base.attr == 'Module'):
+                        return True
+
+                return False
+
+            if not any((has_module_class(item) for item in node.__dict__['body'])):
+                self.debug('  no child of libci.Module found')
+                return False
+
             return True
 
-        return False
+        # pylint: disable=broad-except
+        except Exception as e:
+            raise CIError("Unable to check check module file '{}': {}".format(mfile, str(e)))
 
-    def _load_module(self, module, group, filepath):
+    def _import_module(self, import_name, filename):
+        """
+        Attempt to import a Python module from a file.
+
+        :param str import_name: name assigned to the imported module.
+        :param str filepath: path to a file.
+        :returns: imported Python module.
+        :raises libci.CIError: when import failed.
+        """
+
+        self.debug("try to import module '{}' from file '{}'".format(import_name, filename))
+
+        try:
+            return imp.load_source(import_name, filename)
+
+        # pylint: disable=broad-except
+        except Exception as e:
+            raise CIError("Unable to import module '{}' from '{}': {}".format(import_name, filename, str(e)))
+
+    def _load_python_module(self, group, module_name, filepath):
+        """
+        Load Python module from a file, if it contains `citool` modules. If the
+        file does not look like it contains `citool` modules, or when it's not
+        possible to import the Python module successfully, method simply warns
+        user and ignores the file.
+
+        :param str import_name: name assigned to the imported module.
+        :param str filepath: path to a file.
+        :returns: loaded Python module.
+        :raises libci.CIError: when import failed.
+        """
+
+        # Check content of the file, look for CI and Module stuff
+        try:
+            if not self._check_module_file(filepath):
+                return
+
+        except CIError as e:
+            self.info("ignoring file '{}': {}".format(module_name, e.message))
+            return
+
+        # Try to import file as a Python module
+        import_name = 'libci.ci.{}-{}'.format(group, module_name)
+
+        try:
+            module = self._import_module(import_name, filepath)
+
+        except CIError as e:
+            self.info("ignoring module '{}': {}".format(module_name, e.message))
+            return
+
+        return module
+
+    def _load_citool_modules(self, group, module_name, filepath):
+        """
+        Load `citool` modules from a file. Method attempts to import the file
+        as a Python module, and then checks its content and adds all `citool`
+        modules to internal module registry.
+
+        :param str group: module group.
+        :param str module_name: name assigned to the imported Python module.
+        :param str filepath: path to a file.
+        :rtype: [(module_group, module_class), ...]
+        :returns: list of loaded `citool` modules
+        """
+
+        module = self._load_python_module(group, module_name, filepath)
+
+        loaded_modules = []
+
+        # Look for citool modules in imported stuff, and add them to our module registry
         for name in dir(module):
             cls = getattr(module, name)
-            try:
-                if issubclass(cls, Module) and cls != Module:
-                    if not cls.name:
-                        error = 'no module name specified'
-                        raise CIError(error)
-                    if cls.name in self.modules:
-                        # pprint.pprint(self.modules)
-                        raise CIError("{}' is a duplicate module name '{}/{}'".format(cls.name, group, filepath))
-                    # add to modules dictionary
-                    self.modules[cls.name] = {
-                        'class': cls,
-                        'description': cls.description,
-                        'group': group,
-                    }
-            except TypeError:
-                pass
+
+            if not isinstance(cls, type) or not issubclass(cls, Module) or cls == Module:
+                continue
+
+            if not hasattr(cls, 'name') or not cls.name:
+                raise CIError("No name specified by module class '{}' from file '{}'".format(
+                    cls.__name__, filepath))
+
+            if cls.name in self.modules:
+                raise CIError("Name '{}' of module '{}' from '{}' is a duplicate module name".format(
+                    cls.name, cls.__name__, filepath))
+
+            self.debug("found module '{}', group '{}', in module '{}' from '{}'".format(
+                cls.name, group, module_name, filepath))
+
+            self.modules[cls.name] = {
+                'class': cls,
+                'description': cls.description,
+                'group': group
+            }
+
+            loaded_modules.append((group, cls))
+
+        return loaded_modules
 
     def _load_module_path(self, ppath):
-        """ Load modules from modules directory """
+        """
+        Search and load `citool` modules from a directory.
+
+        In essence, it scans every file with '.py' suffix, and searches for
+        classes derived from `libci.Module`.
+
+        :param str ppath: directory to search for `citool` modules.
+        """
+
         for root, _, files in os.walk(ppath):
-            for filepath in sorted(files):
-                if not filepath.endswith('.py'):
-                    continue
-                group = root.replace(ppath + '/', '')
-                mname, _ = os.path.splitext(filepath)
-                mfile = os.path.join(root, filepath)
-                # check if the file contains a valid libci module
-                # note that various errors can happen here, just ignore
-                # them (like permission denied, syntax error, ...)
-                try:
-                    if not self._check_module_file(mfile):
-                        continue
-                # pylint: disable=broad-except
-                except Exception as e:
-                    self.info('ignoring module \'%s\' ' % mname +
-                              'from \'%s\' group' % group +
-                              ' (error: %s)' % str(e))
-                    continue
-                # try to import the module
-                try:
-                    module = imp.load_source('libci.ci.%s-%s' %
-                                             (group, mname),
-                                             mfile)
-                # pylint: disable=broad-except
-                except Exception as e:
-                    self.info('ignoring module \'{0}\' from \'{1}\' group (error: {2})'.format(
-                        mname, group, str(e)))
+            for filename in sorted(files):
+                if not filename.endswith('.py'):
                     continue
 
-                self._load_module(module, group, filepath)
+                group = root.replace(ppath + '/', '')
+                module_name, _ = os.path.splitext(filename)
+                module_file = os.path.join(root, filename)
+
+                self._load_citool_modules(group, module_name, module_file)
+
+    def _load_modules(self):
+        """
+        Load all available `citool` modules.
+        """
+
+        ppaths = self.get_config('module_path') or MODULE_PATH
+        self.debug('loading modules from these paths: {}'.format(ppaths))
+
+        for ppath in ppaths:
+            self._load_module_path(ppath)
 
     def _init_logging(self, logger):
         # definitely could be done in loop + setattr but pylint can't decode that :(
