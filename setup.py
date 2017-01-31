@@ -25,6 +25,7 @@ TESTS_REQUIRE = [
     'pytest-pylint',
     'pytest-flake8',
     'pytest-cov',
+    'pytest-catchlog',
     'pytest'
 ]
 
@@ -82,7 +83,7 @@ def update_version(version, release):
 
 
 class PyTest(TestCommand):
-    pytest_args = ['-s', '--pylint', '--flake8', '--cov=libci']
+    pytest_args = ['--pylint', '--flake8', '--cov=libci']
 
     def run_tests(self):
         # Clear importer cache - with any luck, this will get rid of (by now not existing

@@ -1,8 +1,9 @@
 import os
-import subprocess
 from libci import Module
-from libci import CIError
+from libci import CIError, CICommandError
 from libci import utils
+
+from libci.utils import run_command
 
 # Jenkins Job Builder YAML
 JOB_NAME = 'ci-brew-dispatcher'
@@ -45,13 +46,9 @@ This module requires an available Jenkins connection via 'jenkins' module.
             raise CIError('no jenkins connection found')
 
         try:
-            out = subprocess.check_output(['jenkins-jobs',
-                                           'update',
-                                           self.data_path],
-                                          stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            msg = 'failed to run jenkins-jobs\n' + e.output
-            raise CIError(msg)
-        msg = 'created/updated JJB jobs from \'{}\''.format(self.data_path)
-        self.info(msg)
-        self.debug(out)
+            run_command(['jenkins-jobs', 'update', self.data_path])
+
+        except CICommandError as exc:
+            raise CIError("Failure during 'jenkins-jobs' execution:\n{}".format(exc.output.stderr))
+
+        self.info('created/updated JJB jobs from \'{}\''.format(self.data_path))

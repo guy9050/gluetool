@@ -26,6 +26,18 @@ class CIRetryError(CIError):
     pass
 
 
+class CICommandError(CIError):
+    """
+    Exception raised when external command failes.
+    """
+
+    def __init__(self, cmd, output):
+        super(CICommandError, self).__init__("Command '{}' failed with exit code {}".format(cmd, output.exit_code))
+
+        self.cmd = cmd
+        self.output = output
+
+
 def retry(*args):
     """ Retry decorator
     This decorator catches given exceptions and returns
