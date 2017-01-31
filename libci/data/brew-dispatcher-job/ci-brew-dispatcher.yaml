@@ -27,6 +27,7 @@
           jms-selector: |
             CI_TYPE = 'brew-taskstatechange'
             AND method = 'build'
+            AND new = 'CLOSED'
     builders:
         - shell: |
             citool jenkins brew-dispatcher --dispatch-all brew --id $id brew-build-name
