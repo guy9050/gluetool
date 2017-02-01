@@ -5,9 +5,7 @@ import pytest
 
 import libci
 
-
-def test_import_sanity():
-    libci.CI()
+from . import NonLoadingCI
 
 
 def test_run_command(monkeypatch, caplog):
@@ -16,6 +14,9 @@ def test_run_command(monkeypatch, caplog):
     import errno
     import subprocess
     from libci.utils import run_command, DEVNULL
+
+    # initialize logger - this is done by CI instance but we don't have any
+    libci.Logging.create_logger()
 
     def caplog_clear():
         caplog.handler.records = []
@@ -229,23 +230,69 @@ def test_cached_property():
 #
 # Modules
 #
-class NonLoadingCI(libci.CI):
-    """
-    Current CI implementation loads modules and configs when instantiated,
-    which makes it *really* hard to make assumptions of the state of its
-    internals - they will always be spoiled by other modules, other external
-    resources the tests cannot control. So, to overcome this I use this
-    custom CI class that disables loading of modules and configs on its
-    instantiation.
 
-    See https://gitlab.cee.redhat.com/mvadkert/citool/issues/15.
-    """
+def test_check_module_file(caplog, tmpdir):
+    # pylint: disable=protected-access
 
-    def _load_modules(self):
-        pass
+    mfile = tmpdir.join('dummy.py')
+    ci = NonLoadingCI()
 
-    def _load_config(self):
-        pass
+    def caplog_clear():
+        caplog.handler.records = []
+
+    def try_pass(file_content):
+        mfile.write(file_content)
+
+        caplog_clear()
+        assert ci._check_module_file(str(mfile)) is True
+        assert caplog.records[0].message == "check possible module file '{}'".format(mfile)
+        assert caplog.records[0].levelno == logging.DEBUG
+
+    def try_fail(file_content, error):
+        mfile.write(file_content)
+
+        caplog_clear()
+        assert ci._check_module_file(str(mfile)) is False
+        assert caplog.records[0].message == "check possible module file '{}'".format(mfile)
+        assert caplog.records[0].levelno == logging.DEBUG
+        assert caplog.records[1].message == error
+        assert caplog.records[1].levelno == logging.DEBUG
+
+    # Test empty Python file
+    try_fail('pass', "  no 'import libci' found")
+
+    # Check file that imports libci but does not have module class
+    try_fail('import libci', "  no child of libci.Module found")
+    try_fail('from libci import CI', "  no child of libci.Module found")
+
+    # Check we ignore module classes with wrong base class
+    try_fail("""
+import libci
+
+class DummyModule(object):
+    pass
+""", "  no child of libci.Module found")
+
+    # Check file that does have module class, but that does not import libci
+    try_fail("""
+class DummyModule(libci.Module):
+    pass
+""", "  no 'import libci' found")
+
+    # Check file that both imports libci, and has module class
+    try_pass("""
+import libci
+
+class DummyModule(libci.Module):
+    pass
+""")
+
+    try_pass("""
+from libci import Module
+
+class DummyModule(Module):
+    pass
+""")
 
 
 class DummyModule(libci.Module):
@@ -328,6 +375,43 @@ def test_module_add_shared():
     assert ci.shared_functions == {}
 
 
+def test_module_del_shared():
+    """
+    Excercise unregistering shared functions.
+    """
+
+    ci = NonLoadingCI()
+
+    class UsefulModule(DummyModule):
+        shared_functions = ['foo', 'bar']
+
+        def foo(self):
+            pass
+
+        def bar(self):
+            pass
+
+    mod = UsefulModule(ci)
+
+    mod.add_shared()
+    assert sorted(ci.shared_functions.keys()) == ['bar', 'foo']
+
+    # Remove shared function
+    mod.del_shared('foo')
+    assert 'foo' not in ci.shared_functions
+
+    ci.del_shared('bar')
+    assert ci.shared_functions == {}
+
+    # Try removing unknown shared function
+    # foo is now already removed, right?
+    mod.del_shared('foo')
+    assert ci.shared_functions == {}
+
+    ci.del_shared('foo')
+    assert ci.shared_functions == {}
+
+
 def test_module_shared():
     """
     Call shared functions.
@@ -350,3 +434,7 @@ def test_module_shared():
 
     # it should produce the same result when called directly
     assert mod.shared('foo', 'a', 13, baz='1335') == "foo: ('a', 13), {'baz': '1335'}"
+
+    # call to unknown shared function returns nothing
+    assert ci.shared('bar', 'a', 13, baz='1335') is None
+    assert mod.ci.shared('bar', 'a', 13, baz='1335') is None
