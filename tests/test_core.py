@@ -209,12 +209,13 @@ def test_module_instantiate():
 
     assert mod.ci == ci
 
-    assert mod.debug == libci.Logging.get_logger().debug
-    assert mod.verbose == libci.Logging.get_logger().verbose
-    assert mod.info == libci.Logging.get_logger().info
-    assert mod.warn == libci.Logging.get_logger().warn
-    assert mod.error == libci.Logging.get_logger().error
-    assert mod.exception == libci.Logging.get_logger().exception
+    # pylint: disable=protected-access
+    assert mod.debug == mod._logger_adapter.debug
+    assert mod.verbose == mod._logger_adapter.verbose
+    assert mod.info == mod._logger_adapter.info
+    assert mod.warn == mod._logger_adapter.warning
+    assert mod.error == mod._logger_adapter.error
+    assert mod.exception == mod._logger_adapter.exception
 
     assert mod.config_parser is None
     # pylint: disable-msg=protected-access
