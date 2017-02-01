@@ -83,9 +83,27 @@ def update_version(version, release):
 
 
 class PyTest(TestCommand):
-    pytest_args = ['--pylint', '--flake8', '--cov=libci']
+    default_pytest_args = ['--pylint', '--flake8', '--cov=libci']
+
+    user_options = [
+        ('pytest-args=', 'a', 'Arguments to pass to pytest')
+    ]
+
+    def initialize_options(self):
+        TestCommand.initialize_options(self)
+
+        # pylint: disable=attribute-defined-outside-init
+        self.pytest_args = None
 
     def run_tests(self):
+        passed_pytest_args = []
+
+        if self.pytest_args is not None:
+            import shlex
+            passed_pytest_args = shlex.split(self.pytest_args)
+
+        pytest_args = passed_pytest_args if passed_pytest_args else self.default_pytest_args
+
         # Clear importer cache - with any luck, this will get rid of (by now not existing
         # anymore) /tmp/easy_install-* paths that, for reasons unknown to mere mortals, were
         # given priority over the correct locations in .eggs/.
@@ -93,8 +111,10 @@ class PyTest(TestCommand):
         # "Unable to import" error.
         sys.path_importer_cache.clear()
 
+        print 'pytest options: %s' % pytest_args
+
         import pytest
-        errno = pytest.main(self.pytest_args)
+        errno = pytest.main(pytest_args)
         sys.exit(errno)
 
 
