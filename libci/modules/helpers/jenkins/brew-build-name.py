@@ -24,6 +24,7 @@ class CIBrewBuildName(Module):
             name: ${BUILD_NAME}
     """
     name = 'brew-build-name'
+    description = 'Create an Jenkins property file with details about brew task'
 
     options = {
         'output': {
