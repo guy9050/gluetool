@@ -1,5 +1,6 @@
 import os
 import re
+import shlex
 import yaml
 
 from libci import Module
@@ -27,10 +28,6 @@ class CIBrewDispatcher(Module):
         # 'list': {
         #    'help': 'List dispatcher configuration',
         # },
-        'dispatch-all': {
-            'help': 'Dispatch all builds (default: false)',
-            'action': 'store_true',
-        },
         'release': {
             'help': 'Package release',
         },
@@ -70,8 +67,10 @@ class CIBrewDispatcher(Module):
         self.debug('packages: {}'.format(self.names))
 
         # defaults
-        self.default_tests = self.config['defaults']['tests']
-        self.default_targets = self.config['defaults']['targets']
+        try:
+            self.default_tests = self.config['default']
+        except KeyError:
+            self.default_tests = []
 
     def verify(self):
         pass
@@ -90,8 +89,8 @@ class CIBrewDispatcher(Module):
 
     def get_tests(self):
         try:
-            if self.config['packages'][self.build['name']]['tests']:
-                return self.config['packages'][self.build['name']]['tests']
+            if self.config['packages'][self.build['name']]:
+                return self.config['packages'][self.build['name']]
         except (KeyError, TypeError):
             return self.default_tests
 
@@ -114,29 +113,13 @@ class CIBrewDispatcher(Module):
             self.verbose("dispatching module '{}' for enabled package '{}' for target '{}'".format(
                 test, self.build['name'], self.build['target']))
 
-            module = test.split()[0]
-            args = test.split()[1:]
+            module = shlex.split(test)[0]
+            args = shlex.split(test)[1:]
 
-            # replace $var with build variable var
-            for i, arg in enumerate(args):
-                if arg[0] == '$':
-                    try:
-                        value = self.build[arg[1:]]
-                        self.verbose("replacing '{}' with internal value '{}'".format(arg, value))
-                        args[i] = value
-                    except KeyError:
-                        raise CIError("could not replace '{}'".format(arg))
-
+            print 'module:' + module
+            print args
             self.run_module(module, args)
 
     def execute(self):
-        dispatch_all = self.option('dispatch-all')
-
-        if self.build['name'] not in self.names and not dispatch_all:
-            self.info('package \'{}\' not enabled'.format(self.build['name']))
-            return
-
-        if dispatch_all or self.check_target():
-            self.dispatch_tests()
-        else:
-            self.info("package '{}' not enabled for target '{}'".format(self.build['name'], self.build['target']))
+        self.dispatch_tests()
+        # self.info("package '{}' not enabled for target '{}'".format(self.build['name'], self.build['target']))
