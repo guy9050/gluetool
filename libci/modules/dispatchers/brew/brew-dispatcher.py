@@ -116,8 +116,6 @@ class CIBrewDispatcher(Module):
             module = shlex.split(test)[0]
             args = shlex.split(test)[1:]
 
-            print 'module:' + module
-            print args
             self.run_module(module, args)
 
     def execute(self):
