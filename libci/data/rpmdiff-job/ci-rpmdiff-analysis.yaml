@@ -17,7 +17,7 @@
             citool brew --id $id rpmdiff --type analysis brew-build-name
         - inject:
             properties-file: build-name.props
-   publishers:
+    publishers:
         - archive:
             artifacts: '**/**'
             allow-empty: 'true'
