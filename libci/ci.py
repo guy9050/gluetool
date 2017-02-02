@@ -9,7 +9,7 @@ import sys
 from .log import Logging, ModuleAdapter
 
 
-CONFIGS = ['/etc/citool', os.path.expanduser('~/.citool.d/citool')]
+CONFIGS = ['/etc/citool.d/citool', os.path.expanduser('~/.citool.d/citool')]
 MODULE_CONFIG_PATHS = ['/etc/citool.d/config',
                        os.path.expanduser('~/.citool.d/config')]
 MODULE_PATH = [os.path.dirname(os.path.abspath(__file__)) + '/modules']
