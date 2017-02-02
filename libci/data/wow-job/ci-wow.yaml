@@ -1,0 +1,28 @@
+- job:
+    name: 'ci-wow'
+    node: beaker
+    description: |
+        Run testing via beaker workflow tomorrow.
+    concurrent: true
+    display-name: 'ci-wow'
+    parameters:
+        - string:
+            name: args
+            default: ''
+            description: 'Additional args for bkr workflow tomorrow'
+        - string:
+            name: id
+            default: ''
+            description: 'Brew task ID.'
+    builders:
+        - shell: |
+            citool brew --id $id brew-build-name guess-distro wow $args
+        - inject:
+            properties-file: build-name.props
+    publishers:
+        - archive:
+            artifacts: '**/**'
+            allow-empty: 'true'
+    wrappers:
+        - build-name:
+            name: ${BUILD_NAME}
