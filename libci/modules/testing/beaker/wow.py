@@ -1,7 +1,6 @@
-from libci import CIError, CICommandError, Module
-from libci import utils
+from libci import CIError, CICommandError, Module, utils
 
-REQUIRED_COMMANDS = ['bkr']
+REQUIRED_COMMANDS = ['bkr', 'beaker-jobwatch']
 
 
 class CIWow(Module):
@@ -26,9 +25,20 @@ class CIWow(Module):
         brew_task = ['--brew-task', str(task.task_id)] if task is not None else []
         whiteboard = "CI run for '{}' for brew task id '{}'".format(task.nvr, task.task_id)
         try:
-            command = ['bkr', 'workflow-tomorrow', '--whiteboard', whiteboard]
+            command = ['bkr', 'workflow-tomorrow', '--id', '--whiteboard', whiteboard]
             command += distro + brew_task + self.args
             output = utils.run_command(command)
         except CICommandError as exc:
             raise CIError(exc.output.stderr)
-        self.info('output follows\n{}'.format(output.stdout + output.stderr))
+        self.info('wow run succesfully with output:\n{}'.format(output.stderr))
+
+        # beaker-jobwatch
+        jobs = []
+        for job in output.stdout.split():
+            jobs += ['--job', job]
+        try:
+            command = ['beaker-jobwatch'] + jobs
+            self.info('running "{}"'.format(' '.join(command)))
+            utils.run_command(command, stdout=utils.PARENT)
+        except CICommandError as exc:
+            raise CIError(exc.output.stderr)
