@@ -75,18 +75,6 @@ class CIBrewDispatcher(Module):
     def verify(self):
         pass
 
-    def check_target(self):
-        try:
-            if self.config['packages'][self.build['name']]['targets']:
-                targets = self.config['packages'][self.build['name']]['targets']
-        except (KeyError, TypeError):
-            targets = self.default_targets
-
-        for target in targets:
-            if re.search(target, self.build['target']):
-                return True
-        return False
-
     def get_tests(self):
         try:
             if self.config['packages'][self.build['name']]:
