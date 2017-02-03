@@ -1,6 +1,7 @@
 import re
 from libci import CIError, Module
 
+
 class CIGuessCompose(Module):
     """
     Guess compose from build target. Currently these translations
@@ -19,7 +20,7 @@ class CIGuessCompose(Module):
     distro_value = None
 
     def distro(self):
-        ""
+        """ return guessed distro value """
         return self.distro_value
 
     def execute(self):
@@ -31,11 +32,11 @@ class CIGuessCompose(Module):
         task = self.shared('brew_task')
         if task is None:
             raise CIError('no brew build found, did you run brew module')
-        m = re.match(r'(staging-)?(rhel-[0-9]+)(.[0-9]+)?-?(z)?-candidate', task.target.target)
-        if m:
-            self.distro_value = '{}{}{}'.format(m.group(2),
-                                                m.group(3) or '',
-                                                '.' + m.group(4) if m.group(4) else '')
+        match = re.match(r'(staging-)?(rhel-[0-9]+)(.[0-9]+)?-?(z)?-candidate', task.target.target)
+        if match:
+            self.distro_value = '{}{}{}'.format(match.group(2),
+                                                match.group(3) or '',
+                                                '.' + match.group(4) if match.group(4) else '')
             self.info("guessed distro '{}' from build target '{}'".format(self.distro_value,
                                                                           task.target.target))
         else:
