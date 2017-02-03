@@ -68,7 +68,7 @@ class CIBrewDispatcher(Module):
 
         # defaults
         try:
-            self.default_tests = self.config['default']
+            self.default_tests = self.config['default'] or []
         except KeyError:
             self.default_tests = []
 
@@ -109,6 +109,9 @@ class CIBrewDispatcher(Module):
                 self.build[option] = self.option(option)
 
     def dispatch_tests(self):
+        if not self.get_tests():
+            self.info("skipping build as no tests found for package '{}'".format(self.build['name']))
+            return
         for test in self.get_tests():
             self.verbose("dispatching module '{}' for enabled package '{}' for target '{}'".format(
                 test, self.build['name'], self.build['target']))
