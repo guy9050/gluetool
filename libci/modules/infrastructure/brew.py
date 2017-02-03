@@ -136,9 +136,7 @@ class BrewTask(object):
 
     @cached_property
     def short_name(self):
-        msg = ['S:'] if self.scratch else []
-        msg.append("{t.task_id}:{t.nvr}".format(t=self))
-        return ''.join(msg)
+        return "{t.task_id}:{scratch}{t.nvr}".format(t=self, scratch='S:' if self.scratch else '')
 
 
 class BrewBuildTarget(object):
