@@ -16,6 +16,12 @@ except ImportError:
     import os
     DEVNULL = open(os.devnull, 'wb')
 
+# Use this constant to order run_command to pass child's output stream
+# to its parent's corresponding stream.
+#
+# I don't want this to collide with any subprocess constant, or possible filename
+PARENT = (17,)
+
 
 #: Result of external process.
 ProcessOutput = collections.namedtuple('ProcessOutput', ['exit_code', 'stdout', 'stderr'])
@@ -61,12 +67,20 @@ def run_command(cmd, *args, **kwargs):
             return 'DEVNULL'
         if stream == subprocess.STDOUT:
             return 'STDOUT'
+        if stream == PARENT:
+            return 'PARENT'
         return stream
 
     printable_kwargs = kwargs.copy()
     for stream in ('stdout', 'stderr'):
         if stream in printable_kwargs:
             printable_kwargs[stream] = _format_stream(printable_kwargs[stream])
+
+    if kwargs['stdout'] == PARENT:
+        del kwargs['stdout']
+
+    if kwargs['stderr'] == PARENT:
+        del kwargs['stderr']
 
     log.debug("run command: cmd='{}', args={}, kwargs={}".format(cmd, args, printable_kwargs))
 
@@ -86,7 +100,11 @@ def run_command(cmd, *args, **kwargs):
 
     def log_standard_stream(name, content):
         if content is None:
-            log.debug('  command produced no output on {}'.format(name))
+            if name in kwargs:
+                log.debug('  command produced no output on {}'.format(name))
+            else:
+                log.debug('  command formared its {} to the parent'.format(name))
+
         else:
             log.debug("{}:\n------------------\n{}\n------------------".format(name, content))
 

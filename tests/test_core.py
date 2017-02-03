@@ -150,6 +150,17 @@ def test_run_command(monkeypatch, caplog):
     assert_logging(1, "run command: cmd='['/bin/ls']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
     monkeypatch.undo()
 
+    # Don't capture stdout and stderr, let them pass
+    caplog_clear()
+    output = run_command(['/bin/ls', '/'], stdout=libci.utils.PARENT, stderr=libci.utils.PARENT)
+
+    assert output.exit_code == 0
+    assert output.stdout is None
+    assert output.stderr is None
+    assert_logging(3, "run command: cmd='['/bin/ls', '/']', args=(), kwargs={'stderr': 'PARENT', 'stdout': 'PARENT'}",
+                   stdout='  command formared its stdout to the parent',
+                   stderr='  command formared its stderr to the parent')
+
 
 def test_check_for_commands():
     commands = ('ls', 'gzip')
