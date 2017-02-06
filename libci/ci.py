@@ -551,6 +551,7 @@ class CI(object):
     def __init__(self):
         # configuration defaults
         self.config = {
+            'colors': None,
             'data_path': None,
             'debug': None,
             'output': None,
@@ -611,6 +612,8 @@ class CI(object):
         parser = argparse.ArgumentParser(usage=usage,
                                          epilog=self.module_group_list_usage(),
                                          formatter_class=argparse.RawTextHelpFormatter)
+        parser.add_argument('-c', '--colors', action='store_true', default=None,
+                            help='Colorize logging on the terminal')
         parser.add_argument('--data-path', help='Specify data path')
         parser.add_argument('-d', '--debug', action='store_true',
                             default=False, help='Debug output')
@@ -654,7 +657,8 @@ class CI(object):
         elif self.config['quiet']:
             level = logging.WARNING
 
-        logger = Logging.create_logger(output_file=self.config['output'], level=level)
+        logger = Logging.create_logger(output_file=self.config['output'], level=level,
+                                       colors=(self.config['colors'] is not None))
         self._init_logging(logger)
 
     def module_list(self):

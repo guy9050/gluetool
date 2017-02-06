@@ -7,6 +7,11 @@ Sets up logging environment for use by citool and modules.
 import atexit
 import logging
 
+try:
+    import colorama
+
+except ImportError:
+    colorama = None
 
 # Add our custom "verbose" loglevel - it's even bellow DEBUG
 logging.VERBOSE = 5
@@ -55,7 +60,19 @@ class LoggingFormatter(logging.Formatter):
         logging.CRITICAL: 'C'
     }
 
-    log_tracebacks = False
+    if colorama is not None:
+        _level_color = {
+            logging.INFO: colorama.Fore.GREEN,
+            logging.WARNING: colorama.Fore.YELLOW,
+            logging.ERROR: colorama.Fore.RED,
+            logging.CRITICAL: colorama.Fore.RED
+        }
+
+    def __init__(self, log_tracebacks=False, colors=False):
+        super(LoggingFormatter, self).__init__()
+
+        self.log_tracebacks = log_tracebacks
+        self.colors = colors
 
     def format(self, record):
         fmt = ['[{stamp}]', '[{level}]', '{msg}']
@@ -75,7 +92,14 @@ class LoggingFormatter(logging.Formatter):
             fmt.insert(2, '[{module_name}]')
             values['module_name'] = record.module_name
 
-        return ' '.join(fmt).format(**values)
+        msg = ' '.join(fmt).format(**values)
+
+        if self.colors is True:
+            color = self._level_color.get(record.levelno, None)
+            if color:
+                msg = color + msg + colorama.Fore.RESET
+
+        return msg
 
 
 class Logging(object):
@@ -124,7 +148,7 @@ class Logging(object):
         return Logging.logger
 
     @staticmethod
-    def create_logger(output_file=None, level=None):
+    def create_logger(output_file=None, level=None, colors=False):
         """
         Create and setup logger.
 
@@ -156,12 +180,20 @@ class Logging(object):
             # set log level to new value
             Logging.stderr_handler.setLevel(level)
 
+            # set color settings according to requested value
+            if colors is True:
+                if colorama is None:
+                    logger.warn("Unable to turn on colorized terminal messages, please install 'colorama' package")
+
+                else:
+                    Logging.stderr_handler.setFormatter(LoggingFormatter(colors=True))
+
         if output_file is not None:
             # catch-everything file requested
             handler = logging.FileHandler(output_file, 'w')
             handler.setLevel(logging.VERBOSE)
 
-            formatter = LoggingFormatter()
+            formatter = LoggingFormatter(log_tracebacks=True)
             formatter.log_tracebacks = True
             handler.setFormatter(formatter)
 
