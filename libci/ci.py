@@ -714,10 +714,18 @@ class CI(object):
         return ret + ', '.join(glist)
 
     def print_cmdline(self, ci_args, modules_args):
-        """ prints info about current run """
-        self.info('command-line info')
-        sys.stdout.write('{0} {1}'.format(sys.argv[0], ' '.join(ci_args)))
+        """
+        Logs command-line that would recreate current process.
+        """
+
+        def _options_to_string(options):
+            return ' '.join(['"%s"' % opt for opt in options])
+
+        cmd = ['{0} {1}'.format(sys.argv[0], _options_to_string(ci_args))]
+
         for module in modules_args:
-            sys.stdout.write(' \\\n  {0} {1}'.format(
-                module.keys()[0], ' '.join(module.values()[0])))
-        sys.stdout.write('\n')
+            module_name = module.keys()[0]
+
+            cmd.append('    {0} {1}'.format(module_name, _options_to_string(module[module_name])))
+
+        self.info('command-line info:\n{}'.format(' \\\n'.join(cmd)))
