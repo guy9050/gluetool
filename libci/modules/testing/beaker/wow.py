@@ -23,7 +23,7 @@ class CIWow(Module):
         distro = ['--distro', self.shared('distro')] if self.shared('distro') else []
         task = self.shared('brew_task')
         brew_task = ['--brew-task', str(task.task_id)] if task is not None else []
-        whiteboard = "CI run for '{}' for brew task id '{}'".format(task.nvr, task.task_id)
+        whiteboard = "CI run {} brew task id {} build target {}".format(task.nvr, task.task_id, task.target.target)
         try:
             command = ['bkr', 'workflow-tomorrow', '--id', '--whiteboard', whiteboard]
             command += distro + brew_task + self.args
