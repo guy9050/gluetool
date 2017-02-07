@@ -77,7 +77,7 @@ class CIBrewDispatcher(Module):
     def get_tests(self):
         try:
             if self.config['packages'][self.build['name']]:
-                return self.config['packages'][self.build['name']]
+                return self.default_tests + self.config['packages'][self.build['name']]
         except (KeyError, TypeError):
             return self.default_tests
 
