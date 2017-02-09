@@ -120,8 +120,8 @@ class CIRpmdiff(Module):
         # blacklist packages
         if blacklist is not None:
             self.verbose('blacklisted packages: {}'.format(blacklist))
-            if self.brew_task.name in blacklist.split(','):
-                self.info('skipping blacklisted package {}'.format(self.brew_task.name))
+            if self.brew_task.component in blacklist.split(','):
+                self.info('skipping blacklisted package {}'.format(self.brew_task.component))
                 return
 
         comparison_msg = ''
