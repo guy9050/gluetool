@@ -2,7 +2,7 @@ import re
 import koji
 import libci
 from libci import CIError
-from libci.utils import cached_property
+from libci.utils import cached_property, format_dict
 
 BREW_API_TOPURL = "http://download.eng.bos.redhat.com/brewroot"
 BREW_WEB_URL = 'https://brewweb.engineering.redhat.com/brew/'
@@ -23,6 +23,8 @@ class BrewTask(object):
         task_info = self.brew.getTaskInfo(self.task_id, request=True)
         if not task_info:
             raise CIError("brew task '{}' not found".format(self.task_id))
+
+        self._module.debug('task info:\n{}'.format(format_dict(task_info)))
 
         return task_info
 
@@ -54,7 +56,7 @@ class BrewTask(object):
 
     @cached_property
     def latest(self):
-        builds = self.brew.listTagged(self.target.destination_tag, None, True, latest=2, package=self.name)
+        builds = self.brew.listTagged(self.target.destination_tag, None, True, latest=2, package=self.component)
         if self.scratch:
             latest = builds[0]["nvr"] if builds else None
         else:
@@ -114,7 +116,7 @@ class BrewTask(object):
         return ".".join(self.srcrpm.split("/")[-1].split(".")[:-2])
 
     @cached_property
-    def name(self):
+    def component(self):
         return "-".join(self.nvr.split("-")[:-2])
 
     @cached_property

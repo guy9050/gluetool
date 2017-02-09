@@ -2,12 +2,9 @@ import os
 from libci import Module
 from libci import CIError
 from libci import utils
-from libci.utils import run_command
-from jenkinsapi.custom_exceptions import UnknownJob
 
 # Jenkins Job Builder YAML
 JOB_NAME = 'ci-wow'
-JJB_YAML = JOB_NAME + '.yaml'
 
 # required cmdline tools
 REQUIRED_CMDS = ['jenkins-jobs']
@@ -34,14 +31,21 @@ This module requires an available Jenkins connection - via the jenkins module.
     description = 'Create and run beaker workflow-tomorrow job'
 
     options = {
-        'args': {
-            'help': 'Additional parameters passed to wow',
-        },
         'id': {
             'help': 'Brew Task ID (read also from the environment)',
         },
+        'wow-options': {
+            'help': 'Additional options for workflow-tomorrow'
+        },
+        'jobwatch-options': {
+            'help': 'Additional options for beaker-jobwatch'
+        },
+        'notify': {
+            'help': 'Comma-separated list of e-mails to notify when job finishes.'
+        }
     }
-    required_options = ['args']
+
+    required_options = ['wow-options']
     jenkins = None
     tid = None
 
@@ -54,20 +58,16 @@ This module requires an available Jenkins connection - via the jenkins module.
         if not self.tid:
             raise CIError('id not found in environment')
 
-    def update_job(self):
-        run_command(['jenkins-jobs', '--flush-cache', 'update', os.path.join(self.data_path, JJB_YAML)])
-        self.jenkins = self.shared('jenkins', reconnect=True)
-
     def execute(self):
         self.jenkins = self.shared('jenkins')
         if self.jenkins is None:
             raise CIError('no jenkins connection found')
 
-        try:
-            self.jenkins[JOB_NAME]
-        except UnknownJob:
-            self.update_job()
+        self.jenkins[JOB_NAME].invoke(build_params={
+            'id': self.tid,
+            'wow_options': self.option('wow-options'),
+            'jobwatch_options': self.option('jobwatch-options'),
+            'notify': self.option('notify')
+        })
 
-        args = self.option('args')
-        self.jenkins[JOB_NAME].invoke(build_params={'id': self.tid, 'args': args})
         self.info("invoked job '{}' with given parameters".format(JOB_NAME))

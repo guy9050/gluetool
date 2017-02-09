@@ -8,7 +8,7 @@ module-rgx = (([a-z_][a-z0-9_-]*)|([A-Z][a-zA-Z0-9-]+))$
 
 [MESSAGES CONTROL]
 # Re-enable these ASAP
-disable=missing-docstring,logging-format-interpolation
+disable=missing-docstring,logging-format-interpolation,too-many-locals
 
 [TYPECHECK]
 # ignore kerberos module

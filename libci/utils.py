@@ -2,8 +2,8 @@
 Various helpers.
 """
 
-import collections
 import errno
+import json
 import subprocess
 
 from libci import CIError, CICommandError
@@ -23,8 +23,31 @@ except ImportError:
 PARENT = (17,)
 
 
-#: Result of external process.
-ProcessOutput = collections.namedtuple('ProcessOutput', ['exit_code', 'stdout', 'stderr'])
+class ProcessOutput(object):
+    """
+    Result of external process.
+    """
+
+    # pylint: disable=too-many-arguments,too-few-public-methods
+    def __init__(self, cmd, exit_code, stdout, stderr, kwargs):
+        self.cmd = cmd
+        self.kwargs = kwargs
+
+        self.exit_code = exit_code
+        self.stdout = stdout
+        self.stderr = stderr
+
+    def log_stream(self, stream, logger):
+        content = getattr(self, stream)
+
+        if content is None:
+            if stream in self.kwargs:
+                logger('{}:\n  command produced no output'.format(stream))
+            else:
+                logger('{}:\n  command forwarded the output to its parent'.format(stream))
+
+        else:
+            logger("{}:\n------------------\n{}\n------------------".format(stream, content))
 
 
 def run_command(cmd, *args, **kwargs):
@@ -52,6 +75,8 @@ def run_command(cmd, *args, **kwargs):
     assert all((isinstance(s, str) for s in cmd)), 'Only list of strings accepted as a command'
 
     log = Logging.get_logger()
+
+    stdout, stderr = None, None
 
     # Set default stdout/stderr, unless told otherwise
     if 'stdout' not in kwargs:
@@ -84,8 +109,6 @@ def run_command(cmd, *args, **kwargs):
 
     log.debug("run command: cmd='{}', args={}, kwargs={}".format(cmd, args, printable_kwargs))
 
-    stdout, stderr = None, None
-
     try:
         p = subprocess.Popen(cmd, *args, **kwargs)
 
@@ -98,20 +121,10 @@ def run_command(cmd, *args, **kwargs):
     stdout, stderr = p.communicate()
     exit_code = p.poll()
 
-    def log_standard_stream(name, content):
-        if content is None:
-            if name in kwargs:
-                log.debug('  command produced no output on {}'.format(name))
-            else:
-                log.debug('  command formared its {} to the parent'.format(name))
+    output = ProcessOutput(cmd, exit_code, stdout, stderr, kwargs)
 
-        else:
-            log.debug("{}:\n------------------\n{}\n------------------".format(name, content))
-
-    log_standard_stream('stdout', stdout)
-    log_standard_stream('stderr', stderr)
-
-    output = ProcessOutput(exit_code, stdout, stderr)
+    output.log_stream('stdout', log.debug)
+    output.log_stream('stderr', log.debug)
 
     if exit_code != 0:
         raise CICommandError(cmd, output)
@@ -161,3 +174,27 @@ class cached_property(object):
         obj.__dict__[self._method.__name__] = value
 
         return value
+
+
+def format_command_line(cmdline):
+    """
+    Return formatted command-line.
+
+    All but the first line are indented by 4 spaces.
+
+    :param cmdline: list of iterables, representing command-line split to multiple lines.
+    """
+
+    def _format_options(options):
+        return ' '.join(['"%s"' % opt for opt in options])
+
+    cmd = [_format_options(cmdline[0])]
+
+    for row in cmdline[1:]:
+        cmd.append('    ' + _format_options(row))
+
+    return ' \\\n'.join(cmd)
+
+
+def format_dict(dictionary):
+    return json.dumps(dictionary, sort_keys=True, indent=4, separators=(',', ': '))
