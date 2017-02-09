@@ -5,16 +5,7 @@ import traceback
 
 import libci
 
-from libci import CIError
-from libci import CIRetryError
-
-def print_error(string):
-    sys.stderr.write('Error: %s\n' % string)
-
-
-def error(string):
-    print_error(string)
-    sys.exit(1)
+from libci import CIError, CIRetryError, Failure
 
 
 def split_argv(argv_all, modules):
@@ -47,6 +38,10 @@ def main():
     # init used vars
     ci = None
     module = None
+
+    # If not None, exception happened and we want to let modules know
+    # during their "destroy" time.
+    failure = None
 
     try:
         # initialize ci, load the module list
@@ -117,22 +112,23 @@ def main():
 
     except (SystemExit, KeyboardInterrupt) as e:
         raise e
+
     # pylint: disable=broad-except
     except Exception as e:
-        exc_info = sys.exc_info()
+        failure = Failure(module=module, exc_info=sys.exc_info())
 
         if module:
             msg = "Exception raised in module '{}': {}".format(module.name, e.message)
         else:
             msg = "Exception raised: {}".format(e.message)
 
-        libci.Logging.get_logger().exception(msg, exc_info=exc_info)
+        libci.Logging.get_logger().exception(msg, exc_info=failure.exc_info)
 
         sys.exit(-1)
 
     finally:
         if ci:
-            ci.destroy_modules()
+            ci.destroy_modules(failure=failure)
 
 if __name__ == '__main__':
     main()
