@@ -38,6 +38,19 @@ class CICommandError(CIError):
         self.output = output
 
 
+class Failure(object):
+    # pylint: disable=too-few-public-methods
+
+    """
+    Bundles exception related info. Used to inform modules in their destroy() phase
+    that citool session was killed because of exception raised by one of modules.
+    """
+
+    def __init__(self, module, exc_info):
+        self.module = module
+        self.exc_info = exc_info
+
+
 def retry(*args):
     """ Retry decorator
     This decorator catches given exceptions and returns
@@ -115,11 +128,15 @@ class Module(object):
         dpath = os.path.join(self.ci.get_config('data_path') or DATA_PATH, self.name)
         self.data_path = dpath if os.path.exists(dpath) else None
 
-    def destroy(self):
-        # pylint: disable-msg=no-self-use
+    def destroy(self, failure=None):
+        # pylint: disable-msg=no-self-use,unused-argument
 
         """
         Here should go any code that needs to be run on exit, like job cleanup etc.
+
+        :param Failure failure: if set, carries information about failure that made
+          citool to destroy the whole session. Modules might want to take actions
+          based on this, e.g. send different notifications.
         """
 
         return None
@@ -574,20 +591,22 @@ class CI(object):
         self._load_config()
         self._load_modules()
 
-    def call_module_destroy(self, module):
-        try:
-            module.debug('destroying myself')
-            module.destroy()
-        # pylint: disable=broad-except
-        except Exception:
-            self.exception('error in destroy function')
+    def destroy_modules(self, failure=None):
+        if not self.module_instances:
+            return
 
-    def destroy_modules(self):
-        if self.module_instances:
-            self.verbose('destroying all modules in reverse order')
-            # we will destroy modules in reverse order, which makes more sense
-            for module in reversed(self.module_instances):
-                self.call_module_destroy(module)
+        # we will destroy modules in reverse order, which makes more sense
+        self.verbose('destroying all modules in reverse order')
+
+        for module in reversed(self.module_instances):
+            try:
+                module.debug('destroying myself')
+                module.destroy(failure=failure)
+
+            # pylint: disable=broad-except
+            except Exception:
+                self.exception('error in destroy function')
+
         self.module_instances = []
 
     def add_module_instance(self, module):
