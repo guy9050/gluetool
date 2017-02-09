@@ -18,7 +18,9 @@ DESCRIPTION = 'CI Tool - Continuous Integration Swiss Army Knife'
 INSTALL_REQUIRES = [
     'kerberos',
     'jenkinsapi',
-    'PyYAML'
+    'PyYAML',
+
+    'beautifulsoup4'  # required by wow module
 ]
 
 TESTS_REQUIRE = [

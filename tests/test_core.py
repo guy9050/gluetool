@@ -89,7 +89,7 @@ def test_run_command(monkeypatch, caplog):
     assert output.stdout is None
     assert output.stderr == 'This goes to stderr\n'
     assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'DEVNULL'}",
-                   stdout='  command produced no output on stdout',
+                   stdout='stdout:\n  command produced no output',
                    stderr='stderr:\n------------------\nThis goes to stderr\n\n------------------')
 
     caplog_clear()
@@ -100,7 +100,7 @@ def test_run_command(monkeypatch, caplog):
     assert output.stderr is None
     assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', args=(), kwargs={'stderr': 'DEVNULL', 'stdout': 'PIPE'}",
                    stdout='stdout:\n------------------\nThis goes to stdout\n\n------------------',
-                   stderr='  command produced no output on stderr')
+                   stderr='stderr:\n  command produced no output')
 
     # Test merging stdout & stderr into one
     caplog_clear()
@@ -111,7 +111,7 @@ def test_run_command(monkeypatch, caplog):
     assert output.stderr is None
     assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', args=(), kwargs={'stderr': 'STDOUT', 'stdout': 'PIPE'}",
                    stdout='stdout:\n------------------\nThis goes to stdout\nThis goes to stderr\n\n------------------',
-                   stderr='  command produced no output on stderr')
+                   stderr='stderr:\n  command produced no output')
 
     # Pass weird stdout value, and test its formatting in log
     stdout = (13, 17)
@@ -158,8 +158,8 @@ def test_run_command(monkeypatch, caplog):
     assert output.stdout is None
     assert output.stderr is None
     assert_logging(3, "run command: cmd='['/bin/ls', '/']', args=(), kwargs={'stderr': 'PARENT', 'stdout': 'PARENT'}",
-                   stdout='  command formared its stdout to the parent',
-                   stderr='  command formared its stderr to the parent')
+                   stdout='stdout:\n  command forwarded the output to its parent',
+                   stderr='stderr:\n  command forwarded the output to its parent')
 
 
 def test_check_for_commands():

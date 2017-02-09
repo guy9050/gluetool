@@ -7,16 +7,24 @@
     display-name: 'ci-wow'
     parameters:
         - string:
-            name: args
-            default: ''
-            description: 'Additional args for bkr workflow tomorrow'
-        - string:
             name: id
             default: ''
             description: 'Brew task ID.'
+        - string:
+            name: wow_options
+            default: ''
+            description: 'Additional options for workflow-tomorrow'
+        - string:
+            name: jobwatch_options
+            default: ''
+            description: 'Additional options for beaker-jobwatch'
+        - string:
+            name: notify
+            default: ''
+            description: 'Comma-separated list of e-mails to notify when job finishes.'
     builders:
         - shell: |
-            citool brew --id $id brew-build-name guess-distro wow $args
+            citool -i -o citool-debug.txt brew --id $id brew-build-name guess-distro wow --wow-options "${wow_options}" --jobwatch-options "${jobwatch_options}" notify --notify "${notify}"
         - inject:
             properties-file: build-name.props
     publishers:

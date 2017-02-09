@@ -722,14 +722,15 @@ class CI(object):
         Logs command-line that would recreate current process.
         """
 
-        def _options_to_string(options):
-            return ' '.join(['"%s"' % opt for opt in options])
+        from .utils import format_command_line
 
-        cmd = ['{0} {1}'.format(sys.argv[0], _options_to_string(ci_args))]
+        cmdline = [
+            [sys.argv[0]] + ci_args
+        ]
 
         for module in modules_args:
             module_name = module.keys()[0]
 
-            cmd.append('    {0} {1}'.format(module_name, _options_to_string(module[module_name])))
+            cmdline.append([module_name] + module[module_name])
 
-        self.info('command-line info:\n{}'.format(' \\\n'.join(cmd)))
+        self.info('command-line info:\n{}'.format(format_command_line(cmdline)))
