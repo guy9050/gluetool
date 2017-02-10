@@ -37,6 +37,8 @@ class CIWow(Module):
 
     def execute(self):
         task = self.shared('brew_task')
+        if task is None:
+            raise CIError('no brew build found, did you run brew module')
         distro = self.shared('distro')
 
         def _command_options(name):
@@ -58,7 +60,8 @@ class CIWow(Module):
         command = [
             'bkr', 'workflow-tomorrow',
             '--id',
-            '--whiteboard', whiteboard
+            '--whiteboard', whiteboard,
+            '--no-reserve'
         ] + distro_option + brew_option + wow_options
 
         self.info("running 'workflow-tomorrow':\n{}".format(utils.format_command_line([command])))
