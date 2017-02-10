@@ -2,12 +2,12 @@ import re
 from libci import CIError, Module
 
 
-class CIGuessCompose(Module):
+class CIGuessDistro(Module):
     """
     Guess compose from build target. Currently these translations
     are supported (sed -r syntax):
 
-    s/(staging-)?(rhel-[0-9]+)(.[0-9]+)?-?(z)?-candidate/\2\3.\4/
+    s/(staging-|supp-)?(rhel-[0-9]+)(.[0-9]+)?-?(z)?-candidate/\2\3.\4/
     """
     name = 'guess-distro'
     description = 'Guess distro from build target of a brew build'
@@ -32,7 +32,7 @@ class CIGuessCompose(Module):
         task = self.shared('brew_task')
         if task is None:
             raise CIError('no brew build found, did you run brew module')
-        match = re.match(r'(staging-)?(rhel-[0-9]+)(.[0-9]+)?-?(z)?-candidate', task.target.target)
+        match = re.match(r'(staging-|supp-)?(rhel-[0-9]+)(.[0-9]+)?-?(z)?-candidate', task.target.target)
         if match:
             self.distro_value = '{}{}{}'.format(match.group(2),
                                                 match.group(3) or '',
