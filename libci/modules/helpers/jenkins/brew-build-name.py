@@ -1,46 +1,32 @@
+import os
 from libci import CIError, Module
-
-DEF_PROPS_FILE = 'build-name.props'
 
 
 class CIBrewBuildName(Module):
     """
-    Create an Jenkins property file with details about brew task,
-    intended to be used for setting build name via the BuildNameSetter
-    plugin.
-
-    Examples of contents of the output file:
-
-    BUILD_NAME=S:12445186:kernel-3.10.0-514.9.1.el7.prebuild
-    BUILD_NAME=12449561:sssd-1.13.3-56.el6
-
-    Example of the section needed to be added to the JJB yaml:
-
-    builders:
-        - inject:
-            properties-file: build-name.props
-    wrappers:
-        - build-name:
-            name: ${BUILD_NAME}
+    Use Jenkins REST API to change build name.
     """
-    name = 'brew-build-name'
-    description = 'Create an Jenkins property file with details about brew task'
 
-    options = {
-        'output': {
-            'help': 'Output properties file, usable for EnvInject',
-            'default': DEF_PROPS_FILE,
-            'short': 'o',
-        }
-    }
+    name = 'brew-build-name'
+    description = 'Set Jenkins build name to details of brew task'
 
     def execute(self):
         task = self.shared('brew_task')
-        output = self.option('output')
         if task is None:
             raise CIError('no brew task found, did you run brew module?')
 
-        with open(output, 'w') as f:
-            f.write('BUILD_NAME={}'.format(task.short_name))
+        if not self.has_shared('jenkins_rest'):
+            self.warn('Jenkins REST helper function is necessary, please provide Jenkins module')
+            return
 
-        self.info("build name '{}' saved to property file '{}'".format(task.short_name, output))
+        build_url = os.getenv('BUILD_URL', None)
+        if build_url is None:
+            self.warn('Build URL not found, was this job started by Jenkins?')
+            return
+
+        self.shared('jenkins_rest', build_url + '/configSubmit', **{
+            'displayName': task.short_name,
+            'description': ''
+        })
+
+        self.info("build name '{}' set".format(task.short_name))

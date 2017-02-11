@@ -153,6 +153,9 @@ class Module(object):
     def del_shared(self, funcname):
         self.ci.del_shared(funcname)
 
+    def has_shared(self, funcname):
+        return self.ci.has_shared(funcname)
+
     def execute(self):
         """
         execute is a required module function
@@ -345,6 +348,9 @@ class CI(object):
             return
 
         del self.shared_functions[funcname]
+
+    def has_shared(self, funcname):
+        return funcname in self.shared_functions
 
     # call a shared function
     def shared(self, funcname, *args, **kwargs):

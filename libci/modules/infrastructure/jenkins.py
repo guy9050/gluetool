@@ -1,11 +1,15 @@
 import ConfigParser
+import json
 import os
+import urllib
+import urllib2
 
 from jenkinsapi.jenkins import Jenkins
 # from libci import Module
 from requests.exceptions import RequestException
 
 import libci
+from libci import CIError
 
 JJB_CONFIG = os.path.expanduser('~/.config/jenkins_jobs/jenkins_jobs.ini')
 JJB_GLOBAL_CONFIG = os.path.expanduser('/etc/jenkins_jobs/jenkins_jobs.ini')
@@ -47,13 +51,47 @@ You can use the option '--create-jjb-config' to force creation of \'{0}\' file.
 
     }
     required_options = ['url']
-    shared_functions = ['jenkins']
+    shared_functions = ['jenkins', 'jenkins_rest']
 
     def jenkins(self, reconnect=False):
         """ return jenkinsapi.Jenkins object instance """
         if reconnect:
             self.connect()
         return self.jenkins_instance
+
+    def jenkins_rest(self, url, **data):
+        """
+        Submit request to Jenkins via its http interface.
+
+        :param str url: URL to send request to. Can be absolute, e.g. when
+          caller gets its base from BUILD_URL env var, or relative, starting
+          with '/'. Configured Jenkjins URL is prepended to relative URLS,
+          while absolute URLs must lead to this configured Jenkins instance.
+        :param dict data: data to submit to the URL.
+        :returns: (response, resonse-content)
+        """
+
+        self.debug("Jenkins REST request: url='{}'\n{}".format(url, libci.utils.format_dict(data)))
+
+        if url.startswith('/'):
+            url = self.option('url') + url
+
+        elif not url.startswith(self.option('url')):
+            raise CIError('Cross-site Jenkins REST request')
+
+        data = urllib.urlencode({
+            'json': json.dumps(data)
+        })
+
+        response = urllib2.urlopen(url, data)
+        code, content = response.getcode(), response.read()
+
+        libci.utils.log_blob(self.debug, 'response: {}'.format(code), content)
+
+        if code != 200:
+            raise CIError('Jenkins REST request failed')
+
+        return response, content
 
     def create_jjb_config(self):
         password = self.option('password')

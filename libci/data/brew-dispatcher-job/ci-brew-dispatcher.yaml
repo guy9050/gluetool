@@ -31,12 +31,7 @@
     builders:
         - shell: |
             citool -i -o citool-debug.txt jenkins brew --id $id brew-build-name brew-dispatcher
-        - inject:
-            properties-file: build-name.props
     publishers:
         - archive:
             artifacts: '**/**'
             allow-empty: 'true'
-    wrappers:
-        - build-name:
-            name: ${BUILD_NAME}
