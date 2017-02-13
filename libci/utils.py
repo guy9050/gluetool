@@ -23,6 +23,10 @@ except ImportError:
 PARENT = (17,)
 
 
+def log_blob(logger, intro, blob):
+    logger("{}:\n------------------\n{}\n------------------".format(intro, blob))
+
+
 class ProcessOutput(object):
     """
     Result of external process.
@@ -47,7 +51,7 @@ class ProcessOutput(object):
                 logger('{}:\n  command forwarded the output to its parent'.format(stream))
 
         else:
-            logger("{}:\n------------------\n{}\n------------------".format(stream, content))
+            log_blob(logger, stream, content)
 
 
 def run_command(cmd, *args, **kwargs):

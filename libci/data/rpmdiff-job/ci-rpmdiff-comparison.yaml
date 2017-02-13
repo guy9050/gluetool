@@ -14,13 +14,8 @@
             description: 'Brew task ID'
     builders:
         - shell: |
-            citool -i -o citool-debug.txt brew --id $id rpmdiff --type comparison brew-build-name
-        - inject:
-            properties-file: build-name.props
+            citool -i -o citool-debug.txt jenkins brew --id $id brew-build-name rpmdiff --type comparison
     publishers:
         - archive:
             artifacts: '**/**'
             allow-empty: 'true'
-    wrappers:
-        - build-name:
-            name: ${BUILD_NAME}

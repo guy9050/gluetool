@@ -24,13 +24,8 @@
             description: 'Comma-separated list of e-mails to notify when job finishes.'
     builders:
         - shell: |
-            citool -i -o citool-debug.txt brew --id $id brew-build-name guess-distro wow --wow-options "${wow_options}" --jobwatch-options "${jobwatch_options}" notify --notify "${notify}"
-        - inject:
-            properties-file: build-name.props
+            citool -i -o citool-debug.txt jenkins brew --id $id brew-build-name guess-distro wow --wow-options "${wow_options}" --jobwatch-options "${jobwatch_options}" notify --notify "${notify}"
     publishers:
         - archive:
             artifacts: '**/**'
             allow-empty: 'true'
-    wrappers:
-        - build-name:
-            name: ${BUILD_NAME}
