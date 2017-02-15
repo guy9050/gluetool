@@ -18,7 +18,15 @@ DATA_PATH = os.path.dirname(os.path.abspath(__file__)) + '/data'
 
 class CIError(Exception):
     """ General libci exception """
-    pass
+    def __init__(self, *args, **kwargs):
+        soft = False
+        if 'soft' in kwargs:
+            soft = kwargs['soft']
+            del kwargs['soft']
+
+        super(CIError, self).__init__(*args, **kwargs)
+
+        self.soft = soft
 
 
 class CIRetryError(CIError):
