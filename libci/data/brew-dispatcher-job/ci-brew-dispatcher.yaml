@@ -30,7 +30,9 @@
             AND new = 'CLOSED'
     builders:
         - shell: |
-            citool -i -o citool-debug.txt jenkins brew --id $id brew-build-name brew-dispatcher
+            citool -i -o citool-debug.txt envinject jenkins brew --id $id brew-build-name brew-dispatcher
+        - inject:
+            properties-file: envinject-citool.props
     publishers:
         - archive:
             artifacts: '**/**'
