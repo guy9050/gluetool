@@ -40,9 +40,15 @@ Beaker matrix:  {beaker_matrix_url}
 """
 
 
-BODY_ERROR = """
-CI pipeline crashed due to infrastructure error, and its operations team has been
+HARD_ERROR_MSG = """
+CI pipeline crashed due to errors, and the operations team has been
 informed about the issue by this message.
+"""
+
+SOFT_ERROR_MSG = """
+CI pipeline was halted due to the following error:
+
+{msg}
 """
 
 
@@ -106,7 +112,11 @@ class Notify(Module):
 
     @utils.cached_property
     def recipients(self):
-        return [CC] + [e.strip() for e in self.option('notify').split(',')]
+        notify = self.option('notify')
+        if not notify:
+            return []
+
+        return [e.strip() for e in notify.split(',')]
 
     def execute(self):
         if not self.option('notify'):
@@ -139,7 +149,15 @@ class Notify(Module):
         if failure is None:
             return
 
-        self.info('Sending failure-state notifications to: {}'.format(', '.join(self.recipients)))
+        recipients = self.recipients
+        exc = failure.exc_info[1]
+        soft = isinstance(exc, CIError) and exc.soft is True
+
+        if soft is not True:
+            self.debug('Failure caused by a non-soft error')
+            recipients = recipients + [CC]
+
+        self.info('Sending failure-state notifications to: {}'.format(', '.join(recipients)))
 
         jenkins_job_url = os.getenv('BUILD_URL', '<Jenkins job URL not available>')
         task = self.shared('brew_task')
@@ -153,11 +171,17 @@ class Notify(Module):
             task = DummyTask(task_id='<Task ID not available>', nvr='<NVR not available>',
                              owner='<Owner not available>')
 
+        if soft:
+            body = SOFT_ERROR_MSG.format(msg=exc.message)
+
+        else:
+            body = HARD_ERROR_MSG
+
         msg = Message(self,
-                      subject='[CI] ERROR: CI crashed due to infrastructure errors',
+                      subject='[CI] ERROR: CI crashed due to errors',
                       header=BODY_HEADER.format(task=task),
                       footer=BODY_FOOTER.format(jenkins_job_url=jenkins_job_url),
-                      body=BODY_ERROR,
-                      recipients=self.recipients)
+                      body=body,
+                      recipients=recipients)
 
         msg.send()

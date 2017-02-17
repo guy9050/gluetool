@@ -39,6 +39,7 @@ class CIWow(Module):
         task = self.shared('brew_task')
         if task is None:
             raise CIError('no brew build found, did you run brew module')
+
         distro = self.shared('distro')
 
         def _command_options(name):
@@ -66,13 +67,18 @@ class CIWow(Module):
 
         self.info("running 'workflow-tomorrow':\n{}".format(utils.format_command_line([command])))
 
+        output = None
         try:
             output = run_command(command)
 
         except CICommandError as exc:
-            raise CIError("Failure during 'wow' execution: {}".format(exc.output.stderr))
+            # Check for most common causes, and raise soft error where necessary
+            soft = False
 
-        self.info('wow finished succesfully!')
+            if 'No relevant tasks found in test plan' in exc.output.stderr:
+                soft = True
+
+            raise CIError("Failure during 'wow' execution: {}".format(exc.output.stderr), soft=soft)
 
         # beaker-jobwatch
         command = [
@@ -90,43 +96,51 @@ class CIWow(Module):
         except CICommandError as exc:
             raise CIError("Failure during 'jobwatch' execution: {}".format(exc.output.stderr))
 
-        self.info('beaker-jobwatch finished successfully')
-
         with open('beaker-jobwatch.log', 'r') as f:
             jobwatch_log = f.read().strip().split('\n')
 
-        if jobwatch_log[-1] != 'finished successfully' \
-                or not jobwatch_log[-2].startswith('duration:') \
-                or not jobwatch_log[-3].startswith('https://beaker.engineering.redhat.com/matrix/'):
-            raise CIError('Unable to parse beaker-jobwatch output')
+        if len(jobwatch_log) < 3:
+            raise CIError('jobwatch output is unexpectedly short')
+
+        if not jobwatch_log[-3].startswith('https://beaker.engineering.redhat.com/matrix/'):
+            raise CIError('Don\'t know where to find beaker matrix URL in jobwatch output')
 
         matrix_url = jobwatch_log[-3].strip()
-        parsed_matrix_url = urlparse.urlparse(matrix_url)
-        parsed_query = urlparse.parse_qs(parsed_matrix_url.query)
 
-        def _process_job(job):
-            self.debug('looking at job {}'.format(job))
+        if jobwatch_log[-1].strip() == 'finished successfully':
+            self.info('beaker-jobwatch finished successfully')
 
-            output = run_command(['bkr', 'job-results', '--prettyxml', 'J:{}'.format(job)])
+            parsed_matrix_url = urlparse.urlparse(matrix_url)
+            parsed_query = urlparse.parse_qs(parsed_matrix_url.query)
 
-            soup = bs4.BeautifulSoup(output.stdout, 'html.parser')
+            def _process_job(job):
+                self.debug('looking at job {}'.format(job))
 
-            for recipe_set in soup.find_all('recipeset', attrs={'response': 'ack'}):
-                if not recipe_set.find_all('recipe', attrs={'result': 'Fail'}):
-                    continue
+                output = run_command(['bkr', 'job-results', '--prettyxml', 'J:{}'.format(job)])
 
-                return False
+                soup = bs4.BeautifulSoup(output.stdout, 'html.parser')
 
-            return True
+                for recipe_set in soup.find_all('recipeset', attrs={'response': 'ack'}):
+                    if not recipe_set.find_all('recipe', attrs={'result': 'Fail'}):
+                        continue
 
-        overall_result = all((_process_job(job) for job in parsed_query['job_ids']))
+                    return False
 
-        self.info('Result of wow jobs: {}'.format('PASS' if overall_result is True else 'FAIL'))
+                return True
+
+            overall_result = 'PASS' if all((_process_job(job) for job in parsed_query['job_ids'])) else 'FAIL'
+
+        else:
+            self.warn('beaker-jobwatch does not report successful completion')
+
+            overall_result = 'ERROR'
+
+        self.info('Result of wow jobs: {}'.format(overall_result))
 
         # Prepare result info
         result = {
             'type': 'wow',
-            'result': 'PASS' if overall_result is True else 'FAIL',
+            'result': overall_result,
             'urls': {
                 'beaker_matrix': matrix_url
             }
