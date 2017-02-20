@@ -121,7 +121,7 @@ class CIWow(Module):
                 soup = bs4.BeautifulSoup(output.stdout, 'html.parser')
 
                 for recipe_set in soup.find_all('recipeset', attrs={'response': 'ack'}):
-                    if not recipe_set.find_all('recipe', attrs={'result': 'Fail'}):
+                    if all((recipe['result'] == 'Pass' for recipe in recipe_set.find_all('recipe'))):
                         continue
 
                     return False
