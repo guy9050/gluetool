@@ -34,6 +34,12 @@ This module requires an available Jenkins connection - via the jenkins module.
         'id': {
             'help': 'Brew Task ID (read also from the environment)',
         },
+        'pipeline-prepend': {
+            'help': 'citool options that will be added at the beginning of citool pipeline'
+        },
+        'pipeline-append': {
+            'help': 'citool options that will be added at the end of citool pipeline'
+        },
         'wow-options': {
             'help': 'Additional options for workflow-tomorrow'
         },
@@ -63,11 +69,16 @@ This module requires an available Jenkins connection - via the jenkins module.
         if self.jenkins is None:
             raise CIError('no jenkins connection found')
 
-        self.jenkins[JOB_NAME].invoke(build_params={
+        build_params = {
             'id': self.tid,
+            'pipeline_prepend': self.option('pipeline-prepend'),
+            'pipeline_append': self.option('pipeline-append'),
             'wow_options': self.option('wow-options'),
             'jobwatch_options': self.option('jobwatch-options'),
             'notify': self.option('notify')
-        })
+        }
+
+        self.jenkins[JOB_NAME].invoke(build_params=build_params)
 
         self.info("invoked job '{}' with given parameters".format(JOB_NAME))
+        self.debug("invoked job '{}' with parameters:\n{}".format(JOB_NAME, utils.format_dict(build_params)))
