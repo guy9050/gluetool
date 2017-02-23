@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import os
+import signal
 import sys
 import traceback
 
@@ -43,9 +45,26 @@ def main():
     # during their "destroy" time.
     failure = None
 
+    # Python installs SIGINT handler that translates signal to
+    # a KeyboardInterrupt exception. It's so good we want to use
+    # it for SIGTERM as well, just wrap the handler with some logging.
+    orig_sigint_handler = signal.getsignal(signal.SIGINT)
+
+    def sigint_handler(signum, frame):
+        ci.warn('Interrupted by SIGINT (Ctrl+C?)')
+        return orig_sigint_handler(signum, frame)
+
+    def sigterm_handler(signum, frame):
+        ci.warn('Interrupted by SIGTERM')
+        return orig_sigint_handler(signum, frame)
+
     try:
         # initialize ci, load the module list
         ci = libci.CI()
+
+        # CI is initialized, we can install our logging handlers
+        signal.signal(signal.SIGINT, sigint_handler)
+        signal.signal(signal.SIGTERM, sigterm_handler)
 
         # split the args and parse citool args
         (ci_args, modules_args) = split_argv(sys.argv[1:], ci.module_list())
@@ -111,6 +130,7 @@ def main():
             break
 
     except (SystemExit, KeyboardInterrupt) as e:
+        failure = Failure(module=module, exc_info=sys.exc_info())
         raise e
 
     # pylint: disable=broad-except
