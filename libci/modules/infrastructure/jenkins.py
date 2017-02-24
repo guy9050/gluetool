@@ -10,29 +10,83 @@ from requests.exceptions import RequestException
 
 import libci
 from libci import CIError
+from libci._proxy import Proxy
 
 JJB_CONFIG = os.path.expanduser('~/.config/jenkins_jobs/jenkins_jobs.ini')
 JJB_GLOBAL_CONFIG = os.path.expanduser('/etc/jenkins_jobs/jenkins_jobs.ini')
 
 
+class JenkinsProxy(Proxy):
+    # pylint: disable=too-few-public-methods
+
+    """
+    Proxy wrapper of Jenkins API instance. This will pass everything
+    back to the wrapped object, but can provide our extensions to the
+    available Jenkins API.
+
+    :param CIJenkins module: our parent module.
+    :param jenkinsapi.jenkins jenkins: Jenkins API connection.
+    """
+
+    def __init__(self, module, jenkins):
+        super(JenkinsProxy, self).__init__(jenkins)
+
+        # this is a proxy, we must be careful not to mess with (possible) jenkin's
+        # attributes, therefore the '_citool_' prefix
+        self._citool_module = module
+
+    def __getattribute__(self, name):
+        # original __getattribute__ hands everything back to the wrapped object,
+        # we need to check for our methods first
+        if name in ('set_build_name',):
+            return object.__getattribute__(self, name)
+
+        return super(JenkinsProxy, self).__getattribute__(name)
+
+    def set_build_name(self, name, description=None, build_url=None):
+        """
+        Set name (and possibly description) of a jenkins build.
+
+        :param str name: desired name.
+        :param str description: if not set, empty string is used.
+        :param str build_url: URL of a jenkins build. If not set, method tries to find
+          it using $BUILD_URL env var.
+        """
+
+        if build_url is None:
+            build_url = os.getenv('BUILD_URL', None)
+
+            if build_url is None:
+                raise CIError('$BUILD_URL env var not found, was this job started by Jenkins?')
+
+        description = description or ''
+
+        self._citool_module.jenkins_rest(build_url + '/configSubmit', **{
+            'displayName': name,
+            'description': description
+        })
+
+        self._citool_module.debug("build name set:\n  name='{}'\n  description='{}'".format(
+            name, description))
+
+
 class CIJenkins(libci.Module):
-    """This modules provides connection to a jenkins instance via jenkinsapi
-module:
-    https://jenkinsapi.readthedocs.io/en/latest/
+    """
+    This modules provides connection to a jenkins instance via jenkinsapi module:
+        https://jenkinsapi.readthedocs.io/en/latest/
 
-This module will also create Jenkins Job Builder configuration file
-    {0}
-if not found in paths '{0}' or '{1}'.
+    This module will also create Jenkins Job Builder configuration file {0},
+    if not found in paths '{0}' or '{1}'.
 
-You can use the option '--create-jjb-config' to force creation of \'{0}\' file.
-""".format(JJB_CONFIG, JJB_GLOBAL_CONFIG)
+    You can use the option '--create-jjb-config' to force creation of \'{0}\' file.
+    """.format(JJB_CONFIG, JJB_GLOBAL_CONFIG)
 
     name = 'jenkins'
     description = 'Connect to a jenkins instance via jenkinsapi'
     requires = 'jenkinsapi'
 
     # shared jenkins object
-    jenkins_instance = None
+    _jenkins = None
 
     options = {
         'create-jjb-config': {
@@ -57,7 +111,8 @@ You can use the option '--create-jjb-config' to force creation of \'{0}\' file.
         """ return jenkinsapi.Jenkins object instance """
         if reconnect:
             self.connect()
-        return self.jenkins_instance
+
+        return self._jenkins
 
     def jenkins_rest(self, url, **data):
         """
@@ -124,12 +179,13 @@ You can use the option '--create-jjb-config' to force creation of \'{0}\' file.
 
         # connect to the jenkins instance
         try:
-            self.jenkins_instance = Jenkins(url,
-                                            username=user,
-                                            password=password)
+            jenkins = Jenkins(url, username=user, password=password)
+
         except RequestException as e:
             self.debug('Connection error: {}'.format(e))
             raise libci.CIError("could not connect to jenkins '{}': {}".format(url, str(e)))
+
+        self._jenkins = JenkinsProxy(self, jenkins)
 
     def execute(self):
         create_config = self.option('create-jjb-config')
@@ -148,6 +204,4 @@ You can use the option '--create-jjb-config' to force creation of \'{0}\' file.
         self.connect()
 
         # be informative about the jenkins connection
-        version = self.jenkins_instance.version
-        msg = 'connected to jenkins \'{}\' version {}'.format(url, version)
-        self.info(msg)
+        self.info('connected to jenkins \'{}\' version {}'.format(url, self._jenkins.version))
