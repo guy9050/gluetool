@@ -19,6 +19,10 @@
             default: ''
             description: 'citool options that will be added at the end of citool pipeline'
         - string:
+            name: guess_distro_options
+            default: ''
+            description: 'Additional options for guess-distro'
+        - string:
             name: wow_options
             default: ''
             description: 'Additional options for workflow-tomorrow'
@@ -38,7 +42,7 @@
               jenkins
               brew --id $id
               brew-build-name
-              guess-distro
+              guess-distro "${guess_distro_options}"
               wow --wow-options "${wow_options}" --jobwatch-options "${jobwatch_options}"
               notify --notify "${notify}"
               ${pipeline_append}
