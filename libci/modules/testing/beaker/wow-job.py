@@ -40,6 +40,9 @@ This module requires an available Jenkins connection - via the jenkins module.
         'pipeline-append': {
             'help': 'citool options that will be added at the end of citool pipeline'
         },
+        'guess-distro-options': {
+            'help': 'Additional options for guess-distro'
+        },
         'wow-options': {
             'help': 'Additional options for workflow-tomorrow'
         },
@@ -73,6 +76,7 @@ This module requires an available Jenkins connection - via the jenkins module.
             'id': self.tid,
             'pipeline_prepend': self.option('pipeline-prepend'),
             'pipeline_append': self.option('pipeline-append'),
+            'guess_distro_options': self.option('guess-distro-options'),
             'wow_options': self.option('wow-options'),
             'jobwatch_options': self.option('jobwatch-options'),
             'notify': self.option('notify')
