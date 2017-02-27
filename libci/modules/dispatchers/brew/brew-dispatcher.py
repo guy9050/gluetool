@@ -232,7 +232,12 @@ class CIBrewDispatcher(Module):
 
         commands = {}
 
-        config_commands = self.config.get('packages', {}).get(component, None)
+        packages_config = self.config.get('packages', None)
+        if packages_config is None:
+            # either there's no key "packages", or it's empty
+            packages_config = {}
+
+        config_commands = packages_config.get(component, None)
         self.debug('commands in config file:\n{}'.format(format_dict(config_commands)))
 
         def _add_command_set(name, set_commands, rules=None):
