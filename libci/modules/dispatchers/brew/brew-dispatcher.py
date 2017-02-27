@@ -15,16 +15,14 @@ class SanityASTVisitor(ast.NodeVisitor):
     like calling functions, and limit rules to basic expressions.
     """
 
-    _valid_classes = (
-        _ast.Expression,
-        _ast.Expr,
-        _ast.Compare,
-        _ast.Name,
-        _ast.Load,
-        _ast.Eq,
-        _ast.NotEq,
-        _ast.Str
-    )
+    _valid_classes = [
+        getattr(_ast, node_class) for node_class in (
+            'Expression', 'Expr', 'Compare', 'Name', 'Load',
+            'Str', 'Num',
+            'Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE', 'Is', 'IsNot', 'In', 'NotIn',
+            'And', 'Or', 'Not'
+        )
+    ]
 
     def generic_visit(self, node):
         if not isinstance(node, SanityASTVisitor._valid_classes):
@@ -114,6 +112,29 @@ class CIBrewDispatcher(Module):
     is `'rhel-7.4-candidate'`, `command1` and `command2` will be dispatched, `command3` and
     `command4` will be dispatched when target is `'rhel-6.5-z-candidate'`, and for every
     other build, `command5` will run.
+
+    Few notes related to the second form:
+      - filtering rules *must* be the first entry in the set,
+      - "default" set is optional - if you don't specify it, no harm to the configuration
+        you just don't have any "fallback" section for cases when no filter rules matched,
+      - if you use one name of the set multiple times, the last will overwrite all former
+        ones.
+
+    Filtering rules are Python expressions, limited in offering of available operations:
+
+      Variables:
+        BREW_TASK_ID
+        BREW_TASK_TARGET
+        BREW_TASK_ISSUER
+        NVR
+        SCRATCH (True if task was a scratch build)
+
+      Types:
+        str, int, float
+
+      Operators:
+        ==, !=, <, <=, >, >=, is, is not, in, not in
+        and, or, not
     """
 
     name = 'brew-dispatcher'
@@ -205,6 +226,8 @@ class CIBrewDispatcher(Module):
         self.debug("construct command sets for component '{}'".format(component))
 
         global_always_commands = self.config.get('default', [])
+        if global_always_commands is None:
+            global_always_commands = []
         self.debug('global "always" commands:\n{}'.format(format_dict(global_always_commands)))
 
         commands = {}
@@ -312,7 +335,7 @@ class CIBrewDispatcher(Module):
             'BREW_TASK_TARGET': task.target.target,
             'BREW_TASK_ISSUER': task.owner,
             'NVR': task.nvr,
-            'SCRATCH': 'scratch' if task.scratch is True else ''
+            'SCRATCH': task.scratch is True
         }
 
         our_globals = {
