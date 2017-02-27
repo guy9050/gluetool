@@ -10,7 +10,7 @@ from requests.exceptions import RequestException
 
 import libci
 from libci import CIError
-from libci._proxy import Proxy
+from libci.proxy import Proxy
 
 JJB_CONFIG = os.path.expanduser('~/.config/jenkins_jobs/jenkins_jobs.ini')
 JJB_GLOBAL_CONFIG = os.path.expanduser('/etc/jenkins_jobs/jenkins_jobs.ini')
@@ -20,25 +20,41 @@ class JenkinsProxy(Proxy):
     # pylint: disable=too-few-public-methods
 
     """
-    Proxy wrapper of Jenkins API instance. This will pass everything
-    back to the wrapped object, but can provide our extensions to the
-    available Jenkins API.
+    Proxy wrapper of a Jenkins API instance. Instance of this class
+    behaves exactly like the Jenkins API instance it wraps, user of such
+    instance can use it like any other Jenkins API instance.
+
+    To us such arrangement brings possibility to extend proxy object with
+    our custom methods. That way we can provide a single object (via our
+    shared function) that combines both the original behavior of Jenkins
+    API instance, and our custom function we want to provide to the users
+    of this module.
+
+    When adding new methods, don't forget to update _CUSTOM_METHODS as well.
 
     :param CIJenkins module: our parent module.
     :param jenkinsapi.jenkins jenkins: Jenkins API connection.
     """
 
+    _CUSTOM_METHODS = ('set_build_name',)
+
     def __init__(self, module, jenkins):
         super(JenkinsProxy, self).__init__(jenkins)
 
-        # this is a proxy, we must be careful not to mess with (possible) jenkin's
-        # attributes, therefore the '_citool_' prefix
-        self._citool_module = module
+        # This is a proxy, so 'self.foo' would change attribute of
+        # the wrapped object. We don't want to mess with its attributes,
+        # so we have to resort to using object's methods when we want
+        # to change *this* object instead.
+        object.__setattr__(self, '_module', module)
 
     def __getattribute__(self, name):
-        # original __getattribute__ hands everything back to the wrapped object,
-        # we need to check for our methods first
-        if name in ('set_build_name',):
+        """
+        Original __getattribute__ method of Proxy class just forwards all
+        its calls to the object Proxy wraps. To allow users use of our custom
+        methods, we must "teach" our __getattribute__ about our methods.
+        """
+
+        if name in JenkinsProxy._CUSTOM_METHODS:
             return object.__getattribute__(self, name)
 
         return super(JenkinsProxy, self).__getattribute__(name)
@@ -53,6 +69,8 @@ class JenkinsProxy(Proxy):
           it using $BUILD_URL env var.
         """
 
+        module = object.__getattribute__(self, '_module')
+
         if build_url is None:
             build_url = os.getenv('BUILD_URL', None)
 
@@ -61,12 +79,12 @@ class JenkinsProxy(Proxy):
 
         description = description or ''
 
-        self._citool_module.jenkins_rest(build_url + '/configSubmit', **{
+        module.jenkins_rest(build_url + '/configSubmit', **{
             'displayName': name,
             'description': description
         })
 
-        self._citool_module.debug("build name set:\n  name='{}'\n  description='{}'".format(
+        module.debug("build name set:\n  name='{}'\n  description='{}'".format(
             name, description))
 
 
