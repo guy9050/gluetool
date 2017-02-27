@@ -3,9 +3,8 @@ before_script:
     - yum -y install git make python-setuptools gcc python-devel krb5-devel
     - (curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py && rm -f get-pip.py)
     - pip install -U setuptools
-    - git clone https://pagure.io/koji.git ~/koji
-    - (cd ~/koji/koji && make install)
+    - pip install tox
 
 tests:
   script:
-    - python setup.py test
+    - tox -e py27
