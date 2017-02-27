@@ -38,7 +38,7 @@ class JenkinsProxy(Proxy):
 
     _CUSTOM_METHODS = ('set_build_name',)
 
-    def __init__(self, module, jenkins):
+    def __init__(self, jenkins, module):
         super(JenkinsProxy, self).__init__(jenkins)
 
         # This is a proxy, so 'self.foo' would change attribute of
@@ -203,7 +203,7 @@ class CIJenkins(libci.Module):
             self.debug('Connection error: {}'.format(e))
             raise libci.CIError("could not connect to jenkins '{}': {}".format(url, str(e)))
 
-        self._jenkins = JenkinsProxy(self, jenkins)
+        self._jenkins = JenkinsProxy(jenkins, self)
 
     def execute(self):
         create_config = self.option('create-jjb-config')
