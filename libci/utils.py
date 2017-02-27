@@ -111,7 +111,12 @@ def run_command(cmd, *args, **kwargs):
     if kwargs['stderr'] == PARENT:
         del kwargs['stderr']
 
-    log.debug("run command: cmd='{}', args={}, kwargs={}".format(cmd, args, printable_kwargs))
+    # Make tests happy by sorting kwargs - it's a dictionary, therefore
+    # unpredictable from the observer's point of view. Can print its entries
+    # in different order with different Pythons, making tests a mess.
+    sorted_kwargs = ', '.join(["'%s': '%s'" % (k, printable_kwargs[k]) for k in sorted(printable_kwargs.iterkeys())])
+
+    log.debug("run command: cmd='%s', args=%s, kwargs={%s}" % (cmd, args, sorted_kwargs))
 
     try:
         p = subprocess.Popen(cmd, *args, **kwargs)

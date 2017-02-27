@@ -15,29 +15,33 @@ def test_run_command(monkeypatch, caplog):
     import subprocess
     from libci.utils import run_command, DEVNULL
 
-    # initialize logger - this is done by CI instance but we don't have any
-    libci.Logging.create_logger()
-
     def caplog_clear():
         caplog.handler.records = []
 
-    def assert_logging(record_count, cmd, stdout=None, stderr=None):
-        assert len(caplog.records) == record_count
-        assert all([r.levelno == logging.DEBUG for r in caplog.records])
+    # initialize logger - this is done by CI instance but we don't have any
+    libci.Logging.create_logger()
+    caplog_clear()
 
-        assert caplog.records[0].message == cmd
+    def assert_logging(record_count, cmd, stdout=None, stderr=None):
+        records = caplog.handler.records
+
+        assert len(records) == record_count
+        assert all([r.levelno == logging.DEBUG for r in records])
+
+        assert records[0].message == cmd
 
         if stdout is not None:
-            assert caplog.records[1].message == stdout
+            assert records[1].message == stdout
 
         if stderr is not None:
-            assert caplog.records[2].message == stderr
+            assert records[2].message == stderr
 
     # Accept lists only
     caplog_clear()
     with pytest.raises(AssertionError, message='Only list of strings accepted as a command'):
         run_command('/bin/ls')
 
+    caplog_clear()
     with pytest.raises(AssertionError, message='Only list of strings accepted as a command'):
         run_command(['/bin/ls', 13])
 
@@ -120,7 +124,7 @@ def test_run_command(monkeypatch, caplog):
     with pytest.raises(AttributeError, message="'tuple' object has no attribute 'fileno'"):
         run_command(cmd, stdout=stdout)
 
-    assert_logging(1, "run command: cmd='['/bin/ls']', args=(), kwargs={'stderr': 'PIPE', 'stdout': (13, 17)}")
+    assert_logging(1, "run command: cmd='['/bin/ls']', args=(), kwargs={'stderr': 'PIPE', 'stdout': '(13, 17)'}")
 
     # OSError(ENOENT) raised by Popen should be translated to CIError
     def faulty_popen_enoent(*args, **kwargs):
