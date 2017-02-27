@@ -206,4 +206,9 @@ def format_command_line(cmdline):
 
 
 def format_dict(dictionary):
-    return json.dumps(dictionary, sort_keys=True, indent=4, separators=(',', ': '))
+    # Use custom "default" handler, to at least encode obj's repr() output when
+    # json encoder does not know how to encode such class
+    def default(obj):
+        return repr(obj)
+
+    return json.dumps(dictionary, sort_keys=True, indent=4, separators=(',', ': '), default=default)
