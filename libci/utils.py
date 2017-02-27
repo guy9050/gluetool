@@ -4,6 +4,7 @@ Various helpers.
 
 import errno
 import json
+import os
 import subprocess
 
 from libci import CIError, CICommandError
@@ -13,7 +14,6 @@ from libci.log import Logging
 try:
     from subprocess import DEVNULL
 except ImportError:
-    import os
     DEVNULL = open(os.devnull, 'wb')
 
 # Use this constant to order run_command to pass child's output stream
