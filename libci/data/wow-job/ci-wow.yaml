@@ -44,7 +44,7 @@
             jenkins
             brew --id $id
             brew-build-name
-            guess-distro "${guess_distro_options}"
+            guess-distro ${guess_distro_options}
             wow --wow-options "${wow_options}" --jobwatch-options "${jobwatch_options}"
             notify --notify "${notify}"
             ${pipeline_append}
