@@ -1,3 +1,5 @@
+---
+
 - job:
     name: 'ci-brew-dispatcher'
     description: |
@@ -7,21 +9,21 @@
     concurrent: true
     display-name: 'ci-brew-dispatcher'
     parameters:
-        - string:
-            name: id
-            description: 'Brew task ID'
-        - string: 
-            name: name
-            description: 'Package name'
-        - string: 
-            name: version
-            description: 'Package version'
-        - string: 
-            name: release
-            description: 'Package release'
-        - string:
-            name: target
-            description: 'Brew target'
+      - string:
+          name: id
+          description: 'Brew task ID'
+      - string:
+          name: name
+          description: 'Package name'
+      - string:
+          name: version
+          description: 'Package version'
+      - string:
+          name: release
+          description: 'Package release'
+      - string:
+          name: target
+          description: 'Brew target'
     triggers:
       - ci-trigger:
           jms-selector: |
@@ -29,11 +31,11 @@
             AND method = 'build'
             AND new = 'CLOSED'
     builders:
-        - shell: |
-            citool -i -o citool-debug.txt envinject jenkins brew --id $id brew-build-name brew-dispatcher
-        - inject:
-            properties-file: envinject-citool.props
+      - shell: |
+          citool -i -o citool-debug.txt envinject jenkins brew --id $id brew-build-name brew-dispatcher
+      - inject:
+          properties-file: envinject-citool.props
     publishers:
-        - archive:
-            artifacts: '**/**'
-            allow-empty: 'true'
+      - archive:
+          artifacts: '**/**'
+          allow-empty: 'true'

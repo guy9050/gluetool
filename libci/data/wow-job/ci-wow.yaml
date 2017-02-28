@@ -1,3 +1,5 @@
+---
+
 - job:
     name: 'ci-wow'
     node: beaker
@@ -6,49 +8,49 @@
     concurrent: true
     display-name: 'ci-wow'
     parameters:
-        - string:
-            name: id
-            default: ''
-            description: 'Brew task ID.'
-        - string:
-            name: pipeline_prepend
-            default: ''
-            description: 'citool options that will be added at the beginning of citool pipeline'
-        - string:
-            name: pipeline_append
-            default: ''
-            description: 'citool options that will be added at the end of citool pipeline'
-        - string:
-            name: guess_distro_options
-            default: ''
-            description: 'Additional options for guess-distro'
-        - string:
-            name: wow_options
-            default: ''
-            description: 'Additional options for workflow-tomorrow'
-        - string:
-            name: jobwatch_options
-            default: ''
-            description: 'Additional options for beaker-jobwatch'
-        - string:
-            name: notify
-            default: ''
-            description: 'Comma-separated list of e-mails to notify when job finishes.'
+      - string:
+          name: id
+          default: ''
+          description: 'Brew task ID.'
+      - string:
+          name: pipeline_prepend
+          default: ''
+          description: 'citool options that will be added at the beginning of citool pipeline'
+      - string:
+          name: pipeline_append
+          default: ''
+          description: 'citool options that will be added at the end of citool pipeline'
+      - string:
+          name: guess_distro_options
+          default: ''
+          description: 'Additional options for guess-distro'
+      - string:
+          name: wow_options
+          default: ''
+          description: 'Additional options for workflow-tomorrow'
+      - string:
+          name: jobwatch_options
+          default: ''
+          description: 'Additional options for beaker-jobwatch'
+      - string:
+          name: notify
+          default: ''
+          description: 'Comma-separated list of e-mails to notify when job finishes.'
     builders:
-        - shell:
-            citool -i -o citool-debug.txt
-              ${pipeline_prepend}
-              envinject
-              jenkins
-              brew --id $id
-              brew-build-name
-              guess-distro "${guess_distro_options}"
-              wow --wow-options "${wow_options}" --jobwatch-options "${jobwatch_options}"
-              notify --notify "${notify}"
-              ${pipeline_append}
-        - inject:
-            properties-file: envinject-citool.props
+      - shell:
+          citool -i -o citool-debug.txt
+            ${pipeline_prepend}
+            envinject
+            jenkins
+            brew --id $id
+            brew-build-name
+            guess-distro "${guess_distro_options}"
+            wow --wow-options "${wow_options}" --jobwatch-options "${jobwatch_options}"
+            notify --notify "${notify}"
+            ${pipeline_append}
+      - inject:
+          properties-file: envinject-citool.props
     publishers:
-        - archive:
-            artifacts: '**/**'
-            allow-empty: 'true'
+      - archive:
+          artifacts: '**/**'
+          allow-empty: 'true'

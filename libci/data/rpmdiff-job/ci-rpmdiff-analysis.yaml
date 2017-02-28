@@ -1,3 +1,5 @@
+---
+
 - job:
     name: 'ci-rpmdiff-analysis'
     node: rpmdiff
@@ -8,16 +10,16 @@
     concurrent: true
     display-name: 'ci-rpmdiff-analysis'
     parameters:
-        - string:
-            name: id
-            default: ''
-            description: 'Brew task ID.'
+      - string:
+          name: id
+          default: ''
+          description: 'Brew task ID.'
     builders:
-        - shell: |
-            citool -i -o citool-debug.txt envinject jenkins brew --id $id brew-build-name rpmdiff --type analysis
-        - inject:
-            properties-file: envinject-citool.props
+      - shell: |
+          citool -i -o citool-debug.txt envinject jenkins brew --id $id brew-build-name rpmdiff --type analysis
+      - inject:
+          properties-file: envinject-citool.props
     publishers:
-        - archive:
-            artifacts: '**/**'
-            allow-empty: 'true'
+      - archive:
+          artifacts: '**/**'
+          allow-empty: 'true'
