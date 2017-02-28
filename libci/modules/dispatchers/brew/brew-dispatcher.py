@@ -15,14 +15,14 @@ class SanityASTVisitor(ast.NodeVisitor):
     like calling functions, and limit rules to basic expressions.
     """
 
-    _valid_classes = [
+    _valid_classes = tuple([
         getattr(_ast, node_class) for node_class in (
             'Expression', 'Expr', 'Compare', 'Name', 'Load',
             'Str', 'Num',
             'Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE', 'Is', 'IsNot', 'In', 'NotIn',
             'And', 'Or', 'Not'
         )
-    ]
+    ])
 
     def generic_visit(self, node):
         if not isinstance(node, SanityASTVisitor._valid_classes):
