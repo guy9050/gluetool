@@ -66,9 +66,9 @@ class CIBuildOnCommit(Module):
                                             "x86_64", "--target", target]
         self.info("scheduling scratch build of component '{0}' and branch '{1}'".format(self.component, self.branch))
         # dry mod: just print the command, don't execute it
-        self.info("Running ing dry mode (testing), no scratch build will be scheduled")
+        #self.info("Running ing dry mode (testing), no scratch build will be scheduled")
         self.info(command)
-        #run_command(command, stdout = 1, stderr = 1)
+        run_command(command, stdout = 1, stderr = 1)
 
         os.chdir(cwd)
         # cleanup
