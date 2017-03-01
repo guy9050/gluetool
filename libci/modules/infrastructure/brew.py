@@ -205,6 +205,7 @@ class CIBrew(libci.Module):
     description = 'Connect to Brew instance via koji python module'
     requires = 'jenkinsapi'
 
+    brew_instance = None
     brew_task_instance = None
 
     options = {
@@ -218,20 +219,23 @@ class CIBrew(libci.Module):
     }
     required_options = ['url', 'id']
 
-    shared_functions = ['brew_task']
+    shared_functions = ['brew_task', 'get_brew']
 
     def brew_task(self):
         """ return a BrewTask instance of passed task_id """
         return self.brew_task_instance
 
+    def get_brew(self):
+        return self.brew_instance
+
     def execute(self):
         url = self.option('url')
         task_id = self.option('id')
 
-        brew_instance = koji.ClientSession(url)
-        version = brew_instance.getAPIVersion()
+        self.brew_instance = koji.ClientSession(url)
+        version = self.brew_instance.getAPIVersion()
         self.info('connected to brew instance \'{}\' API version {}'.format(url, version))
 
         # print information about the task
-        self.brew_task_instance = BrewTask(self, task_id, brew_instance)
+        self.brew_task_instance = BrewTask(self, task_id, self.brew_instance)
         self.info(self.brew_task_instance.full_name)
