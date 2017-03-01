@@ -1,0 +1,29 @@
+- job:
+    name: 'build-on-commit'
+    description: |
+        Schedule scratch build after commit into staging branch in dist-git.
+    concurrent: true
+    display-name: 'ci-build-on-commit'
+    parameters:
+        - string:
+            name: repo
+            description: 'Component name'
+        - string: 
+            name: branch
+            description: 'Git branch'
+    triggers:
+      - ci-trigger:
+          jms-selector: |
+            type = 'dist-git'
+            AND namespace = 'rpms'
+            AND branch LIKE '%staging%'
+    builders:
+        - shell: |
+            citool -i -o citool-debug.txt build-on-commit --component ${repo} --branch ${branch}
+    publishers:
+        - archive:
+            artifacts: '**/**'
+            allow-empty: 'true'
+    wrappers:
+        - build-name:
+            name: ${BUILD_NAME}
