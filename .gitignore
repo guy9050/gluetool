@@ -1,5 +1,6 @@
 **/*~
 **/*.pyc
+**/*.pyo
 build
 dist
 version.py
@@ -9,6 +10,7 @@ libatt.egg-info
 *.egg-info
 .eggs
 .cache
+.tox
 
 # coverage data files
 **/.coverage*
