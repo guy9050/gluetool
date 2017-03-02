@@ -8,138 +8,21 @@ from libci import CIError, CICommandError, Module, utils
 from libci.utils import run_command, log_blob, format_dict
 
 
-REQUIRED_COMMANDS = ['bkr', 'beaker-jobwatch', '/bin/tcms-results']
+REQUIRED_COMMANDS = ['bkr', 'beaker-jobwatch', 'tcms-results']
 
 DEFAULT_BEAKER_RESULTS_FILE = 'beaker-results.json'
 
-# Import tcms-results as a module so we can reuse its code
-try:
-    # pylint: disable=invalid-name
-    tcms_results = imp.load_source('tcms_results', '/bin/tcms-results')
-
-except ImportError as e:
-    raise CIError('Cannot import tcms-results: {}'.format(str(e)))
-
-
-class TaskAggregator(tcms_results.TaskAggregator):
-    # pylint: disable=too-few-public-methods
-
-    """
-    This class makes use of tcms-result's unique gift of parsing and processing
-    of beaker data, and simply observes and stores processed data, to let us
-    simply store the gathered data and present them to the world.
-    """
-
-    WOW_MODULE = None
-    WOW_STORAGE = {}
-
-    # pylint: disable=invalid-name
-    def recordResult(self, task, caserun):
-        """
-        Overrides original method that does the actual processing of results.
-        Our code lets it do its job, and when its done, we just store some
-        of that data into our storage.
-        """
-
-        # call the original method to fulfill tcms-results duty
-        super(TaskAggregator, self).recordResult(task, caserun)
-
-        if task.status != 'Completed':
-            self._wow_module.warn('Task {0} not completed'.format(task.name))
-            return
-
-        DEBUG = TaskAggregator.WOW_MODULE.debug
-        storage = TaskAggregator.WOW_STORAGE
-
-        xml = task.xml
-        journal = tcms_results.JournalParser(task)
-
-        DEBUG("task: '{}'".format(task.name))
-        log_blob(DEBUG, 'task XML', xml.toprettyxml())
-        log_blob(DEBUG, 'task journal', journal.getDetails())
-
-        machine = xml.getElementsByTagName('roles')[0].getElementsByTagName('system')[0]
-
-        if task.name not in storage:
-            storage[task.name] = []
-
-        data = {
-            'name': task.name,
-            'bkr_recipe_id': int(task.recipe.id),
-            'bkr_distrovariant': str(task.recipe.environment),
-            'bkr_task_id': int(xml.attributes['id'].value),
-            'bkr_version': xml.attributes['version'].value,
-            'bkr_arch': task.recipe.arch,
-            'bkr_status': task.status,
-            'bkr_result': task.result,
-            'bkr_host': machine.attributes['value'].value,
-            'bkr_duration': 0,
-            'bkr_params': [],
-            'bkr_packages': [],
-            'bkr_phases': {},
-            'bkr_logs': []
-        }
-
-        # convert test duration in a form of %h:%m:%s to simple integer (sec)
-        # note: duration doesn't always need to be there, e.g. when "External
-        # Watchdog Expired"
-        duration = xml.attributes.get('duration')
-        if duration is not None:
-            data['bkr_duration'] = 0
-
-            days_and_hours = duration.value.split(',')  # "1 day, 23:51:43"
-            if len(days_and_hours) > 1:
-                data['bkr_duration'] += int(days_and_hours.pop(0).split(' ')[0]) * 24 * 60 * 60
-
-            _chunks = [int(_chunk) for _chunk in days_and_hours[0].split(':')]
-            data['bkr_duration'] += _chunks[0] * 60 * 60 + _chunks[1] * 60 + _chunks[2]
-
-        # store params, if any
-        params_node = xml.getElementsByTagName('params')
-        if len(params_node) > 0:
-            for param in params_node[0].getElementsByTagName('param'):
-                # this is caserun.id, safe to ignore
-                if param.attributes['name'].value == 'CASERUNS':
-                    continue
-
-                data['bkr_params'].append('%s="%s"' % (param.attributes['name'].value, param.attributes['value'].value))
-
-        # store packages, only unique names
-        packages = {}
-        for phase, phase_packages in journal.getDetails().iteritems():
-            map(packages.__setitem__, phase_packages, [])
-
-        data['bkr_packages'] = [k.strip() for k in sorted(packages.keys())]
-
-        # store phases
-        results_nodes = xml.getElementsByTagName('results')
-        if results_nodes:
-            for result_node in results_nodes[0].getElementsByTagName('result'):
-                phase = result_node.attributes['path'].value
-                result = result_node.attributes['result'].value
-
-                data['bkr_phases'][phase] = result
-
-        # store log links
-        logs_nodes = xml.getElementsByTagName('logs')
-        if logs_nodes:
-            for log_node in logs_nodes[0].getElementsByTagName('log'):
-                data['bkr_logs'].append({
-                    'href': log_node.attributes['href'].value,
-                    'name': log_node.attributes['name'].value
-                })
-
-        storage[task.name].append(data)
-
-
-# Replace the original TaskAggregator class with our custom version
-tcms_results.TaskAggregator = TaskAggregator
+TCMS_RESULTS_LOCATIONS = ('/bin', '/usr/bin')
 
 
 class CIWow(Module):
     """
-    This module just wraps beaker workflow tomorrow and injects --distro
-    from shared 'distro' function if available.
+    This module wraps workflow-tomorrow, beaker-jobwatch and tcms-results, using them
+    to create a simple testing pipeline for given build.
+
+    w-t is used to kick of beaker jobs, using options passed by user. beaker-jobwatch
+    than babysits jobs, and if everything goes well, tcms-results are used to gather
+    results and create a simple summary.
     """
 
     name = 'wow'
@@ -151,12 +34,14 @@ class CIWow(Module):
             'help': 'Additional options for beaker-jobwatch'
         },
         'beaker-results': {
-            'help': 'Name of the file with beaker results JSON',
+            'help': 'Name of the file with beaker results JSON. Default is {}'.format(DEFAULT_BEAKER_RESULTS_FILE),
             'default': DEFAULT_BEAKER_RESULTS_FILE
         }
     }
 
     shared_functions = ['results']
+
+    _processed_results = None
 
     _results = []
 
@@ -165,6 +50,132 @@ class CIWow(Module):
 
     def sanity(self):
         utils.check_for_commands(REQUIRED_COMMANDS)
+
+        for path in TCMS_RESULTS_LOCATIONS:
+            try:
+                self.tcms_results = tcms_results = imp.load_source('tcms_results', os.path.join(path, 'tcms-results'))
+                break
+
+            except ImportError as exc:
+                self.warn('Cannot import tcms-results from {}: {}'.format(path, str(exc)))
+
+        else:
+            raise CIError('Cannot import tcms-results')
+
+        # These are acessed by TaskAggregator.recordResult, and processed results must be
+        # also accesible to other methods of this module.
+        citool_module = self
+        processed_results = self._processed_results = {}
+
+        class TaskAggregator(tcms_results.TaskAggregator):
+            # pylint: disable=too-few-public-methods
+
+            """
+            This class makes use of tcms-result's unique gift of parsing and processing
+            of beaker data, and simply observes and stores processed data, to let us
+            simply store the gathered data and present them to the world.
+            """
+
+            # pylint: disable=invalid-name
+            def recordResult(self, task, caserun):
+                """
+                Overrides original method that does the actual processing of results.
+                Our code lets it do its job, and when its done, we just store some
+                of that data into our storage.
+                """
+
+                # call the original method to fulfill tcms-results duty
+                super(TaskAggregator, self).recordResult(task, caserun)
+
+                if task.status != 'Completed':
+                    self._wow_module.warn('Task {0} not completed'.format(task.name))
+                    return
+
+                DEBUG = citool_module.debug
+
+                xml = task.xml
+                journal = tcms_results.JournalParser(task)
+
+                DEBUG("task: '{}'".format(task.name))
+                log_blob(DEBUG, 'task XML', xml.toprettyxml())
+                log_blob(DEBUG, 'task journal', journal.getDetails())
+
+                machine = xml.getElementsByTagName('roles')[0].getElementsByTagName('system')[0]
+
+                if task.name not in processed_results:
+                    processed_results[task.name] = []
+
+                data = {
+                    'name': task.name,
+                    'bkr_recipe_id': int(task.recipe.id),
+                    'bkr_distrovariant': str(task.recipe.environment),
+                    'bkr_task_id': int(xml.attributes['id'].value),
+                    'bkr_version': xml.attributes['version'].value,
+                    'bkr_arch': task.recipe.arch,
+                    'bkr_status': task.status,
+                    'bkr_result': task.result,
+                    'bkr_host': machine.attributes['value'].value,
+                    'bkr_duration': 0,
+                    'bkr_params': [],
+                    'bkr_packages': [],
+                    'bkr_phases': {},
+                    'bkr_logs': []
+                }
+
+                # convert test duration in a form of %h:%m:%s to simple integer (sec)
+                # note: duration doesn't always need to be there, e.g. when "External
+                # Watchdog Expired"
+                duration = xml.attributes.get('duration')
+                if duration is not None:
+                    data['bkr_duration'] = 0
+
+                    days_and_hours = duration.value.split(',')  # "1 day, 23:51:43"
+                    if len(days_and_hours) > 1:
+                        data['bkr_duration'] += int(days_and_hours.pop(0).split(' ')[0]) * 24 * 60 * 60
+
+                    _chunks = [int(_chunk) for _chunk in days_and_hours[0].split(':')]
+                    data['bkr_duration'] += _chunks[0] * 60 * 60 + _chunks[1] * 60 + _chunks[2]
+
+                # store params, if any
+                params_node = xml.getElementsByTagName('params')
+                if len(params_node) > 0:
+                    for param in params_node[0].getElementsByTagName('param'):
+                        # this is caserun.id, safe to ignore
+                        if param.attributes['name'].value == 'CASERUNS':
+                            continue
+
+                        data['bkr_params'].append('%s="%s"' % (param.attributes['name'].value,
+                                                               param.attributes['value'].value))
+
+                # store packages, only unique names
+                packages = {}
+                for phase, phase_packages in journal.getDetails().iteritems():
+                    map(packages.__setitem__, phase_packages, [])
+
+                data['bkr_packages'] = [k.strip() for k in sorted(packages.keys())]
+
+                # store phases
+                results_nodes = xml.getElementsByTagName('results')
+                if results_nodes:
+                    for result_node in results_nodes[0].getElementsByTagName('result'):
+                        phase = result_node.attributes['path'].value
+                        result = result_node.attributes['result'].value
+
+                        data['bkr_phases'][phase] = result
+
+                # store log links
+                logs_nodes = xml.getElementsByTagName('logs')
+                if logs_nodes:
+                    for log_node in logs_nodes[0].getElementsByTagName('log'):
+                        data['bkr_logs'].append({
+                            'href': log_node.attributes['href'].value,
+                            'name': log_node.attributes['name'].value
+                        })
+
+                processed_results[task.name].append(data)
+
+        # Replace the original TaskAggregator class with our custom version
+        tcms_results.TaskAggregator = TaskAggregator
 
     def _run_wow(self, task, distro, options):
         """
@@ -277,12 +288,10 @@ class CIWow(Module):
         parsed_matrix_url = urlparse.urlparse(matrix_url)
         parsed_query = urlparse.parse_qs(parsed_matrix_url.query)
 
-        TaskAggregator.WOW_MODULE = self
-
         # tcms-results simply parses sys.argv... No other way to foist our options :/
         old_argv, sys.argv = sys.argv, ['/bin/tcms-results', '--job={}'.format(','.join(parsed_query['job_ids']))]
         try:
-            tcms_results.options = tcms_results.parse()
+            self.tcms_results.options = self.tcms_results.parse()
 
         finally:
             sys.argv = old_argv
@@ -291,12 +300,10 @@ class CIWow(Module):
         self.info('tcms-results are working')
 
         try:
-            tcms_results.Results().investigate().update()
+            self.tcms_results.Results().investigate().update()
 
         except Exception as e:
             raise CIError('Failed to process beaker results: {}'.format(str(e)))
-
-        processed_results = TaskAggregator.WOW_STORAGE
 
         # Any single task with a result other than "PASS" - or even with
         # a status other than "COMPLETED" - means testing failed.
@@ -307,7 +314,7 @@ class CIWow(Module):
 
         self.debug('Try to find any non-PASS task')
 
-        for task, runs in processed_results.iteritems():
+        for task, runs in self._processed_results.iteritems():
             self.debug("    task '{}'".format(task))
 
             for run in runs:
@@ -317,9 +324,9 @@ class CIWow(Module):
                     continue
 
                 self.debug('            We have our traitor!')
-                return 'FAIL', processed_results, matrix_url
+                return 'FAIL', self._processed_results, matrix_url
 
-        return 'PASS', processed_results, matrix_url
+        return 'PASS', self._processed_results, matrix_url
 
     def execute(self):
         task = self.shared('brew_task')
