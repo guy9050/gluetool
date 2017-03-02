@@ -46,6 +46,9 @@ class CIRpmdiff(Module):
         'blacklist': {
             'help': 'A comma seaparted list of blacklisted package names',
         },
+        'run-id': {
+            'help': 'Do not schedule run, just report from given run id',
+        },
         'type': {
             'help': 'Test type: analysis or comparison',
             'choices': ['analysis', 'comparison'],
@@ -94,23 +97,23 @@ class CIRpmdiff(Module):
         except CICommandError as exc:
             raise CIError("Failure during 'rpmdiff-remote' execution: {}".format(exc.output.stderr))
 
-    def _get_runinfo(self, task_id):
-        command = self.rpmdiff_cmd + ["runinfo", task_id]
+    def _get_runinfo(self, run_id):
+        command = self.rpmdiff_cmd + ["runinfo", run_id]
 
         blob = json.loads(CIRpmdiff._run_command(command).stdout)
         utils.log_blob(self.debug, 'rpmdiff-remote runinfo returned', utils.format_dict(blob))
 
         return blob
 
-    def _wait_until_finished(self, task_id):
+    def _wait_until_finished(self, run_id):
         start_time = time.time()
-        runinfo = self._get_runinfo(task_id)
-        self.verbose("RPMdiff task [{}] state: {}".format(task_id, runinfo['overall_score']['description']))
+        runinfo = self._get_runinfo(run_id)
+        self.verbose("RPMdiff run [{}] state: {}".format(run_id, runinfo['overall_score']['description']))
         while runinfo['overall_score']['description'] in ['Running', 'Queued for test']:
             if (time.time() - start_time) > self.max_timeout:
                 raise CIError("Waiting for RPMdiff results timed out ")
             time.sleep(self.check_interval)
-            runinfo = self._get_runinfo(task_id)
+            runinfo = self._get_runinfo(run_id)
         return runinfo
 
     def _run_rpmdiff(self, test_type, nvr_baseline=None):
@@ -130,8 +133,9 @@ class CIRpmdiff(Module):
         return self._wait_until_finished(run_id)
 
     def execute(self):
-        test_type = self.option('type')
         blacklist = self.option('blacklist')
+        run_id = self.option('run-id')
+        test_type = self.option('type')
         url = self.option('url')
 
         # override url if requested
@@ -158,7 +162,10 @@ class CIRpmdiff(Module):
         msg += ['compared to {}'.format(self.brew_task.latest)] if test_type == 'comparison' else []
         self.info(' '.join(msg))
 
-        runinfo = self._run_rpmdiff(test_type, self.brew_task.latest)
+        if run_id:
+            runinfo = self._get_runinfo(run_id)
+        else:
+            runinfo = self._run_rpmdiff(test_type, self.brew_task.latest)
         self.info('result: {}'.format(runinfo['overall_score']['description']))
 
         if test_type == 'comparison':
@@ -180,7 +187,9 @@ class CIRpmdiff(Module):
                     'item': item,
                     'type': result_type,
                     'newnvr': self.brew_task.nvr,
-                    'oldnvr': self.brew_task.latest
+                    'oldnvr': self.brew_task.latest,
+                    'scratch': self.brew_task.scratch,
+                    'taskid': self.brew_task.task_id
                 },
                 'ref_url': runinfo['web_url'],
                 'testcase': {
@@ -200,11 +209,13 @@ class CIRpmdiff(Module):
                         'item': item,
                         'type': result_type,
                         'newnvr': self.brew_task.nvr,
-                        'oldnvr': self.brew_task.latest
+                        'oldnvr': self.brew_task.latest,
+                        'scratch': self.brew_task.scratch,
+                        'taskid': self.brew_task.task_id
                     },
                     'ref_url': '{}/{}'.format(runinfo['web_url'], result['test']['test_id']),
                     'testcase': {
-                        'name': 'dist.rpmdiff.{}'.format(description),
+                        'name': 'dist.rpmdiff.{}.{}'.format(test_type, description),
                         'ref_url': result['test']['wiki_url']
                     },
                     'outcome': RPMDIFF_SCORE[result['score']],
