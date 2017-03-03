@@ -16,7 +16,7 @@
           description: 'Brew task ID.'
     builders:
       - shell: |
-          citool -i -o citool-debug.txt envinject jenkins brew --id $id brew-build-name rpmdiff --type analysis
+          citool -i -o citool-debug.txt envinject jenkins brew --id $id brew-build-name rpmdiff --type analysis notify-ci-bus
       - inject:
           properties-file: envinject-citool.props
     publishers:
