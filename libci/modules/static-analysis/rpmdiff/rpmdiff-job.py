@@ -54,7 +54,7 @@ This module requires an available Jenkins connection - via the jenkins module.
         utils.check_for_commands(REQUIRED_CMDS)
 
         # check if jjb yaml exists
-        if self.option('type') == 'analysis':
+        if self.option('type') == 'comparison':
             self.job_name = CMP_JOB_NAME
             self.yaml = os.path.join(self.data_path, CMP_JJB_YAML)
         else:
