@@ -74,7 +74,10 @@ class CINotifyBus(Module):
         # connect to message bus
         self.cibus = stomp.Connection([(self.option('host'), self.option('port'))])
         self.cibus.start()
-        self.cibus.connect(login=self.option('user'), passcode=self.option('password'), wait=True)
+        try:
+            self.cibus.connect(login=self.option('user'), passcode=self.option('password'), wait=True)
+        except stomp.exception.ConnectFailedException:
+            raise CIError('could not connect to CI message bus')
         if self.cibus.is_connected() is not True:
             raise CIError('could not connect to CI message bus')
 
