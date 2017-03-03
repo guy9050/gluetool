@@ -3,7 +3,7 @@ from libci import CIError, Module, utils
 
 # defaults
 CI_BUS_HOST = 'ci-bus.lab.eng.rdu2.redhat.com'
-CI_BUS_PORT = '61613'
+CI_BUS_PORT = 61613
 CI_BUS_TOPIC = '/topic/CI'
 
 
