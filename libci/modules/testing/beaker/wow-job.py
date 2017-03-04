@@ -41,7 +41,7 @@ This module requires an available Jenkins connection - via the jenkins module.
             'help': 'citool options that will be added at the end of citool pipeline'
         },
         'guess-distro-options': {
-            'help': 'Additional options for guess-distro'
+            'help': 'Additional options for guess-distro module'
         },
         'wow-options': {
             'help': 'Additional options for workflow-tomorrow'
@@ -49,8 +49,8 @@ This module requires an available Jenkins connection - via the jenkins module.
         'jobwatch-options': {
             'help': 'Additional options for beaker-jobwatch'
         },
-        'notify': {
-            'help': 'Comma-separated list of e-mails to notify when job finishes.'
+        'notify-email-options': {
+            'help': 'Additional options for notify-email module'
         }
     }
 
@@ -79,7 +79,7 @@ This module requires an available Jenkins connection - via the jenkins module.
             'guess_distro_options': self.option('guess-distro-options'),
             'wow_options': self.option('wow-options'),
             'jobwatch_options': self.option('jobwatch-options'),
-            'notify': self.option('notify')
+            'notify_email_options': self.option('notify-email-options')
         }
 
         self.jenkins[JOB_NAME].invoke(build_params=build_params)
