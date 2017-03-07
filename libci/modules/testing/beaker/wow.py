@@ -194,12 +194,20 @@ class CIWow(Module):
         whiteboard = 'CI run {} brew task id {} build target {}'.format(task.nvr, task.task_id, task.target.target)
 
         # wow
+        task_params = {
+            'BASEOS_CI': 'true',
+            'BASEOS_CI_COMPONENT': str(task.component)
+        }
+
         command = [
             'bkr', 'workflow-tomorrow',
             '--id',
             '--whiteboard', whiteboard,
             '--no-reserve'
         ] + distro_option + brew_option + options
+
+        for name, value in task_params.iteritems():
+            command += ['--taskparam', '{}={}'.format(name, value)]
 
         self.info("running 'workflow-tomorrow':\n{}".format(utils.format_command_line([command])))
 
