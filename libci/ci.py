@@ -618,8 +618,8 @@ class CI(object):
                 module.destroy(failure=failure)
 
             # pylint: disable=broad-except
-            except Exception:
-                self.exception('error in destroy function')
+            except Exception as exception:
+                self.exception('error in destroy function: {}'.format(str(exception)))
 
         self.module_instances = []
 
