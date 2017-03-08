@@ -318,7 +318,13 @@ class Notify(Module):
 
         if soft is not True:
             self.debug('Failure caused by a non-soft error')
-            recipients += self.hard_error_cc
+
+            if self.force_recipients:
+                self.debug('Hard error CC overruled by force recipients')
+                recipients = self.force_recipients
+
+            else:
+                recipients += self.hard_error_cc
 
         recipients = self.polish_recipients(recipients)
 
