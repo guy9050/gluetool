@@ -303,7 +303,7 @@ class Notify(Module):
             msg.send()
 
     def destroy(self, failure=None):
-        if failure is None:
+        if failure is None or isinstance(failure.exc_info[1], SystemExit):
             return
 
         exc = failure.exc_info[1]
