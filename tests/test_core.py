@@ -51,7 +51,7 @@ def test_run_command(monkeypatch, caplog):
     assert output.exit_code == 0
     assert 'bin' in output.stdout
     assert output.stderr == ''
-    assert_logging(3, "run command: cmd='['/bin/ls', '/']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}",
+    assert_logging(3, "run command: cmd='['/bin/ls', '/']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}",
                    stderr='stderr:\n------------------\n\n------------------')
 
     assert caplog.records[1].message.startswith('stdout:\n------------------\n')
@@ -63,13 +63,13 @@ def test_run_command(monkeypatch, caplog):
     with pytest.raises(libci.CIError, message="Command '/bin/non-existent-binary' not found"):
         run_command(['/bin/non-existent-binary'])
 
-    assert_logging(1, "run command: cmd='['/bin/non-existent-binary']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
+    assert_logging(1, "run command: cmd='['/bin/non-existent-binary']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
 
     # Test existing but failing binary
     with pytest.raises(libci.CICommandError, message="Command '/bin/false' failed with exit code 1") as excinfo:
         run_command(['/bin/false'])
 
-    assert_logging(4, "run command: cmd='['/bin/non-existent-binary']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
+    assert_logging(4, "run command: cmd='['/bin/non-existent-binary']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
     assert excinfo.value.output.exit_code == 1
     assert excinfo.value.output.stdout == ''
     assert excinfo.value.output.stderr == ''
@@ -81,7 +81,7 @@ def test_run_command(monkeypatch, caplog):
     assert output.exit_code == 0
     assert output.stdout == 'This goes to stdout\n'
     assert output.stderr == 'This goes to stderr\n'
-    assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}",
+    assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}",
                    stdout='stdout:\n------------------\nThis goes to stdout\n\n------------------',
                    stderr='stderr:\n------------------\nThis goes to stderr\n\n------------------')
 
@@ -92,7 +92,7 @@ def test_run_command(monkeypatch, caplog):
     assert output.exit_code == 0
     assert output.stdout is None
     assert output.stderr == 'This goes to stderr\n'
-    assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'DEVNULL'}",
+    assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', kwargs={'stderr': 'PIPE', 'stdout': 'DEVNULL'}",
                    stdout='stdout:\n  command produced no output',
                    stderr='stderr:\n------------------\nThis goes to stderr\n\n------------------')
 
@@ -102,7 +102,7 @@ def test_run_command(monkeypatch, caplog):
     assert output.exit_code == 0
     assert output.stdout == 'This goes to stdout\n'
     assert output.stderr is None
-    assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', args=(), kwargs={'stderr': 'DEVNULL', 'stdout': 'PIPE'}",
+    assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', kwargs={'stderr': 'DEVNULL', 'stdout': 'PIPE'}",
                    stdout='stdout:\n------------------\nThis goes to stdout\n\n------------------',
                    stderr='stderr:\n  command produced no output')
 
@@ -113,7 +113,7 @@ def test_run_command(monkeypatch, caplog):
     assert output.exit_code == 0
     assert output.stdout == 'This goes to stdout\nThis goes to stderr\n'
     assert output.stderr is None
-    assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', args=(), kwargs={'stderr': 'STDOUT', 'stdout': 'PIPE'}",
+    assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', kwargs={'stderr': 'STDOUT', 'stdout': 'PIPE'}",
                    stdout='stdout:\n------------------\nThis goes to stdout\nThis goes to stderr\n\n------------------',
                    stderr='stderr:\n  command produced no output')
 
@@ -124,7 +124,7 @@ def test_run_command(monkeypatch, caplog):
     with pytest.raises(AttributeError, message="'tuple' object has no attribute 'fileno'"):
         run_command(cmd, stdout=stdout)
 
-    assert_logging(1, "run command: cmd='['/bin/ls']', args=(), kwargs={'stderr': 'PIPE', 'stdout': '(13, 17)'}")
+    assert_logging(1, "run command: cmd='['/bin/ls']', kwargs={'stderr': 'PIPE', 'stdout': '(13, 17)'}")
 
     # OSError(ENOENT) raised by Popen should be translated to CIError
     def faulty_popen_enoent(*args, **kwargs):
@@ -137,7 +137,7 @@ def test_run_command(monkeypatch, caplog):
     with pytest.raises(libci.CIError, message="Command '/bin/ls' not found"):
         run_command(['/bin/ls'])
 
-    assert_logging(1, "run command: cmd='['/bin/ls']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
+    assert_logging(1, "run command: cmd='['/bin/ls']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
     monkeypatch.undo()
 
     # While other OSError instances simply pass through
@@ -151,7 +151,7 @@ def test_run_command(monkeypatch, caplog):
     with pytest.raises(OSError, message='foo'):
         run_command(['/bin/ls'])
 
-    assert_logging(1, "run command: cmd='['/bin/ls']', args=(), kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
+    assert_logging(1, "run command: cmd='['/bin/ls']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
     monkeypatch.undo()
 
     # Don't capture stdout and stderr, let them pass
@@ -161,7 +161,7 @@ def test_run_command(monkeypatch, caplog):
     assert output.exit_code == 0
     assert output.stdout is None
     assert output.stderr is None
-    assert_logging(3, "run command: cmd='['/bin/ls', '/']', args=(), kwargs={'stderr': 'PARENT', 'stdout': 'PARENT'}",
+    assert_logging(3, "run command: cmd='['/bin/ls', '/']', kwargs={'stderr': 'PARENT', 'stdout': 'PARENT'}",
                    stdout='stdout:\n  command forwarded the output to its parent',
                    stderr='stderr:\n  command forwarded the output to its parent')
 

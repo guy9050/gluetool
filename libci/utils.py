@@ -54,7 +54,7 @@ class ProcessOutput(object):
             log_blob(logger, stream, content)
 
 
-def run_command(cmd, *args, **kwargs):
+def run_command(cmd, logger=None, **kwargs):
     """
     Run external command, and return it's exit code and output.
 
@@ -78,7 +78,7 @@ def run_command(cmd, *args, **kwargs):
     assert isinstance(cmd, list), 'Only list of strings accepted as a command'
     assert all((isinstance(s, str) for s in cmd)), 'Only list of strings accepted as a command'
 
-    log = Logging.get_logger()
+    logger = logger or Logging.get_logger()
 
     stdout, stderr = None, None
 
@@ -116,10 +116,10 @@ def run_command(cmd, *args, **kwargs):
     # in different order with different Pythons, making tests a mess.
     sorted_kwargs = ', '.join(["'%s': '%s'" % (k, printable_kwargs[k]) for k in sorted(printable_kwargs.iterkeys())])
 
-    log.debug("run command: cmd='%s', args=%s, kwargs={%s}" % (cmd, args, sorted_kwargs))
+    logger.debug("run command: cmd='%s', kwargs={%s}" % (cmd, sorted_kwargs))
 
     try:
-        p = subprocess.Popen(cmd, *args, **kwargs)
+        p = subprocess.Popen(cmd, **kwargs)
 
     except OSError as e:
         if e.errno == errno.ENOENT:
@@ -132,8 +132,8 @@ def run_command(cmd, *args, **kwargs):
 
     output = ProcessOutput(cmd, exit_code, stdout, stderr, kwargs)
 
-    output.log_stream('stdout', log.debug)
-    output.log_stream('stderr', log.debug)
+    output.log_stream('stdout', logger.debug)
+    output.log_stream('stderr', logger.debug)
 
     if exit_code != 0:
         raise CICommandError(cmd, output)
