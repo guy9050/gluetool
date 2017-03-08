@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 
-from .log import Logging, ModuleAdapter
+from .log import Logging, ContextAdapter, ModuleAdapter
 
 
 CONFIGS = ['/etc/citool.d/citool', os.path.expanduser('~/.citool.d/citool')]
@@ -114,14 +114,8 @@ class Module(object):
 
         # initialize logging helpers
         # definitely could be done in loop + setattr but pylint can't decode that :(
-        self._logger_adapter = adapter = ModuleAdapter(Logging.get_logger(), self)
-
-        self.verbose = adapter.verbose
-        self.debug = adapter.debug
-        self.info = adapter.info
-        self.warn = adapter.warning
-        self.error = adapter.error
-        self.exception = adapter.exception
+        self.logger = ModuleAdapter(ci.logger, self)
+        self.logger.connect(self)
 
         # configuration parser
         self.config_parser = None
@@ -569,15 +563,6 @@ class CI(object):
         for ppath in ppaths:
             self._load_module_path(ppath)
 
-    def _init_logging(self, logger):
-        # definitely could be done in loop + setattr but pylint can't decode that :(
-        self.verbose = logger.verbose
-        self.debug = logger.debug
-        self.info = logger.info
-        self.warn = logger.warn
-        self.error = logger.error
-        self.exception = logger.exception
-
     # find all available modules
     def __init__(self):
         # configuration defaults
@@ -599,7 +584,8 @@ class CI(object):
         # Right now, we don't know the desired log level, or if
         # output file is in play, just get simple logger before
         # the actual configuration is known.
-        self._init_logging(Logging.create_logger())
+        self.logger = ContextAdapter(Logging.create_logger())
+        self.logger.connect(self)
 
         # load config and create module list
         self._load_config()
@@ -692,7 +678,9 @@ class CI(object):
 
         logger = Logging.create_logger(output_file=self.config['output'], level=level,
                                        colors=(self.config['colors'] is not None))
-        self._init_logging(logger)
+
+        self.logger = ContextAdapter(logger)
+        self.logger.connect(self)
 
     def module_list(self):
         return sorted(self.modules)

@@ -332,13 +332,13 @@ def test_module_instantiate():
 
     assert mod.ci == ci
 
-    # pylint: disable=protected-access
-    assert mod.debug == mod._logger_adapter.debug
-    assert mod.verbose == mod._logger_adapter.verbose
-    assert mod.info == mod._logger_adapter.info
-    assert mod.warn == mod._logger_adapter.warning
-    assert mod.error == mod._logger_adapter.error
-    assert mod.exception == mod._logger_adapter.exception
+    # pylint: disable=protected-access,no-member
+    assert mod.debug == mod.logger.debug
+    assert mod.verbose == mod.logger.verbose
+    assert mod.info == mod.logger.info
+    assert mod.warn == mod.logger.warning
+    assert mod.error == mod.logger.error
+    assert mod.exception == mod.logger.exception
 
     assert mod.config_parser is None
     # pylint: disable-msg=protected-access

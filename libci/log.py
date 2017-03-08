@@ -33,15 +33,57 @@ logging.Logger.verbose = verbose_logger
 logging.LoggerAdapter.verbose = verbose_adapter
 
 
-class ModuleAdapter(logging.LoggerAdapter):
+class ContextAdapter(logging.LoggerAdapter):
     """
-    Custom logger adapter, adding context (module) info to the messages.
+    Generic logger adapter that collects "contexts", and prepends them
+    to the message.
 
-    So far, we're interested only in module name.
+    "context" is any key in `extra` dictionary starting with `ctx_`,
+    the its is expected to be tuple(priority, value). Contexts are
+    then sorted by their priorities before inserting them into the
+    message (lower priority means context will be placed closer to
+    the beggining of the line - highest priority comes last.
+    """
+
+    def __init__(self, logger, extra=None):
+        super(ContextAdapter, self).__init__(logger, extra or {})
+
+    def process(self, msg, kwargs):
+        """
+        Original `process` overwrites `kwargs['extra']` which doesn't work
+        for us - we want to chain adapters, getting more and more contexts
+        on the way. Therefore `update` instead of assignment.
+        """
+
+        if 'extra' not in kwargs:
+            kwargs['extra'] = {}
+
+        kwargs['extra'].update(self.extra)
+        return msg, kwargs
+
+    def connect(self, parent):
+        """
+        Create helper loggign methods in parrent, by assigning adapter's
+        methods to it. Simply instantiate adapter and call its `connect`
+        with your instance as `parent` argument, and your instance will
+        get all these logging helpers.
+        """
+
+        parent.debug = self.debug
+        parent.verbose = self.verbose
+        parent.info = self.info
+        parent.warn = self.warning
+        parent.error = self.error
+        parent.exception = self.exception
+
+
+class ModuleAdapter(ContextAdapter):
+    """
+    Custom logger adapter, adding module name as a context.
     """
 
     def __init__(self, logger, module):
-        super(ModuleAdapter, self).__init__(logger, {'module_name': module.name})
+        super(ModuleAdapter, self).__init__(logger, {'ctx_module_name': (10, module.name)})
 
 
 class LoggingFormatter(logging.Formatter):
@@ -87,10 +129,20 @@ class LoggingFormatter(logging.Formatter):
             fmt.append('{exc_text}')
             values['exc_text'] = '\n' + self.formatException(record.exc_info)
 
-        if hasattr(record, 'module_name'):
-            # add module name between level and message
-            fmt.insert(2, '[{module_name}]')
-            values['module_name'] = record.module_name
+        # List all context properties of record
+        ctx_properties = [prop for prop in dir(record) if prop.startswith('ctx_')]
+
+        if ctx_properties:
+            # Sorting them in reverse order of priorities - we're goign to insert
+            # their values into `fmt`, so the highest priority context must be
+            # inserted as the last one.
+            sorted_ctxs = sorted(ctx_properties, key=lambda x: x[0], reverse=True)
+
+            for name in sorted_ctxs:
+                _, value = getattr(record, name)
+
+                fmt.insert(2, '[{%s}]' % name)
+                values[name] = value
 
         msg = ' '.join(fmt).format(**values)
 
