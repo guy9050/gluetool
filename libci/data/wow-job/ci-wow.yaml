@@ -23,7 +23,7 @@
       - string:
           name: guess_distro_options
           default: ''
-          description: 'Additional options for guess-distro'
+          description: 'Additional options for guess-distro module'
       - string:
           name: wow_options
           default: ''
@@ -33,9 +33,9 @@
           default: ''
           description: 'Additional options for beaker-jobwatch'
       - string:
-          name: notify
+          name: notify_email_options
           default: ''
-          description: 'Comma-separated list of e-mails to notify when job finishes.'
+          description: 'Additional options for notify-email module.'
     builders:
       - shell:
           citool -i -o citool-debug.txt
@@ -46,7 +46,7 @@
             brew-build-name
             guess-distro ${guess_distro_options}
             wow --wow-options "${wow_options}" --jobwatch-options "${jobwatch_options}"
-            notify --notify "${notify}"
+            notify-email --wow-default "{ISSUER}" ${notify_email_options}
             ${pipeline_append}
       - inject:
           properties-file: envinject-citool.props
