@@ -306,7 +306,13 @@ class Module(object):
             for opt in self.options:
                 try:
                     value = getattr(options, opt.replace('-', '_'))
+                    # if no option specified, skip it
                     if value is None and opt in self._config:
+                        continue
+                    # make sure we do not replace existing configuration value
+                    # with add_argument default
+                    if opt in self._config and self._config[opt] is not None and \
+                            'default' in self.options[opt] and value == self.options[opt]['default']:
                         continue
                     self._config[opt] = value
                     self.debug("Added option '{}' value '{}' from commandline".format(opt, value))
