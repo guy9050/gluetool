@@ -62,7 +62,7 @@ class CIRpmdiff(Module):
 
     brew_task = None
     check_interval = 60
-    max_timeout = 3600 * 24
+    max_timeout = 3600 * 4
     rpmdiff_cmd = None
     _results = []
 
