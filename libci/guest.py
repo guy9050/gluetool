@@ -74,7 +74,7 @@ class Guest(object):
 
     def destroy(self):
         """
-        Destroy guest. Free its resources, and noone should be able to use it
+        Destroy guest. Free its resources, and no one should be able to use it
         after this method finishes.
         """
 
@@ -100,7 +100,7 @@ class Guest(object):
 
     def restore_snapshot(self, snapshot):
         """
-        Resotre given snapshot.
+        Restore given snapshot.
 
         :returns: a guest. It may be a completely different instance of `Guest`, but
           in any case represents the guest with requested snapshot restored.
