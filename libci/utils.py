@@ -6,6 +6,7 @@ import errno
 import json
 import os
 import subprocess
+import urllib2
 
 from libci import CIError, CICommandError
 from libci.log import Logging
@@ -212,3 +213,32 @@ def format_dict(dictionary):
         return repr(obj)
 
     return json.dumps(dictionary, sort_keys=True, indent=4, separators=(',', ': '), default=default)
+
+
+def fetch_url(url, logger=None, success_codes=(200,)):
+    """
+    "Get me content of this URL" helper.
+
+    Very thin wrapper around urllib. Added value is logging, and converting
+    possible errors to CIError exception.
+
+    :param str url: URL to get.
+    :param logger: Logger used for logging. `ContextAdapter` instance, for example.
+    :param tuple success_codes: tuple of HTTP response codes representing successfull request.
+    :returns: tuple of (response, content), where `response` is what `urllib2.urlopen()` returns,
+      and `content` is the payload of the response.
+    """
+
+    logger = logger or Logging.get_logger()
+
+    logger.debug("opening URL '{}'".format(url))
+
+    response = urllib2.urlopen(url)
+    code, content = response.getcode(), response.read()
+
+    log_blob(logger.debug, '{}: {}'.format(url, code), content)
+
+    if code not in success_codes:
+        raise CIError("Unsuccessfull response from '{}'".format(url))
+
+    return response, content
