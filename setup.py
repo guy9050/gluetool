@@ -20,7 +20,9 @@ INSTALL_REQUIRES = [
     'jenkinsapi',
     'PyYAML',
 
-    'beautifulsoup4'  # required by wow module
+    'beautifulsoup4',  # required by wow module
+    'urlgrabber',  # required by covscan module
+    'stomp.py'  # required notify-bus module
 ]
 
 TESTS_REQUIRE = [
