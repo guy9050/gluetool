@@ -1,77 +1,52 @@
 import os
 import re
 import tempfile
-import subprocess
 import json
 from urllib2 import urlopen
 from urlgrabber.grabber import urlgrab
 from libci import Module
 from libci import utils
 from libci import CIError
+from libci.utils import cached_property
 
 REQUIRED_CMDS = ['covscan']
 
 
 class CovscanResult(object):
-    def __init__(self, task_id):
+    def __init__(self, module, task_id):
+        self.module = module
         self.task_id = task_id
-        self.url = 'http://cov01.lab.eng.brq.redhat.com/covscanhub/task/%s/' % task_id
-        self._fixed_defects = None
-        self._added_defects = None
+        self.url = 'http://cov01.lab.eng.brq.redhat.com/covscanhub/task/{}/'.format(task_id)
 
-    @staticmethod
-    def _fetch_diff(url):
+    def _fetch_diff(self, url):
         diff_json = urlopen(url).read()
         diff = json.loads(diff_json)
         defects = diff['defects']
+        self.module.debug("fetched {} from {}".format(defects, url))
         return defects
 
-    @property
+    @cached_property
     def added(self):
-        if self._added_defects is None:
-            added_json_url = self.url + 'log/added.js?format=raw'
-            self._added_defects = self._fetch_diff(added_json_url)
-        return self._added_defects
+        added_json_url = self.url + 'log/added.js?format=raw'
+        added_defects = self._fetch_diff(added_json_url)
+        return added_defects
 
-    @property
+    @cached_property
     def fixed(self):
-        if self._fixed_defects is None:
-            fixed_json_url = self.url + 'log/fixed.js?format=raw'
-            self._fixed_defects = self._fetch_diff(fixed_json_url)
-        return self._fixed_defects
+        fixed_json_url = self.url + 'log/fixed.js?format=raw'
+        fixed_defects = self._fetch_diff(fixed_json_url)
+        return fixed_defects
 
     def status_failed(self):
-        stdout = urlopen(self.url + 'log/stdout.log?format=raw')
+        url = self.url + 'log/stdout.log?format=raw'
+        stdout = urlopen(url)
+        self.module.debug("fetched {} from {}".format(stdout, url))
         return stdout == "Failing because of at least one subtask hasn't closed properly."
 
+    # download added.html and fixed.html to keep them as build artifacts
     def download_artifacts(self):
         urlgrab(self.url + 'log/added.html?format=raw')
         urlgrab(self.url + 'log/fixed.html?format=raw')
-
-
-class Covscan(object):
-    def __init__(self, srpm, baseline, config, baseconfig):
-        self.srpm = srpm
-        self.baseline = baseline
-        self.config = config
-        self.baseconfig = baseconfig
-        self.result_url = None
-
-    def version_diff_build(self, module):
-        handle, task_id_filename = tempfile.mkstemp()
-        os.close(handle)
-
-        command = ['covscan', 'version-diff-build', '--config', self.config, '--base-config', self.baseconfig,
-                   '--base-brew-build', self.baseline, '--srpm', self.srpm, '--task-id-file', task_id_filename]
-
-        module.verbose(' '.join(command))
-
-        if subprocess.call(command) > 0:
-            raise CIError("Failure during 'covscan' client execution")
-        with open(task_id_filename, 'r') as task_id_file:
-            covscan_task_id = int(task_id_file.readline())
-        os.unlink(task_id_filename)
-        return CovscanResult(covscan_task_id)
 
 
 class CICovscan(Module):
@@ -81,10 +56,10 @@ class CICovscan(Module):
 
     options = {
         'blacklist': {
-            'help': 'A comma seaparted list of blacklisted package names'
+            'help': 'A comma separated list of blacklisted package names'
         },
         'target_pattern': {
-            'help': 'A comma seaparted list of regexes, which define enabled targets'
+            'help': 'A comma separated list of regexes, which define enabled targets'
         }
     }
 
@@ -99,36 +74,43 @@ class CICovscan(Module):
     def sanity(self):
         utils.check_for_commands(REQUIRED_CMDS)
 
-    def scan(self):
-        brew = self.shared('get_brew')
+    def version_diff_build(self, srpm, baseline, config, baseconfig):
+        handle, task_id_filename = tempfile.mkstemp()
+        os.close(handle)
 
-        component = self.brew_task.component
-        destination_tag = self.brew_task.target.destination_tag
-        builds = brew.listTagged(destination_tag, None, True, latest=2, package=component)
+        command = ['covscan', 'version-diff-build', '--config', config, '--base-config', baseconfig,
+                   '--base-brew-build', baseline, '--srpm', srpm, '--task-id-file', task_id_filename]
+
+        command_result = utils.run_command(command)
+
         try:
-            if self.brew_task.scratch:
-                baseline = builds[0]['nvr']
-                self.info('Using latest non-scratch build [%s] in tag [%s] as baseline',
-                          baseline, self.brew_task.target.destination_tag)
-            else:
-                baseline = builds[1]['nvr']
-                self.info('Using second latest non-scratch build [%s] in tag [%s] as baseline',
-                          baseline, self.brew_task.target.destination_tag)
-        except LookupError:
-            self.info('Covscan baseline not detected, skipping job')
-            return
+            if command_result.exit_code > 0:
+                raise CIError("Failure during 'covscan' client execution")
+
+            with open(task_id_filename, 'r') as task_id_file:
+                covscan_task_id = int(task_id_file.readline())
+        finally:
+            os.unlink(task_id_filename)
+        return CovscanResult(self, covscan_task_id)
+
+    def scan(self):
+        baseline = self.brew_task.latest
+
+        if not baseline:
+            raise CIError('Covscan baseline not detected, skipping job')
+
+        self.info('Using (second) latest non-scratch build [%s] in tag [%s] as baseline',
+                  baseline, self.brew_task.target.destination_tag)
 
         self.info('Obtaining source RPM from Brew build')
-        srcrpm = self.brew_task.srcrpm
-        srcrpm = urlgrab(srcrpm)
+        srcrpm = urlgrab(self.brew_task.srcrpm)
 
         self.info('Issuing Covscan request')
 
         config = 'rhel-{0}-x86_64'.format(self.brew_task.target.rhel)
         base_config = 'rhel-{0}-x86_64-basescan'.format(self.brew_task.target.rhel)
 
-        covscan = Covscan(srcrpm, baseline, config, base_config)
-        covscan_result = covscan.version_diff_build(self)
+        covscan_result = self.version_diff_build(srcrpm, baseline, config, base_config)
 
         if covscan_result.status_failed():
             raise CIError('Failed to get result files. Try find solution here: {0}'.format(covscan_result.url))
@@ -169,20 +151,15 @@ class CICovscan(Module):
         blacklist = self.option('blacklist')
         if blacklist is not None:
             self.verbose('blacklisted packages: {}'.format(blacklist))
-            if self.brew_task.component in blacklist.split(','):
+            if self.brew_task.component in [splitted.strip() for splitted in blacklist.split(',')]:
                 self.info('Skipping blacklisted package {}'.format(self.brew_task.component))
                 return
 
         target = self.brew_task.target.target
-        scan = False
         enabled_targets = self.option('target_pattern')
         self.verbose('enabled targets: {}'.format(enabled_targets))
-        for regex in enabled_targets.split(','):
-            pattern = re.compile(regex.strip())
-            if pattern.match(target):
-                scan = True
 
-        if scan:
+        if any((re.compile(regex.strip()).match(target) for regex in enabled_targets.split(','))):
             self.info('Running covscan for {} on {}'.format(self.brew_task.component, target))
             self.scan()
         else:

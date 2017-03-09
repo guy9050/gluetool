@@ -219,14 +219,11 @@ class CIBrew(libci.Module):
     }
     required_options = ['url', 'id']
 
-    shared_functions = ['brew_task', 'get_brew']
+    shared_functions = ['brew_task']
 
     def brew_task(self):
         """ return a BrewTask instance of passed task_id """
         return self.brew_task_instance
-
-    def get_brew(self):
-        return self.brew_instance
 
     def execute(self):
         url = self.option('url')
