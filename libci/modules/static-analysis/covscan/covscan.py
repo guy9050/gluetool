@@ -2,12 +2,12 @@ import os
 import re
 import tempfile
 import json
+import StringIO
+import gzip
 from urllib2 import urlopen
 from urlgrabber.grabber import urlgrab
-from libci import Module
-from libci import utils
-from libci import CIError
-from libci.utils import cached_property
+from libci import Module, CIError
+from libci.utils import cached_property, log_blob, run_command, check_for_commands, format_dict
 
 REQUIRED_CMDS = ['covscan']
 
@@ -21,8 +21,9 @@ class CovscanResult(object):
     def _fetch_diff(self, url):
         diff_json = urlopen(url).read()
         diff = json.loads(diff_json)
+        log_blob(self.module.debug, 'This is what we got from covscan', diff)
         defects = diff['defects']
-        self.module.debug("fetched {} from {}".format(defects, url))
+        self.module.debug('Defects:\n{}\nfetched from {}'.format(format_dict(defects), url))
         return defects
 
     @cached_property
@@ -39,9 +40,18 @@ class CovscanResult(object):
 
     def status_failed(self):
         url = self.url + 'log/stdout.log?format=raw'
-        stdout = urlopen(url)
-        self.module.debug("fetched {} from {}".format(stdout, url))
-        return stdout == "Failing because of at least one subtask hasn't closed properly."
+        response = urlopen(url)
+
+        # response is gz archiv, it has to be decompressed
+        compressed_file = StringIO.StringIO()
+        compressed_file.write(response.read())
+        compressed_file.seek(0)
+
+        decompressed_file = gzip.GzipFile(fileobj=compressed_file, mode='rb')
+        output = decompressed_file.read()
+
+        log_blob(self.module.debug, 'fetched from {}'.format(url), output)
+        return output == "Failing because of at least one subtask hasn't closed properly.\n"
 
     # download added.html and fixed.html to keep them as build artifacts
     def download_artifacts(self):
@@ -72,20 +82,17 @@ class CICovscan(Module):
         return self._results
 
     def sanity(self):
-        utils.check_for_commands(REQUIRED_CMDS)
+        check_for_commands(REQUIRED_CMDS)
 
     def version_diff_build(self, srpm, baseline, config, baseconfig):
         handle, task_id_filename = tempfile.mkstemp()
-        os.close(handle)
-
-        command = ['covscan', 'version-diff-build', '--config', config, '--base-config', baseconfig,
-                   '--base-brew-build', baseline, '--srpm', srpm, '--task-id-file', task_id_filename]
-
-        command_result = utils.run_command(command)
-
         try:
-            if command_result.exit_code > 0:
-                raise CIError("Failure during 'covscan' client execution")
+            os.close(handle)
+
+            command = ['covscan', 'version-diff-build', '--config', config, '--base-config', baseconfig,
+                       '--base-brew-build', baseline, '--srpm', srpm, '--task-id-file', task_id_filename]
+
+            run_command(command)
 
             with open(task_id_filename, 'r') as task_id_file:
                 covscan_task_id = int(task_id_file.readline())
