@@ -218,7 +218,7 @@ class NetworkedGuest(Guest):
         self._scp += options
 
     def __repr__(self):
-        return '{}@{}:{}'.format(self.username, self.hostname, self.port)
+        return '{}{}:{}'.format((self.username + '@') if self.username is not None else '', self.hostname, self.port)
 
     def _execute(self, cmd, **kwargs):
         return libci.utils.run_command(cmd, logger=self.logger, **kwargs)
