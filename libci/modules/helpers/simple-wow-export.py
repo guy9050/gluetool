@@ -7,7 +7,7 @@ DEFAULT_LOG_FILE = 'simple-wow-export.log'
 
 
 #: Default record template
-DEFAULT_TEMPLATE = '{BREW_TASK_ID};{NVR};{SCRATCH};{RESULT};{JENKINS_JOB_URL};{BEAKER_MATRIX_URL}'
+DEFAULT_TEMPLATE = '{BREW_TASK_ID};{NAME};{VERSION};{RELEASE};{SCRATCH};{RESULT};{JENKINS_JOB_URL};{BEAKER_MATRIX_URL}'
 
 
 class SimpleWowExport(libci.Module):
@@ -53,6 +53,9 @@ class SimpleWowExport(libci.Module):
             'BREW_TASK_ISSUER': task.owner,
             'BREW_TASK_TARGET': task.target,
             'NVR': task.nvr,
+            'NAME': task.component,
+            'VERSION': task.version,
+            'RELEASE': task.release,
             'SCRATCH': 'scratch' if task.scratch is True else '',
             'RESULT': result['result'],
             'JENKINS_JOB_URL': result['urls'].get('jenkins_job', ''),
