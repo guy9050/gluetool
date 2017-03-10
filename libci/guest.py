@@ -176,7 +176,9 @@ class NetworkedGuest(Guest):
     Guest, accessible over network, using ssh for control.
 
     :param libci.Module module: parent module
-    :param str hostname: box hostname.
+    :param str hostname: box hostname - this is used for connecting to the host.
+    :param str name: box name - this one appears in log messages, identifies the guest.
+      If not set, `hostname` is used.
     :param int port: SSH port (default: 22).
     :param str username: SSH username (default: root).
     :param str key: path to a key file.
@@ -186,7 +188,9 @@ class NetworkedGuest(Guest):
     DEFAULT_SSH_PORT = 22
 
     # pylint: disable=too-many-arguments
-    def __init__(self, module, hostname, port=None, username=None, key=None, options=None):
+    def __init__(self, module, hostname, name=None, port=None, username=None, key=None, options=None):
+        name = name or hostname
+
         super(NetworkedGuest, self).__init__(module, hostname)
 
         self.hostname = hostname
