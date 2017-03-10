@@ -190,8 +190,7 @@ class NetworkedGuest(Guest):
     # pylint: disable=too-many-arguments
     def __init__(self, module, hostname, name=None, port=None, username=None, key=None, options=None):
         name = name or hostname
-
-        super(NetworkedGuest, self).__init__(module, hostname)
+        super(NetworkedGuest, self).__init__(module, name)
 
         self.hostname = hostname
         self.port = int(port) if port is not None else self.DEFAULT_SSH_PORT
