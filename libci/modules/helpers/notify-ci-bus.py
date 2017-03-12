@@ -46,6 +46,7 @@ class CINotifyBus(Module):
                        'sent following message to CI message bus',
                        'header:\n{}\nbody:\n{}'.format(utils.format_dict(headers), body))
         if stomp.__version__[0] < 4:
+            # pylint: disable=no-value-for-parameter
             self.cibus.send(message=body, headers=headers, destination=self.option('destination'))
         else:
             self.cibus.send(body=body, headers=headers, destination=self.option('destination'))
@@ -64,7 +65,7 @@ class CINotifyBus(Module):
         self.info('published RPMdiff results to CI message bus')
 
     def publish_result(self, result):
-        publish_function = getattr(self, 'publish_{}'.format(result['type'], None))
+        publish_function = getattr(self, 'publish_{}'.format(result['type']), None)
         if publish_function:
             publish_function(result)
         else:
