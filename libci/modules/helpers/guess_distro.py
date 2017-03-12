@@ -60,13 +60,24 @@ directory listing. Default is {}""".format(DEFAULT_NIGHTLY_LISTING),
         if task is None:
             raise CIError("Using 'target-autodetect' method without a brew task does not work")
 
-        match = re.match(r'(staging-|supp-)?(rhel-[0-9]+)(.[0-9]+)?-?(z)?-candidate', task.target.target)
-        if not match:
-            raise CIError("could not translate build target '{}' to distro".format(task.target.target))
+        translations = {
+            # default translation for rhel and staging branches
+            r'(staging-|supp-)?(rhel-[0-9]+)(.[0-9]+)?-?(z)?-candidate':
+                lambda match: '{}{}{}'.format(match.group(2),
+                                              match.group(3) or '',
+                                              '.' + match.group(4) if match.group(4) else ''),
+            # RHEL LE 7.1 product
+            r'rhel-7.1-ppc64le-?(z)?-candidate':
+                lambda match: 'rhel-le-7.1{}'.format('.' + match.group(1) if match.group(1) else '')
+        }
 
-        self._distro = '{}{}{}'.format(match.group(2),
-                                       match.group(3) or '',
-                                       '.' + match.group(4) if match.group(4) else '')
+        for regex, function in translations.items():
+            match = re.match(regex, task.target.target)
+            if match:
+                self._distro = function(match)
+                break
+        else:
+            raise CIError("could not translate build target '{}' to distro".format(task.target.target))
 
         self.debug("transformed target '{}' to distro '{}'".format(task.target.target, self._distro))
 
