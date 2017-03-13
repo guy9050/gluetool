@@ -22,6 +22,10 @@ class CINotifyBus(Module):
             'help': 'Message bus topic/subscription (default: {})'.format(CI_BUS_TOPIC),
             'default': CI_BUS_TOPIC,
         },
+        'dry-run': {
+            'help': 'Do not send notifications.',
+            'action': 'store_true',
+        },
         'host': {
             'help': 'Message bus host (default: {})'.format(CI_BUS_HOST),
             'default': CI_BUS_HOST,
@@ -45,6 +49,10 @@ class CINotifyBus(Module):
         utils.log_blob(self.debug,
                        'sent following message to CI message bus',
                        'header:\n{}\nbody:\n{}'.format(utils.format_dict(headers), body))
+
+        if self.option('dry-run') is not None:
+            return
+
         if stomp.__version__[0] < 4:
             # pylint: disable=no-value-for-parameter
             self.cibus.send(message=body, headers=headers, destination=self.option('destination'))
@@ -72,6 +80,10 @@ class CINotifyBus(Module):
             self.warn("skipping unsupported result type '{}'".format(result['type']))
 
     def sanity(self):
+        # skip connecting if in dry mode
+        if self.option('dry-run') is not None:
+            return
+
         # connect to message bus
         self.cibus = stomp.Connection([(self.option('host'), self.option('port'))])
         self.cibus.start()
@@ -84,6 +96,9 @@ class CINotifyBus(Module):
 
     def execute(self):
         results = self.shared('results') or []
+
+        if self.option('dry-run') is not None:
+            self.info('running in dry-run mode, no messages will be sent out')
 
         for result in results:
             self.publish_result(result)
