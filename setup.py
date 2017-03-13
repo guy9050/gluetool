@@ -22,6 +22,7 @@ INSTALL_REQUIRES = [
 
     'beautifulsoup4',  # required by wow module
     'python-openstackclient',  # required by openstack module
+    'retrying',  # required by openstack module
     'stomp.py',  # required by notify-bus module
     'urlgrabber'  # required by covscan module
 ]
