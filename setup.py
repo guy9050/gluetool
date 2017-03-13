@@ -21,8 +21,9 @@ INSTALL_REQUIRES = [
     'PyYAML',
 
     'beautifulsoup4',  # required by wow module
-    'urlgrabber',  # required by covscan module
-    'stomp.py'  # required by notify-bus module
+    'python-openstackclient',  # required by openstack module
+    'stomp.py',  # required by notify-bus module
+    'urlgrabber'  # required by covscan module
 ]
 
 TESTS_REQUIRE = [
