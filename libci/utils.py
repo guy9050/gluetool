@@ -13,6 +13,7 @@ from libci.log import Logging
 
 
 try:
+    # pylint: disable=ungrouped-imports
     from subprocess import DEVNULL
 except ImportError:
     DEVNULL = open(os.devnull, 'wb')
