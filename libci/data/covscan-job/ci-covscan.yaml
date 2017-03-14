@@ -1,3 +1,4 @@
+---
 - job:
     name: 'ci-covscan'
     node: master
@@ -6,14 +7,14 @@
     concurrent: true
     display-name: 'ci-covscan'
     parameters:
-        - string:
-            name: id
-            default: ''
-            description: 'Brew task ID.'
+      - string:
+          name: id
+          default: ''
+          description: 'Brew task ID.'
     builders:
-        - shell: |
-             citool -i -o citool-debug.txt brew --id $id covscan
+      - shell: |
+          citool -i -o citool-debug.txt brew --id $id covscan
     publishers:
-        - archive:
-            artifacts: '**/**'
-            allow-empty: 'true'
+      - archive:
+          artifacts: '**/**'
+          allow-empty: 'true'
