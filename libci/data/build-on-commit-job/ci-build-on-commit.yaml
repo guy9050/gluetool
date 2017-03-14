@@ -1,3 +1,4 @@
+---
 - job:
     name: 'build-on-commit'
     description: |
@@ -5,22 +6,22 @@
     concurrent: true
     display-name: 'ci-build-on-commit'
     parameters:
-        - string:
-            name: repo
-            description: 'Component name'
-        - string: 
-            name: branch
-            description: 'Git branch'
+      - string:
+          name: repo
+          description: 'Component name'
+      - string:
+          name: branch
+          description: 'Git branch'
     triggers:
       - ci-trigger:
           jms-selector: |
-            type = 'dist-git'
-            AND namespace = 'rpms'
-            AND branch LIKE '%staging%'
+              type = 'dist-git'
+              AND namespace = 'rpms'
+              AND branch LIKE '%staging%'
     builders:
-        - shell: |
-            citool -i -o citool-debug.txt build-on-commit --component ${repo} --branch ${branch}
+      - shell: |
+          citool -i -o citool-debug.txt build-on-commit --component ${repo} --branch ${branch}
     publishers:
-        - archive:
-            artifacts: '**/**'
-            allow-empty: 'true'
+      - archive:
+          artifacts: '**/**'
+          allow-empty: 'true'
