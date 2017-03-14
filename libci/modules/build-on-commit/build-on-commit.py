@@ -1,25 +1,24 @@
-import json
-import re
-import time
 import os
-import sys
-import logging
-import subprocess
-from libci import Module
-from libci import CIError, CICommandError
-from libci import utils
-from libci.utils import run_command
+import re
+from libci import CICommandError, CIError, Module
+from libci.utils import check_for_commands, run_command
 
+# Base URL of the dit-git repositories
+GIT_BASE_URL = 'git://pkgs.devel.redhat.com/rpms/'
+# This module required rhpkg tool installed
+REQUIRED_CMDS = ['rhpkg']
 
-# TODO: move to config
-GIT_BASE_URL = "git://pkgs.devel.redhat.com/rpms/"
 
 class CIBuildOnCommit(Module):
     """
     CI Build-on-commit module
 
-    This module schedules an scratch build on commit in either staging branch or
-    in branch containing ci.yaml.
+    This module schedules a scratch build on commit to branches which match any
+    pattern specified via branch_pattern option.
+
+    The branches are translated into staging-rhel[67]-candidate build targets,
+    which are then used to build the package. If the translation fails, the
+    build will not happen and the module will fail.
     """
 
     name = 'build-on-commit'
@@ -29,79 +28,79 @@ class CIBuildOnCommit(Module):
         'blacklist': {
             'help': 'A comma seaparted list of blacklisted package names',
         },
+        'branch': {
+            'help': 'Git branch of repository to build',
+        },
+        'branch-pattern': {
+            'help': 'A comma separated list of regexes, which define branches that will be built',
+        },
         'component': {
             'help': 'Component name',
         },
-        'branch': {
-            'help': 'Git branch',
-        # TODO: add required target (consult with mhlavinka)
+        'shared-dir': {
+            'help': 'Shared directory used for cloning repositories',
         }
 
     }
-    required_options = ['component', 'branch']
+    required_options = ['component', 'branch', 'shared-dir', 'branch-pattern']
 
-    @staticmethod
-    def _run_command(command):
-        try:
-            return run_command(command)
+    def sanity(self):
+        """
+        Make sure that rhpkg tool is available.
 
-        except CICommandError as exc:
-            raise CIError("Failure during 'boc' execution: {}".format(exc.output.stderr))
-
-
-    def _build_package(self, target):
-        cwd = os.getcwd()
-        #self.info("cwd = {0}".format(cwd))
-        git_dir = cwd + '/' + self.component
-        if not os.path.isdir(git_dir):
-            command = ["git", "clone", GIT_BASE_URL + self.component]
-            CIBuildOnCommit._run_command(command)
-        os.chdir(git_dir)
-        command = ["rhpkg", "switch-branch", self.branch]
-        CIBuildOnCommit._run_command(command)
-
-        
-        # scheduling scratch build
-        command = ["rhpkg", "build", "--scratch", "--skip-nvr-check", "--arches",
-                                            "x86_64", "--target", target]
-        self.info("scheduling scratch build of component '{0}' and branch '{1}'".format(self.component, self.branch))
-        # dry mod: just print the command, don't execute it
-        #self.info("Running ing dry mode (testing), no scratch build will be scheduled")
-        self.info(command)
-        run_command(command, stdout = 1, stderr = 1)
-
-        os.chdir(cwd)
-        # cleanup
-        # TODO: this can be removed when there is shared working dir (config)
-        command = ["rm", '-rf', self.component]
-        CIBuildOnCommit._run_command(command)
-
-        return
-
-    def is_staging(self):
-        return "staging" in self.branch
+        Make sure that shared directory exists as early as possible
+        and change the current working directory to it.
+        """
+        check_for_commands(REQUIRED_CMDS)
 
     def execute(self):
-        self.component = self.option('component')
-        self.branch = self.option('branch')
+        component = self.option('component')
+        branch = self.option('branch')
         blacklist = self.option('blacklist')
-        #self.info("Build-on-commit for component '{0}' and branch '{1}'.".format(self.component, self.branch))
+        branch_pattern = self.option('branch-pattern')
 
-        if not self.is_staging():
-            self.error("Branch '{0}' is not staging branch, skipping execution".format(self.branch))
-            raise CIError("Trying to schedule build for non-staging branch")
+        # blacklist packages
+        if blacklist:
+            self.verbose('blacklisted packages: {}'.format(blacklist))
+            if component in [s.strip() for s in blacklist.split(',')]:
+                self.info('skipping blacklisted component {}'.format(component))
+                return
 
-        # TODO: blacklist
+        # check if branch is enabled in branch_pattern list
+        if not any(re.match(regex.strip(), branch) for regex in branch_pattern.split(',')):
+            self.info("skipping branch because it did not match branch_patterns '{}'".format(branch_pattern))
+            return
 
-        # TODO: read targets from ci.yaml ?
-        if "rhel-7" in self.branch:
-            target = "staging-rhel-7-candidate"
-        elif "rhel-6" in self.branch:
-            target = "staging-rhel-6-candidate"
+        # transform branch name to build target
+        match = re.match('.*rhel-([67]).*', branch)
+        if match is None:
+            raise CIError("failed to detect build-target from branch '{}'".format(branch))
+        target = "staging-rhel-{}-candidate".format(match.group(1))
+
+        # create shared directory if needed
+        shared_dir = self.option('shared-dir')
+        if not os.path.isdir(shared_dir):
+            os.mkdir(shared_dir)
+        os.chdir(shared_dir)
+
+        # update existing repository or clone a new one
+        if os.path.isdir(component):
+            os.chdir(component)
+            self.info("updating existing repository of '{}'".format(component))
+            command = ["rhpkg", "switch-branch", "--fetch", branch]
+            run_command(command)
         else:
-            # this can be provided in configuration of boc module or via ci.yaml in repo
-            raise CIError("Failure during 'boc': failed to detect rhel version from branch {}".format(self.branch))
+            self.info("cloning repository of '{}'".format(component))
+            command = ["git", "clone", GIT_BASE_URL + component]
+            run_command(command)
+            os.chdir(component)
 
         # schedule scratch build
-        self._build_package(target)
-
+        msg = ['scheduling scratch build of component']
+        msg += ["'{}' on branch '{}' with build target '{}'".format(component, branch, target)]
+        self.info(' '.join(msg))
+        command = ["rhpkg", "build", "--scratch", "--skip-nvr-check", "--arches", "x86_64", "--target", target]
+        try:
+            run_command(command)
+        except CICommandError as exc:
+            raise CIError("failure during 'rhpkg' execution\n{}'".format(exc.output.stdout))
