@@ -11,8 +11,9 @@ from libci.utils import format_dict
 
 DEFAULT_FLAVOR = 'm1.small'
 DEFAULT_NAME = 'citool'
-DEFAULT_SERVER_ACTIVATION = 120
-DEFAULT_IMAGE_ACTIVATION = 10
+MAX_SERVER_ACTIVATION = 120
+MAX_SERVER_SHUTDOWN = 60
+MAX_IMAGE_ACTIVATION = 60
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
 
 
@@ -71,17 +72,19 @@ class OpenstackGuest(NetworkedGuest):
         except NotFound:
             self.debug('instance already deleted - skipping')
 
-    @retry(stop_max_attempt_number=DEFAULT_IMAGE_ACTIVATION, wait_fixed=1000)
-    def _wait_for_active_image(self, image_id):
+    def _check_resource_status(self, resource, rid, status):
         """
-        Wait until image is in active state.
+        Check if resource with given id is in expected status.
 
-        param: id of the image to check
+        param: str resource: resource type (images, servers, etc.)
+        param: unicode id: ID of the resource to check
+        param: unicode status: expected status of the resource in unicode
+
         """
-        image = self._nova.images.find(id=image_id)
-        self.debug('trying ...' + image.status)
-        if image.status != u'ACTIVE':
-            raise CIError('image did not become active in 10 seconds')
+        obj = getattr(self._nova, resource).find(id=rid)
+        self.debug('{} resource status: {}'.format(resource, obj.status))
+        if obj.status != status:
+            raise CIError("{} resource has invalid status '{}', expected '{}'".format(resource, obj.status, status))
 
     def create_snapshot(self):
         """
@@ -94,12 +97,31 @@ class OpenstackGuest(NetworkedGuest):
         :returns: created image id
         """
         name = strftime('{}_%Y-%m-%d_%d-%H:%M:%S'.format(self.name), gmtime())
+        self.info("creating image snapshot named '{}'".format(name))
+
+        # stop instance
+        self._instance.stop()
+
+        # we need to shutdown the instance before creating snapshot
+        # note: we are calling here the parametrized retry decorator
+        retry(stop_max_attempt_number=MAX_SERVER_SHUTDOWN,
+              wait_fixed=1000)(self._check_resource_status)('servers', self._instance.id, u'SHUTOFF')
+        self.info("server '{}' powered off".format(self.name))
+
+        # create image
         image_id = self._instance.create_image(name)
         self._snapshots.append(image_id)
 
         # we need to wait until the image is ready for usage
-        self._wait_for_active_image(image_id)
-        self.info("created image snapshot '{}'".format(name))
+        # note: we are calling here the parametrized retry decorator
+        retry(stop_max_attempt_number=MAX_IMAGE_ACTIVATION,
+              wait_fixed=1000)(self._check_resource_status)('images', image_id, u'ACTIVE')
+        self.info("image snapshot '{}' created".format(name))
+
+        # start instance
+        self._instance.start()
+        self.wait(timeout=MAX_SERVER_ACTIVATION, tick=1)
+        self.info("server '{}' is up now".format(self.name))
 
         return image_id
 
@@ -112,9 +134,10 @@ class OpenstackGuest(NetworkedGuest):
         """
         assert isinstance(snapshot, StrWithMeta)
 
+        self.info("rebuilding server with snapshot '{}'".format(snapshot))
         self._instance.rebuild(snapshot)
-        self.wait(timeout=DEFAULT_SERVER_ACTIVATION, tick=1)
-        self.info("restored snapshot '{}'".format(snapshot))
+        self.wait(timeout=MAX_SERVER_ACTIVATION, tick=1)
+        self.info("instance rebuilt and is up now")
 
         return self
 
@@ -277,10 +300,10 @@ class CIOpenstack(Module):
             self._all.append(instance)
             instances.append(instance)
 
-        self.info('created {} instance(s)'.format(count))
+        self.info("created {} instance(s) with flavor '{}' from image '{}'".format(count, flavor, image))
 
         for instance in instances:
-            instance.wait(timeout=DEFAULT_SERVER_ACTIVATION, tick=1)
+            instance.wait(timeout=MAX_SERVER_ACTIVATION, tick=1)
 
         self.info('instances are ready for usage')
 
@@ -313,7 +336,7 @@ class CIOpenstack(Module):
         try:
             self.nova.servers.list()
         except Unauthorized:
-            raise CIError('invalid openstack crendetials')
+            raise CIError('invalid openstack credentials')
         self.info("connected to '{}' with user '{}', project '{}'".format(auth_url,
                                                                           username,
                                                                           project_name))
