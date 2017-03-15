@@ -163,6 +163,10 @@ class CIOpenstack(Module):
         'ip-pool-name': {
             'help': 'Name of the floating ips pool name to use',
         },
+        'keep': {
+            'help': 'Keep instance running, do not destroy',
+            'action': 'store_true',
+        },
         'key-name': {
             'help': 'Name of the keypair to inject into instance',
         },
@@ -184,7 +188,6 @@ class CIOpenstack(Module):
         'ssh-user': {
             'help': 'SSH username'
         }
-
     }
     required_options = ['auth-url', 'password', 'project-name', 'username', 'ssh-key', 'ip-pool-name']
     shared_functions = ['openstack_provision']
@@ -276,6 +279,9 @@ class CIOpenstack(Module):
         return instances
 
     def destroy(self, failure=None):
+        if self._all and self.option('keep'):
+            self.info('keeping instances provisioned, skipping removal')
+            return
         for instance in self._all:
             instance.destroy()
         self.info('successfully removed all instances')
@@ -303,5 +309,6 @@ class CIOpenstack(Module):
         self.info("connected to '{}' with user '{}', project '{}'".format(auth_url,
                                                                           username,
                                                                           project_name))
+
         # check if key name valid
         self.nova.keypairs.find(name=key_name)
