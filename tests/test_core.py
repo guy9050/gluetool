@@ -52,10 +52,10 @@ def test_run_command(monkeypatch, caplog):
     assert 'bin' in output.stdout
     assert output.stderr == ''
     assert_logging(3, "run command: cmd='['/bin/ls', '/']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}",
-                   stderr='stderr:\n------------------\n\n------------------')
+                   stderr='stderr:\n---v---v---v---v---v---\n\n---^---^---^---^---^---')
 
-    assert caplog.records[1].message.startswith('stdout:\n------------------\n')
-    assert caplog.records[1].message.endswith('\n------------------')
+    assert caplog.records[1].message.startswith('stdout:\n---v---v---v---v---v---\n')
+    assert caplog.records[1].message.endswith('\n---^---^---^---^---^---')
     assert len(caplog.records[1].message.split('\n')) >= 5
 
     # Test non-existent binary
@@ -82,8 +82,8 @@ def test_run_command(monkeypatch, caplog):
     assert output.stdout == 'This goes to stdout\n'
     assert output.stderr == 'This goes to stderr\n'
     assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}",
-                   stdout='stdout:\n------------------\nThis goes to stdout\n\n------------------',
-                   stderr='stderr:\n------------------\nThis goes to stderr\n\n------------------')
+                   stdout='stdout:\n---v---v---v---v---v---\nThis goes to stdout\n\n---^---^---^---^---^---',
+                   stderr='stderr:\n---v---v---v---v---v---\nThis goes to stderr\n\n---^---^---^---^---^---')
 
     # Test overriding stdout and stderr
     caplog_clear()
@@ -94,7 +94,7 @@ def test_run_command(monkeypatch, caplog):
     assert output.stderr == 'This goes to stderr\n'
     assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', kwargs={'stderr': 'PIPE', 'stdout': 'DEVNULL'}",
                    stdout='stdout:\n  command produced no output',
-                   stderr='stderr:\n------------------\nThis goes to stderr\n\n------------------')
+                   stderr='stderr:\n---v---v---v---v---v---\nThis goes to stderr\n\n---^---^---^---^---^---')
 
     caplog_clear()
     cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
@@ -103,7 +103,7 @@ def test_run_command(monkeypatch, caplog):
     assert output.stdout == 'This goes to stdout\n'
     assert output.stderr is None
     assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', kwargs={'stderr': 'DEVNULL', 'stdout': 'PIPE'}",
-                   stdout='stdout:\n------------------\nThis goes to stdout\n\n------------------',
+                   stdout='stdout:\n---v---v---v---v---v---\nThis goes to stdout\n\n---^---^---^---^---^---',
                    stderr='stderr:\n  command produced no output')
 
     # Test merging stdout & stderr into one
@@ -114,7 +114,7 @@ def test_run_command(monkeypatch, caplog):
     assert output.stdout == 'This goes to stdout\nThis goes to stderr\n'
     assert output.stderr is None
     assert_logging(3, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', kwargs={'stderr': 'STDOUT', 'stdout': 'PIPE'}",
-                   stdout='stdout:\n------------------\nThis goes to stdout\nThis goes to stderr\n\n------------------',
+                   stdout='stdout:\n---v---v---v---v---v---\nThis goes to stdout\nThis goes to stderr\n\n---^---^---^---^---^---',
                    stderr='stderr:\n  command produced no output')
 
     # Pass weird stdout value, and test its formatting in log

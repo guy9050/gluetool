@@ -27,7 +27,7 @@ PARENT = (17,)
 
 
 def log_blob(logger, intro, blob):
-    logger("{}:\n------------------\n{}\n------------------".format(intro, blob))
+    logger("{}:\n---v---v---v---v---v---\n{}\n---^---^---^---^---^---".format(intro, blob))
 
 
 class ThreadAdapter(ContextAdapter):
