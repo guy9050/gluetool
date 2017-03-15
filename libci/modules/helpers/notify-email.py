@@ -52,6 +52,8 @@ Beaker matrix:  {beaker_matrix_url}
 RPMDIFF_BODY = """
 Result:         {result[result]}
 RPMdiff run:    {rpmdiff_url}
+
+RPMdiff CI Test Plan: http://url.corp.redhat.com/rpmdiff-in-ci
 """
 
 
