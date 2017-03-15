@@ -119,11 +119,11 @@ class CICovscan(Module):
 
         covscan_result = self.version_diff_build(srcrpm, baseline, config, base_config)
 
-        if covscan_result.status_failed():
-            raise CIError('Failed to get result files. Try find solution here: {0}'.format(covscan_result.url))
-
         self.debug('Removing the downloaded source RPM')
         os.unlink(srcrpm)
+
+        if covscan_result.status_failed():
+            raise CIError('Failed to get result files. Try find solution here: {0}'.format(covscan_result.url))
 
         covscan_result.download_artifacts()
 
