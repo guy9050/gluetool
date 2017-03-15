@@ -77,7 +77,7 @@ class SimpleWowExport(libci.Module):
         # check whether the template can be used as Python templating string
 
         variables = ('BREW_TASK_ID', 'BREW_TASK_ISSUER', 'BREW_TASK_TARGET', 'NVR', 'SCRATCH', 'RESULT',
-                     'JENKINS_JOB_URL', 'BEAKER_MATRIX_URL')
+                     'JENKINS_JOB_URL', 'BEAKER_MATRIX_URL', 'NAME', 'VERSION', 'RELEASE')
 
         try:
             self.template.format(**{v: '' for v in variables})
