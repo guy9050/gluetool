@@ -117,13 +117,14 @@ class CICovscan(Module):
         config = 'rhel-{0}-x86_64'.format(self.brew_task.target.rhel)
         base_config = 'rhel-{0}-x86_64-basescan'.format(self.brew_task.target.rhel)
 
-        covscan_result = self.version_diff_build(srcrpm, baseline, config, base_config)
+        try:
+            covscan_result = self.version_diff_build(srcrpm, baseline, config, base_config)
+        finally:
+            self.debug('Removing the downloaded source RPM')
+            os.unlink(srcrpm)
 
         if covscan_result.status_failed():
             raise CIError('Failed to get result files. Try find solution here: {0}'.format(covscan_result.url))
-
-        self.debug('Removing the downloaded source RPM')
-        os.unlink(srcrpm)
 
         covscan_result.download_artifacts()
 
