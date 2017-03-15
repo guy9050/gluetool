@@ -5,11 +5,12 @@ Various helpers.
 import errno
 import json
 import os
+import threading
 import subprocess
 import urllib2
 
 from libci import CIError, CICommandError
-from libci.log import Logging
+from libci.log import Logging, ContextAdapter
 
 
 try:
@@ -27,6 +28,55 @@ PARENT = (17,)
 
 def log_blob(logger, intro, blob):
     logger("{}:\n------------------\n{}\n------------------".format(intro, blob))
+
+
+class ThreadAdapter(ContextAdapter):
+    """
+    Custom logger adapter, adding thread name as a context.
+    """
+
+    def __init__(self, logger, thread):
+        super(ThreadAdapter, self).__init__(logger, {'ctx_thread_name': (5, thread.name)})
+
+
+class WorkerThread(threading.Thread):
+    """
+    Worker threads gets a job to do, and returns a result. It gets a callable, `fn`,
+    which will be called in thread's `run()` method, and thread's `result` property
+    will be the result - value returned by `fn`, or exception raised during the
+    runtime of `fn`.
+
+    :param logger: logger to use for logging.
+    :param fn: thread will start `fn` to do the job.
+    :param fn_args: arguments for `fn`
+    :param fn_kwargs: keyword arguments for `fn`
+    """
+
+    def __init__(self, logger, fn, fn_args=None, fn_kwargs=None, *args, **kwargs):
+        threading.Thread.__init__(self, *args, **kwargs)
+
+        self.logger = ThreadAdapter(logger, self)
+        self.logger.connect(self)
+
+        self._fn = fn
+        self._args = fn_args or ()
+        self._kwargs = fn_kwargs or {}
+
+        self.result = None
+
+    def run(self):
+        self.debug('worker thread started')
+
+        try:
+            self.result = self._fn(*self._args, **self._kwargs)
+
+        # pylint: disable=broad-except
+        except Exception as e:
+            self.exception('exception raised in worker thread: {}'.format(str(e)))
+            self.result = e
+
+        finally:
+            self.debug('worker thread finished')
 
 
 class ProcessOutput(object):
