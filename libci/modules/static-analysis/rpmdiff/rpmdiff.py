@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import time
 from libci import Module
@@ -199,6 +200,10 @@ class CIRpmdiff(Module):
                 'outcome': RPMDIFF_OVERALL_SCORE[runinfo['overall_score']['description']],
             }]
         }
+
+        # add jenkins job url
+        if 'BUILD_URL' in os.environ:
+            result['urls']['jenkins_job'] = os.environ['BUILD_URL']
 
         def _parse_results(data):
             parsed_results = []
