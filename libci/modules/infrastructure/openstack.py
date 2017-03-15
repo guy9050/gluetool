@@ -226,10 +226,18 @@ class CIOpenstack(Module):
                 raise CIError('no image name specified')
 
         # get image reference
-        try:
-            image_ref = self.nova.images.find(name=image)
-        except NotFound:
-            self._resource_not_found('images', image)
+        def _get_image_ref():
+            try:
+                for image_ref in self.nova.images.findall(name=image):
+                    if image_ref.status == u'ACTIVE':
+                        return image_ref
+
+                raise CIError('No unique image match, many images found and more than one is active')
+
+            except NotFound:
+                self._resource_not_found('images', image)
+
+        image_ref = _get_image_ref()
 
         # get flavor reference
         flavor = flavor or self.option('flavor')
