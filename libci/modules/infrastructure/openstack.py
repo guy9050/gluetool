@@ -1,7 +1,6 @@
 from time import gmtime, strftime
 
 from novaclient import client
-from novaclient.base import StrWithMeta
 from novaclient.exceptions import NotFound, Unauthorized
 from retrying import retry
 
@@ -97,7 +96,7 @@ class OpenstackGuest(NetworkedGuest):
         :returns: created image id
         """
         name = strftime('{}_%Y-%m-%d_%d-%H:%M:%S'.format(self.name), gmtime())
-        self.info("creating image snapshot named '{}'".format(name))
+        self.debug("creating image snapshot named '{}'".format(name))
 
         # stop instance
         self._instance.stop()
@@ -106,7 +105,7 @@ class OpenstackGuest(NetworkedGuest):
         # note: we are calling here the parametrized retry decorator
         retry(stop_max_attempt_number=MAX_SERVER_SHUTDOWN,
               wait_fixed=1000)(self._check_resource_status)('servers', self._instance.id, u'SHUTOFF')
-        self.info("server '{}' powered off".format(self.name))
+        self.debug("server '{}' powered off".format(self.name))
 
         # create image
         image_id = self._instance.create_image(name)
@@ -121,9 +120,9 @@ class OpenstackGuest(NetworkedGuest):
         # start instance
         self._instance.start()
         self.wait_alive(timeout=MAX_SERVER_ACTIVATION, tick=1)
-        self.info("server '{}' is up now".format(self.name))
+        self.debug("server '{}' is up now".format(self.name))
 
-        return image_id
+        return name
 
     def restore_snapshot(self, snapshot):
         """
@@ -132,7 +131,6 @@ class OpenstackGuest(NetworkedGuest):
         param: image instance
         :returns: server instance rebuilt from given image.
         """
-        assert isinstance(snapshot, StrWithMeta)
 
         self.info("rebuilding server with snapshot '{}'".format(snapshot))
         self._instance.rebuild(snapshot)
@@ -250,15 +248,18 @@ class CIOpenstack(Module):
 
         # get image reference
         def _get_image_ref():
-            try:
-                for image_ref in self.nova.images.findall(name=image):
-                    if image_ref.status == u'ACTIVE':
-                        return image_ref
+            self.debug("get image reference for '{}'".format(image))
 
-                raise CIError('No unique image match, many images found and more than one is active')
-
-            except NotFound:
+            image_refs = self.nova.images.findall(name=image)
+            if not image_refs:
                 self._resource_not_found('images', image)
+
+            for image_ref in image_refs:
+                self.debug('name: {}, status: {}'.format(image_ref.name, image_ref.status))
+                if image_ref.status == u'ACTIVE':
+                    return image_ref
+
+            raise CIError("Multiple images found for '{}', and none of them is active".format(image))
 
         image_ref = _get_image_ref()
 
