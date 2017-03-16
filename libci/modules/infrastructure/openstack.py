@@ -133,7 +133,7 @@ class OpenstackGuest(NetworkedGuest):
         """
 
         self.info("rebuilding server with snapshot '{}'".format(snapshot))
-        self._instance.rebuild(snapshot)
+        self._instance.rebuild(self._module.get_image_ref(snapshot))
         self.wait_alive(timeout=MAX_SERVER_ACTIVATION, tick=1)
         self.info("instance rebuilt and is up now")
 
@@ -223,6 +223,20 @@ class CIOpenstack(Module):
         available = [item.name for item in getattr(self.nova, resource).list()]
         raise CIError("{0} '{1}' not found, available {0}\n{2}".format(type, name, ', '.join(available)))
 
+    def get_image_ref(self, name):
+        self.debug("get image reference for '{}'".format(name))
+
+        image_refs = self.nova.images.findall(name=name)
+        if not image_refs:
+            self._resource_not_found('images', name)
+
+        for image_ref in image_refs:
+            self.debug('name: {}, status: {}'.format(image_ref.name, image_ref.status))
+            if image_ref.status == u'ACTIVE':
+                return image_ref
+
+        raise CIError("Multiple images found for '{}', and none of them is active".format(name))
+
     def openstack_provision(self, count=1, name=DEFAULT_NAME, image=None, flavor=None):
         """
         Provision multiple openstack instances from the given image name. The flavor is by
@@ -247,21 +261,7 @@ class CIOpenstack(Module):
                 raise CIError('no image name specified')
 
         # get image reference
-        def _get_image_ref():
-            self.debug("get image reference for '{}'".format(image))
-
-            image_refs = self.nova.images.findall(name=image)
-            if not image_refs:
-                self._resource_not_found('images', image)
-
-            for image_ref in image_refs:
-                self.debug('name: {}, status: {}'.format(image_ref.name, image_ref.status))
-                if image_ref.status == u'ACTIVE':
-                    return image_ref
-
-            raise CIError("Multiple images found for '{}', and none of them is active".format(image))
-
-        image_ref = _get_image_ref()
+        image_ref = self.get_image_ref(image)
 
         # get flavor reference
         flavor = flavor or self.option('flavor')
@@ -301,12 +301,12 @@ class CIOpenstack(Module):
             self._all.append(instance)
             instances.append(instance)
 
-        self.info("created {} instance(s) with flavor '{}' from image '{}'".format(count, flavor, image))
+        self.debug('created {} instances, waiting for them to become ACTIVE'.format(count))
 
         for instance in instances:
             instance.wait_alive(timeout=MAX_SERVER_ACTIVATION, tick=1)
 
-        self.info('instances are ready for usage')
+        self.info("created {} instance(s) with flavor '{}' from image '{}'".format(count, flavor, image))
 
         return instances
 
