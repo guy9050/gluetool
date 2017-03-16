@@ -90,7 +90,7 @@ class RestraintScheduler(libci.Module):
             ),
             'beaker-tasks': (
                 'http://beaker.engineering.redhat.com/rpms/',
-                {'gpgcheck': 0, 'enabled': 1}
+                {'gpgcheck': 0, 'enabled': 0}
             )
         }
 
@@ -102,12 +102,14 @@ class RestraintScheduler(libci.Module):
         guest.execute('yum clean metadata')
 
         # install restraint & other harness-related packages
+        # pylint: disable=line-too-long
         guest.execute('yum install -y --enablerepo=restraint --enablerepo=beaker-harness beakerlib beakerlib-redhat restraint psmisc yum-plugin-priorities parted createrepo')
         guest.execute('chkconfig --level 345 restraintd on')
         guest.execute('service restraintd start')
 
         # install brew build
         guest.debug('installing brew task packages')
+        # pylint: disable=line-too-long
         guest.execute('yum install -y --enablerepo=restraint --enablerepo=beaker-tasks distribution-distribution-install-brew-build.noarch')
         guest.execute('METHOD=install TASKS={} make -C /mnt/tests/distribution/install/brew-build/'.format(task_id))
 

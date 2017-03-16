@@ -40,6 +40,7 @@ class RestraintRunner(libci.Module):
         return self._bool_option('parallelize')
 
     def _guest_restraint_address(self, guest):
+        # pylint: disable=no-self-use
         return '{}:{}/{}'.format(guest.hostname, DEFAULT_RESTRAINT_PORT, guest.port)
 
     def _run_task_set(self, guest, task_set, recipe_attrs, recipe_set_attrs):
@@ -126,7 +127,9 @@ class RestraintRunner(libci.Module):
             threads = []
 
             for i, (guest, task) in enumerate(zip(guests, tasks)):
-                thread = libci.utils.WorkerThread(guest.logger, self._run_task_set, fn_args=(guest, [task], recipe_attrs, recipe_set_attrs), name='task-runner-{}'.format(i))
+                thread = libci.utils.WorkerThread(guest.logger, self._run_task_set,
+                                                  fn_args=(guest, [task], recipe_attrs, recipe_set_attrs),
+                                                  name='task-runner-{}'.format(i))
                 threads.append(thread)
 
                 thread.start()
@@ -204,7 +207,8 @@ class RestraintRunner(libci.Module):
             threads = []
 
             for i, (guest, recipe_set) in enumerate(schedule):
-                thread = libci.utils.WorkerThread(self.logger, self._run_recipe_set, fn_args=(guest, recipe_set), name='recipe-set-runner-{}'.format(i))
+                thread = libci.utils.WorkerThread(self.logger, self._run_recipe_set, fn_args=(guest, recipe_set),
+                                                  name='recipe-set-runner-{}'.format(i))
                 threads.append(thread)
 
                 thread.start()
