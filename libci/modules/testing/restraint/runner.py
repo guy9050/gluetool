@@ -17,8 +17,13 @@ class RestraintRunner(libci.Module):
             'default': 'no',
             'metavar': 'yes|no'
         },
-        'parallelize': {
-            'help': 'Enabel or disable parralelization of recipe sets and task sets (default: no)',
+        'parallelize-recipe-sets': {
+            'help': 'Enable or disable parallelization of recipe sets (default: no)',
+            'default': 'no',
+            'metavar': 'yes|no'
+        },
+        'parallelize-test-sets': {
+            'help': 'Enable or disable parallelization of test sets (default: no)',
             'default': 'no',
             'metavar': 'yes|no'
         }
@@ -36,8 +41,12 @@ class RestraintRunner(libci.Module):
         return self._bool_option('use-snapshots')
 
     @libci.utils.cached_property
-    def parallelize(self):
-        return self._bool_option('parallelize')
+    def parallelize_recipe_sets(self):
+        return self._bool_option('parallelize-recipe-sets')
+
+    @libci.utils.cached_property
+    def parallelize_task_sets(self):
+        return self._bool_option('parallelize-task-sets')
 
     def _guest_restraint_address(self, guest):
         # pylint: disable=no-self-use
@@ -85,12 +94,15 @@ class RestraintRunner(libci.Module):
 
             except libci.CICommandError as e:
                 if e.output.stderr.strip().startswith('One or more tasks failed'):
-                    pass
+                    output = 'One or more tasks failed'
 
                 else:
                     raise
 
-        self.info('Task set output:\n{}'.format(output.stdout))
+            else:
+                output = output.stdout
+
+        self.info('Task set output:\n{}'.format(output))
 
         return ('task set result', )  # results
 
@@ -118,7 +130,7 @@ class RestraintRunner(libci.Module):
         # save current state of guest
         base_snapshot = guest.create_snapshot()
 
-        if self.parallelize:
+        if self.parallelize_task_sets:
             # run all task in parallel, each on its own guest, using the snapshot as their image
             self.info('Running {} tasks in parallel'.format(len(tasks)))
             self.debug('parallelize {} tasks requires {} additional guests'.format(len(tasks), len(tasks) - 1))
@@ -201,7 +213,7 @@ class RestraintRunner(libci.Module):
     def execute(self):
         schedule = self.shared('schedule') or []
 
-        if self.parallelize:
+        if self.parallelize_recipe_sets:
             self.info('Scheduled {} items, running them in parallel'.format(len(schedule)))
 
             threads = []
