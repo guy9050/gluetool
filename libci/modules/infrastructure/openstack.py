@@ -120,7 +120,7 @@ class OpenstackGuest(NetworkedGuest):
 
         # start instance
         self._instance.start()
-        self.wait(timeout=MAX_SERVER_ACTIVATION, tick=1)
+        self.wait_alive(timeout=MAX_SERVER_ACTIVATION, tick=1)
         self.info("server '{}' is up now".format(self.name))
 
         return image_id
@@ -136,7 +136,7 @@ class OpenstackGuest(NetworkedGuest):
 
         self.info("rebuilding server with snapshot '{}'".format(snapshot))
         self._instance.rebuild(snapshot)
-        self.wait(timeout=MAX_SERVER_ACTIVATION, tick=1)
+        self.wait_alive(timeout=MAX_SERVER_ACTIVATION, tick=1)
         self.info("instance rebuilt and is up now")
 
         return self
@@ -303,7 +303,7 @@ class CIOpenstack(Module):
         self.info("created {} instance(s) with flavor '{}' from image '{}'".format(count, flavor, image))
 
         for instance in instances:
-            instance.wait(timeout=MAX_SERVER_ACTIVATION, tick=1)
+            instance.wait_alive(timeout=MAX_SERVER_ACTIVATION, tick=1)
 
         self.info('instances are ready for usage')
 

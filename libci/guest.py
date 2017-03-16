@@ -129,10 +129,12 @@ class Guest(object):
 
         raise NotImplementedError()
 
-    def wait(self, timeout=None, tick=30):
+    def wait(self, check, timeout=None, tick=30):
         """
         Wait for the guest to become responsive (e.g. after reboot).
 
+        :param check: callable performing the actual test. If its return
+          value evaluates to `True`, the waiting finishes successfully.
         :param int timeout: if set, wait at max TIMEOUT seconds. If `None`,
           wait indefinitely.
         :param int tick: check guest status every TICK seconds.
@@ -226,30 +228,37 @@ class NetworkedGuest(Guest):
     def execute(self, cmd, **kwargs):
         return self._execute(self._ssh + [self.hostname] + [cmd], **kwargs)
 
-    def wait(self, timeout=None, tick=30):
+    def wait(self, check, timeout=None, tick=30):
         assert isinstance(tick, int) and tick > 0
 
+        if timeout is not None:
+            end_time = time.time() + timeout
+
         def _timeout():
-            return '{} seconds'.format(timeout) if timeout is not None else 'infinite'
+            return '{} seconds'.format(int(end_time - time.time())) if timeout is not None else 'infinite'
 
-        self.debug('waiting for guest to become alive, {} timeout, check every {} seconds'.format(_timeout(), tick))
-
-        while timeout is None or timeout >= 0:
+        self.debug("waiting for check '{}', {} timeout, check every {} seconds".format(check, _timeout(), tick))
+        while timeout is None or time.time() < end_time:
             self.debug('{} left, sleeping for {} seconds'.format(_timeout(), tick))
             time.sleep(tick)
 
             try:
-                self.execute('exit')
-                self.debug('command succeeded, assuming guest is alive')
-                return
+                ret = check()
+                if ret:
+                    self.debug('check passed, assuming success')
+                    return ret
 
             except libci.CICommandError:
                 pass
 
-            self.debug('command failed, assuming guest not available')
+            self.debug('check failed, assuming failure')
 
-            if timeout is not None:
-                timeout -= tick
+        raise libci.CIError('Check did not manage to pass for guest')
+
+    def wait_alive(self, **kwargs):
+        self.debug('waiting for guest to become alive')
+
+        return self.wait(lambda: self.execute('exit'), **kwargs)
 
     def copy_to(self, src, dst, recursive=False, **kwargs):
         self.debug("copy to the guest: '{}' => '{}'".format(src, dst))
