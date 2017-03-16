@@ -90,7 +90,7 @@ class RestraintScheduler(libci.Module):
             ),
             'beaker-tasks': (
                 'http://beaker.engineering.redhat.com/rpms/',
-                {'gpgcheck': 0, 'enabled': 0}
+                {'gpgcheck': 0, 'enabled': 1}
             )
         }
 
