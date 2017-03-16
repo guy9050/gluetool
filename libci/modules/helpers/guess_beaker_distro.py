@@ -8,7 +8,7 @@ from libci.utils import log_blob, format_dict
 DEFAULT_NIGHTLY_LISTING = 'http://download.eng.brq.redhat.com/nightly/'
 
 
-class CIGuessDistro(Module):
+class CIGuessBeakerDistro(Module):
     """
     "Guess" distro. User can choose from different possible methods of "guessing":
 
@@ -23,8 +23,8 @@ class CIGuessDistro(Module):
       nightlies, and you'll get something like RHEL-7.4-20170223.n.0
     """
 
-    name = 'guess-distro'
-    description = 'Guess distro from build target of a brew build'
+    name = 'guess-beaker-distro'
+    description = 'Guess beaker distro from build target of a brew build'
 
     options = {
         'method': {
