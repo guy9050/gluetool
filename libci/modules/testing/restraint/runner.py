@@ -455,7 +455,7 @@ class RestraintRunner(libci.Module):
 
         # Prepare result info
         result = {
-            'type': 'openstack',
+            'type': 'restraint',
             'result': overall_result,
             'urls': {},
             'tests': results
