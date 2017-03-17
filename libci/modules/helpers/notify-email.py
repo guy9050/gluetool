@@ -56,6 +56,10 @@ RPMdiff run:    {rpmdiff_url}
 RPMdiff CI Test Plan: http://url.corp.redhat.com/rpmdiff-in-ci
 """
 
+RESTRAINT_BODY = """
+Result:         {result[result]}
+"""
+
 
 class Message(object):
     # pylint: disable=too-few-public-methods
@@ -151,6 +155,18 @@ class Notify(Module):
         },
 
         # Per-result-type notify lists
+        'restraint-notify': {
+            'help': 'Notify only the listed recipients.',
+            'metavar': 'EMAILS'
+        },
+        'restraint-default-notify': {
+            'help': 'Default list of recipients. Default: ""',
+            'metavar': 'EMAILS'
+        },
+        'restraint-add-notify': {
+            'help': 'Extends default list of recipients.',
+            'metavar': 'EMAILS'
+        },
         'rpmdiff-notify': {
             'help': 'Notify only the listed recipients.',
             'metavar': 'EMAILS'
@@ -291,6 +307,10 @@ class Notify(Module):
         rpmdiff_url = result['urls'].get('rpmdiff_url', '<RPMdiff URL not available>')
 
         msg.body = RPMDIFF_BODY.format(result=result, rpmdiff_url=rpmdiff_url)
+
+    def format_result_restraint(self, result, msg):
+        # pylint: disable=no-self-use
+        msg.body = RESTRAINT_BODY.format(result=result)
 
     def execute(self):
         task = self.shared('brew_task')
