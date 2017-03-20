@@ -169,7 +169,7 @@ class CICovscan(Module):
         enabled_targets = self.option('target_pattern')
         self.verbose('enabled targets: {}'.format(enabled_targets))
 
-        if any((re.compile(regex.strip()).match(target) for regex in enabled_targets.split(','))):
+        if enabled_targets and any((re.compile(regex.strip()).match(target) for regex in enabled_targets.split(','))):
             self.info('Running covscan for {} on {}'.format(self.brew_task.component, target))
             self.scan()
         else:
