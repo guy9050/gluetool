@@ -343,7 +343,7 @@ class CIBrewDispatcher(Module):
                     _add_command_set('default', set_commands)
                     continue
 
-                if len(set_commands) < 2:
+                if set_commands is None or len(set_commands) < 2:
                     raise CIError("Command set '{}' does not contain filtering rules".format(set_name), soft=True)
 
                 rules = Rules(set_commands[0])
@@ -478,10 +478,6 @@ class CIBrewDispatcher(Module):
 
         for set_name, set_commands in commands.iteritems():
             self.debug("set '{}':\n{}".format(set_name, format_dict(set_commands)))
-
-            # Ignore default section, that's just a fallback
-            if set_name == 'default':
-                continue
 
             _dispatch_commands(set_commands)
 
