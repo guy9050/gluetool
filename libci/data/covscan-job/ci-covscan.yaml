@@ -16,5 +16,8 @@
           citool -i -o citool-debug.txt brew --id $id covscan
     publishers:
       - archive:
-          artifacts: '**/**'
+          artifacts: '*.txt, *.html'
           allow-empty: 'true'
+    properties:
+      - build-discarder:
+          num-to-keep: 500
