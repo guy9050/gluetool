@@ -211,8 +211,12 @@ class CIBrewDispatcher(Module):
             raise CIError('file \'{}\' does not exist'.format(config))
 
         # read yaml configuration
-        with open(config, 'r') as stream:
-            self.config = yaml.load(stream)
+        try:
+            with open(config, 'r') as stream:
+                self.config = yaml.load(stream)
+
+        except yaml.YAMLError as e:
+            raise CIError('Unable to load configuration: {}'.format(str(e)))
 
         self.debug('config:\n{}'.format(format_dict(self.config)))
 
