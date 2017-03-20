@@ -5,7 +5,7 @@ from libci.utils import check_for_commands, run_command
 
 # Base URL of the dit-git repositories
 GIT_BASE_URL = 'git://pkgs.devel.redhat.com/rpms/'
-# This module required rhpkg tool installed
+# This module requires rhpkg tool installed
 REQUIRED_CMDS = ['rhpkg']
 
 
@@ -53,6 +53,14 @@ class CIBuildOnCommit(Module):
         """
         check_for_commands(REQUIRED_CMDS)
 
+    @staticmethod
+    def _run_command(command):
+        try:
+            run_command(command)
+        except CICommandError as exc:
+            error = exc.output.stdout.rstrip("'\n") + exc.output.stderr.rstrip("'\n")
+            raise CIError("failure during '{}' execution\n{}'".format(command[0], error))
+
     def execute(self):
         component = self.option('component')
         branch = self.option('branch')
@@ -88,11 +96,11 @@ class CIBuildOnCommit(Module):
             os.chdir(component)
             self.info("updating existing repository of '{}'".format(component))
             command = ["rhpkg", "switch-branch", "--fetch", branch]
-            run_command(command)
+            self._run_command(command)
         else:
             self.info("cloning repository of '{}'".format(component))
             command = ["git", "clone", GIT_BASE_URL + component]
-            run_command(command)
+            self._run_command(command)
             os.chdir(component)
 
         # schedule scratch build
@@ -100,7 +108,4 @@ class CIBuildOnCommit(Module):
         msg += ["'{}' on branch '{}' with build target '{}'".format(component, branch, target)]
         self.info(' '.join(msg))
         command = ["rhpkg", "build", "--scratch", "--skip-nvr-check", "--arches", "x86_64", "--target", target]
-        try:
-            run_command(command)
-        except CICommandError as exc:
-            raise CIError("failure during 'rhpkg' execution\n{}'".format(exc.output.stdout))
+        self._run_command(command)
