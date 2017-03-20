@@ -12,8 +12,20 @@ from libci.utils import format_dict
 DEFAULT_RESTRAINT_PORT = 8081
 DEFAULT_BEAKER_RESULTS_FILE = 'beaker-results.json'
 
+REQUIRED_COMMANDS = ['restraint']
+
 
 class RestraintRunner(libci.Module):
+    """
+    This module runs recipe sets, prepared by other modules, using restraint harness.
+    It can make use of snapshots (if supported by guests) to isolate each test, and
+    it's able to parallelize tests.
+
+    The results are provided in the form similar to what wow module does - short summary
+    in console log, artifact file, and shared function to publish results for later
+    modules as well.
+    """
+
     name = 'restraint-runner'
 
     options = {
@@ -43,6 +55,10 @@ class RestraintRunner(libci.Module):
     _results = []
 
     def results(self):
+        """
+        Returns list of test results.
+        """
+
         return self._results
 
     def _bool_option(self, name):
@@ -249,7 +265,7 @@ class RestraintRunner(libci.Module):
 
             try:
                 output = libci.utils.run_command([
-                    '/usr/bin/restraint', '-v',
+                    'restraint', '-v',
                     '--host', '1={}@{}'.format(guest.username, self._guest_restraint_address(guest)),
                     '--job', f.name
                 ], logger=guest.logger)
@@ -366,7 +382,7 @@ class RestraintRunner(libci.Module):
         # to bear.
         assert len(recipe_set.find_all('recipe')) == 1
 
-        guest.info('Running recipe set:\n{}'.format(recipe_set.prettify()))
+        guest.debug('Running recipe set:\n{}'.format(recipe_set.prettify()))
 
         if guest.supports_snapshots() is True and self.use_snapshots:
             results = self._run_recipe_set_isolated(guest, recipe_set)
@@ -374,7 +390,7 @@ class RestraintRunner(libci.Module):
         else:
             results = self._run_recipe_set_whole(guest, recipe_set)
 
-        guest.info('Recipe set finished!')
+        guest.debug('Recipe set finished')
         return results
 
     def _process_results(self, results):
@@ -399,6 +415,8 @@ class RestraintRunner(libci.Module):
         return 'PASS'
 
     def sanity(self):
+        libci.utils.check_for_commands(REQUIRED_COMMANDS)
+
         if self.parallelize_recipe_sets:
             self.info('Will run recipe sets in parallel')
 
@@ -411,6 +429,9 @@ class RestraintRunner(libci.Module):
             else:
                 self.info('Will run recipe set tasks serially, using snapshots')
         else:
+            if self.parallelize_task_sets:
+                raise libci.CIError('--parallelize-task-sets is not supported when snapshots are disabled', soft=True)
+
             self.info('Will run recipe set tasks serially, without snapshots')
 
     def execute(self):

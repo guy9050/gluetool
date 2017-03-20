@@ -6,6 +6,13 @@ from libci import utils, CIError, CICommandError
 
 
 class RestraintScheduler(libci.Module):
+    """
+    Prepares "schedule" for runners. It uses workflow-tomorrow - with options
+    provided by the user - to prepare a list of recipe sets, then it acquire
+    required number of guests, and hands this to whoever will actually run
+    the recipe sets.
+    """
+
     name = 'restraint-scheduler'
 
     options = {
@@ -19,6 +26,13 @@ class RestraintScheduler(libci.Module):
     _schedule = None
 
     def schedule(self):
+        """
+        Returns schedule for runners. It tells runner which recipe sets
+        it should run on which guest.
+
+        :returns: [(guest, <recipeSet/>), ...]
+        """
+
         return self._schedule
 
     def _run_wow(self, task, distro, options):
