@@ -1,0 +1,63 @@
+---
+
+- job:
+    name: 'ci-openstack'
+    node: openstack
+    description: |
+        Run tests using restraint and OpenStack guests.
+    concurrent: true
+    display-name: 'ci-openstack'
+    parameters:
+      - string:
+          name: id
+          default: ''
+          description: 'Brew task ID.'
+      - string:
+          name: pipeline_prepend
+          default: ''
+          description: 'citool options that will be added at the beginning of citool pipeline'
+      - string:
+          name: pipeline_append
+          default: ''
+          description: 'citool options that will be added at the end of citool pipeline'
+      - string:
+          name: guess_beaker_distro_options
+          default: ''
+          description: 'Additional options for guess-beaker-distro module.'
+      - string:
+          name: guess_openstack_image_options
+          default: ''
+          description: 'Additional options for guess-openstack-image module.'
+      - string:
+          name: wow_options
+          default: ''
+          description: 'Additional options for workflow-tomorrow module.'
+      - string:
+          name: restraint_runner_options
+          default: ''
+          description: 'Additional options for restraint-runner module.'
+      - string:
+          name: notify_email_options
+          default: ''
+          description: 'Additional options for notify-email module.'
+    builders:
+      - shell:
+          citool -i -o citool-debug.txt
+            ${pipeline_prepend}
+            envinject
+            jenkins
+            openstack
+            brew --id $id
+            brew-build-name
+            guess-beaker-distro ${guess_beaker_distro_options}
+            guess-openstack-image ${guess_openstack_image_options}
+            restraint-scheduler --wow-options="${wow_options}"
+            restraint-runner ${restraint_runner_options}
+            notify-email --restraint-default="{ISSUER}" ${notify_email_options}
+            ${pipeline_append}
+      - inject:
+          properties-file: envinject-citool.props
+    publishers:
+      - archive:
+          artifacts: '**/**'
+          allow-empty: 'true'
