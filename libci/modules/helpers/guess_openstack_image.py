@@ -1,4 +1,5 @@
 import re
+from collections import OrderedDict
 from libci import CIError, Module
 
 
@@ -49,14 +50,19 @@ class CIGuessOpenstackImage(Module):
         if task is None:
             raise CIError("Using 'target-autodetect' method without a brew task does not work")
 
-        translations = {
+        translations = OrderedDict([
+            # for rhel-7.4 and rhel-6.9
+            # note: we need to find out this automatically via pp.engineering maybe?
+            (r'staging-rhel-6-candidate', lambda match: 'rhel-6.8-server-x86_64-updated'),
+            (r'rhel-7.4-candidate', lambda match: 'rhel-7.3-server-x86_64-updated'),
+            (r'rhel-6.9-candidate', lambda match: 'rhel-6.8-server-x86_64-updated'),
             # default translation for non-eus/aus/z-stream rhel and staging branches
-            r'(staging-|supp-)?(rhel-[0-9]+.[0-9]+)?-candidate':
-                lambda match: '{}-server-x86_64-released'.format(match.group(2)),
+            (r'(rhel-[0-9]+.[0-9]+)-candidate',
+                lambda match: '{}-server-x86_64-released'.format(match.group(1))),
             # eus/aus/z-stream translate always to *-updated
-            r'(rhel-[0-9]+.[0-9]+)?-z-candidate':
-                lambda match: '{}-server-x86_64-updated'.format(match.group(2)),
-        }
+            (r'(rhel-[0-9]+.[0-9]+)-z-candidate',
+                lambda match: '{}-server-x86_64-updated'.format(match.group(1))),
+        ])
 
         for regex, function in translations.items():
             match = re.match(regex, task.target.target)
