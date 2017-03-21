@@ -156,8 +156,12 @@ class CIRpmdiff(Module):
                 self.info('skipping blacklisted package {}'.format(self.brew_task.component))
                 return
 
-        if test_type == 'comparison' and self.brew_task.latest is None:
-            raise CIError('could not find baseline for this build')
+        if test_type == 'comparison':
+            if self.brew_task.latest is None:
+                raise CIError('could not find baseline for this build')
+            if self.brew_task.scratch is False and self.brew_task.latest == self.brew_task.nvr:
+                self.info('cowardly refusing to compare same packages')
+                return
 
         msg = ["running {} for task '{}'".format(test_type, self.brew_task.task_id)]
         msg += ['compared to {}'.format(self.brew_task.latest)] if test_type == 'comparison' else []
