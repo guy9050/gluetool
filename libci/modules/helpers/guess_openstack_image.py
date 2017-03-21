@@ -57,11 +57,9 @@ class CIGuessOpenstackImage(Module):
             (r'rhel-7.4-candidate', lambda match: 'rhel-7.3-server-x86_64-updated'),
             (r'rhel-6.9-candidate', lambda match: 'rhel-6.8-server-x86_64-updated'),
             # default translation for non-eus/aus/z-stream rhel and staging branches
-            (r'(rhel-[0-9]+.[0-9]+)-candidate',
-                lambda match: '{}-server-x86_64-released'.format(match.group(1))),
+            (r'(rhel-[0-9]+.[0-9]+)-candidate', lambda match: '{}-server-x86_64-released'.format(match.group(1))),
             # eus/aus/z-stream translate always to *-updated
-            (r'(rhel-[0-9]+.[0-9]+)-z-candidate',
-                lambda match: '{}-server-x86_64-updated'.format(match.group(1))),
+            (r'(rhel-[0-9]+.[0-9]+)-z-candidate', lambda match: '{}-server-x86_64-updated'.format(match.group(1))),
         ])
 
         for regex, function in translations.items():
