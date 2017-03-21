@@ -1,11 +1,12 @@
 import os
+import re
 import shlex
 import ast
 import _ast
 import yaml
 
 from libci import Module, CIError
-from libci.utils import format_dict
+from libci.utils import format_dict, cached_property
 
 
 class SanityASTVisitor(ast.NodeVisitor):
@@ -17,16 +18,22 @@ class SanityASTVisitor(ast.NodeVisitor):
 
     _valid_classes = tuple([
         getattr(_ast, node_class) for node_class in (
-            'Expression', 'Expr', 'Compare', 'Name', 'Load',
-            'Str', 'Num',
+            'Expression', 'Expr', 'Compare', 'Name', 'Load', 'BoolOp',
+            'Str', 'Num', 'List', 'Tuple',
             'Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE', 'Is', 'IsNot', 'In', 'NotIn',
-            'And', 'Or', 'Not'
+            'And', 'Or', 'Not',
+            'Call'
         )
     ])
+
+    _valid_functions = ('MATCH',)
 
     def generic_visit(self, node):
         if not isinstance(node, SanityASTVisitor._valid_classes):
             raise CIError('Node of type {} not allowed in rules'.format(node.__class__.__name__), soft=True)
+
+        if isinstance(node, _ast.Call) and node.func.id not in SanityASTVisitor._valid_functions:
+            raise CIError('Calling function {} not allowed in rules'.format(node.func.id), soft=True)
 
         super(SanityASTVisitor, self).generic_visit(node)
 
@@ -60,6 +67,9 @@ class Rules(object):
         except SyntaxError as e:
             raise CIError("Cannot parse rules '{}': line {}, offset {}".format(self._rules, e.lineno, e.offset),
                           soft=True)
+
+        except TypeError as e:
+            raise CIError("Cannot parse rules '{}'".format(self._rules), soft=True)
 
         SanityASTVisitor().visit(tree)
 
@@ -99,6 +109,8 @@ class CIBrewDispatcher(Module):
         component:
             extra-testing:
                 - BREW_TASK_TARGET == 'rhel-7.4-candidate'
+                - flag1: foo
+                  flag2: bar
                 - command1
                 - command2
             extra-special-testing:
@@ -115,10 +127,20 @@ class CIBrewDispatcher(Module):
 
     Few notes related to the second form:
       - filtering rules *must* be the first entry in the set,
+      - flags are optional - the come right after rules, but can be omited
       - "default" set is optional - if you don't specify it, no harm to the configuration
         you just don't have any "fallback" section for cases when no filter rules matched,
       - if you use one name of the set multiple times, the last will overwrite all former
         ones.
+
+    There are two global sections: "default" which applies for components that don't have
+    their own configuration, and "all" which is appended to commands for every component.
+    Both sections can use filtering to better specify commands.
+
+    The only supported fag so far is "apply-all" (default: True). When set to False,
+    commands from "all" section will not be appended to component's commands. This is useful
+    in case you want to "opt out" from global configuration, e.g. you wish to run rpmdiff
+    for your component but with different options.
 
     Filtering rules are Python expressions, limited in offering of available operations:
 
@@ -135,7 +157,13 @@ class CIBrewDispatcher(Module):
       Operators:
         ==, !=, <, <=, >, >=, is, is not, in, not in
         and, or, not
+
+      Functions:
+        MATCH(pattern, variable)
     """
+
+    # Supported flags - keep them alphabetically sorted
+    KNOWN_FLAGS = ('apply-all',)
 
     name = 'brew-dispatcher'
     description = 'Configurable brew dispatcher'
@@ -189,10 +217,167 @@ class CIBrewDispatcher(Module):
             raise CIError('file \'{}\' does not exist'.format(config))
 
         # read yaml configuration
-        with open(config, 'r') as stream:
-            self.config = yaml.load(stream)
+        try:
+            with open(config, 'r') as stream:
+                self.config = yaml.load(stream)
+
+        except yaml.YAMLError as e:
+            raise CIError('Unable to load configuration: {}'.format(str(e)))
 
         self.debug('config:\n{}'.format(format_dict(self.config)))
+
+    @cached_property
+    def _rules_locals(self):
+        task = self.shared('brew_task')
+
+        def match(pattern, value):
+            return re.match(pattern, value) is not None
+
+        return {
+            # constants
+            'BREW_TASK_ID': task.task_id,
+            'BREW_TASK_TARGET': task.target.target,
+            'BREW_TASK_ISSUER': task.owner,
+            'NVR': task.nvr,
+            'SCRATCH': task.scratch is True,
+
+            # functions
+            'MATCH': match
+        }
+
+    @cached_property
+    def _rules_globals(self):
+        # pylint: disable=no-self-use
+
+        return {
+            '__builtins__': None
+        }
+
+    def _reduce_section(self, commands, is_component=True, default_commands=None, all_commands=None):
+        """
+        Reduce commands to a minimal set - apply filtering rules, apply global sections,
+        and return set of command sets.
+        """
+
+        self.debug('reduce section:\n{}'.format(format_dict(commands)))
+
+        all_commands = all_commands or []
+        default_commands = default_commands or []
+
+        reduced = {}
+
+        def _add_command_set(name, set_commands):
+            self.debug("    adding command set '{}', with commands:\n{}".format(name, format_dict(set_commands)))
+
+            if not set_commands:
+                if is_component is True:
+                    # there is nothing in this command set, not even flag telling us
+                    # to avoid "all" commands, therefore add just them
+                    self.debug('      empty command set, using only "all" commands')
+                    reduced[name] = all_commands[:]
+
+                else:
+                    # command sets in global sections are simply empty
+                    self.debug('      empty command set')
+                    reduced[name] = []
+
+                return
+
+            if is_component is True:
+                flags = {
+                    'apply-all': True
+                }
+
+                if isinstance(set_commands[0], dict):
+                    self.debug('      specifies flags:\n{}'.format(format_dict(set_commands[0])))
+
+                    flags.update(set_commands[0])
+                    del set_commands[0]
+
+                for flag in [flag for flag in flags.iterkeys() if flag not in CIBrewDispatcher.KNOWN_FLAGS]:
+                    self.warn("Flag '{}' is not supported (typo maybe?)".format(flag))
+
+                self.debug('      final flags:\n{}'.format(format_dict(flags)))
+
+                if flags['apply-all'] is True:
+                    self.debug("      allows 'all' section to be appended")
+                    set_commands = set_commands[:] + all_commands
+
+            reduced[name] = set_commands[:]
+
+        if commands is None:
+            # No tests in this section
+            self.debug('  section contains no commands')
+
+            if is_component is True:
+                return {
+                    'default': default_commands[:]
+                }
+
+            else:
+                return {
+                    'default': []
+                }
+
+        if isinstance(commands, list):
+            # foo:
+            #   - flag1: foo
+            #     flag2: bar
+            #   - command1
+            #   - command2
+            #
+            # Simply add commands as a "default" set.
+
+            _add_command_set('default', commands)
+            return reduced
+
+        if isinstance(commands, dict):
+            # Now it gets complicated:
+            #
+            # foo:
+            #   extra-testing:
+            #     - rules
+            #     - command1
+            #     - command2
+            #   extra-special-testing:
+            #     - rules
+            #     - flag1: foo
+            #       flag2: bar
+            #     - command3
+            #     - command4
+            #   default:
+            #     - command5
+
+            for set_name, set_commands in commands.iteritems():
+                self.debug('  checking command set {}'.format(set_name))
+
+                if set_name == 'default':
+                    # no rules
+                    _add_command_set('default', set_commands)
+                    continue
+
+                if set_commands is None or len(set_commands) < 2:
+                    raise CIError("Command set '{}' does not contain filtering rules".format(set_name), soft=True)
+
+                rules = Rules(set_commands[0])
+                self.debug('    evaluating rules {}'.format(rules))
+
+                if rules.eval(self._rules_globals, self._rules_locals) is not True:
+                    self.debug('    denied by rules')
+                    continue
+
+                del set_commands[0]
+
+                self.debug('    allowed by rules')
+                _add_command_set(set_name, set_commands)
+
+            if 'default' in reduced and len(reduced) > 1:
+                self.debug('  there are other sections, not just "default" - remove it')
+                del reduced['default']
+
+            return reduced
+
+        raise CIError('Unexpected data found in config', soft=True)
 
     def _construct_command_sets(self, component):
         """
@@ -200,13 +385,11 @@ class CIBrewDispatcher(Module):
         "command sets". Each set has a name and list of commands, and can carry
         filtering rules.
 
-        Returns a dictionary, where keys are set names and values are tuples, with
-        the first item being rules (or None), and the second item is a list of
-        commands.
+        Returns a dictionary, where keys are set names and values are list of commands.
 
             {
-                'default': (None, [cmd1, cmd2]),
-                'foo': (Rules('BREW_TASK_TARGET == rhel-7.4-candidate'), [cmd3, cmd4]),
+                'default': [cmd1, cmd2],
+                'foo': [cmd3, cmd4],
                 ...
             }
 
@@ -225,77 +408,36 @@ class CIBrewDispatcher(Module):
 
         self.debug("construct command sets for component '{}'".format(component))
 
-        global_always_commands = self.config.get('default', [])
-        if global_always_commands is None:
-            global_always_commands = []
-        self.debug('global "always" commands:\n{}'.format(format_dict(global_always_commands)))
+        def _reduce_global_section(name):
+            self.debug('reducing "{}" section'.format(name))
 
-        commands = {}
+            commands = self._reduce_section(self.config.get(name, []), is_component=False)
+
+            if commands is None:
+                self.debug('  empty section, empty list')
+
+                return []
+
+            if len(commands) > 1:
+                raise CIError('Top-level section {} must reduce to a single command set'.format(name))
+
+            self.debug('reduced to:\n{}'.format(format_dict(commands)))
+            return commands.values()[0]
+
+        global_all_commands = _reduce_global_section('all')
+        self.debug('global "all" commands:\n{}'.format(global_all_commands))
+
+        global_default_commands = _reduce_global_section('default')
+        self.debug('global "default" commands:\n{}'.format(global_default_commands))
 
         packages_config = self.config.get('packages', None)
         if packages_config is None:
             # either there's no key "packages", or it's empty
             packages_config = {}
 
-        config_commands = packages_config.get(component, None)
-        self.debug('commands in config file:\n{}'.format(format_dict(config_commands)))
-
-        def _add_command_set(name, set_commands, rules=None):
-            commands[name] = (rules, global_always_commands + set_commands)
-
-        if config_commands is None:
-            # No tests for this component
-
-            _add_command_set('default', [])
-            return commands
-
-        if isinstance(config_commands, list):
-            # this is how "normal" components look like:
-            #
-            # foo:
-            #   - command1
-            #   - command2
-            #
-            # Simply add commands as a "default" set.
-
-            _add_command_set('default', config_commands)
-            return commands
-
-        if isinstance(config_commands, dict):
-            # Now it gets complicated:
-            #
-            # foo:
-            #   extra-testing:
-            #     - rules
-            #     - command1
-            #     - command2
-            #   extra-special-testing:
-            #     - rules
-            #     - command3
-            #     - command4
-            #   default:
-            #     - command5
-            #
-            # However it's quite simple at the end - we get this as a dictionary, and simply
-            # convert each key (default, extra-testing, extra-special-testing) to a set in
-            # components dinctionary.
-
-            for set_name, set_commands in config_commands.iteritems():
-                if set_name == 'default':
-                    # no rules
-                    _add_command_set('default', set_commands)
-                    continue
-
-                if len(set_commands) < 2:
-                    raise CIError("Set '{}' of component '{}' must contain filtering rule".format(set_name, component),
-                                  soft=True)
-
-                rules = Rules(set_commands[0])
-                _add_command_set(set_name, set_commands[1:], rules=rules)
-
-            return commands
-
-        raise CIError("Unexpected data found in config for component '{}'".format(component), soft=True)
+        return self._reduce_section(packages_config.get(component, None),
+                                    all_commands=global_all_commands,
+                                    default_commands=global_default_commands)
 
     def verify(self):
         pass
@@ -331,24 +473,6 @@ class CIBrewDispatcher(Module):
         commands = self._construct_command_sets(component)
         self.debug('commands:\n{}'.format(format_dict(commands)))
 
-        # If we dispatch commands from at least one set, we don't have to fall back to "default" set
-        dispatched = 0
-
-        # Context for rule evaluation
-        our_locals = {
-            'BREW_TASK_ID': task.task_id,
-            'BREW_TASK_TARGET': task.target.target,
-            'BREW_TASK_ISSUER': task.owner,
-            'NVR': task.nvr,
-            'SCRATCH': task.scratch is True
-        }
-
-        our_globals = {
-            '__builtins__': None
-        }
-
-        self.debug('locals:\n{}'.format(format_dict(our_locals)))
-
         def _dispatch_commands(commands):
             """
             Dispatch commands, one by one. This usually leads to starting some
@@ -357,39 +481,19 @@ class CIBrewDispatcher(Module):
             """
 
             for command in commands:
-                self.info("dispatching command '{}'".format(command))
-
                 module = shlex.split(command)[0]
                 args = shlex.split(command)[1:]
 
                 self.debug("module='{}', args='{}'".format(module, args))
                 self.run_module(module, args)
 
-        for set_name, (rules, set_commands) in commands.iteritems():
-            self.debug("set '{}': rules '{}', commands '{}'".format(set_name, rules, set_commands))
+        self.info('Dispatching command sets')
 
-            # Ignore default section, that's just a fallback
-            if set_name == 'default':
-                continue
+        for set_name, set_commands in commands.iteritems():
+            commands_desc = '\n'.join(['  {}'.format(command) for command in set_commands])
+            self.info("Set '{}':\n{}".format(set_name, commands_desc))
 
-            # Check rules
-            if rules.eval(our_globals, our_locals) is not True:
-                self.debug('denied by rules')
-                continue
-
-            self.debug('allowed by rules')
-
-            # Yay, dispatch \o/
             _dispatch_commands(set_commands)
-            dispatched += 1
-
-        if dispatched != 0:
-            self.debug("already dispatched {} sets of commands, skip 'default'".format(dispatched))
-            return
-
-        # Dispatch "default" set, if there's any
-        if 'default' in commands:
-            _dispatch_commands(commands['default'][1])
 
     def execute(self):
         self._dispatch_tests()
