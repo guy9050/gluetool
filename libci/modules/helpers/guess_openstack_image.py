@@ -80,8 +80,8 @@ class CIGuessOpenstackImage(Module):
     }
 
     def sanity(self):
-        image_required = ('force')
-        image_ignored = ('target-autodetection')
+        image_required = ('force',)
+        image_ignored = ('target-autodetection',)
 
         method = self.option('method')
         image = self.option('image')
