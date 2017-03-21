@@ -18,8 +18,8 @@ class SanityASTVisitor(ast.NodeVisitor):
 
     _valid_classes = tuple([
         getattr(_ast, node_class) for node_class in (
-            'Expression', 'Expr', 'Compare', 'Name', 'Load',
-            'Str', 'Num',
+            'Expression', 'Expr', 'Compare', 'Name', 'Load', 'BoolOp',
+            'Str', 'Num', 'List', 'Tuple',
             'Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE', 'Is', 'IsNot', 'In', 'NotIn',
             'And', 'Or', 'Not',
             'Call'
@@ -67,6 +67,9 @@ class Rules(object):
         except SyntaxError as e:
             raise CIError("Cannot parse rules '{}': line {}, offset {}".format(self._rules, e.lineno, e.offset),
                           soft=True)
+
+        except TypeError as e:
+            raise CIError("Cannot parse rules '{}'".format(self._rules), soft=True)
 
         SanityASTVisitor().visit(tree)
 
@@ -158,6 +161,9 @@ class CIBrewDispatcher(Module):
       Functions:
         MATCH(pattern, variable)
     """
+
+    # Supported flags - keep them alphabetically sorted
+    KNOWN_FLAGS = ('apply-all',)
 
     name = 'brew-dispatcher'
     description = 'Configurable brew dispatcher'
@@ -288,6 +294,9 @@ class CIBrewDispatcher(Module):
                     flags.update(set_commands[0])
                     del set_commands[0]
 
+                for flag in [flag for flag in flags.iterkeys() if flag not in CIBrewDispatcher.KNOWN_FLAGS]:
+                    self.warn("Flag '{}' is not supported (typo maybe?)".format(flag))
+
                 self.debug('      final flags:\n{}'.format(format_dict(flags)))
 
                 if flags['apply-all'] is True:
@@ -351,6 +360,8 @@ class CIBrewDispatcher(Module):
                     raise CIError("Command set '{}' does not contain filtering rules".format(set_name), soft=True)
 
                 rules = Rules(set_commands[0])
+                self.debug('    evaluating rules {}'.format(rules))
+
                 if rules.eval(self._rules_globals, self._rules_locals) is not True:
                     self.debug('    denied by rules')
                     continue
@@ -470,8 +481,6 @@ class CIBrewDispatcher(Module):
             """
 
             for command in commands:
-                self.info("dispatching command '{}'".format(command))
-
                 module = shlex.split(command)[0]
                 args = shlex.split(command)[1:]
 
@@ -481,7 +490,8 @@ class CIBrewDispatcher(Module):
         self.info('Dispatching command sets')
 
         for set_name, set_commands in commands.iteritems():
-            self.debug("set '{}':\n{}".format(set_name, format_dict(set_commands)))
+            commands_desc = '\n'.join(['  {}'.format(command) for command in set_commands])
+            self.info("Set '{}':\n{}".format(set_name, commands_desc))
 
             _dispatch_commands(set_commands)
 
