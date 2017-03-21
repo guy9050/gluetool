@@ -123,8 +123,10 @@ class CICovscan(Module):
             self.debug('Removing the downloaded source RPM')
             os.unlink(srcrpm)
 
+        self.info('Covscan task url: {0}'.format(covscan_result.url))
+
         if covscan_result.status_failed():
-            raise CIError('Failed to get result files. Try find solution here: {0}'.format(covscan_result.url))
+            raise CIError('Failed to get result files.')
 
         covscan_result.download_artifacts()
 
@@ -167,7 +169,7 @@ class CICovscan(Module):
         enabled_targets = self.option('target_pattern')
         self.verbose('enabled targets: {}'.format(enabled_targets))
 
-        if any((re.compile(regex.strip()).match(target) for regex in enabled_targets.split(','))):
+        if enabled_targets and any((re.compile(regex.strip()).match(target) for regex in enabled_targets.split(','))):
             self.info('Running covscan for {} on {}'.format(self.brew_task.component, target))
             self.scan()
         else:
