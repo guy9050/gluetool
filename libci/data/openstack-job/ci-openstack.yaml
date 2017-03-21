@@ -51,7 +51,7 @@
             brew-build-name
             guess-beaker-distro ${guess_beaker_distro_options}
             guess-openstack-image ${guess_openstack_image_options}
-            restraint-scheduler --wow-options "${wow_options}"
+            restraint-scheduler --wow-options="${wow_options}"
             restraint-runner ${restraint_runner_options}
             notify-email --openstack-default "{ISSUER}" ${notify_email_options}
             ${pipeline_append}
