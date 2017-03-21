@@ -127,7 +127,7 @@ class RestraintScheduler(libci.Module):
         guest.execute('yum install -y --enablerepo=restraint --enablerepo=beaker-tasks distribution-distribution-install-brew-build.noarch')
         guest.execute('METHOD=install TASKS={} make -C /mnt/tests/distribution/install/brew-build/'.format(task_id))
 
-    def create_schedule(self, task, job_desc):
+    def create_schedule(self, task, job_desc, image):
         """
         Main workhorse - given the job XML, get some guests, and create pairs
         (guest, tasks) for runner to process.
@@ -142,7 +142,7 @@ class RestraintScheduler(libci.Module):
         self.info('job contains {} recipe sets, asking for guests'.format(len(recipe_sets)))
 
         # get corresponding number of guests
-        guests = self.shared('openstack_provision', len(recipe_sets), image='rhel-7.3-server-x86_64-updated')
+        guests = self.shared('openstack_provision', len(recipe_sets), image=image)
 
         assert guests is not None
         assert len(guests) == len(recipe_sets)
@@ -197,6 +197,10 @@ class RestraintScheduler(libci.Module):
         if task is None:
             raise CIError('no brew build found, did you run brew module')
 
+        image = self.shared('image')
+        if image is None:
+            raise CIError('No image provided, did you run guess-*-image module?')
+
         distro = self.shared('distro')
 
         def _command_options(name):
@@ -214,7 +218,7 @@ class RestraintScheduler(libci.Module):
         job = bs4.BeautifulSoup(wow_output.stdout, 'xml')
         self.debug('job as planned by wow:\n{}'.format(job.prettify()))
 
-        self.create_schedule(task, job)
+        self.create_schedule(task, job, image)
 
     def destroy(self, failure=None):
         pass
