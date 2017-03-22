@@ -61,9 +61,9 @@ class CovscanResult(object):
 
 class CICovscan(Module):
     """
-    CI RPMdiff module
+    CI Covscan module
 
-    This module schedules an RPMdiff run, waits until it is finished and reports
+    This module schedules a Covscan task, waits until it is finished and reports
     results in results shared function.
     """
 
