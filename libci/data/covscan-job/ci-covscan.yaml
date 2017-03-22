@@ -13,7 +13,7 @@
           description: 'Brew task ID.'
     builders:
       - shell: |
-          citool -i -o citool-debug.txt brew --id $id covscan
+          citool -i -o citool-debug.txt brew --id $id jenkins brew-build-name covscan
     publishers:
       - archive:
           artifacts: '*.txt, *.html'
