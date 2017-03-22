@@ -1,12 +1,11 @@
-#!/usr/bin/env python
+"""
+Heart of the "citool" script. Referred to by setuptools' entry point.
+"""
 
-import os
 import signal
 import sys
-import traceback
 
 import libci
-
 from libci import CIError, CIRetryError, Failure
 
 
@@ -37,6 +36,8 @@ def split_argv(argv_all, modules):
 
 
 def main():
+    # pylint: disable=too-many-branches,too-many-statements
+
     # init used vars
     ci = None
     module = None
@@ -58,6 +59,7 @@ def main():
         ci.warn('Interrupted by SIGTERM')
         return orig_sigint_handler(signum, frame)
 
+    # pylint: disable=too-many-nested-blocks,broad-except
     try:
         # initialize ci, load the module list
         ci = libci.CI()
@@ -96,7 +98,7 @@ def main():
         # actually the execution loop is retries+1
         # there is always one execution
         retries = ci.get_config('retries')
-        for i in range(retries+1):
+        for i in range(retries + 1):
             try:
                 # destroy all modules if they exist
                 # this will call their destructor, where modules should keep
@@ -133,7 +135,6 @@ def main():
         failure = Failure(module=module, exc_info=sys.exc_info())
         raise e
 
-    # pylint: disable=broad-except
     except Exception as e:
         failure = Failure(module=module, exc_info=sys.exc_info())
 
@@ -149,6 +150,3 @@ def main():
     finally:
         if ci:
             ci.destroy_modules(failure=failure)
-
-if __name__ == '__main__':
-    main()

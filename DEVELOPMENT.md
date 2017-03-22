@@ -18,14 +18,39 @@ Host gitlab
   IdentitiesOnly yes
 ```
 
-To begin digging into `citool` sources, get yourself a `virtualenv` utility, and create your development environment:
+To begin digging into `citool` sources, there are few requirements:
+
+  - `virtualenv` utility
+  - few packages: `libcurl-devel`, `rpm-python`, <libxml devel dependency for lxml>
+
 
 ```
-  mkvirtualenv -p /usr/bin/python2.7 <virtualenv-dir>
+  # create virtualenv
+  virtualenv -p /usr/bin/python2.7 <virtualenv-dir>
+  . <virtualenv-dir>/bin/activate
+
+  # update pip
+  pip install --upgrade pip
+
+  # checkout citool's repo
   git clone gitlab:<your username>/<your fork name>
   cd citool
+
+  # install citool's requirements
+  pip install -r requirements.txt
+  ./install-koji.sh
+  pip install --global-option="--with-nss" pycurl==7.43.0  # NEEDS curl devel packages
+  ln -s /usr/lib64/python2.7/site-packages/rpm $VE/lib64/python2.7/site-packages
+
+  # tell virtualenv's requests package about RH CA cert
+  echo "export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-bundle.crt" >> $VE/bin/activate
+
+  # and install citool in development mode
   python setup.py develop
 ```
+
+`citool`'s modules may require additional commands as well, e.g. tools like `tcms-results` or `restraint`. You'd have
+to install these tools as well to be able to use the corresponding modules.
 
 Now every time you activate your new virtualenv, you should be able to run `citool`:
 

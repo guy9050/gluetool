@@ -15,18 +15,6 @@ from setuptools.command.test import test as TestCommand
 
 DESCRIPTION = 'CI Tool - Continuous Integration Swiss Army Knife'
 
-INSTALL_REQUIRES = [
-    'kerberos',
-    'jenkinsapi',
-    'PyYAML',
-
-    'beautifulsoup4',  # required by wow module
-    'python-openstackclient',  # required by openstack module
-    'retrying',  # required by openstack module
-    'stomp.py',  # required by notify-bus module
-    'urlgrabber'  # required by covscan module
-]
-
 TESTS_REQUIRE = [
     'pytest-pylint',
     'pytest-flake8',
@@ -132,14 +120,17 @@ if __name__ == '__main__':
     setup(name='citool',
           # we write only the version here, release should be specified only for rpm
           version='{0}'.format(VERSION),
-          install_requires=INSTALL_REQUIRES,
           tests_require=TESTS_REQUIRE,
           cmdclass={
               'test': PyTest
           },
           packages=['libci'],
           include_package_data=True,
-          scripts=['bin/citool'],
+          entry_points={
+              'console_scripts': {
+                  'citool = libci.citool:main'
+              }
+          },
           description=DESCRIPTION,
           long_description=DESCRIPTION,
           author='Miroslav Vadkerti',
