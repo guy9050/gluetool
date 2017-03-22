@@ -1,3 +1,4 @@
+import base64
 import ConfigParser
 import json
 import os
@@ -120,7 +121,11 @@ class CIJenkins(libci.Module):
         'username': {
             'help': 'Jenkins admin username (default: None)',
         },
-
+        'no-ssl-verify': {
+            'help': 'Do not verify HTTPS certificate.',
+            'action': 'store_true',
+            'default': False
+        }
     }
     required_options = ['url']
     shared_functions = ['jenkins', 'jenkins_rest']
@@ -152,11 +157,23 @@ class CIJenkins(libci.Module):
         elif not url.startswith(self.option('url')):
             raise CIError('Cross-site Jenkins REST request')
 
-        data = urllib.urlencode({
-            'json': json.dumps(data)
-        })
+        if data:
+            data = urllib.urlencode({
+                'json': json.dumps(data)
+            })
 
-        response = urllib2.urlopen(url, data)
+        username, password = self.option('username'), self.option('password')
+
+        if username or password:
+            request = urllib2.Request(url)
+            base64string = base64.b64encode('{}:{}'.format(username, password))
+            request.add_header('Authorization', 'Basic {}'.format(base64string))
+            response = urllib2.urlopen(request, data)
+
+        else:
+            request = url
+
+        response = urllib2.urlopen(request, data)
         code, content = response.getcode(), response.read()
 
         libci.utils.log_blob(self.debug, 'response: {}'.format(code), content)
@@ -194,10 +211,11 @@ class CIJenkins(libci.Module):
         password = self.option('password')
         url = self.option('url')
         user = self.option('username')
+        ssl_verify = not self.option('no-ssl-verify')
 
         # connect to the jenkins instance
         try:
-            jenkins = Jenkins(url, username=user, password=password)
+            jenkins = Jenkins(url, username=user, password=password, ssl_verify=ssl_verify)
 
         except RequestException as e:
             self.debug('Connection error: {}'.format(e))
