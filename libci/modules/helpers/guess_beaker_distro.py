@@ -148,8 +148,8 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
         compiled_map = []
 
         for pattern_dict in pattern_map:
-            if pattern_dict is None:
-                raise CIError('No target pattern specified')
+            if not isinstance(pattern_dict, dict):
+                raise CIError("Invalid format: '- <pattern>: <transform>' expected, '{}' found".format(pattern_dict))
 
             pattern = pattern_dict.keys()[0]
             transform = [s.strip() for s in pattern_dict[pattern].split(',')]
