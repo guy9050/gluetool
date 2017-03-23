@@ -126,7 +126,10 @@ class CICovscan(Module):
         self.info('Covscan task url: {0}'.format(covscan_result.url))
 
         if covscan_result.status_failed():
-            raise CIError('Failed to get result files.')
+            msg = 'Failed to get result files. '\
+                  'Probably because of covscan task failed. '\
+                  'Try find solution here {}'.format(covscan_result.url)
+            raise CIError(msg, soft=True)
 
         covscan_result.download_artifacts()
 
@@ -141,8 +144,11 @@ class CICovscan(Module):
         result = {
             'type': 'covscan',
             'result': overall_result,
+            'fixed': len(covscan_result.fixed),
+            'added': len(covscan_result.added),
             'urls': {
-                'covscan_url': covscan_result.url
+                'covscan_url': covscan_result.url,
+                'brew_url': self.brew_task.url
             }
         }
 

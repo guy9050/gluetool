@@ -22,6 +22,9 @@ class CICovscanJob(Module):
     options = {
         'id': {
             'help': 'Brew task id',
+        },
+        'notify-email-options': {
+            'help': 'Additional options for notify-email module'
         }
     }
 
@@ -62,5 +65,10 @@ class CICovscanJob(Module):
         except UnknownJob:
             self.update_job()
 
-        self.jenkins[self.job_name].invoke(build_params={'id': self.brew_id})
+        build_params = {
+            'id': self.brew_id,
+            'notify_email_options': self.option('notify-email-options')
+        }
+
+        self.jenkins[self.job_name].invoke(build_params=build_params)
         self.info("invoked job '{}' with build params id='{}'".format(self.job_name, self.brew_id))

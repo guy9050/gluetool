@@ -60,6 +60,18 @@ RESTRAINT_BODY = """
 Result:         {result[result]}
 """
 
+COVSCAN_BODY = """
+Tested build:  {brew_url}
+
+Fixed defects:  {result[fixed]}
+Added defects:  {result[added]}
+
+Final result:   {result[result]}
+
+Covscan url:    {covscan_url}
+What covscan is: https://engineering.redhat.com/trac/CoverityScan/wiki/covscan
+"""
+
 
 class Message(object):
     # pylint: disable=too-few-public-methods
@@ -190,6 +202,18 @@ class Notify(Module):
         'wow-add-notify': {
             'help': 'Extends default list of recipients.',
             'metavar': 'EMAILS'
+        },
+        'covscan-notify': {
+            'help': 'Notify only the listed recipients.',
+            'metavar': 'EMAILS'
+        },
+        'covscan-default-notify': {
+            'help': 'Default list of recipients. Default: ""',
+            'metavar': 'EMAILS'
+        },
+        'covscan-add-notify': {
+            'help': 'Extends default list of recipients.',
+            'metavar': 'EMAILS'
         }
     }
 
@@ -311,6 +335,13 @@ class Notify(Module):
     def format_result_restraint(self, result, msg):
         # pylint: disable=no-self-use
         msg.body = RESTRAINT_BODY.format(result=result)
+
+    def format_result_covscan(self, result, msg):
+        # pylint: disable=no-self-use
+        covscan_url = result['urls'].get('covscan_url', '<Covscan URL not available>')
+        brew_url = result['urls'].get('brew_url', '<Covscan URL not available>')
+
+        msg.body = COVSCAN_BODY.format(result=result, covscan_url=covscan_url, brew_url=brew_url)
 
     def execute(self):
         task = self.shared('brew_task')
