@@ -60,6 +60,12 @@ class CovscanResult(object):
 
 
 class CICovscan(Module):
+    """
+    CI Covscan module
+
+    This module schedules a Covscan task, waits until it is finished and reports
+    results in results shared function.
+    """
 
     name = 'covscan'
     description = 'Run covscan'
@@ -79,6 +85,7 @@ class CICovscan(Module):
     _results = []
 
     def results(self):
+        """Returns results of Covscan task"""
         return self._results
 
     def sanity(self):
