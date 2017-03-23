@@ -7,7 +7,7 @@ import gzip
 from urllib2 import urlopen
 from urlgrabber.grabber import urlgrab
 from libci import Module, CIError
-from libci.utils import cached_property, log_blob, run_command, check_for_commands, format_dict
+from libci.utils import cached_property, log_blob, run_command, check_for_commands, format_dict, CICommandError
 
 REQUIRED_CMDS = ['covscan']
 
@@ -92,7 +92,10 @@ class CICovscan(Module):
             command = ['covscan', 'version-diff-build', '--config', config, '--base-config', baseconfig,
                        '--base-brew-build', baseline, '--srpm', srpm, '--task-id-file', task_id_filename]
 
-            run_command(command)
+            try:
+                run_command(command)
+            except CICommandError as exc:
+                raise CIError("Failure during 'covscan' execution: {}".format(exc.output.stderr))
 
             with open(task_id_filename, 'r') as task_id_file:
                 covscan_task_id = int(task_id_file.readline())

@@ -61,15 +61,16 @@ Result:         {result[result]}
 """
 
 COVSCAN_BODY = """
-Tested build:  {brew_url}
+Tested build:   {brew_url}
 
 Fixed defects:  {result[fixed]}
 Added defects:  {result[added]}
 
 Final result:   {result[result]}
 
-Covscan url:    {covscan_url}
-What covscan is: https://engineering.redhat.com/trac/CoverityScan/wiki/covscan
+Covscan url:          {covscan_url}
+Covscan wiki:         https://engineering.redhat.com/trac/CoverityScan/wiki/covscan
+Covscan CI Test Plan: https://url.corp.redhat.com/covscan-in-ci
 """
 
 
