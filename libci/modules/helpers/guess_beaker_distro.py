@@ -164,7 +164,13 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
 
                 replace = spice(replace)
 
-            compiled_map.append((re.compile(pattern), replace))
+            try:
+                pattern = re.compile(pattern)
+
+            except re.error as e:
+                raise CIError("Pattern '{}' is not valid: {}".format(pattern, str(e)))
+
+            compiled_map.append((pattern, replace))
 
         return compiled_map
 
