@@ -17,7 +17,7 @@ class CIGuessBeakerDistro(Module):
       - 'target-autodetection': module will transform target of brew task to a distro:
         - for z-candidate targets ('rhel-7.3-candidate') will try to find corresponding
         batch update compose ('RHEL-7.3-updates-20170222.0');
-        - for non-z-candidate targets ('rhel-7.3-candidate') will transfor taget into
+        - for non-z-candidate targets ('rhel-7.3-candidate') will transform target into
         a distro ('rhel-7.3')
 
       - 'force': use specified distro no matter what. Use --distro option to set *what*
@@ -83,8 +83,12 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
         if not os.path.exists(path):
             raise CIError("pattern map '{}' does not exist".format(path))
 
-        with open(path, 'r') as f:
-            pattern_map = yaml.load(f)
+        try:
+            with open(path, 'r') as f:
+                pattern_map = yaml.load(f)
+
+        except yaml.YAMLError as e:
+            raise CIError('Unable to load configuration: {}'.format(str(e)))
 
         if pattern_map is None:
             raise CIError("pattern map '{}' does not contain any patterns".format(path))
@@ -172,7 +176,7 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
 
         :param str base_url: URL of the index page. It should be a directory listing,
           with links leading to relevant composes.
-        :param str hint: what composs should be examined - it the name of compose
+        :param str hint: what composes should be examined - it the name of compose
           starts with `hint`, it's one of ours.
         :returns: name of the compose, or `None`.
         """
