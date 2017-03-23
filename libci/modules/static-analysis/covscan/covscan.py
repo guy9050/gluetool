@@ -7,7 +7,7 @@ import gzip
 from urllib2 import urlopen
 from urlgrabber.grabber import urlgrab
 from libci import Module, CIError
-from libci.utils import cached_property, log_blob, run_command, check_for_commands, format_dict
+from libci.utils import cached_property, log_blob, run_command, check_for_commands, format_dict, CICommandError
 
 REQUIRED_CMDS = ['covscan']
 
@@ -99,7 +99,10 @@ class CICovscan(Module):
             command = ['covscan', 'version-diff-build', '--config', config, '--base-config', baseconfig,
                        '--base-brew-build', baseline, '--srpm', srpm, '--task-id-file', task_id_filename]
 
-            run_command(command)
+            try:
+                run_command(command)
+            except CICommandError as exc:
+                raise CIError("Failure during 'covscan' execution: {}".format(exc.output.stderr))
 
             with open(task_id_filename, 'r') as task_id_file:
                 covscan_task_id = int(task_id_file.readline())
@@ -133,7 +136,10 @@ class CICovscan(Module):
         self.info('Covscan task url: {0}'.format(covscan_result.url))
 
         if covscan_result.status_failed():
-            raise CIError('Failed to get result files.')
+            msg = 'Failed to get result files. '\
+                  'Probably because of covscan task failed. '\
+                  'Try find solution here {}'.format(covscan_result.url)
+            raise CIError(msg, soft=True)
 
         covscan_result.download_artifacts()
 
@@ -148,8 +154,11 @@ class CICovscan(Module):
         result = {
             'type': 'covscan',
             'result': overall_result,
+            'fixed': len(covscan_result.fixed),
+            'added': len(covscan_result.added),
             'urls': {
-                'covscan_url': covscan_result.url
+                'covscan_url': covscan_result.url,
+                'brew_url': self.brew_task.url
             }
         }
 
