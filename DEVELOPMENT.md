@@ -21,7 +21,7 @@ Host gitlab
 To begin digging into `citool` sources, there are few requirements:
 
   - `virtualenv` utility
-  - few packages: `libcurl-devel`, `rpm-python`, `krb5-devel`, <libxml devel dependency for lxml>
+  - few packages: `libcurl-devel`, `rpm-python`, `krb5-devel`, <libxml devel dependency for lxml>, `yum`
   - you'll need RH CA certificates, some pieces of our infrastructure work on HTTPS. If you don't have the certs
     installed already (check your `/etc/ssl`), fetch them (`root` required):
 
@@ -56,6 +56,12 @@ To begin digging into `citool` sources, there are few requirements:
   # rpm package is required by koji, and it seems reasonable to us the one provided by
   # system rpm. virtualenv is isolated from system libraries, therefore this symlink
   ln -s /usr/lib64/python2.7/site-packages/rpm $VIRTUAL_ENV/lib64/python2.7/site-packages
+
+  # the same applies to yum (rpmUtils) as well
+  ln -s /usr/lib/python2.7/site-packages/rpmUtils $VIRTUAL_ENV/lib64/python2.7/site-packages
+
+  # we need qe.py as well, for tcms & wow to work correctly
+  ln -s /usr/share/qa-tools/python-modules/qe.py $VIRTUAL_ENV/lib64/python2.7/site-packages
 
   # tell virtualenv's requests package about RH CA cert
   echo "export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-bundle.crt" >> $VIRTUAL_ENV/bin/activate
