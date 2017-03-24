@@ -18,14 +18,54 @@ Host gitlab
   IdentitiesOnly yes
 ```
 
-To begin digging into `citool` sources, get yourself a `virtualenv` utility, and create your development environment:
+To begin digging into `citool` sources, there are few requirements:
+
+  - `virtualenv` utility
+  - few packages: `libcurl-devel`, `rpm-python`, `krb5-devel`, <libxml devel dependency for lxml>
+  - you'll need RH CA certificates, some pieces of our infrastructure work on HTTPS. If you don't have the certs
+    installed already (check your `/etc/ssl`), fetch them (`root` required):
+
+    ```
+      curl -o /etc/pki/ca-trust/source/anchors/RH-IT-Root-CA.crt https://password.corp.redhat.com/RH-IT-Root-CA.crt
+      curl -o /etc/pki/ca-trust/source/anchors/Eng-CA.crt https://engineering.redhat.com/Eng-CA.crt
+      update-ca-trust
+    ```
+
 
 ```
-  mkvirtualenv -p /usr/bin/python2.7 <virtualenv-dir>
+  # create virtualenv
+  virtualenv -p /usr/bin/python2.7 <virtualenv-dir>
+  . <virtualenv-dir>/bin/activate
+
+  # update pip
+  pip install --upgrade pip
+
+  # checkout citool's repo
   git clone gitlab:<your username>/<your fork name>
   cd citool
+
+  # install citool's requirements
+  pip install -r requirements.txt
+
+  # install koji - it needs to be downloaded and built
+  ./install-koji.sh
+
+  # pycurl's backend must match system's library
+  pip install --global-option="--with-nss" pycurl==7.43.0
+
+  # rpm package is required by koji, and it seems reasonable to us the one provided by
+  # system rpm. virtualenv is isolated from system libraries, therefore this symlink
+  ln -s /usr/lib64/python2.7/site-packages/rpm $VIRTUAL_ENV/lib64/python2.7/site-packages
+
+  # tell virtualenv's requests package about RH CA cert
+  echo "export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-bundle.crt" >> $VIRTUAL_ENV/bin/activate
+
+  # and install citool in development mode
   python setup.py develop
 ```
+
+`citool`'s modules may require additional commands as well, e.g. tools like `tcms-results` or `restraint`. You'd have
+to install these tools as well to be able to use the corresponding modules.
 
 Now every time you activate your new virtualenv, you should be able to run `citool`:
 
@@ -63,6 +103,12 @@ Tox also accepts additional options which are then passed to `py.test`:
 
 ```
   tox -e py27 -- --cov=libci --cov-report=html:coverage-report
+```
+
+To use Tox, you have to install it:
+
+```
+  pip install tox virtualenv
 ```
 
 While `setup.py` uses the current Python interpreter it founds in your `$PATH`, Tox creates (and caches) virtualenv
