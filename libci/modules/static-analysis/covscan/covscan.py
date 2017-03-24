@@ -151,6 +151,9 @@ class CICovscan(Module):
             self.info('PASS: No new defects in package.')
             overall_result = 'PASS'
 
+        # Log in format expected by postbuild scripting
+        self.info('Result of testing: {}'.format(overall_result))
+
         result = {
             'type': 'covscan',
             'result': overall_result,

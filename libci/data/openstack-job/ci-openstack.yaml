@@ -61,3 +61,46 @@
       - archive:
           artifacts: '**/**'
           allow-empty: 'true'
+      - groovy-postbuild:
+          on-failure: "failed"
+          script: |
+              if (manager.getResult() == "SUCCESS") {
+                  manager.listener.logger.println("[groovy-postbuild]: Success - cheching result of testing process");
+                  manager.addBadge("success.gif", "CI pipeline finished successfully");
+                  manager.createSummary("green.gif").appendText("<h1>CI pipeline finished successfully</h1>",
+                                                                false, false, false, "green");
+
+                  if (manager.logContains(".* Result of testing: FAIL.*")) {
+                      manager.listener.logger.println("[groovy-postbuild]: Tests failed");
+                      manager.addBadge("delete.gif", "Tests FAILED");
+                      manager.createSummary("red.gif").appendText("<h1>Tests failed</h1>",
+                                                                  false, false, false, "red");
+
+                  } else if (manager.logContains(".* Result of testing: ERROR.*")) {
+                      manager.listener.logger.println("[groovy-postbuild]: Tests failed because of errors");
+                      manager.addBadge("delete.gif", "Tests FAILED");
+                      manager.createSummary("red.gif").appendText("<h1>Tests failed because of errors</h1>",
+                                                                  false, false, false, "red");
+
+                  } else if (manager.logContains(".* Result of testing: PASS.*")) {
+                      manager.listener.logger.println("[groovy-postbuild]: Tests passed");
+                      manager.addBadge("success.gif", "Tests PASSED");
+                      manager.createSummary("green.gif").appendText("<h1>Tests passed</h1>",
+                                                                    false, false, false, "green");
+
+                  } else {
+                      manager.listener.logger.println("[groovy-postbuild]: Cannot find result of the testing process");
+                      manager.addBadge("warning.gif", "Tests result unknown");
+                      manager.addShortText("UNKNOWN");
+                      manager.createSummary("red.gif").appendText("<h1>Tests results are unknown</h1>",
+                                                                  false, false, false, "red");
+                  }
+              } else {
+                  manager.listener.logger.println("[groovy-postbuild]: Failure - giving up on result search");
+                  manager.addBadge("error.gif", "CI pipeline crashed");
+                  manager.addBadge("error.gif", "Tests did not run correctly");
+                  manager.createSummary("red.gif").appendText("<h1>CI pipeline failed to finish</h1>",
+                                                              false, false, false, "red");
+                  manager.createSummary("red.gif").appendText("<h1>Tests did not run correctly</h1>",
+                                                              false, false, false, "red");
+              }
