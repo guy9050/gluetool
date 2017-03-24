@@ -309,11 +309,17 @@ class Module(object):
                     # if no option specified, skip it
                     if value is None and opt in self._config:
                         continue
-                    # make sure we do not replace existing configuration value
-                    # with add_argument default
-                    if opt in self._config and self._config[opt] is not None and \
-                            'default' in self.options[opt] and value == self.options[opt]['default']:
-                        continue
+                    # do not replace config options with default command line values
+                    if opt in self._config and self._config[opt] is not None:
+                        # if default parameter used
+                        if 'default' in self.options[opt] and value == self.options[opt]['default']:
+                            continue
+                        # with action store_true, the default is False
+                        if 'store_true' in self.options[opt]['action'] and value is False:
+                            continue
+                        # with action store_false, the default is True
+                        if 'store_false' in self.options[opt]['action'] and value is True:
+                            continue
                     self._config[opt] = value
                     self.debug("Added option '{}' value '{}' from commandline".format(opt, value))
                 except AttributeError:
