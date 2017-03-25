@@ -33,6 +33,9 @@ def log_blob(logger, intro, blob):
 class ThreadAdapter(ContextAdapter):
     """
     Custom logger adapter, adding thread name as a context.
+
+    :param libci.log.ContextAdapter logger: parent logger whose methods will be used for logging.
+    :param threading.Thread thread: thread whose name will be added.
     """
 
     def __init__(self, logger, thread):
@@ -41,12 +44,12 @@ class ThreadAdapter(ContextAdapter):
 
 class WorkerThread(threading.Thread):
     """
-    Worker threads gets a job to do, and returns a result. It gets a callable, `fn`,
-    which will be called in thread's `run()` method, and thread's `result` property
-    will be the result - value returned by `fn`, or exception raised during the
-    runtime of `fn`.
+    Worker threads gets a job to do, and returns a result. It gets a callable, ``fn``,
+    which will be called in thread's ``run()`` method, and thread's ``result`` property
+    will be the result - value returned by ``fn``, or exception raised during the
+    runtime of ``fn``.
 
-    :param logger: logger to use for logging.
+    :param libci.log.ContextAdapter logger: logger to use for logging.
     :param fn: thread will start `fn` to do the job.
     :param fn_args: arguments for `fn`
     :param fn_kwargs: keyword arguments for `fn`
@@ -110,20 +113,20 @@ def run_command(cmd, logger=None, **kwargs):
     """
     Run external command, and return it's exit code and output.
 
-    This is a very thin and simple wrapper above `subprocess.Popen`, and its
-    main purpose is to log everything that happens before and after execution.
-    All additional arguments are passed directly to `Popen` constructor.
+    This is a very thin and simple wrapper above :py:class:`subprocess.Popen`,
+    and its main purpose is to log everything that happens before and after
+    execution. All additional arguments are passed directly to `Popen` constructor.
 
-    If `stdout` or `stderr` keyword arguments are not specified, function
-    will set them to `subprocess.PIPE`, to capture both output streams in
-    separate strings.
+    If ``stdout`` or ``stderr`` keyword arguments are not specified, function
+    will set them to :py:const:`subprocess.PIPE`, to capture both output streams
+    in separate strings.
 
     :param list cmd: command to execute.
-    :rtype: ProcessOutput instance
-    :returns: `ProcessOutput` instance whose attributes contain data returned
-      by the process.
-    :raises CIError: when command was not found.
-    :raises CICommandError: when command exited with non-zero exit code.
+    :rtype: libci.utils.ProcessOutput instance
+    :returns: :py:class:`libci.utils.ProcessOutput` instance whose attributes contain
+      data returned by the process.
+    :raises libci.ci.CIError: when command was not found.
+    :raises libci.ci.CICommandError: when command exited with non-zero exit code.
     :raises Exception: when anything else breaks.
     """
 
@@ -206,7 +209,7 @@ def check_for_commands(cmds):
 class cached_property(object):
     # pylint: disable=invalid-name,too-few-public-methods
     """
-    `property`-like decorator - at first access, it calls decorated
+    ``property``-like decorator - at first access, it calls decorated
     method to acquire the real value, and then replaces itself with
     this value, making it effectively "cached". Useful for properties
     whose value does not change over time, and where getting the real
@@ -243,7 +246,7 @@ def format_command_line(cmdline):
 
     All but the first line are indented by 4 spaces.
 
-    :param cmdline: list of iterables, representing command-line split to multiple lines.
+    :param list cmdline: list of iterables, representing command-line split to multiple lines.
     """
 
     def _format_options(options):
@@ -271,13 +274,13 @@ def fetch_url(url, logger=None, success_codes=(200,)):
     "Get me content of this URL" helper.
 
     Very thin wrapper around urllib. Added value is logging, and converting
-    possible errors to CIError exception.
+    possible errors to :py:class:`libci.ci.CIError` exception.
 
     :param str url: URL to get.
-    :param logger: Logger used for logging. `ContextAdapter` instance, for example.
+    :param libci.log.ContextLogger logger: Logger used for logging.
     :param tuple success_codes: tuple of HTTP response codes representing successfull request.
-    :returns: tuple of (response, content), where `response` is what `urllib2.urlopen()` returns,
-      and `content` is the payload of the response.
+    :returns: tuple ``(response, content)`` where ``response`` is what :py:func:`urllib2.urlopen`
+      returns, and ``content`` is the payload of the response.
     """
 
     logger = logger or Logging.get_logger()

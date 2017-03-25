@@ -14,3 +14,6 @@ libatt.egg-info
 
 # coverage data files
 **/.coverage*
+
+# auto-generated *.rst docs
+docs/source/libci.*

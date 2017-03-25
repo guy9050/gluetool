@@ -17,14 +17,19 @@ DATA_PATH = os.path.dirname(os.path.abspath(__file__)) + '/data'
 
 
 class CIError(Exception):
-    """ General libci exception """
-    def __init__(self, *args, **kwargs):
-        soft = False
-        if 'soft' in kwargs:
-            soft = kwargs['soft']
-            del kwargs['soft']
+    """
+    General ``libci`` exception.
 
-        super(CIError, self).__init__(*args, **kwargs)
+    :param bool soft: **Soft** errors are errors CI Ops and/or developers shouldn't be bothered with, things that
+      are up to the user to fix, e.g. empty set of tests. **Hard** errors are supposed to warn Ops/Devel teams
+      about important infrastructure issues, code deficiencies, bugs and other issues that are fixable only by
+      their actions.
+
+    :ivar bool soft: If ``True``, the exception is a soft error.
+    """
+
+    def __init__(self, message, soft=False, **kwargs):
+        super(CIError, self).__init__(message, **kwargs)
 
         self.soft = soft
 
@@ -37,6 +42,12 @@ class CIRetryError(CIError):
 class CICommandError(CIError):
     """
     Exception raised when external command failes.
+
+    :param list cmd: Command as passed to libci.utils.run_command helper.
+    :param libci.utils.ProcessOutput output: Process output data.
+
+    :ivar list cmd: Command as passed to libci.utils.run_command helper.
+    :ivar libci.utils.ProcessOutput output: Process output data.
     """
 
     def __init__(self, cmd, output):
@@ -50,8 +61,14 @@ class Failure(object):
     # pylint: disable=too-few-public-methods
 
     """
-    Bundles exception related info. Used to inform modules in their destroy() phase
-    that citool session was killed because of exception raised by one of modules.
+    Bundles exception related info. Used to inform modules in their ``destroy()`` phase
+    that ``citool`` session was killed because of exception raised by one of modules.
+
+    :param libci.ci.Module module: module in which the error happened, or ``None``.
+    :param tuple exc_info: Exception information as returned by :py:func:`sys.exc_info`.
+
+    :ivar libci.ci.Module module: module in which the error happened, or ``None``.
+    :ivar tuple exc_info: Exception information as returned by :py:func:`sys.exc_info`.
     """
 
     def __init__(self, module, exc_info):
@@ -80,29 +97,49 @@ def retry(*args):
 
 
 class Module(object):
+    """
+    Base class of all ``citool`` modules.
+
+    :param libci.ci.CI ci: CI instance owning the module.
+
+    :ivar libci.ci.CI ci: CI instance owning the module.
+    """
+
     #
     # static variables, same in all instances
     #
-    name = None         # default: group-module_name (without .py suffix)
-    description = None  # short description, displayed in module list
 
-    # The options variable defines additional module options
-    # the required_options defines a list of required module options
-    #
-    # 'option_name' defines the long option name (i.e. --option_name')
-    # {
-    #    'option_name' : {
-    #        'action' : 'store',        # The default action is 'store'
-    #        'default' : default_value, # The default value for the option
-    #        'help' : 'Option help',    # Option help
-    #         ... any other argparse args
-    #    },
-    # }
+    name = None
+    """Module name. Usually matches the name of the source file, no suffix."""
+
+    description = None
+    """Short module description, displayed in ``citool``'s module listing."""
+
     options = {}
+    """
+    The ``options`` variable defines additional module options and their properties::
+
+        options = {
+            <option name>: {
+                <option properties>
+            },
+        }
+
+    where
+
+    * ``option name`` is used to name the option in the parser, and ``--<option name>`` is then accepted
+      option of the module
+    * ``option properties`` are passed to :py:meth:`argparse.ArgumentParser.add_argument` as keyword arguments
+      when the option is being added to the parser, therefore any arguments recognized by :py:mod:`argparse`
+      can be used
+    """
+
     required_options = None
+    """List of names of required options, or ``None``."""
 
     #: A list of names of module's shared functions
     shared_functions = []
+    """A list of names of shared functions exported by the module."""
 
     def __init__(self, ci):
         #
@@ -136,9 +173,9 @@ class Module(object):
         """
         Here should go any code that needs to be run on exit, like job cleanup etc.
 
-        :param Failure failure: if set, carries information about failure that made
-          citool to destroy the whole session. Modules might want to take actions
-          based on this, e.g. send different notifications.
+        :param libci.ci.Failure failure: if set, carries information about failure that made
+          ``citool`` to destroy the whole session. Modules might want to take actions based
+          on provided information, e.g. send different notifications.
         """
 
         return None
@@ -170,8 +207,9 @@ class Module(object):
         In this method, modules can define additional checks before execution.
 
         Some examples:
-        - Advanced checks on passed options
-        - Check for additional requirements (tools, data, etc.)
+
+        * Advanced checks on passed options
+        * Check for additional requirements (tools, data, etc.)
         """
 
         return None
@@ -348,7 +386,7 @@ class CI(object):
         with the same name, if there was any such.
 
         :param str funcname: Name of the shared function.
-        :param libci.Module module: Module instance providing the shared function.
+        :param libci.ci.Module module: Module instance providing the shared function.
         """
 
         if not hasattr(module, funcname):
@@ -389,14 +427,15 @@ class CI(object):
     #
     def _check_module_file(self, mfile):
         """
-        Make sure the file looks like a `citool` module:
-          - can be processed by Python parser,
-          - imports `libci.CI` and `libci.Module`,
-          - contains child class of `libci.Module`.
+        Make sure the file looks like a ``citool`` module:
+
+        - can be processed by Python parser,
+        - imports :py:class:`libci.ci.CI` and :py:class:`libci.ci.Module`,
+        - contains child class of :py:class:`libci.ci.Module`.
 
         :param str mfile: path to a file.
-        :returns: `True` if file contains `citool` module, `False` otherwise.
-        :raises libci.CIError: when it's not possible to finish the check.
+        :returns: ``True`` if file contains ``citool`` module, ``False`` otherwise.
+        :raises libci.ci.CIError: when it's not possible to finish the check.
         """
 
         self.debug("check possible module file '{}'".format(mfile))
@@ -408,7 +447,7 @@ class CI(object):
             # check for libci import
             def imports_libci(item):
                 """
-                Return `True` if item is an `import` statement, and imports `libci`.
+                Return ``True`` if item is an ``import`` statement, and imports ``libci``.
                 """
 
                 return (item.__class__.__name__ == 'Import' and item.names[0].name == 'libci') \
@@ -421,8 +460,8 @@ class CI(object):
             # check for libci.Module class definition
             def has_module_class(item):
                 """
-                Return `True` if item is a class definition, and any of the base classes
-                is `libci.Module`.
+                Return ``True`` if item is a class definition, and any of the base classes
+                is libci.ci.Module.
                 """
 
                 if item.__class__.__name__ != 'ClassDef':
@@ -452,7 +491,7 @@ class CI(object):
         :param str import_name: name assigned to the imported module.
         :param str filepath: path to a file.
         :returns: imported Python module.
-        :raises libci.CIError: when import failed.
+        :raises libci.ci.CIError: when import failed.
         """
 
         self.debug("try to import module '{}' from file '{}'".format(import_name, filename))
@@ -466,15 +505,15 @@ class CI(object):
 
     def _load_python_module(self, group, module_name, filepath):
         """
-        Load Python module from a file, if it contains `citool` modules. If the
-        file does not look like it contains `citool` modules, or when it's not
+        Load Python module from a file, if it contains ``citool`` modules. If the
+        file does not look like it contains ``citool`` modules, or when it's not
         possible to import the Python module successfully, method simply warns
         user and ignores the file.
 
         :param str import_name: name assigned to the imported module.
         :param str filepath: path to a file.
         :returns: loaded Python module.
-        :raises libci.CIError: when import failed.
+        :raises libci.ci.CIError: when import failed.
         """
 
         # Check content of the file, look for CI and Module stuff
@@ -500,7 +539,7 @@ class CI(object):
 
     def _load_citool_modules(self, group, module_name, filepath):
         """
-        Load `citool` modules from a file. Method attempts to import the file
+        Load ``citool`` modules from a file. Method attempts to import the file
         as a Python module, and then checks its content and adds all `citool`
         modules to internal module registry.
 
@@ -508,7 +547,7 @@ class CI(object):
         :param str module_name: name assigned to the imported Python module.
         :param str filepath: path to a file.
         :rtype: [(module_group, module_class), ...]
-        :returns: list of loaded `citool` modules
+        :returns: list of loaded ``citool`` modules
         """
 
         module = self._load_python_module(group, module_name, filepath)
@@ -545,10 +584,10 @@ class CI(object):
 
     def _load_module_path(self, ppath):
         """
-        Search and load `citool` modules from a directory.
+        Search and load ``citool`` modules from a directory.
 
-        In essence, it scans every file with '.py' suffix, and searches for
-        classes derived from `libci.Module`.
+        In essence, it scans every file with ``.py`` suffix, and searches for
+        classes derived from :py:class:`libci.ci.Module`.
 
         :param str ppath: directory to search for `citool` modules.
         """

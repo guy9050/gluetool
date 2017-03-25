@@ -88,58 +88,58 @@ class RestraintRunner(libci.Module):
         # pylint: disable=no-self-use
 
         """
-        `task_results` is quite common structure - `list` of dictionaries, with `task` name being
-        the key, with `task runs` - list of disctionaries, one for each task run - as values. We
-        need to merge all task runs for a single task into a single list.
+        ``task_results`` is quite common structure - ``list`` of dictionaries, with ``task`` name
+        being the key, with ``task runs`` - list of dictionaries, one for each task run - as values.
+        We need to merge all task runs for a single task into a single list.
 
-        ```
-        [
-          {
-            'foo task': [
-              {
-                'result': 'PASS'
-              },
-              {
-                'result': 'PASS'
-              }
-            ],
-            'bar task': [
-              {
-                'result': 'FAIL'
-              }
-            ]
-          },
-          {
-            'bar task': [
-              {
-                'result': 'PASS'
-              }
-            ]
-        ]
-        ```
+        .. code-block:: python
+
+           [
+             {
+               'foo task': [
+                 {
+                   'result': 'PASS'
+                 },
+                 {
+                   'result': 'PASS'
+                 }
+               ],
+               'bar task': [
+                 {
+                   'result': 'FAIL'
+                 }
+               ]
+             },
+             {
+               'bar task': [
+                 {
+                   'result': 'PASS'
+                 }
+               ]
+           ]
 
         becomes
 
-        ```
-        {
-          'foo task': [
+        .. code-block:: python
+
             {
-              'result': 'PASS'
-            },
-            {
-              'result': 'PASS'
-            }
-          ],
-          'bar task': [
-            {
-              'result': 'FAIL'
-            },
-            {
-              'result': 'PASS'
-            }
-          ]
-        }
-        ```
+              'foo task': [
+               {
+                 'result': 'PASS'
+               },
+               {
+                 'result': 'PASS'
+               }
+             ],
+             'bar task': [
+               {
+                 'result': 'FAIL'
+               },
+               {
+                 'result': 'PASS'
+               }
+             ]
+           }
         """
 
         merged = defaultdict(list)
