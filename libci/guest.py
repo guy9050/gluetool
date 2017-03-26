@@ -140,7 +140,33 @@ class Guest(object):
         :param int tick: check guest status every TICK seconds.
         """
 
-        raise NotImplementedError()
+        assert isinstance(tick, int) and tick > 0
+
+        if timeout is not None:
+            end_time = time.time() + timeout
+
+        def _timeout():
+            return '{} seconds'.format(int(end_time - time.time())) if timeout is not None else 'infinite'
+
+        self.debug("waiting for check '{}', {} timeout, check every {} seconds".format(check.func_name,
+                                                                                       _timeout(), tick))
+
+        while timeout is None or time.time() < end_time:
+            self.debug('{} left, sleeping for {} seconds'.format(_timeout(), tick))
+            time.sleep(tick)
+
+            try:
+                ret = check()
+                if ret:
+                    self.debug('check passed, assuming success')
+                    return ret
+
+            except libci.CICommandError:
+                pass
+
+            self.debug('check failed, assuming failure')
+
+        raise libci.CIError('Check did not manage to pass for guest')
 
     def create_file(self, dst, content):
         """
@@ -227,33 +253,6 @@ class NetworkedGuest(Guest):
 
     def execute(self, cmd, **kwargs):
         return self._execute(self._ssh + [self.hostname] + [cmd], **kwargs)
-
-    def wait(self, check, timeout=None, tick=30):
-        assert isinstance(tick, int) and tick > 0
-
-        if timeout is not None:
-            end_time = time.time() + timeout
-
-        def _timeout():
-            return '{} seconds'.format(int(end_time - time.time())) if timeout is not None else 'infinite'
-
-        self.debug("waiting for check '{}', {} timeout, check every {} seconds".format(check, _timeout(), tick))
-        while timeout is None or time.time() < end_time:
-            self.debug('{} left, sleeping for {} seconds'.format(_timeout(), tick))
-            time.sleep(tick)
-
-            try:
-                ret = check()
-                if ret:
-                    self.debug('check passed, assuming success')
-                    return ret
-
-            except libci.CICommandError:
-                pass
-
-            self.debug('check failed, assuming failure')
-
-        raise libci.CIError('Check did not manage to pass for guest')
 
     def wait_alive(self, **kwargs):
         self.debug('waiting for guest to become alive')
