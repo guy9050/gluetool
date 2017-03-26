@@ -211,7 +211,7 @@ class CIOpenstack(Module):
         }
     }
     required_options = ['auth-url', 'password', 'project-name', 'username', 'ssh-key', 'ip-pool-name']
-    shared_functions = ['openstack_provision']
+    shared_functions = ['provision']
 
     # connection handler
     nova = None
@@ -237,7 +237,7 @@ class CIOpenstack(Module):
 
         raise CIError("Multiple images found for '{}', and none of them is active".format(name))
 
-    def openstack_provision(self, count=1, name=DEFAULT_NAME, image=None, flavor=None):
+    def provision(self, count=1, name=DEFAULT_NAME, image=None, flavor=None):
         """
         Provision multiple openstack instances from the given image name. The flavor is by
         default {}. The name of the instances is created from the name parameter plus the floating

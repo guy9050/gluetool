@@ -142,7 +142,7 @@ class RestraintScheduler(libci.Module):
         self.info('job contains {} recipe sets, asking for guests'.format(len(recipe_sets)))
 
         # get corresponding number of guests
-        guests = self.shared('openstack_provision', len(recipe_sets), image=image)
+        guests = self.shared('provision', count=len(recipe_sets), image=image)
 
         assert guests is not None
         assert len(guests) == len(recipe_sets)
