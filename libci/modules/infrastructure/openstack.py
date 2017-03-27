@@ -20,10 +20,10 @@ class OpenstackGuest(NetworkedGuest):
     """
     Implements Openstack Network Guest with snapshots support.
     """
-    @retry(stop_max_attempt_number=3, wait_fixed=1000)
+    @retry(stop_max_attempt_number=10, wait_fixed=1000)
     def _assign_ip(self):
         """
-        The assignment of IP can fail if done too early. So retry it 3 times
+        The assignment of IP can fail if done too early. So retry it 10 times
         to be sure that there is some other issue.
         """
         self._instance.add_floating_ip(self._ip)
