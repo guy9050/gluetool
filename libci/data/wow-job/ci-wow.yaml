@@ -50,6 +50,8 @@
             ${pipeline_append}
       - inject:
           properties-file: envinject-citool.props
+    wrappers:
+      - workspace-cleanup
     publishers:
       - archive:
           artifacts: '**/**'
