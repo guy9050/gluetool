@@ -387,11 +387,12 @@ class CIBrewDispatcher(Module):
 
         Returns a dictionary, where keys are set names and values are list of commands.
 
-            {
-                'default': [cmd1, cmd2],
-                'foo': [cmd3, cmd4],
-                ...
-            }
+        .. code-block:: python
+
+           {
+               'default': [cmd1, cmd2],
+               'foo': [cmd3, cmd4]
+           }
 
         Commands listed in 'default' section of the config file - the top-level one,
         not the component-specific! - are added to every command set. This means that

@@ -7,11 +7,17 @@ class CIGuessOpenstackImage(Module):
     """
     "Guess" openstack image. User can choose from different possible methods of "guessing":
 
-      - 'target-autodetection': module will transform build target of brew task to an image name,
-      e.g. 'rhel-7.3-candidate' => 'rhel-7.3-server-x86_64-released'. This is the default method.
-      The z-stream/eus/aus build targets are translated to *-updated images.
+    * ``target-autodetection``: module will transform build target of brew task to an image name:
 
-      - 'force': use specified image no matter what. Use --image option to set *what*
+        * for z-candidate targets (``rhel-7.3-candidate``) will try to find corresponding
+          updated image (``rhel-7.3-server-x86_64-updated``)
+
+        * for non-z-candidate targets (``rhel-7.3-candidate``) will transform target into
+          a released image (``rhel-7.3-server-x86_64-released``)
+
+        * the z-stream/eus/aus build targets are translated to updated images.
+
+    * ``force``: use specified image no matter what. Use ``--image`` option to set *what*
       image you wish to use
     """
 

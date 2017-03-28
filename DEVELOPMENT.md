@@ -120,3 +120,21 @@ To use Tox, you have to install it:
 While `setup.py` uses the current Python interpreter it founds in your `$PATH`, Tox creates (and caches) virtualenv
 for the test run, and uses that for running the tests. It also adds few other tests that were simpler to integrate
 here, e.g. YAML linter.
+
+
+## Documentation
+
+Auto-generated documentation is located in `docs/` directory. To update your local copy, run these commands:
+
+```
+  # install requirements
+  pip install -r docs-requirements.txt
+
+  # regenerate RST sources from Python files
+  sphinx-apidoc -T -e -o docs/source/ libci/
+
+  # generate HTML
+  make -C docs/ html
+```
+
+Then you can read generated docs by opening `docs/build/html/index.html`.
