@@ -24,3 +24,5 @@
       - archive:
           artifacts: '**/**'
           allow-empty: 'true'
+    wrappers:
+      - workspace-cleanup

@@ -25,6 +25,8 @@
     properties:
       - build-discarder:
           num-to-keep: 500
+    wrappers:
+      - workspace-cleanup
     publishers:
       - archive:
           artifacts: '*.txt, *.html'
