@@ -80,6 +80,15 @@ class Guest(object):
 
         raise NotImplementedError()
 
+    def setup(self, variables=None):
+        """
+        Setup guest before testing. This is up to child classes to implement - it
+        may be a mix of direct commands, temporary files, Ansible playbooks (via
+        ``guest-setup`` module).
+        """
+
+        raise NotImplementedError()
+
     @property
     def supports_snapshots(self):
         """
@@ -221,6 +230,12 @@ class NetworkedGuest(Guest):
 
     def __repr__(self):
         return '{}{}:{}'.format((self.username + '@') if self.username is not None else '', self.hostname, self.port)
+
+    def setup(self, **kwargs):
+        if not self._module.has_shared('setup_guest'):
+            raise libci.CIError("Module 'guest-setup' is required to actually set the guests up.")
+
+        return self._module.shared('setup_guest', [self.hostname], **kwargs)
 
     def _execute(self, cmd, **kwargs):
         return libci.utils.run_command(cmd, logger=self.logger, **kwargs)
