@@ -40,9 +40,13 @@
           name: notify_email_options
           default: ''
           description: 'Additional options for notify-email module.'
+    wrappers:
+      - ansicolor:
+          colormap: xterm
+      - workspace-cleanup
     builders:
       - shell:
-          citool -i -o citool-debug.txt
+          citool -c -i -o citool-debug.txt
             ${pipeline_prepend}
             envinject
             jenkins
@@ -57,8 +61,6 @@
             ${pipeline_append}
       - inject:
           properties-file: envinject-citool.props
-    wrappers:
-      - workspace-cleanup
     publishers:
       - archive:
           artifacts: '**/**'
