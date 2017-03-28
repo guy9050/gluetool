@@ -91,41 +91,10 @@ class RestraintScheduler(libci.Module):
         """
 
         guest.debug('setting the guest up')
-
-        # additional repositories
-        repos = {
-            'beaker-harness': (
-                'http://beaker.engineering.redhat.com/harness/RedHatEnterpriseLinux7/',
-                {'gpgcheck': 0, 'enabled': 0}
-            ),
-            'restraint': (
-                'http://file.bos.redhat.com/~bpeck/restraint/rhel7--test/x86_64/',
-                {'gpgcheck': 0, 'enabled': 0}
-            ),
-            'beaker-tasks': (
-                'http://beaker.engineering.redhat.com/rpms/',
-                {'gpgcheck': 0, 'enabled': 1}
-            )
-        }
-
-        for name, (baseurl, options) in repos.iteritems():
-            guest.debug("adding '{}' repository ({}, {})".format(name, baseurl, options))
-
-            guest.create_repo(name, name, baseurl, **options)
-
-        guest.execute('yum clean metadata')
-
-        # install restraint & other harness-related packages
-        # pylint: disable=line-too-long
-        guest.execute('yum install -y --enablerepo=restraint --enablerepo=beaker-harness beakerlib beakerlib-redhat restraint psmisc yum-plugin-priorities parted createrepo')
-        guest.execute('chkconfig --level 345 restraintd on')
-        guest.execute('service restraintd start')
-
-        # install brew build
-        guest.debug('installing brew task packages')
-        # pylint: disable=line-too-long
-        guest.execute('yum install -y --enablerepo=restraint --enablerepo=beaker-tasks distribution-distribution-install-brew-build.noarch')
-        guest.execute('METHOD=install TASKS={} make -C /mnt/tests/distribution/install/brew-build/'.format(task_id))
+        guest.setup(variables={
+            'BREW_METHOD': 'install',
+            'BREW_TASKS': str(task_id)
+        })
 
     def create_schedule(self, task, job_desc, image):
         """
