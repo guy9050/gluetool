@@ -1,3 +1,4 @@
+import re
 from time import gmtime, strftime
 
 from novaclient import client
@@ -53,6 +54,19 @@ class OpenstackGuest(NetworkedGuest):
                                              username=details['username'],
                                              key=details['key'],
                                              options=DEFAULT_SSH_OPTIONS)
+
+    def setup(self, variables=None, **kwargs):
+        variables = variables or {}
+
+        # workaround-openstack-hostname.yaml requires hostname and domainname.
+        # If not set, create ones - some tests may depend on resolvable hostname.
+        if 'GUEST_HOSTNAME' not in variables:
+            variables['GUEST_HOSTNAME'] = re.sub(r'10\.(\d+)\.(\d+)\.(\d+)', r'host-\1-\2-\3', str(self._ip.ip))
+
+        if 'GUEST_DOMAINNAME' not in variables:
+            variables['GUEST_DOMAINNAME'] = 'host.centralci.eng.rdu2.redhat.com'
+
+        super(OpenstackGuest, self).setup(variables=variables, **kwargs)
 
     def destroy(self):
         """
