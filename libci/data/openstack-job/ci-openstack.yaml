@@ -40,6 +40,12 @@
           name: notify_email_options
           default: ''
           description: 'Additional options for notify-email module.'
+    properties:
+      - inject:
+          properties-content: |
+            # Tell Ansible to store its *.retry file locally, to avoid possible race conditions.
+            # Ansible would put them in the playbook directories otherwise.
+            RETRY_FILES_SAVE_PATH=$WORKSPACE
     wrappers:
       - ansicolor:
           colormap: xterm
@@ -48,7 +54,9 @@
       - shell:
           citool -c -i -o citool-debug.txt
             ${pipeline_prepend}
+            ansible
             envinject
+            guest-setup --playbooks=${CITOOL_CONFIG}/guest-setup/openstack-restraint.yaml
             jenkins
             openstack
             brew --id $id
