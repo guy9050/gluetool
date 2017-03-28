@@ -50,7 +50,7 @@ class CINotifyBus(Module):
                        'sent following message to CI message bus',
                        'header:\n{}\nbody:\n{}'.format(utils.format_dict(headers), body))
 
-        if self.option('dry-run') is not None:
+        if self.option('dry-run'):
             return
 
         if stomp.__version__[0] < 4:
@@ -97,7 +97,7 @@ class CINotifyBus(Module):
     def execute(self):
         results = self.shared('results') or []
 
-        if self.option('dry-run') is not None:
+        if self.option('dry-run'):
             self.info('running in dry-run mode, no messages will be sent out')
 
         for result in results:
