@@ -18,12 +18,14 @@
               type = 'dist-git'
               AND namespace = 'rpms'
               AND branch LIKE '%staging%'
+    wrappers:
+      - ansicolor:
+          colormap: xterm
+      - workspace-cleanup
     builders:
       - shell: |
-          citool -i -o citool-debug.txt build-on-commit --component ${repo} --branch ${branch}
+          citool -c -i -o citool-debug.txt build-on-commit --component ${repo} --branch ${branch}
     publishers:
       - archive:
           artifacts: '**/**'
           allow-empty: 'true'
-    wrappers:
-      - workspace-cleanup

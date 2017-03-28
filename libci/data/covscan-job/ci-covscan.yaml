@@ -15,9 +15,13 @@
           name: notify_email_options
           default: ''
           description: 'Additional options for notify-email module.'
+    wrappers:
+      - ansicolor:
+          colormap: xterm
+      - workspace-cleanup
     builders:
       - shell:
-          citool -i -o citool-debug.txt
+          citool -c -i -o citool-debug.txt
             brew --id $id
             jenkins
             brew-build-name
@@ -25,8 +29,6 @@
     properties:
       - build-discarder:
           num-to-keep: 500
-    wrappers:
-      - workspace-cleanup
     publishers:
       - archive:
           artifacts: '*.txt, *.html'

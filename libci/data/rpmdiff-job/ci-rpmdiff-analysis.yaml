@@ -14,9 +14,13 @@
           name: id
           default: ''
           description: 'Brew task ID.'
+    wrappers:
+      - ansicolor:
+          colormap: xterm
+      - workspace-cleanup
     builders:
       - shell: |
-          citool -i -o citool-debug.txt envinject jenkins brew --id $id brew-build-name \
+          citool -c -i -o citool-debug.txt envinject jenkins brew --id $id brew-build-name \
                  rpmdiff --type analysis notify-ci-bus
       - inject:
           properties-file: envinject-citool.props
@@ -24,5 +28,3 @@
       - archive:
           artifacts: '**/**'
           allow-empty: 'true'
-    wrappers:
-      - workspace-cleanup
