@@ -7,7 +7,7 @@ from retrying import retry
 
 from libci import Module, CIError
 from libci.guest import NetworkedGuest
-from libci.utils import format_dict
+from libci.utils import format_dict, cached_property
 
 DEFAULT_FLAVOR = 'm1.small'
 DEFAULT_NAME = 'citool'
@@ -38,13 +38,15 @@ class OpenstackGuest(NetworkedGuest):
         # get an floating IP from a random available pool
         self._ip = self._nova.floating_ips.create(details['ip_pool_name'])
 
+        # complete userdata - use our default
         # create openstack instance
         name = '{}-{}'.format(details['name'], self._ip.ip)
         self._instance = self._nova.servers.create(name=name,
                                                    flavor=details['flavor'],
                                                    image=details['image'],
                                                    network=details['network'],
-                                                   key_name=details['key_name'])
+                                                   key_name=details['key_name'],
+                                                   userdata=details['user_data'])
 
         self._assign_ip()
 
@@ -222,6 +224,10 @@ class CIOpenstack(Module):
         },
         'ssh-user': {
             'help': 'SSH username'
+        },
+        'user-data': {
+            'help': """User data to pass to OpenStack when requesting instances. If the value doesn't start
+with '#cloud-config', it's considered a path and module will read the actual userdata from it."""
         }
     }
     required_options = ['auth-url', 'password', 'project-name', 'username', 'ssh-key', 'ip-pool-name']
@@ -232,6 +238,22 @@ class CIOpenstack(Module):
 
     # all openstack instances
     _all = []
+
+    @cached_property
+    def user_data(self):
+        user_data = self.option('user-data')
+
+        if user_data is None:
+            return None
+
+        if not user_data.startswith('#cloud-config'):
+            self.debug("loading userdata from '{}'".format(user_data))
+
+            with open(user_data, 'r') as f:
+                user_data = f.read()
+
+        self.debug('userdata:\n{}'.format(user_data))
+        return user_data
 
     def _resource_not_found(self, resource, name):
         available = [item.name for item in getattr(self.nova, resource).list()]
@@ -307,6 +329,7 @@ class CIOpenstack(Module):
                 'ip_pool_name': self.option('ip-pool-name'),
                 'username': self.option('ssh-user'),
                 'key': self.option('ssh-key'),
+                'user_data': self.user_data
             }
 
             self.verbose('creating instance with following details\n{}'.format(format_dict(details)))
