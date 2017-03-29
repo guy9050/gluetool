@@ -11,7 +11,7 @@ class CIPostgreSQL(libci.Module):
     name = 'postgresql'
     description = 'Connect to PostgreSQL database'
 
-    # shared jenkins object
+    # shared connection object
     _connection = None
 
     options = {
@@ -52,13 +52,11 @@ class CIPostgreSQL(libci.Module):
 
         # connect to the instance
         try:
-            connection = pgdb.connect(host=host, port=port, dbname=dbname,
-                                      user=user, password=password)
-        except pgdb.OperationalError as e:
+            self._connection = pgdb.connect(host=host, port=port, dbname=dbname,
+                                            user=user, password=password)
+        except Exception as e:
             self.debug('Connection error: {}'.format(e))
             raise libci.CIError("could not connect to PostgreSQL '{}': {}".format(host, str(e)))
-
-        self._connection = connection
 
     def server_version(self):
         cursor = self._connection.cursor()
@@ -68,7 +66,7 @@ class CIPostgreSQL(libci.Module):
     def execute(self):
         # connecto to database
         self.connect()
-        host = self.option('port')
+        host = self.option('host')
         version = self.server_version()
 
         # be informative about the database connection
