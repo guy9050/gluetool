@@ -1,5 +1,5 @@
 before_script:
-    - yum -y install git make python-setuptools gcc python-devel krb5-devel
+    - yum -y install git make python-setuptools gcc python-devel krb5-devel postgresql-devel
     - (curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py && rm -f get-pip.py)
     - pip install -U setuptools
     - pip install tox
