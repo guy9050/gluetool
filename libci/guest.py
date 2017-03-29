@@ -6,6 +6,7 @@ the modules.
 """
 
 import os
+import socket
 import tempfile
 import time
 
@@ -272,7 +273,31 @@ class NetworkedGuest(Guest):
     def wait_alive(self, **kwargs):
         self.debug('waiting for guest to become alive')
 
-        return self.wait(lambda: self.execute('exit'), **kwargs)
+        addrinfo = socket.getaddrinfo(self.hostname, self.port, 0, socket.SOCK_STREAM)
+        (family, socktype, proto, _, sockaddr) = addrinfo[0]
+
+        def check_ssh():
+            sock = socket.socket(family, socktype, proto)
+            sock.settimeout(1)
+
+            # pylint: disable=bare-except
+            try:
+                sock.connect(sockaddr)
+                return True
+
+            except:
+                pass
+
+            finally:
+                sock.close()
+
+        self.wait(check_ssh, **kwargs)
+
+        msg = 'guest {} is alive'.format(self.hostname)
+
+        output = self.execute("echo '{}'".format(msg))
+        if output.stdout.strip() != msg:
+            raise libci.CIError('Guest did not respond to ping request')
 
     def copy_to(self, src, dst, recursive=False, **kwargs):
         self.debug("copy to the guest: '{}' => '{}'".format(src, dst))
