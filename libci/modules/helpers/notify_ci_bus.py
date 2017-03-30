@@ -72,6 +72,39 @@ class CINotifyBus(Module):
             self.publish(headers, subresult)
         self.info('published RPMdiff results to CI message bus')
 
+    def publish_covscan(self, result):
+        task = self.shared('brew_task')
+        item = '{} {}'.format(task.nvr, result['baseline'])
+
+        headers = {
+            'CI_TYPE': 'resultsdb',
+            'item': item,
+            'scratch': task.scratch,
+            'taskid': task.task_id,
+            'testcase': 'dist.covscan',
+            'type': 'koji_build_pair'
+        }
+
+        body = {
+            'data': {
+                'item': item,
+                'newnvr': task.nvr,
+                'oldnvr': result['baseline'],
+                'scratch': task.scratch,
+                'taskid': task.task_id,
+                'type': 'koji_build_pair'
+            },
+            'outcome': result['result'],
+            'ref_url': result['urls']['covscan_url'],
+            'testcase': {
+                'name': 'dist.covscan',
+                'ref_url': 'https://url.corp.redhat.com/covscan-in-ci'
+            }
+        }
+
+        self.publish(headers, body)
+        self.info('published Covscan results to CI message bus')
+
     def publish_result(self, result):
         publish_function = getattr(self, 'publish_{}'.format(result['type']), None)
         if publish_function:
@@ -81,7 +114,7 @@ class CINotifyBus(Module):
 
     def sanity(self):
         # skip connecting if in dry mode
-        if self.option('dry-run') is not None:
+        if self.option('dry-run'):
             return
 
         # connect to message bus
@@ -96,7 +129,6 @@ class CINotifyBus(Module):
 
     def execute(self):
         results = self.shared('results') or []
-
         if self.option('dry-run'):
             self.info('running in dry-run mode, no messages will be sent out')
 
