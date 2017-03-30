@@ -60,6 +60,11 @@
                       manager.createSummary("green.gif").appendText("<h1>Tests passed</h1>",
                                                                     false, false, false, "green");
 
+                  } else if (manager.logContains(".*covscan.*skipping job.*")) {
+                      manager.listener.logger.println("[groovy-postbuild]: Skippped testing because build target not enabled");
+                      manager.addBadge("info.gif", "Testing skipped");
+                      manager.createSummary("grey.gif").appendText("<h1>Testing skipped</h1>",
+                                                                   false, false, false, "grey");
                   } else {
                       manager.listener.logger.println("[groovy-postbuild]: Cannot find result of the testing process");
                       manager.addBadge("warning.gif", "Tests result unknown");
