@@ -187,6 +187,9 @@ class CIRpmdiff(Module):
             'urls': {
                 'rpmdiff_url': runinfo['web_url'],
             },
+            'ids': {
+                'rpmdiff_run_id': run_id,
+            },
             'rpmdiff': [{
                 'data': {
                     'item': item,
