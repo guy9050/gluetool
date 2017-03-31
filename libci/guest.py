@@ -305,7 +305,7 @@ class NetworkedGuest(Guest):
         cmd = self._scp[:]
 
         if recursive:
-            cmd += ['-r', recursive]
+            cmd += ['-r']
 
         cmd += [src, '{}@{}:{}'.format(self.username, self.hostname, dst)]
 
@@ -317,7 +317,7 @@ class NetworkedGuest(Guest):
         cmd = self._scp[:]
 
         if recursive:
-            cmd += ['-r', recursive]
+            cmd += ['-r']
 
         cmd += ['{}@{}:{}'.format(self.username, self.hostname, src), dst]
 
