@@ -353,10 +353,10 @@ class Module(object):
                         if 'default' in self.options[opt] and value == self.options[opt]['default']:
                             continue
                         # with action store_true, the default is False
-                        if 'store_true' in self.options[opt]['action'] and value is False:
+                        if self.options[opt].get('action', '') == 'store_true' and value is False:
                             continue
                         # with action store_false, the default is True
-                        if 'store_false' in self.options[opt]['action'] and value is True:
+                        if self.options[opt].get('action', '') == 'store_false' and value is True:
                             continue
                     self._config[opt] = value
                     self.debug("Added option '{}' value '{}' from commandline".format(opt, value))
