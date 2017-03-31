@@ -159,6 +159,7 @@ class CICovscan(Module):
             'result': overall_result,
             'fixed': len(covscan_result.fixed),
             'added': len(covscan_result.added),
+            'baseline': baseline,
             'urls': {
                 'covscan_url': covscan_result.url,
                 'brew_url': self.brew_task.url

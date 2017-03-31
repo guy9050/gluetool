@@ -25,7 +25,9 @@
             brew --id $id
             jenkins
             brew-build-name
-            covscan notify-email --covscan-default "{ISSUER}" ${notify_email_options}
+            covscan
+            notify-ci-bus
+            notify-email --covscan-default "{ISSUER}" ${notify_email_options}
     properties:
       - build-discarder:
           num-to-keep: 500
