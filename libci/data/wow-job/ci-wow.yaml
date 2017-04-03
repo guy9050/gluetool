@@ -45,6 +45,7 @@
           citool -c -i -o citool-debug.txt
             ${pipeline_prepend}
             jenkins
+            testing-results
             brew --id $id
             brew-build-name
             guess-beaker-distro ${guess_distro_options}

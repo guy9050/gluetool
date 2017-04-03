@@ -60,7 +60,7 @@ class CINotifyBus(Module):
             self.cibus.send(body=body, headers=headers, destination=self.option('destination'))
 
     def publish_rpmdiff(self, result):
-        for subresult in result['rpmdiff']:
+        for subresult in result.payload:
             headers = {
                 'CI_TYPE': 'resultsdb',
                 'type': subresult['data']['type'],
@@ -74,7 +74,7 @@ class CINotifyBus(Module):
 
     def publish_covscan(self, result):
         task = self.shared('brew_task')
-        item = '{} {}'.format(task.nvr, result['baseline'])
+        item = '{} {}'.format(task.nvr, result.baseline)
 
         headers = {
             'CI_TYPE': 'resultsdb',
@@ -89,13 +89,13 @@ class CINotifyBus(Module):
             'data': {
                 'item': item,
                 'newnvr': task.nvr,
-                'oldnvr': result['baseline'],
+                'oldnvr': result.baseline,
                 'scratch': task.scratch,
                 'taskid': task.task_id,
                 'type': 'koji_build_pair'
             },
-            'outcome': result['result'],
-            'ref_url': result['urls']['covscan_url'],
+            'outcome': result.overall_result,
+            'ref_url': result.urls['covscan_url'],
             'testcase': {
                 'name': 'dist.covscan',
                 'ref_url': 'https://url.corp.redhat.com/covscan-in-ci'
@@ -106,11 +106,11 @@ class CINotifyBus(Module):
         self.info('published Covscan results to CI message bus')
 
     def publish_result(self, result):
-        publish_function = getattr(self, 'publish_{}'.format(result['type']), None)
+        publish_function = getattr(self, 'publish_{}'.format(result.test_type), None)
         if publish_function:
             publish_function(result)
         else:
-            self.warn("skipping unsupported result type '{}'".format(result['type']))
+            self.warn("skipping unsupported result type '{}'".format(result.test_type))
 
     def sanity(self):
         # skip connecting if in dry mode

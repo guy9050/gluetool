@@ -13,7 +13,7 @@ SMTP = 'smtp.corp.redhat.com'
 SENDER = 'qe-baseos-automation@redhat.com'
 HARD_ERROR_CC = ['qe-baseos-automation@redhat.com']
 
-SUBJECT = '[CI] [{result[type]}] {result[result]} for {task.nvr}, brew task {task.task_id}, \
+SUBJECT = '[CI] [{result.test_type}] {result.overall_result} for {task.nvr}, brew task {task.task_id}, \
 build target {task.target.target}'
 
 
@@ -26,7 +26,7 @@ Build issuer:   {task.owner}@redhat.com
 
 BODY_FOOTER = """
 
-Jenkins job:    {jenkins_job_url}
+Jenkins job:    {jenkins_build_url}
 
 
 --
@@ -45,28 +45,28 @@ CI pipeline was halted due to the following error:
 """
 
 WOW_BODY = """
-Result:         {result[result]}
+Result:         {result.overall_result}
 Beaker matrix:  {beaker_matrix_url}
 """
 
 RPMDIFF_BODY = """
-Result:         {result[result]}
+Result:         {result.overall_result}
 RPMdiff run:    {rpmdiff_url}
 
 RPMdiff CI Test Plan: http://url.corp.redhat.com/rpmdiff-in-ci
 """
 
 RESTRAINT_BODY = """
-Result:         {result[result]}
+Result:         {result.overall_result}
 """
 
 COVSCAN_BODY = """
 Tested build:   {brew_url}
 
-Fixed defects:  {result[fixed]}
-Added defects:  {result[added]}
+Fixed defects:  {result.fixed}
+Added defects:  {result.added}
 
-Final result:   {result[result]}
+Final result:   {result.overall_result}
 
 Covscan url:          {covscan_url}
 Covscan wiki:         https://engineering.redhat.com/trac/CoverityScan/wiki/covscan
@@ -323,13 +323,13 @@ class Notify(Module):
 
     def format_result_wow(self, result, msg):
         # pylint: disable=no-self-use
-        beaker_matrix_url = result['urls'].get('beaker_matrix', '<Beaker matrix URL not available>')
+        beaker_matrix_url = result.urls.get('beaker_matrix', '<Beaker matrix URL not available>')
 
         msg.body = WOW_BODY.format(result=result, beaker_matrix_url=beaker_matrix_url)
 
     def format_result_rpmdiff(self, result, msg):
         # pylint: disable=no-self-use
-        rpmdiff_url = result['urls'].get('rpmdiff_url', '<RPMdiff URL not available>')
+        rpmdiff_url = result.urls.get('rpmdiff_url', '<RPMdiff URL not available>')
 
         msg.body = RPMDIFF_BODY.format(result=result, rpmdiff_url=rpmdiff_url)
 
@@ -339,8 +339,8 @@ class Notify(Module):
 
     def format_result_covscan(self, result, msg):
         # pylint: disable=no-self-use
-        covscan_url = result['urls'].get('covscan_url', '<Covscan URL not available>')
-        brew_url = result['urls'].get('brew_url', '<Covscan URL not available>')
+        covscan_url = result.urls.get('covscan_url', '<Covscan URL not available>')
+        brew_url = result.urls.get('brew_url', '<Covscan URL not available>')
 
         msg.body = COVSCAN_BODY.format(result=result, covscan_url=covscan_url, brew_url=brew_url)
 
@@ -352,9 +352,9 @@ class Notify(Module):
         results = self.shared('results') or []
 
         for result in results:
-            self.debug('result:\n{}'.format(utils.format_dict(result)))
+            self.debug('result:\n{}'.format(result))
 
-            result_type = result['type']
+            result_type = result.test_type
 
             formatter = getattr(self, 'format_result_{}'.format(result_type), None)
             if formatter is None:
@@ -368,12 +368,10 @@ class Notify(Module):
 
             self.info('Sending {} result notifications to: {}'.format(result_type, ', '.join(recipients)))
 
-            jenkins_job_url = result['urls'].get('jenkins_job', '<Jenkins job URL not available>')
-
             msg = Message(self,
                           subject=SUBJECT.format(task=task, result=result),
                           header=BODY_HEADER.format(task=task),
-                          footer=BODY_FOOTER.format(jenkins_job_url=jenkins_job_url),
+                          footer=BODY_FOOTER.format(jenkins_build_url=result.urls['jenkins_build']),
                           recipients=recipients)
 
             formatter(result, msg)
@@ -407,7 +405,7 @@ class Notify(Module):
 
         self.info('Sending failure-state notifications to: {}'.format(', '.join(recipients)))
 
-        jenkins_job_url = os.getenv('BUILD_URL', '<Jenkins job URL not available>')
+        jenkins_build_url = os.getenv('BUILD_URL', '<Jenkins job URL not available>')
         task = self.shared('brew_task')
 
         if task is None:
@@ -428,7 +426,7 @@ class Notify(Module):
         msg = Message(self,
                       subject='[CI] ERROR: CI crashed due to errors',
                       header=BODY_HEADER.format(task=task),
-                      footer=BODY_FOOTER.format(jenkins_job_url=jenkins_job_url),
+                      footer=BODY_FOOTER.format(jenkins_build_url=jenkins_build_url),
                       body=body,
                       recipients=recipients)
 

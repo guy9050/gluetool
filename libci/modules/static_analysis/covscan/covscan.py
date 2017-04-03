@@ -8,8 +8,25 @@ from urllib2 import urlopen
 from urlgrabber.grabber import urlgrab
 from libci import Module, CIError
 from libci.utils import cached_property, log_blob, run_command, check_for_commands, format_dict, CICommandError
+from libci.results import TestResult, publish_result
 
 REQUIRED_CMDS = ['covscan']
+
+
+class CovscanTestResult(TestResult):
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, overall_result, covscan_result, brew_task, **kwargs):
+        urls = {
+            'covscan_url': covscan_result.url,
+            'brew_url': brew_task.url
+        }
+
+        super(CovscanTestResult, self).__init__('covscan', overall_result, urls=urls, **kwargs)
+
+        self.fixed = len(covscan_result.fixed)
+        self.added = len(covscan_result.added)
+        self.baseline = brew_task.latest
 
 
 class CovscanResult(object):
@@ -79,14 +96,7 @@ class CICovscan(Module):
         }
     }
 
-    shared_functions = ['results']
-
     brew_task = None
-    _results = []
-
-    def results(self):
-        """Returns results of Covscan task"""
-        return self._results
 
     def sanity(self):
         check_for_commands(REQUIRED_CMDS)
@@ -154,23 +164,7 @@ class CICovscan(Module):
         # Log in format expected by postbuild scripting
         self.info('Result of testing: {}'.format(overall_result))
 
-        result = {
-            'type': 'covscan',
-            'result': overall_result,
-            'fixed': len(covscan_result.fixed),
-            'added': len(covscan_result.added),
-            'baseline': baseline,
-            'urls': {
-                'covscan_url': covscan_result.url,
-                'brew_url': self.brew_task.url
-            }
-        }
-
-        if 'BUILD_URL' in os.environ:
-            result['urls']['jenkins_job'] = os.environ['BUILD_URL']
-
-        self._results = self.shared('results') or []
-        self._results.append(result)
+        publish_result(self, CovscanTestResult, overall_result, covscan_result, self.brew_task)
 
     def execute(self):
         # get a brew task instance
