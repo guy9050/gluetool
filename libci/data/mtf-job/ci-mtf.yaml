@@ -1,7 +1,7 @@
 ---
 
 - job:
-    name: 'ci-mft'
+    name: 'ci-mtf'
     node: mft
     description: |
         Run modular testing framework using OpenStack guests.
@@ -16,25 +16,43 @@
           name: pipeline_append
           default: ''
           description: 'citool options that will be added at the end of citool pipeline'
+    triggers:
+      - ci-trigger:
+          jms-selector: |
+            CI_TYPE = 'fedmsg'
+            AND topic = 'org.fedoraproject.prod.mbs.module.state.change'
+            AND state_name = 'done'
     wrappers:
       - ansicolor:
           colormap: xterm
       - workspace-cleanup
     builders:
-      - shell:
-          citool -c -i -o citool-debug.log
-            ${pipeline_prepend}
-            envinject
-            jenkins
-            openstack --user-data $CITOOL_CONFIG/default-user-data.yaml
-            mtf --fedmsgfile /tmp/example_message_module.yaml
-            ${pipeline_append}
+      - shell: |
+          env
+          export CI_MESSAGE
+          echo $CI_MESSAGE
+          MODULENAME=`echo "$CI_MESSAGE" | egrep -o '"name".*'|sed 's/.*: "\(.*\)".*/\1/'`
+          echo "$CI_MESSAGE" > exported-fedmsg.yaml
+          citool -c -i -o citool-debug.txt \
+                 ${pipeline_prepend}
+                 jenkins
+                 openstack --user-data=$CITOOL_CONFIG/default-user-data.yaml \
+                 mtf --fedmsgfile=exported-fedmsg.yaml --module=$MODULENAME \
+                 ${pipeline_append}
       - inject:
           properties-file: envinject-citool.props
     publishers:
       - archive:
           artifacts: '**/**'
           allow-empty: 'true'
+      - xunit:
+          types:
+            - junit:
+                pattern: 'avocado/*.xunit'
+                requireupdate: true
+                deleteoutput: true
+                skip-if-no-test-files: false
+                stoponerror: false
       - groovy-postbuild:
           on-failure: "failed"
           script: |
