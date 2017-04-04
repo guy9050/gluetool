@@ -22,6 +22,8 @@ class CIMTF(Module):
         fedmsgf = os.path.abspath(self.option('fedmsgfile'))
         module = self.option('module')
 
+        self.shared('jenkins').set_build_name(module)
+
         guests = self.shared('provision', image='Fedora-Cloud-Base-25-compose-latest')
         assert guests and len(guests) == 1, 'bad provision'
 
@@ -38,7 +40,9 @@ class CIMTF(Module):
         map(guest.execute, setupcmds)
         guest.copy_to(fedmsgf, '/tmp/message.yaml')
 
-        guest.execute("""bash -c 'cd modularity-testing-framework/examples/{};
+        try:
+            guest.execute("""bash -c 'cd modularity-testing-framework/examples/{};
 ../../tools/run-avocado-tests.sh `cat /tmp/message.yaml | ../../tools/taskotron-msg-reader.py`'""".format(module))
 
-        guest.copy_from('/root/avocado', '.', recursive=True)
+        finally:
+            guest.copy_from('/root/avocado', '.', recursive=True)
