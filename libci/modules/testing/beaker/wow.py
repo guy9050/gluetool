@@ -203,7 +203,8 @@ class CIWow(Module):
             'bkr', 'workflow-tomorrow',
             '--id',
             '--whiteboard', whiteboard,
-            '--no-reserve'
+            '--no-reserve',
+            '--decision'
         ] + distro_option + brew_option + options
 
         for name, value in task_params.iteritems():
