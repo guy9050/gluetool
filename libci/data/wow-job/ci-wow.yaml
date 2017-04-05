@@ -44,7 +44,6 @@
       - shell:
           citool -c -i -o citool-debug.txt
             ${pipeline_prepend}
-            envinject
             jenkins
             brew --id $id
             brew-build-name
@@ -52,8 +51,6 @@
             wow --wow-options="${wow_options}" --jobwatch-options="${jobwatch_options}"
             notify-email --wow-default="{ISSUER}" ${notify_email_options}
             ${pipeline_append}
-      - inject:
-          properties-file: envinject-citool.props
     publishers:
       - archive:
           artifacts: '**/**'

@@ -19,11 +19,13 @@
           colormap: xterm
       - workspace-cleanup
     builders:
-      - shell: |
-          citool -c -i -o citool-debug.txt envinject jenkins brew --id $id brew-build-name \
-                 rpmdiff --type comparison notify-ci-bus
-      - inject:
-          properties-file: envinject-citool.props
+      - shell:
+          citool -c -i -o citool-debug.txt
+                 jenkins
+                 brew --id $id
+                 brew-build-name
+                 rpmdiff --type comparison
+                 notify-ci-bus
     publishers:
       - archive:
           artifacts: '**/**'
