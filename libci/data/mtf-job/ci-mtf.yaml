@@ -37,8 +37,6 @@
                  openstack --user-data=$CITOOL_CONFIG/default-user-data.yaml \
                  mtf --fedmsgfile=exported-fedmsg.yaml --module=$MODULENAME \
                  ${pipeline_append}
-      - inject:
-          properties-file: envinject-citool.props
     publishers:
       - archive:
           artifacts: '**/**'

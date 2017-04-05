@@ -26,19 +26,18 @@
           description: 'Brew target'
     triggers:
       - ci-trigger:
-          jms-selector: |
-            CI_TYPE = 'brew-taskstatechange'
-            AND method = 'build'
-            AND new = 'CLOSED'
+          jms-selector: CI_TYPE = 'brew-taskstatechange' AND method = 'build' AND new = 'CLOSED'
     wrappers:
       - ansicolor:
           colormap: xterm
       - workspace-cleanup
     builders:
-      - shell: |
-          citool -c -i -o citool-debug.txt envinject jenkins brew --id $id brew-build-name brew-dispatcher
-      - inject:
-          properties-file: envinject-citool.props
+      - shell:
+          citool -c -i -o citool-debug.txt
+                 jenkins
+                 brew --id $id
+                 brew-build-name
+                 brew-dispatcher
     publishers:
       - archive:
           artifacts: '**/**'
