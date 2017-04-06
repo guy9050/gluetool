@@ -8,6 +8,8 @@
 # using the same set of packages in the production and in the development
 # as well.
 
+# required by guest-setup module
+ansible==2.2.2.0
 # required by many modules for XML/HTML manipulatiion
 beautifulsoup4==4.5.3
 # optional - enables logging colors
@@ -31,20 +33,28 @@ urlgrabber==3.10.2
 
 
 # Implicit requirementes
+asn1crypto==0.22.0
 Babel==2.3.4
+cffi==1.10.0
 cliff==2.4.0
 cmd2==0.7.0
+cryptography==1.8.1
 debtcollector==1.12.0
 deprecation==1.0
+enum34==1.1.6
 funcsigs==1.0.2
 functools32==3.2.3.post2
+idna==2.5
+ipaddress==1.0.18
 iso8601==0.1.11
+Jinja2==2.9.6
 jsonpatch==1.15
 jsonpointer==1.10
 jsonschema==2.6.0
 kerberos==1.2.5
 keystoneauth1==2.19.0
 lxml==3.7.3
+MarkupSafe==1.0
 monotonic==1.3
 msgpack-python==0.4.8
 netaddr==0.7.19
@@ -57,10 +67,14 @@ oslo.config==3.23.0
 oslo.i18n==3.14.0
 oslo.serialization==2.17.0
 oslo.utils==3.23.0
+paramiko==2.1.2
 pbr==2.0.0
 positional==1.1.1
 prettytable==0.7.2
 psycopg2==2.7.1
+pyasn1==0.2.3
+pycparser==2.17
+pycrypto==2.6.1
 pygresql==5.0.3
 pykerberos==1.1.14
 python-cinderclient==2.0.1
