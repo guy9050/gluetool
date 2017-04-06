@@ -35,7 +35,7 @@ REQUIRED_CMDS = ['rpmdiff-remote']
 class RpmdiffTestResult(TestResult):
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, overall_result, runinfo, **kwargs):
+    def __init__(self, runinfo, **kwargs):
         overall_result = RPMDIFF_OVERALL_SCORE[runinfo['overall_score']['description']]
 
         ids = {
