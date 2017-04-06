@@ -5,14 +5,24 @@ import urlparse
 import imp
 
 from libci import CIError, CICommandError, Module, utils
-from libci.utils import run_command, log_blob, format_dict
+from libci.utils import run_command, log_blob
+from libci.results import TestResult, publish_result
 
 
 REQUIRED_COMMANDS = ['bkr', 'beaker-jobwatch', 'tcms-results']
 
-DEFAULT_BEAKER_RESULTS_FILE = 'beaker-results.json'
-
 TCMS_RESULTS_LOCATIONS = ('/bin', '/usr/bin')
+
+
+class WowTestResult(TestResult):
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, overall_result, matrix_url, **kwargs):
+        urls = {
+            'beaker_matrix': matrix_url
+        }
+
+        super(WowTestResult, self).__init__('wow', overall_result, urls=urls, **kwargs)
 
 
 class CIWow(Module):
@@ -32,21 +42,10 @@ class CIWow(Module):
         },
         'jobwatch-options': {
             'help': 'Additional options for beaker-jobwatch'
-        },
-        'beaker-results': {
-            'help': 'Name of the file with beaker results JSON. Default is {}'.format(DEFAULT_BEAKER_RESULTS_FILE),
-            'default': DEFAULT_BEAKER_RESULTS_FILE
         }
     }
 
-    shared_functions = ['results']
-
     _processed_results = None
-
-    _results = []
-
-    def results(self):
-        return self._results
 
     def sanity(self):
         utils.check_for_commands(REQUIRED_COMMANDS)
@@ -365,26 +364,4 @@ class CIWow(Module):
 
         self.info('Result of testing: {}'.format(overall_result))
 
-        # Prepare result info
-        result = {
-            'type': 'wow',
-            'result': overall_result,
-            'urls': {
-                'beaker_matrix': matrix_url
-            },
-            'tests': processed_results
-        }
-
-        if 'BUILD_URL' in os.environ:
-            result['urls']['jenkins_job'] = os.environ['BUILD_URL']
-
-        # Save processed beaker results as an artifact
-        with open(self.option('beaker-results'), 'w') as f:
-            f.write(format_dict(processed_results))
-            f.flush()
-
-        self.debug("Processed results saved into '{}'".format(self.option('beaker-results')))
-
-        # Publish the result
-        self._results = self.shared('results') or []
-        self._results.append(result)
+        publish_result(self, WowTestResult, overall_result, matrix_url, payload=processed_results)

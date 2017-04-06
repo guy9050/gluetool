@@ -1,10 +1,10 @@
 import json
-import os
 import re
 import time
 from libci import Module
 from libci import CIError, CICommandError
 from libci import utils
+from libci.results import TestResult, publish_result
 
 # map RPMdiff overal score to resultsdb 2.0 API outcome states
 # http://docs.resultsdb20.apiary.io/
@@ -30,6 +30,23 @@ RPMDIFF_SCORE = {
 
 # required commands of module
 REQUIRED_CMDS = ['rpmdiff-remote']
+
+
+class RpmdiffTestResult(TestResult):
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, runinfo, **kwargs):
+        overall_result = RPMDIFF_OVERALL_SCORE[runinfo['overall_score']['description']]
+
+        ids = {
+            'rpmdiff_run_id': runinfo['run_id'],
+        }
+
+        urls = {
+            'rpmdiff_url': runinfo['web_url']
+        }
+
+        super(RpmdiffTestResult, self).__init__('rpmdiff', overall_result, ids=ids, urls=urls, **kwargs)
 
 
 class CIRpmdiff(Module):
@@ -59,19 +76,16 @@ class CIRpmdiff(Module):
         }
     }
     required_options = ['type']
-    shared_functions = ['results']
 
     brew_task = None
     check_interval = 60
     max_timeout = 3600 * 4
     rpmdiff_cmd = None
-    _results = []
+
+    _result_class = None
 
     def sanity(self):
         utils.check_for_commands(REQUIRED_CMDS)
-
-    def results(self):
-        return self._results
 
     @staticmethod
     def _parse_run_id(string):
@@ -181,36 +195,22 @@ class CIRpmdiff(Module):
             item = self.brew_task.nvr
 
         # basic result data and overall result
-        result = {
-            'type': 'rpmdiff',
-            'result': RPMDIFF_OVERALL_SCORE[runinfo['overall_score']['description']],
-            'urls': {
-                'rpmdiff_url': runinfo['web_url'],
+        tests = [{
+            'data': {
+                'item': item,
+                'type': result_type,
+                'newnvr': self.brew_task.nvr,
+                'oldnvr': self.brew_task.latest,
+                'scratch': self.brew_task.scratch,
+                'taskid': self.brew_task.task_id
             },
-            'ids': {
-                'rpmdiff_run_id': run_id,
+            'ref_url': runinfo['web_url'],
+            'testcase': {
+                'name': 'dist.rpmdiff.{}'.format(test_type),
+                'ref_url': 'https://url.corp.redhat.com/rpmdiff-in-ci',
             },
-            'rpmdiff': [{
-                'data': {
-                    'item': item,
-                    'type': result_type,
-                    'newnvr': self.brew_task.nvr,
-                    'oldnvr': self.brew_task.latest,
-                    'scratch': self.brew_task.scratch,
-                    'taskid': self.brew_task.task_id
-                },
-                'ref_url': runinfo['web_url'],
-                'testcase': {
-                    'name': 'dist.rpmdiff.{}'.format(test_type),
-                    'ref_url': 'https://url.corp.redhat.com/rpmdiff-in-ci',
-                },
-                'outcome': RPMDIFF_OVERALL_SCORE[runinfo['overall_score']['description']],
-            }]
-        }
-
-        # add jenkins job url
-        if 'BUILD_URL' in os.environ:
-            result['urls']['jenkins_job'] = os.environ['BUILD_URL']
+            'outcome': RPMDIFF_OVERALL_SCORE[runinfo['overall_score']['description']],
+        }]
 
         def _parse_results(data):
             parsed_results = []
@@ -234,10 +234,6 @@ class CIRpmdiff(Module):
                 })
             return parsed_results
 
-        # add all runtest results
-        result['rpmdiff'].extend(_parse_results(self._get_runinfo('{}/results'.format(runinfo['run_id']))))
-        self.debug("results dictionary\n{}".format(utils.format_dict(result)))
+        tests.extend(_parse_results(self._get_runinfo('{}/results'.format(runinfo['run_id']))))
 
-        # publish it
-        self._results = self.shared('results') or []
-        self._results.append(result)
+        publish_result(self, RpmdiffTestResult, runinfo, payload=tests)

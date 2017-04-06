@@ -57,9 +57,9 @@ class SimpleWowExport(libci.Module):
             'VERSION': task.version,
             'RELEASE': task.release,
             'SCRATCH': 'scratch' if task.scratch is True else '',
-            'RESULT': result['result'],
-            'JENKINS_JOB_URL': result['urls'].get('jenkins_job', ''),
-            'BEAKER_MATRIX_URL': result['urls'].get('beaker_matrix', '')
+            'RESULT': result.overall_result,
+            'JENKINS_JOB_URL': result.urls.get('jenkins_build', ''),
+            'BEAKER_MATRIX_URL': result.urls.get('beaker_matrix', '')
         }
 
         return self.template.format(**variables)
@@ -94,9 +94,9 @@ class SimpleWowExport(libci.Module):
         records = []
 
         for result in results:
-            self.debug('result:\n{}'.format(libci.utils.format_dict(result)))
+            self.debug('result:\n{}'.format(result))
 
-            if result['type'] != 'wow':
+            if result.test_type not in ('wow', 'restraint'):
                 continue
 
             records.append(self._format_record(task, result))

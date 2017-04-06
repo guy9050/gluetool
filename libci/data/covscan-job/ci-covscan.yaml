@@ -23,6 +23,7 @@
       - shell:
           citool -c -i -o citool-debug.txt
                  jenkins
+                 testing-results
                  brew --id $id
                  brew-build-name
                  covscan
@@ -33,7 +34,7 @@
           num-to-keep: 500
     publishers:
       - archive:
-          artifacts: '*.txt, *.html'
+          artifacts: '*.txt, *.html, *.json'
           allow-empty: 'true'
       - groovy-postbuild:
           on-failure: "failed"

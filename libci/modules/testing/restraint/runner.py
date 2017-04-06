@@ -7,12 +7,19 @@ import bs4
 
 import libci
 from libci.utils import format_dict
+from libci.results import TestResult, publish_result
 
 
 DEFAULT_RESTRAINT_PORT = 8081
-DEFAULT_BEAKER_RESULTS_FILE = 'beaker-results.json'
 
 REQUIRED_COMMANDS = ['restraint']
+
+
+class RestraintTestResult(TestResult):
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, overall_result, **kwargs):
+        super(RestraintTestResult, self).__init__('restraint', overall_result, **kwargs)
 
 
 class RestraintRunner(libci.Module):
@@ -43,23 +50,10 @@ class RestraintRunner(libci.Module):
             'help': 'Enable or disable parallelization of test sets (default: no)',
             'default': 'no',
             'metavar': 'yes|no'
-        },
-        'beaker-results': {
-            'help': 'Name of the file with beaker results JSON. Default is {}'.format(DEFAULT_BEAKER_RESULTS_FILE),
-            'default': DEFAULT_BEAKER_RESULTS_FILE
         }
     }
 
-    shared_functions = ['results']
-
-    _results = []
-
-    def results(self):
-        """
-        Returns list of test results.
-        """
-
-        return self._results
+    _result_class = None
 
     def _bool_option(self, name):
         value = self.option(name)
@@ -474,24 +468,4 @@ class RestraintRunner(libci.Module):
 
         self.info('Result of testing: {}'.format(overall_result))
 
-        # Prepare result info
-        result = {
-            'type': 'restraint',
-            'result': overall_result,
-            'urls': {},
-            'tests': results
-        }
-
-        if 'BUILD_URL' in os.environ:
-            result['urls']['jenkins_job'] = os.environ['BUILD_URL']
-
-        # Save results as an artifact
-        with open(self.option('beaker-results'), 'w') as f:
-            f.write(format_dict(results))
-            f.flush()
-
-        self.debug("Processed results saved into '{}'".format(self.option('beaker-results')))
-
-        # Publish the result
-        self._results = self.shared('results') or []
-        self._results.append(result)
+        publish_result(self, RestraintTestResult, overall_result, payload=results)
