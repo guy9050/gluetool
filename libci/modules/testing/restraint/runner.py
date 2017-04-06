@@ -189,6 +189,7 @@ class RestraintRunner(libci.Module):
                 duration = None
 
             build_url = os.getenv('BUILD_URL', '<Jenkins job URL not available>')
+            artifact_root = build_url + '/artifact'
 
             task_name = task_results['name']
 
@@ -199,7 +200,7 @@ class RestraintRunner(libci.Module):
                 'bkr_host': journal_root.hostname.string if journal_root is not None else None,
                 'bkr_logs': [
                     {
-                        'href': build_url + '/' + job_dir + '/' + log['path'],
+                        'href': '{}/{}/{}'.format(artifact_root, job_dir, log['path']),
                         'name': log['filename']
                     } for log in task_results.logs.find_all('log')
                 ],
