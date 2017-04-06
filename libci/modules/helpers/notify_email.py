@@ -26,7 +26,7 @@ Build issuer:   {task.owner}@redhat.com
 
 BODY_FOOTER = """
 
-Jenkins job:    {jenkins_build_url}
+Jenkins build:    {jenkins_build_url}
 
 
 --
@@ -405,7 +405,7 @@ class Notify(Module):
 
         self.info('Sending failure-state notifications to: {}'.format(', '.join(recipients)))
 
-        jenkins_build_url = os.getenv('BUILD_URL', '<Jenkins job URL not available>')
+        jenkins_build_url = os.getenv('BUILD_URL', '<Jenkins build URL not available>')
         task = self.shared('brew_task')
 
         if task is None:
