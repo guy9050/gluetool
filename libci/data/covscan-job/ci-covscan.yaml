@@ -1,7 +1,7 @@
 ---
 - job:
     name: 'ci-covscan'
-    node: master
+    node: covscan
     description: |
         Managed by Jenkins Job Builder. Do not edit via web.
     concurrent: true
