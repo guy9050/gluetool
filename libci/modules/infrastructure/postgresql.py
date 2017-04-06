@@ -64,7 +64,7 @@ class CIPostgreSQL(libci.Module):
     def server_version(self):
         cursor = self._connection.cursor()
         row = cursor.execute("SELECT VERSION()").fetchone()
-        return row[0] if not None else None
+        return row[0] if row else None
 
     def execute(self):
         # connecto to database
