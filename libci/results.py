@@ -13,6 +13,7 @@ class TestResult(object):
     :param str test_type: Type of testing. Makes sense to producers and consumers,
       ``Result`` class does not care of its actual value.
     :param str overall_result: Overall result of the test, e.g. ``PASS``, ``FAIL`` or ``ERROR``.
+      The actual value depends on producer's view of the testing process and its results.
     :param dict ids: producer may want to attach arbitrary IDs to the result, e.g.
       test run ID (default: empty)
     :param dict url: producer may want to attach arbitrary URLs to the result, e.g.
@@ -21,7 +22,8 @@ class TestResult(object):
       list of individual tests and their results performed.
 
     :ivar str test_type: Type of the test.
-    :ivar str overall_result: One of ``PASS``, ``FAIL`` or ``ERROR``.
+    :ivar str overall_result: Overall result of the testing process, e.g. ``PASS``, ``FAIL``
+      or ``ERROR``.
     :ivar dict ids: IDs producer think might interest the result consumer.
     :ivar dict urls: URLs producer think might interest the result consumer.
     :ivar payload: Data producer think might interest the result consumer.
