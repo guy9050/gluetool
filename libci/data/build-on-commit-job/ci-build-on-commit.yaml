@@ -14,7 +14,8 @@
           description: 'Git branch'
     triggers:
       - ci-trigger:
-          jms-selector: type = 'dist-git' AND namespace = 'rpms' AND branch LIKE '%staging%'
+          jms-selector: >
+            type = 'dist-git' AND namespace = 'rpms' AND branch LIKE '%staging%'
     wrappers:
       - ansicolor:
           colormap: xterm

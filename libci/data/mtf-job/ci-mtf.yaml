@@ -18,7 +18,7 @@
           description: 'citool options that will be added at the end of citool pipeline'
     triggers:
       - ci-trigger:
-          jms-selector:
+          jms-selector: >
             CI_TYPE = 'fedmsg' AND topic = 'org.fedoraproject.prod.mbs.module.state.change' AND state_name = 'done'
     wrappers:
       - ansicolor:
