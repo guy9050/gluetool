@@ -89,7 +89,7 @@ class RpmDiffWaiver(libci.Module):
         for waiver in waivers:
             if error[1] != waiver.subpackage:
                 continue
-            if re.match('^' + waiver.content_pattern + '$', error[2]):
+            if re.search(waiver.content_pattern, error[2]):
                 return True
         return False
 
