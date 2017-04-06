@@ -31,18 +31,14 @@ class CIMTF(Module):
 
         setupcmds = [
             'dnf copr -y enable jscotka/modularity-testing-framework',
-            'dnf install -y modularity-testing-framework',
-            'dnf install -y python-pip make docker httpd git python2-avocado',
-            'pip install PyYAML behave',
-            'git clone https://pagure.io/modularity-testing-framework.git'
+            'dnf install -y modularity-testing-framework'
         ]
 
         map(guest.execute, setupcmds)
         guest.copy_to(fedmsgf, '/tmp/message.yaml')
 
         try:
-            guest.execute("""bash -c 'cd modularity-testing-framework/examples/{};
-../../tools/run-avocado-tests.sh `cat /tmp/message.yaml | ../../tools/taskotron-msg-reader.py`'""".format(module))
+            guest.execute("bash /usr/share/moduleframework/tools/run-them.sh {} /tmp/message.yaml".format(module))
 
         finally:
             guest.copy_from('/root/avocado', '.', recursive=True)
