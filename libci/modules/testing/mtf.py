@@ -1,6 +1,6 @@
 import os
 
-from libci import Module
+from libci import Module, CICommandError
 
 
 class CIMTF(Module):
@@ -40,5 +40,12 @@ class CIMTF(Module):
         try:
             guest.execute("bash /usr/share/moduleframework/tools/run-them.sh {} /tmp/message.yaml".format(module))
 
+        except CICommandError as exc:
+            output = exc.output
+
+            self.error('Test command exited with exit code {} - see debug log for details'.format(output.exit_code))
+
         finally:
             guest.copy_from('/root/avocado', '.', recursive=True)
+
+        self.info('Result of testing: {}'.format('PASS' if output.exit_code == 0 else 'FAIL'))
