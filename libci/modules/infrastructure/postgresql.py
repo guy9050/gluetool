@@ -6,6 +6,9 @@ class CIPostgreSQL(libci.Module):
     """
     This module provides connection to a PostgreSQL database via PyGreSQL library:
         http://www.pygresql.org/
+    Connection is compliant with Python Database API Specification v2.0
+    Documentation of connection object can be found on:
+        http://www.pygresql.org/contents/pgdb/index.html
     """
 
     name = 'postgresql'
@@ -60,8 +63,8 @@ class CIPostgreSQL(libci.Module):
 
     def server_version(self):
         cursor = self._connection.cursor()
-        cursor.execute("SELECT VERSION()")
-        return cursor.fetchone()
+        row = cursor.execute("SELECT VERSION()").fetchone()
+        return row[0] if row else None
 
     def execute(self):
         # connecto to database
@@ -70,4 +73,4 @@ class CIPostgreSQL(libci.Module):
         version = self.server_version()
 
         # be informative about the database connection
-        self.info('connected to postgresql \'{}\' version {}'.format(host, version))
+        self.info('connected to postgresql \'{}\' version \'{}\''.format(host, version))
