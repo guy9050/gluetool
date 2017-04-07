@@ -2,6 +2,7 @@
 
 - job:
     name: 'ci-brew-dispatcher'
+    node: dispatcher
     description: |
         Runs generic brew dispatcher. Note that the 'brew-dispatcher' module
         reads all required variables (name, version, release, target and task_id)
