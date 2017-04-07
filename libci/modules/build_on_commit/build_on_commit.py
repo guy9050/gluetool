@@ -67,6 +67,12 @@ class CIBuildOnCommit(Module):
         blacklist = self.option('blacklist')
         branch_pattern = self.option('branch-pattern')
 
+        # create jenkins build label
+        if self.shared('jenkins') and os.getenv('BUILD_URL', None):
+            label = component + ": " + branch
+            self.info("setting jenkins build name to \"{0}\"".format(label))
+            self.shared('jenkins').set_build_name(label)
+
         # blacklist packages
         if blacklist:
             self.verbose('blacklisted packages: {}'.format(blacklist))
