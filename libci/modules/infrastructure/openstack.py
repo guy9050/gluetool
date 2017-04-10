@@ -11,7 +11,7 @@ from libci.utils import format_dict, cached_property
 
 DEFAULT_FLAVOR = 'm1.small'
 DEFAULT_NAME = 'citool'
-MAX_SERVER_ACTIVATION = 120
+MAX_SERVER_ACTIVATION = 240
 MAX_SERVER_SHUTDOWN = 60
 MAX_IMAGE_ACTIVATION = 60
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
@@ -135,7 +135,7 @@ class OpenstackGuest(NetworkedGuest):
 
         # start instance
         self._instance.start()
-        self.wait_alive(timeout=MAX_SERVER_ACTIVATION, tick=1)
+        self.wait_alive(timeout=self._module.option('activation-time'), tick=1)
         self.debug("server '{}' is up now".format(self.name))
 
         return name
@@ -150,7 +150,7 @@ class OpenstackGuest(NetworkedGuest):
 
         self.info("rebuilding server with snapshot '{}'".format(snapshot))
         self._instance.rebuild(self._module.get_image_ref(snapshot))
-        self.wait_alive(timeout=MAX_SERVER_ACTIVATION, tick=1)
+        self.wait_alive(timeout=self._module.option('activation-time'), tick=1)
         self.info("instance rebuilt and is up now")
 
         return self
@@ -186,6 +186,11 @@ class CIOpenstack(Module):
         'api-version': {
             'help': 'API version (default: 2)',
             'default': '2'
+        },
+        'activation-time': {
+            'help': "Machines maximum activation time before timeout in \
+seconds (default: {})".format(MAX_SERVER_ACTIVATION),
+            'type': int,
         },
         'auth-url': {
             'help': 'Auth URL'
@@ -341,7 +346,7 @@ with '#cloud-config', it's considered a path and module will read the actual use
         self.debug('created {} instances, waiting for them to become ACTIVE'.format(count))
 
         for instance in instances:
-            instance.wait_alive(timeout=MAX_SERVER_ACTIVATION, tick=1)
+            instance.wait_alive(timeout=self.option('activation-time'), tick=1)
 
         self.info("created {} instance(s) with flavor '{}' from image '{}'".format(count, flavor, image))
 
