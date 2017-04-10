@@ -75,6 +75,14 @@ class Failure(object):
         self.module = module
         self.exc_info = exc_info
 
+        if exc_info:
+            exc = exc_info[1]
+
+            self.soft = isinstance(exc, CIError) and exc.soft is True
+
+        else:
+            self.soft = False
+
 
 def retry(*args):
     """ Retry decorator
@@ -614,8 +622,9 @@ class CI(object):
         for ppath in ppaths:
             self._load_module_path(ppath)
 
-    # find all available modules
-    def __init__(self):
+    def __init__(self, sentry=None):
+        self._sentry = sentry
+
         # configuration defaults
         self.config = {
             'colors': None,
@@ -635,7 +644,7 @@ class CI(object):
         # Right now, we don't know the desired log level, or if
         # output file is in play, just get simple logger before
         # the actual configuration is known.
-        self.logger = ContextAdapter(Logging.create_logger())
+        self.logger = ContextAdapter(Logging.create_logger(sentry=sentry))
         self.logger.connect(self)
 
         # load config and create module list
@@ -728,7 +737,8 @@ class CI(object):
             level = logging.WARNING
 
         logger = Logging.create_logger(output_file=self.config['output'], level=level,
-                                       colors=(self.config['colors'] is not None))
+                                       colors=(self.config['colors'] is not None),
+                                       sentry=self._sentry)
 
         self.logger = ContextAdapter(logger)
         self.logger.connect(self)

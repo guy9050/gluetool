@@ -200,7 +200,7 @@ class Logging(object):
         return Logging.logger
 
     @staticmethod
-    def create_logger(output_file=None, level=None, colors=False):
+    def create_logger(output_file=None, level=None, colors=False, sentry=None):
         """
         Create and setup logger.
 
@@ -258,6 +258,11 @@ class Logging(object):
             logger.debug("created output file '{}'".format(output_file))
 
             atexit.register(Logging._close_output_file)
+
+        if sentry is not None:
+            import raven.breadcrumbs
+
+            raven.breadcrumbs.register_special_log_handler(logger, lambda *args: False)
 
         logger.debug("logger set up: output_file='{}', level={}".format(output_file, level))
 

@@ -2,6 +2,7 @@
 Heart of the "citool" script. Referred to by setuptools' entry point.
 """
 
+import os
 import signal
 import sys
 
@@ -38,6 +39,13 @@ def split_argv(argv_all, modules):
 def main():
     # pylint: disable=too-many-branches,too-many-statements
 
+    sentry = None
+
+    if 'SENTRY_DSN' in os.environ:
+        import raven
+
+        sentry = raven.Client(os.getenv('SENTRY_DSN'), install_logging_hook=True)
+
     # init used vars
     ci = None
     module = None
@@ -62,7 +70,7 @@ def main():
     # pylint: disable=too-many-nested-blocks,broad-except
     try:
         # initialize ci, load the module list
-        ci = libci.CI()
+        ci = libci.CI(sentry=sentry)
 
         # CI is initialized, we can install our logging handlers
         signal.signal(signal.SIGINT, sigint_handler)
@@ -144,6 +152,9 @@ def main():
             msg = "Exception raised: {}".format(e.message)
 
         libci.Logging.get_logger().exception(msg, exc_info=failure.exc_info)
+
+        if not failure.soft:
+            sentry.captureException(exc_info=failure.exc_info)
 
         sys.exit(-1)
 
