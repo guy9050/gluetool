@@ -190,6 +190,7 @@ class CIOpenstack(Module):
         'activation-time': {
             'help': "Machines maximum activation time before timeout in \
 seconds (default: {})".format(MAX_SERVER_ACTIVATION),
+            'type': int,
         },
         'auth-url': {
             'help': 'Auth URL'
