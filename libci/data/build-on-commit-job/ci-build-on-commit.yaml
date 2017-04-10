@@ -1,6 +1,7 @@
 ---
 - job:
     name: 'build-on-commit'
+    node: boc
     description: |
         Schedule scratch build after push into staging branch of any dist-git repository.
     concurrent: true
