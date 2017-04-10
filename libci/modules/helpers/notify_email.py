@@ -13,7 +13,7 @@ SMTP = 'smtp.corp.redhat.com'
 SENDER = 'qe-baseos-automation@redhat.com'
 HARD_ERROR_CC = ['qe-baseos-automation@redhat.com']
 
-SUBJECT = '[CI] [{result.test_type}] {result.overall_result} for {task.nvr}, brew task {task.task_id}, \
+SUBJECT = '[CI] [{result.test_type}] [{result.overall_result}] {task.nvr}, brew task {task.task_id}, \
 build target {task.target.target}'
 
 
@@ -424,7 +424,7 @@ class Notify(Module):
             body = HARD_ERROR_MSG
 
         msg = Message(self,
-                      subject='[CI] ERROR: CI crashed due to errors',
+                      subject='[CI] [ABORT] CI pipeline crashed, operations team was notified',
                       header=BODY_HEADER.format(task=task),
                       footer=BODY_FOOTER.format(jenkins_build_url=jenkins_build_url),
                       body=body,
