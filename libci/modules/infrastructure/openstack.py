@@ -1,20 +1,27 @@
+import errno
+import os
 import re
 from time import gmtime, strftime
+from datetime import datetime, timedelta
 
 from novaclient import client
 from novaclient.exceptions import NotFound, Unauthorized
 from retrying import retry
 
-from libci import Module, CIError
+from libci import Module, CIError, CICommandError
 from libci.guest import NetworkedGuest
 from libci.utils import format_dict, cached_property
 
 DEFAULT_FLAVOR = 'm1.small'
 DEFAULT_NAME = 'citool'
+DEFAULT_RESERVE_DIR = '~/openstack-reservations'
+DEFAULT_REMOTE_RESERVE_FILE = '~/.openstack-reservation'
+DEFAULT_RESERVE_TIME = 24
 MAX_SERVER_ACTIVATION = 240
 MAX_SERVER_SHUTDOWN = 60
 MAX_IMAGE_ACTIVATION = 60
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
+TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 
 class OpenstackGuest(NetworkedGuest):
@@ -29,26 +36,43 @@ class OpenstackGuest(NetworkedGuest):
         """
         self._instance.add_floating_ip(self._ip)
 
-    def __init__(self, module, details):
-        self._instance = None
-        self._ip = None
+    def __init__(self, module, details=None, instance_id=None):
         self._snapshots = []
         self._nova = module.nova
+        details = details or {}
 
-        # get an floating IP from a random available pool
-        self._ip = self._nova.floating_ips.create(details['ip_pool_name'])
+        #
+        # Create a new instance
+        #
+        if instance_id is None:
+            assert details is not None, 'no details passed to OpenstackGuest constructor'
 
-        # complete userdata - use our default
-        # create openstack instance
-        name = '{}-{}'.format(details['name'], self._ip.ip)
-        self._instance = self._nova.servers.create(name=name,
-                                                   flavor=details['flavor'],
-                                                   image=details['image'],
-                                                   network=details['network'],
-                                                   key_name=details['key_name'],
-                                                   userdata=details['user_data'])
+            # get an floating IP from a random available pool
+            self._ip = self._nova.floating_ips.create(details['ip_pool_name'])
 
-        self._assign_ip()
+            # complete userdata - use our default
+            # create openstack instance
+            name = '{}-{}'.format(details['name'], self._ip.ip)
+            self._instance = self._nova.servers.create(name=name,
+                                                       flavor=details['flavor'],
+                                                       image=details['image'],
+                                                       network=details['network'],
+                                                       key_name=details['key_name'],
+                                                       userdata=details['user_data'])
+
+            self._assign_ip()
+
+        #
+        # Intialize from an existing instance
+        #
+        else:
+            self._instance = self._nova.servers.find(id=instance_id)
+            self._ip = self._nova.floating_ips.find(instance_id=instance_id)
+            name = '{}-{}'.format(DEFAULT_NAME, self._ip.ip)
+            details.update({
+                'username': module.option('ssh-user'),
+                'key': module.option('ssh-key')
+            })
 
         super(OpenstackGuest, self).__init__(module,
                                              str(self._ip.ip),
@@ -58,6 +82,12 @@ class OpenstackGuest(NetworkedGuest):
                                              options=DEFAULT_SSH_OPTIONS)
 
     def setup(self, variables=None, **kwargs):
+        """
+        Custom setup for Openstack guests. Add a resolvable openstack hostname in case there
+        is none.
+
+        :param dict variables: dictionary with GUEST_HOSTNAME and/or GUEST_DOMAINNAME keys
+        """
         variables = variables or {}
 
         # workaround-openstack-hostname.yaml requires hostname and domainname.
@@ -171,17 +201,77 @@ class OpenstackGuest(NetworkedGuest):
     def supports_snapshots(self):
         return True
 
+    @cached_property
+    def floating_ip(self):
+        """
+        Property provides associated floating IP address as a string.
+
+        :returns: floating IP address of the guest
+        """
+        return str(self._ip.ip)
+
+    @cached_property
+    def instance_id(self):
+        """
+        Provides instance ID as a string.
+
+        :returns: string representation of instance ID
+        """
+        return str(self._instance.id)
+
 
 class CIOpenstack(Module):
     """
-    This module manages Openstack instances. It provides a shared function
-    to create given number of instances.
+    This module manages Openstack guests. It provides a shared function
+    `provision` to create given number of guests.
 
     When the module is destroyed it disassociates all associated floating IPs,
-    deletes all created snapshots and removes all instances.
+    deletes all created snapshots and removes all guests.
+
+    The module provides reservation functionality. By using the 'reserve' option
+    the module will create a file in the directory specified by
+    the 'reserve-directory' option for each reserved machine. The created files
+    are unique and their name is
+
+        ${JOB_NAME}_${BUILD_ID}_INSTANCE_ID
+
+    or just
+
+        INSTANCE_ID
+
+    if one of the environment variables JOB_NAME or BUILD_ID are not found. The
+    INSTANCE_ID is replaced by the Openstack instance hash, which uniquely
+    identifies the machine.
+
+    The file will contain one record for each provisioned host with the following
+    content:
+
+        TIMESTAMP INSTANCE_ID IPv4_ADDRESS
+
+    TIMESTAMP is a human readable reservation expiration time, e.g. 2017-04-13T03:05:09.
+
+    INSTANCE_ID is a unique hash identifying the reserved machine.
+
+    IPv4_ADDRESS is the floating IP address attached to the machine. It is
+    provided only for reference, it is not being used by the module, but needs to be
+    present.
+
+    Moreover the module adds the TIMESTAMP on the instance itself into a file whose
+    path is specified by the DEFAULT_REMOTE_RESERVE_FILE variable.
+
+    The reserved machines cleanup is done by calling the module with '--cleanup'
+    or '--cleanup-force' paramters.
+
+    With forced cleanup all reserved machines will be destroyed.
+
+    With ordinary cleanup, the module will use the highest reservation expiration time
+    from the instance and the reservation file. If this time has passed, the machines
+    will be destroyed. The cleanup will be also performed right away if the timestamp
+    file is gone from the machine.
     """
 
     name = 'openstack'
+    description = 'Provides Openstack guests'
     options = {
         'api-version': {
             'help': 'API version (default: 2)',
@@ -195,6 +285,14 @@ seconds (default: {})".format(MAX_SERVER_ACTIVATION),
         'auth-url': {
             'help': 'Auth URL'
         },
+        'cleanup': {
+            'help': 'Cleanup reserved machines which have expired timestamp',
+            'action': 'store_true',
+        },
+        'cleanup-force': {
+            'help': 'Force cleanup reserved machines which have expired timestamp',
+            'action': 'store_true',
+        },
         'flavor': {
             'help': 'Default flavor of machines (default: {})'.format(DEFAULT_FLAVOR),
             'default': DEFAULT_FLAVOR,
@@ -206,7 +304,8 @@ seconds (default: {})".format(MAX_SERVER_ACTIVATION),
             'help': 'Name of the floating ips pool name to use',
         },
         'keep': {
-            'help': 'Keep instance running, do not destroy',
+            'help': """Keep instance(s) running, do not destroy. No reservation records are created and it is
+expected from the user to cleanup the instance(s).""",
             'action': 'store_true',
         },
         'key-name': {
@@ -221,6 +320,26 @@ seconds (default: {})".format(MAX_SERVER_ACTIVATION),
         'project-name': {
             'help': 'Project/Tenant Name'
         },
+        'provision': {
+            'help': 'Provision given number of guests',
+            'metavar': 'COUNT',
+            'type': int,
+        },
+        'reserve': {
+            'help': 'Creates reservation records and keeps the instance(s) provisioned',
+            'action': 'store_true',
+        },
+        'reserve-directory': {
+            'help': 'Reservation records directory (default: {})'.format(DEFAULT_RESERVE_DIR),
+            'metavar': 'PATH',
+            'default': DEFAULT_RESERVE_DIR,
+        },
+        'reserve-time': {
+            'help': 'Reservation time in hours (default: {})'.format(DEFAULT_RESERVE_TIME),
+            'default': DEFAULT_RESERVE_TIME,
+            'metavar': 'HOURS',
+            'type': int,
+        },
         'username': {
             'help': 'Username to used for authentication'
         },
@@ -231,7 +350,7 @@ seconds (default: {})".format(MAX_SERVER_ACTIVATION),
             'help': 'SSH username'
         },
         'user-data': {
-            'help': """User data to pass to OpenStack when requesting instances. If the value doesn't start
+            'help': """User data to pass to OpenStack when requesting guests. If the value doesn't start
 with '#cloud-config', it's considered a path and module will read the actual userdata from it."""
         }
     }
@@ -241,7 +360,7 @@ with '#cloud-config', it's considered a path and module will read the actual use
     # connection handler
     nova = None
 
-    # all openstack instances
+    # all openstack guests
     _all = []
 
     @cached_property
@@ -278,13 +397,152 @@ with '#cloud-config', it's considered a path and module will read the actual use
 
         raise CIError("Multiple images found for '{}', and none of them is active".format(name))
 
+    def _get_reservation_file_name(self, guest):
+        """
+        Returns unique reservation file name. This is by default built from environment variables and
+        has the form
+
+            ${JOB_NAME}_${BUILD_ID}_INSTANCE_ID
+
+        If any of the environment variables JOB_NAME or BUILD_ID are missing from the environment only
+        INSTANCE_ID will be used, i.e.
+
+            INSTANCE_ID
+        """
+        try:
+            fname = "{}_{}_{}".format(os.environ['JOB_NAME'], os.environ['BUILD_ID'], guest.instance_id)
+            self.debug('using JOB_NAME, BUILD_ID and instance id as reservation file name')
+            return fname
+        except KeyError:
+            self.debug('using instance id as reservation file name')
+            return guest.instance_id
+
+    def _get_reservation_time(self):
+        """
+        Return reservation time string. We use the format defined by the TIME_FORMAT for storing the timestamp.
+        """
+        reserve_until = (datetime.now() + timedelta(hours=self.option('reserve-time'))).strftime(TIME_FORMAT)
+        self.debug("reservation time until '{}'".format(reserve_until))
+        return reserve_until
+
+    def _create_reservation_directory(self):
+        """
+        Make sure that reservation directory exists. Will silently ignore if directory already exist.
+        """
+        self._reservation_directory = os.path.expanduser(self.option('reserve-directory'))
+        # make sure reservation directory exists
+        try:
+            os.makedirs(self._reservation_directory)
+        except OSError as e:
+            # be happy if someone already created the path
+            if e.errno != errno.EEXIST:
+                raise e
+
+    def _reserve_guests(self):
+        """
+        Add reservation records to the shared reservation directory and the timestamp file on the guest.
+        """
+        # count reservation time
+        reservation_time = self._get_reservation_time()
+        self.info("reserving guests until '{}'".format(reservation_time))
+
+        # go through all guests and write reservation files
+        for guest in self._all:
+            with open(os.path.join(self._reservation_directory, self._get_reservation_file_name(guest)), 'w') as f:
+                # record guest details into the reservation file
+                f.write('{} {} {}{}'.format(reservation_time,
+                                            guest.instance_id,
+                                            guest.floating_ip,
+                                            os.linesep))
+
+            # record the reservation time to the remote reservation file
+            guest.execute('echo {} > {}'.format(reservation_time, DEFAULT_REMOTE_RESERVE_FILE))
+
+    def _cleanup_guest(self, handle):
+        """
+        Read one reservation record from the opened file identified by the file handle and destroy
+        the instance if we need to cleanup the machine.
+
+        Also remove invalid files if encountered. The machine will be destroyed also when the timestamp
+        file is gone from the guest.
+
+        :param file handle: An opened reservation file handle for reading.
+        """
+        try:
+            # the instance floating will be resolved from the instance
+            # we have it in the reservation file just for reference
+            strtime, instance_id, _ = handle.readline().split()
+            local_timestamp = datetime.strptime(strtime, TIME_FORMAT)
+        except IOError as e:
+            raise CIError('error reading file: {}'.format(e))
+        except ValueError as e:
+            self.info("invalid format, caused error (file will be removed): '{}'".format(e))
+            return True
+
+        try:
+            # init existing Openstack server from instance_id
+            guest = OpenstackGuest(self, instance_id=instance_id)
+        except NotFound:
+            self.info("guest '{}' not found (file will be removed)".format(instance_id))
+            return True
+
+        if self.option('cleanup-force'):
+            guest.info("destroying because of forced cleanup")
+            guest.destroy()
+            return True
+
+        try:
+            strtime = guest.execute("cat {}".format(DEFAULT_REMOTE_RESERVE_FILE)).stdout.rstrip()
+            self.debug("read timestamp '{}' from remote file '{}'".format(strtime, DEFAULT_REMOTE_RESERVE_FILE))
+            guest_timestamp = datetime.strptime(strtime, TIME_FORMAT)
+        except CICommandError as exc:
+            # remove the guest if the file is gone
+            if 'No such file' in exc.output.stderr:
+                guest.info("destroying because remote timestamp file is gone")
+                guest.destroy()
+                return True
+            guest_timestamp = 0
+
+        # use the largest timestamp
+        timestamp = max([guest_timestamp, local_timestamp])
+
+        # validate timestamp
+        if datetime.now() > timestamp:
+            guest.info("destroying because timestamp '{}' has been reached".format(timestamp))
+            guest.destroy()
+            return True
+
+        guest.info("staying up because timestamp '{}' has not been reached".format(timestamp))
+        return False
+
+    def _cleanup(self):
+        """
+        Go through all reservation files and free expired machines. First look at the instance and use
+        the remote reserve file for validation. If the machine is down, use the local timestamp.
+
+        In case user requested forced cleanup, remove machine without timestamp validation
+        """
+        directory = os.path.expanduser(self.option('reserve-directory'))
+        for root, _, files in os.walk(directory):
+            # we expect here that there are now subdirectories here
+            if not files:
+                self.info('no instance to cleanup, skipping')
+                continue
+            for filename in files:
+                path = os.path.join(root, filename)
+                self.debug("processing reserve file '{}'".format(path))
+                with open(path) as f:
+                    if self._cleanup_guest(f):
+                        self.debug("removing reservation file '{}'".format(path))
+                        os.unlink(path)
+
     def provision(self, count=1, name=DEFAULT_NAME, image=None, flavor=None):
         """
-        Provision multiple openstack instances from the given image name. The flavor is by
-        default {}. The name of the instances is created from the name parameter plus the floating
+        Provision multiple openstack guests from the given image name. The flavor is by
+        default {}. The name of the guests is created from the name parameter plus the floating
         IPv4 address.
 
-        :param int count: number of openstack instances to create
+        :param int count: number of openstack guests to create
         :param str name: box name, by default DEFAULT_NAME
         :param str image: image to use, by default taken from cmdline/config or `openstack_image` shared function
         :param str flavor: flavor to use for the instance, by default DEFAULT_FLAVOR
@@ -322,8 +580,8 @@ with '#cloud-config', it's considered a path and module will read the actual use
         else:
             network_ref = None
 
-        # create given number of instances
-        instances = []
+        # create given number of guests
+        guests = []
         for _ in range(count):
             details = {
                 'name': name,
@@ -337,28 +595,44 @@ with '#cloud-config', it's considered a path and module will read the actual use
                 'user_data': self.user_data
             }
 
-            self.verbose('creating instance with following details\n{}'.format(format_dict(details)))
-            instance = OpenstackGuest(self, details)
+            self.verbose('creating guest with following details\n{}'.format(format_dict(details)))
+            guest = OpenstackGuest(self, details=details)
 
-            self._all.append(instance)
-            instances.append(instance)
+            self._all.append(guest)
+            guests.append(guest)
 
-        self.debug('created {} instances, waiting for them to become ACTIVE'.format(count))
+        self.debug('created {} guests, waiting for them to become ACTIVE'.format(count))
 
-        for instance in instances:
-            instance.wait_alive(timeout=self.option('activation-time'), tick=1)
+        for guest in guests:
+            guest.wait_alive(timeout=self.option('activation-time'), tick=1)
+
+        if self.option('reserve'):
+            self._reserve_guests()
 
         self.info("created {} instance(s) with flavor '{}' from image '{}'".format(count, flavor, image))
 
-        return instances
+        return guests
 
     def destroy(self, failure=None):
-        if self._all and self.option('keep'):
-            self.info('keeping instances provisioned, skipping removal')
+        if not self._all:
             return
+
+        if self.option('keep'):
+            self.info('keeping guests provisioned, important note: NO AUTOMATIC CLEANUP')
+            return
+
+        if self.option('reserve') and not self.option('cleanup-force'):
+            self.info("keeping guests reserved, expecting regular cleanup via '--cleanup' option")
+            return
+
         for instance in self._all:
             instance.destroy()
-        self.info('successfully removed all instances')
+
+        self.info('successfully removed all guests')
+
+    def sanity(self):
+        if self.option('reserve'):
+            self._create_reservation_directory()
 
     def execute(self):
         api_version = self.option('api-version')
@@ -367,6 +641,9 @@ with '#cloud-config', it's considered a path and module will read the actual use
         password = self.option('password')
         username = self.option('username')
         key_name = self.option('key-name')
+        provision_count = self.option('provision')
+        cleanup = self.option('cleanup')
+        cleanup_force = self.option('cleanup-force')
 
         # connect to openstack instance
         self.nova = client.Client(api_version,
@@ -386,3 +663,11 @@ with '#cloud-config', it's considered a path and module will read the actual use
 
         # check if key name valid
         self.nova.keypairs.find(name=key_name)
+
+        # provision given number of guests right away
+        if provision_count:
+            self.provision(provision_count)
+
+        # run cleanup if requested
+        if cleanup or cleanup_force:
+            self._cleanup()
