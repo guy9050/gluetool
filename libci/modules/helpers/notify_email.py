@@ -12,6 +12,7 @@ SMTP = 'smtp.corp.redhat.com'
 
 SENDER = 'qe-baseos-automation@redhat.com'
 HARD_ERROR_CC = ['qe-baseos-automation@redhat.com']
+ARCHIVE_BCC = ['qe-baseos-automation@redhat.com']
 
 SUBJECT = '[CI] [{result.test_type}] {result.overall_result} for {task.nvr}, brew task {task.task_id}, \
 build target {task.target.target}'
@@ -77,7 +78,8 @@ Covscan CI Test Plan: https://url.corp.redhat.com/covscan-in-ci
 class Message(object):
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, module, subject=None, header=None, footer=None, body=None, recipients=None, sender=None):
+    def __init__(self, module, subject=None, header=None, footer=None, body=None, recipients=None, bcc=None,
+                 sender=None):
         # pylint: disable=too-many-arguments
         self._module = module
 
@@ -86,6 +88,7 @@ class Message(object):
         self.footer = footer or ''
         self.body = body or ''
         self.recipients = recipients or []
+        self.bcc = bcc or []
         self.sender = sender or self._module.option('sender')
 
     def send(self):
@@ -101,14 +104,16 @@ class Message(object):
         msg['Subject'] = self.subject
         msg['From'] = self.sender
         msg['To'] = ', '.join(self.recipients)
+        msg['Bcc'] = ', '.join(self.bcc)
 
         self._module.debug("Recipients: '{}'".format(', '.join(self.recipients)))
+        self._module.debug("Bcc: '{}'".format(', '.join(self.bcc)))
         self._module.debug("Sender: '{}'".format(self.sender))
         self._module.debug("Subject: '{}'".format(self.subject))
         utils.log_blob(self._module.debug, 'Content', content)
 
         smtp = smtplib.SMTP(self._module.option('smtp-server'))
-        smtp.sendmail(self.sender, self.recipients, msg.as_string())
+        smtp.sendmail(self.sender, self.recipients + self.bcc, msg.as_string())
         smtp.quit()
 
 
@@ -165,6 +170,12 @@ class Notify(Module):
         'force-recipients': {
             'help': 'If set, it will override any and all recipient settings - all e-mails will go to this list',
             'metavar': 'EMAILS'
+        },
+        'archive-bcc': {
+            # pylint: disable=line-too-long
+            'help': 'If set, it will send copy of every outgoing e-mail to EMAILS (default: {})'.format(', '.join(ARCHIVE_BCC)),
+            'metavar': 'EMAILS',
+            'default': ', '.join(ARCHIVE_BCC)
         },
 
         # Per-result-type notify lists
@@ -283,6 +294,14 @@ class Notify(Module):
         return self.option_to_mails('force-recipients')
 
     @utils.cached_property
+    def archive_bcc(self):
+        """
+        List of archive (Bcc) recipients.
+        """
+
+        return self.option_to_mails('archive-bcc')
+
+    @utils.cached_property
     def symbolic_recipients(self):
         """
         Mapping between symbolic recipients and the actual values.
@@ -372,7 +391,8 @@ class Notify(Module):
                           subject=SUBJECT.format(task=task, result=result),
                           header=BODY_HEADER.format(task=task),
                           footer=BODY_FOOTER.format(jenkins_build_url=result.urls['jenkins_build']),
-                          recipients=recipients)
+                          recipients=recipients,
+                          bcc=self.archive_bcc)
 
             formatter(result, msg)
             msg.send()
@@ -428,6 +448,7 @@ class Notify(Module):
                       header=BODY_HEADER.format(task=task),
                       footer=BODY_FOOTER.format(jenkins_build_url=jenkins_build_url),
                       body=body,
-                      recipients=recipients)
+                      recipients=recipients,
+                      bcc=self.archive_bcc)
 
         msg.send()
