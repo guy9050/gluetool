@@ -171,7 +171,7 @@ class RpmDiffWaiver(libci.Module):
                 self.info("There were not errors")
                 continue
             if not self.can_waive(errors, waivers[test_name]):
-                self.info("Errors found, cant waive")
+                self.info("No all errors can be waived, skipping")
                 continue
             self.info("This test will be waived")
             if not self.waive_test(link):
