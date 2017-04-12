@@ -9,6 +9,8 @@ import threading
 import subprocess
 import urllib2
 
+import urlnorm
+
 from libci import CIError, CICommandError
 from libci.log import Logging, ContextAdapter
 
@@ -296,3 +298,36 @@ def fetch_url(url, logger=None, success_codes=(200,)):
         raise CIError("Unsuccessfull response from '{}'".format(url))
 
     return response, content
+
+
+def treat_url(url, shorten=False, logger=None):
+    """
+    Remove "weird" artifacts from the given URL. Collapse adjacent '.'s, apply '..', etc.
+
+    :param str url: URL to clear.
+    :param bool shorten: If ``True``, will try to shorten the URL, using remote service.
+    :param libci.log.ContextAdapter logger: parent logger whose methods will be used for logging.
+      This is purely optional, used only when contacting shortening service.
+    :rtype: str
+    :returns: Treated URL.
+    """
+
+    try:
+        url = str(urlnorm.norm(url))
+
+    except urlnorm.InvalidUrl as exc:
+        # urlnorm cannot handle localhost: https://github.com/jehiah/urlnorm/issues/3
+        if exc.message == "host u'localhost' is not valid":
+            pass
+
+        else:
+            raise exc
+
+    if shorten is True:
+        try:
+            _, url = fetch_url('https://url.corp.redhat.com/new?{}'.format(url), logger=logger)
+
+        except CIError as exc:
+            logger.warn('Unable to shorten URL (see log for more details): {}'.format(exc.message))
+
+    return url.strip()

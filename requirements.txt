@@ -18,6 +18,8 @@ colorama==0.3.7
 jenkinsapi==0.3.3
 # required by jenkins-jobs
 jenkins-job-builder==1.6.2
+# required by notify-email module
+mako==1.0.6
 # required by opentack module - novaclient
 python-novaclient==7.1.0
 python-openstackclient==3.9.0
@@ -32,8 +34,12 @@ requests==2.12.5
 retrying==1.3.3
 # required by notify-bus module
 stomp.py==4.1.17
+# required for better formatting
+tabulate==0.7.7
 # required by covscan module
 urlgrabber==3.10.2
+# required to normalize URLs
+urlnorm==1.1.4
 
 
 # Implicit requirementes

@@ -48,6 +48,8 @@ class ContextAdapter(logging.LoggerAdapter):
     def __init__(self, logger, extra=None):
         super(ContextAdapter, self).__init__(logger, extra or {})
 
+        self.warn = self.warning
+
     def process(self, msg, kwargs):
         """
         Original `process` overwrites `kwargs['extra']` which doesn't work
