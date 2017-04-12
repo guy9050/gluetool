@@ -7,6 +7,7 @@ import libci
 
 RPMDIFF_RESULTS_TO_WAIVE = ["needs inspection", "failed"]
 RPMDIFF_AUTOWAIVERS_QUERY = """SELECT
+    rpmdiff_autowaive_rule.autowaive_rule_id as id,
     package_name,
     product_versions.name as product_version,
     rpmdiff_tests.description AS test,
@@ -20,11 +21,37 @@ JOIN product_versions ON rpmdiff_autowaive_product_versions.product_version_id =
 WHERE active = 1 and package_name = %(package)s and product_versions.name LIKE %(product)s
 ORDER BY 1, 2, 3, 4
 """
+ERRATA_AUTOWAIVER_URL = "https://errata.devel.redhat.com/rpmdiff/show_autowaive_rule/{}"
+RPMDIFF_WEBUI_COMMENT = "Autowaived with citool with these rules: {}"
 # for information purpose about how look like errata product version in database
 # RHEL-6 RHEL-6.8.z RHEL-6-SATELLITE-6.2 RHEL-7 RHEL-7.2.Z RHEL-7-SATELLITE-7.2
 RPMDIFF_PRODUCT_VERSION_MAPPING = {
     'satellite-6.2.0-rhel-6-candidate': 'RHEL-7-SATELLITE-6.2',
 }
+
+
+class RpmDiffWaiverMatcher(object):
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, errors, waivers):
+        self.errors = errors
+        self.waivers = waivers
+        self.matched = []
+
+    def can_waive(self):
+        for error in self.errors:
+            if not self._waivers_match(error):
+                return False
+        return True
+
+    def _waivers_match(self, error):
+        for waiver in self.waivers:
+            if error.subpackage != waiver.subpackage:
+                continue
+            if re.search(waiver.content_pattern, error.message):
+                self.matched.append(waiver)
+                return True
+        return False
 
 
 class RpmDiffWaiver(libci.Module):
@@ -85,22 +112,7 @@ class RpmDiffWaiver(libci.Module):
                 ))
         return errors
 
-    @staticmethod
-    def _waivers_match(error, waivers):
-        for waiver in waivers:
-            if error.subpackage != waiver.subpackage:
-                continue
-            if re.search(waiver.content_pattern, error.message):
-                return True
-        return False
-
-    def can_waive(self, errors, waivers):
-        for error in errors:
-            if not self._waivers_match(error, waivers):
-                return False
-        return True
-
-    def waive_test(self, link):
+    def waive_test(self, link, comment):
         # try kerberos login
         session = requests.session()
         url = self.option("url") + "/auth/login/?next=/"
@@ -112,7 +124,7 @@ class RpmDiffWaiver(libci.Module):
         token = BeautifulSoup(session.get(link, headers=headers).text, "html.parser") \
             .find("div", attrs={"id": "runDetail"})["data-token"]
         data = {
-            "comment": "Autowaived by citool",
+            "comment": comment,
             "action": "waive",
             "csrfmiddlewaretoken": token
         }
@@ -170,11 +182,16 @@ class RpmDiffWaiver(libci.Module):
             if not errors:
                 self.info("There were no errors")
                 continue
-            if not self.can_waive(errors, waivers[test_name]):
+            matcher = RpmDiffWaiverMatcher(errors, waivers[test_name])
+            if not matcher.can_waive():
                 self.info("No all errors can be waived, skipping")
                 continue
-            self.info("This test will be waived")
-            if not self.waive_test(link):
+            log_msg = ""
+            for waiver in matcher.matched:
+                log_msg = "\n".join([log_msg, ERRATA_AUTOWAIVER_URL.format(waiver.id)])
+            self.info("This test will be waived with there rules: {}".format(log_msg))
+
+            if not self.waive_test(link, RPMDIFF_WEBUI_COMMENT.format(log_msg)):
                 self.info("Test was probably not waived due to error in http")
 
     def rpmdiff_id_from_results(self):
