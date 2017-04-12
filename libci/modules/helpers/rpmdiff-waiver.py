@@ -105,7 +105,7 @@ class RpmDiffWaiver(libci.Module):
         url = self.option("url") + "/auth/login/?next=/"
         kerberos_auth = HTTPKerberosAuth(mutual_authentication=OPTIONAL)
         if session.get(url, auth=kerberos_auth).status_code != 200:
-            raise Exception("Authentication failed while waiving RPMDiff tests")
+            raise libci.CIError("Authentication failed while waiving RPMDiff tests")
         # obtain token
         headers = {"Referer": link}
         token = BeautifulSoup(session.get(link, headers=headers).text, "html.parser") \
