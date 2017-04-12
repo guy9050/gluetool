@@ -32,7 +32,7 @@ class RpmDiffWaiver(libci.Module):
     according to autowaivers in Errata tool.
     """
 
-    name = 'rpmdiffwaiver'
+    name = 'rpmdiff-waiver'
     description = 'Run autowaivers from Errata on RPMDiff runs'
 
     options = {
@@ -168,7 +168,7 @@ class RpmDiffWaiver(libci.Module):
             self.info('Download result table')
             errors = self._download_errors(link)
             if not errors:
-                self.info("There were not errors")
+                self.info("There were no errors")
                 continue
             if not self.can_waive(errors, waivers[test_name]):
                 self.info("No all errors can be waived, skipping")
