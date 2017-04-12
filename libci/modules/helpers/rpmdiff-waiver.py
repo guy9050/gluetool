@@ -145,8 +145,7 @@ class RpmDiffWaiver(libci.Module):
         results_page = requests.get(hub_url + "/run/{}".format(run_id)).text
         table = BeautifulSoup(results_page, "html.parser").find("table", attrs={"class": "summary"})
         if not table:
-            self.info('No table found')
-            return
+            raise libci.CIError('Table of results was not found on RPMDiff WebUI')
 
         self.info("Query waivers for product version: {}".format(errata_product))
         waivers = self.query_waivers(package, errata_product)
