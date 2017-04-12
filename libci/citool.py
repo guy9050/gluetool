@@ -153,7 +153,7 @@ def main():
 
         libci.Logging.get_logger().exception(msg, exc_info=failure.exc_info)
 
-        if not failure.soft:
+        if not failure.soft and sentry is not None:
             sentry.captureException(exc_info=failure.exc_info)
 
         sys.exit(-1)
