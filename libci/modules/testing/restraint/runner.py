@@ -145,7 +145,7 @@ class RestraintRunner(libci.Module):
         # and return a dictionary, not a default dict
         return dict(merged)
 
-    def _gather_task_set_results(self, output):
+    def _gather_task_set_results(self, guest, output):
         """
         restraint produces `job.xml` which carries pile of logs, results and so on.
         We open `job.xml`, and find all necessary data to construct dictionaries,
@@ -193,11 +193,25 @@ class RestraintRunner(libci.Module):
 
             task_name = task_results['name']
 
+            # If guest provides hostname, export it to result as well - user may need to connect
+            # to it, and its hostname (as set during its setup) may not be resolvable - but
+            # we're guaranteed to connect to the guest using guest.hostname value.
+
+            if hasattr(guest, 'hostname'):
+                connectable_hostname = guest.hostname
+
+            elif journal_root is not None:
+                connectable_hostname = journal_root.hostname.string
+
+            else:
+                connectable_hostname = None
+
             results[task_name].append({
                 'bkr_arch': journal_root.arch.string if journal_root is not None else None,
                 'bkr_distrovariant': None,
                 'bkr_duration': duration,
                 'bkr_host': journal_root.hostname.string if journal_root is not None else None,
+                'connectable_host': connectable_hostname,
                 'bkr_logs': [
                     {
                         'href': '{}/{}/{}'.format(artifact_root, job_dir, log['path']),
@@ -277,7 +291,7 @@ class RestraintRunner(libci.Module):
 
         self.info('Task set output:\n{}'.format(output.stdout))
 
-        result = self._gather_task_set_results(output.stdout)
+        result = self._gather_task_set_results(guest, output.stdout)
         self.debug('task set result:\n{}'.format(format_dict(result)))
 
         return result
