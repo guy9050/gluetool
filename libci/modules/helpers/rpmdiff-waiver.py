@@ -1,5 +1,5 @@
 import re
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 import requests
 from requests_kerberos import HTTPKerberosAuth, OPTIONAL
 from bs4 import BeautifulSoup
@@ -72,22 +72,25 @@ class RpmDiffWaiver(libci.Module):
         rows = BeautifulSoup(requests.get(link).text, "html.parser") \
             .find("table", attrs={"class": "result"}) \
             .find("table").find_all("tr")
+        error = namedtuple('RpmDiffError', 'error_type subpackage message')
         errors = []
         for row in rows:
             columns = row.find_all("td")
             error_type = columns[0].find("b").getText().strip()
-            error_detail1 = columns[2].getText().strip()
-            error_detail2 = columns[4].find("pre").getText()
             if error_type.lower() in RPMDIFF_RESULTS_TO_WAIVE:
-                errors.append((error_type, error_detail1, error_detail2))
+                errors.append(error(
+                    error_type=error_type,
+                    subpackage=columns[2].getText().strip(),
+                    message=columns[4].find("pre").getText()
+                ))
         return errors
 
     @staticmethod
     def _waivers_match(error, waivers):
         for waiver in waivers:
-            if error[1] != waiver.subpackage:
+            if error.subpackage != waiver.subpackage:
                 continue
-            if re.search(waiver.content_pattern, error[2]):
+            if re.search(waiver.content_pattern, error.message):
                 return True
         return False
 
