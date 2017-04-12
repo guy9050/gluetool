@@ -1,4 +1,5 @@
 import re
+from collections import defaultdict
 import requests
 from requests_kerberos import HTTPKerberosAuth, OPTIONAL
 from bs4 import BeautifulSoup
@@ -61,12 +62,9 @@ class RpmDiffWaiver(libci.Module):
         }
         cursor.execute(RPMDIFF_AUTOWAIVERS_QUERY, search)
         waivers = cursor.fetchall()
-        categorized = {}
+        categorized = defaultdict(list)
         for waiver in waivers:
-            if waiver.test in categorized:
-                categorized[waiver.test].append(waiver)
-            else:
-                categorized[waiver.test] = [waiver]
+            categorized[waiver.test].append(waiver)
         return categorized
 
     @staticmethod
