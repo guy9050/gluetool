@@ -400,7 +400,7 @@ class Notify(Module):
         :returns: Shortened URL if ``--shorten-urls`` was set, original URL otherwise.
         """
 
-        if self.option('shorten-urls') is True:
+        if self.option('shorten-urls'):
             return utils.treat_url(url, shorten=True, logger=self.logger)
 
         return utils.treat_url(url)
