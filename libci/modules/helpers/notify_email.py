@@ -5,6 +5,10 @@ Sending notifications about CI results - via e-mail.
 import os
 import smtplib
 from email.mime.text import MIMEText
+
+from mako.template import Template
+from mako import exceptions
+
 from libci import CIError, Module, utils
 
 
@@ -59,7 +63,8 @@ RPMdiff CI Test Plan: http://url.corp.redhat.com/rpmdiff-in-ci
 
 RESTRAINT_BODY = """
 Result:         {result.overall_result}
-"""
+
+{fails}"""
 
 COVSCAN_BODY = """
 Tested build:   {brew_url}
@@ -73,6 +78,26 @@ Covscan url:          {covscan_url}
 Covscan wiki:         https://engineering.redhat.com/trac/CoverityScan/wiki/covscan
 Covscan CI Test Plan: https://url.corp.redhat.com/covscan-in-ci
 """
+
+FAILS_BODY = Template("""
+<%
+  import re
+  import tabulate
+%>
+
+Failed tests:
+
+% for name, runs in fails.iteritems():
+  ${name} failed on:
+  <%
+    table  = [('Output ({}):'.format(run['arch']), run['testout.log']) for run in runs[1:]]
+    table += [('Test source:', runs[0][0])]
+  %>
+${ re.sub(r'(.*)', r'    \\1', tabulate.tabulate(table, tablefmt='plain')) }
+
+
+%endfor
+""")
 
 
 class Message(object):
@@ -160,6 +185,12 @@ class Notify(Module):
         'sender': {
             'help': 'E-mail of the sender. Default: {}'.format(SENDER),
             'default': SENDER
+        },
+
+        'shorten-urls': {
+            'help': 'Shorten long URLs, using https://url.corp.redhat.com/',
+            'action': 'store_true',
+            'default': False
         },
 
         'hard-error-cc': {
@@ -340,26 +371,162 @@ class Notify(Module):
 
         return default_recipients + add_recipients
 
+    @staticmethod
+    def _render_template(tmpl, **kwargs):
+        """
+        Render template. Logs errors, and raises an exception when it's not possible
+        to correctly render the remplate.
+
+        :param mako.template.Template tmpl: Template to render.
+        :param dict kwargs: Keyword arguments passed to render process.
+        :rtype: str
+        :returns: Rendered template.
+        :raises libci.ci.CIError: when the rednering failed.
+        """
+
+        try:
+            return tmpl.render(**kwargs)
+
+        except:
+            details = exceptions.text_error_template().render()
+            raise CIError('Cannot render template:\n{}'.format(details))
+
+    def _shorten_url(self, url):
+        """
+        Depending on module options, this method may or may not shorten the url.
+
+        :param str url: URL to shorten.
+        :rtype: str
+        :returns: Shortened URL if ``--shorten-urls`` was set, original URL otherwise.
+        """
+
+        if self.option('shorten-urls') is True:
+            return utils.treat_url(url, shorten=True, logger=self.logger)
+
+        return utils.treat_url(url)
+
+    def _gather_failed_tests(self, result):
+        """
+        Gather short summary for each failed test instance. The summary will then be used
+        to provide user with more information in the notification e-mails.
+
+        :param libci.result.Result result: result to inspect. So far, only ``workflow-tomorrow`
+          and ``restraint`` provide the summaries, other result types do not support this
+          feature.
+
+        :rtype: dict
+        :returns: a dictionary, where task names are the keys, with lists as values:
+
+          .. code-block:: python
+
+             [
+               (<URL of test source git repository>),
+               {
+                 'arch': <architecture the test ran on>,
+                 'status': 'Completed', ...,
+                 'result': 'PASS', 'FAIL', ...
+                 'testout.log': <optional URL of test output log>
+               },
+               ...
+             ]
+        """
+
+        self.debug('searching for failed tests')
+
+        fails = {}
+
+        for name, runs in result.payload.iteritems():
+            self.debug('consider task {}'.format(name))
+
+            for run in runs:
+                status, result = str(run['bkr_status']), str(run['bkr_result'])
+
+                if status.lower() == 'completed' and result.lower() == 'pass':
+                    continue
+
+                name_parts = name.split('/')
+
+                if name not in fails:
+                    name_parts = name.split('/')
+
+                    # guess git URL from test name... this is not good, this is so bad
+                    # there's not even a cathegory for this approach...
+                    if len(name_parts) >= 4:
+                        # E.g. /tools/strace/Regressions/bz12345678-foo-bar-crashed
+                        test_src = 'http://pkgs.devel.redhat.com/cgit/tests/{}/tree/{}'.format(
+                            name_parts[2], '/'.join(name_parts[3:]))
+                        test_src = self._shorten_url(test_src)
+
+                    else:
+                        self.warn("Cannot assign GIT address to a test '{}'".format(name))
+                        test_src = '<Unknown GIT address>'
+
+                    fails[name] = [(test_src,)]
+
+                run_summary = {
+                    'arch': run['bkr_arch'],
+                    'status': run['bkr_status'],
+                    'result': run['bkr_result']
+                }
+
+                for log in run['bkr_logs']:
+                    if str(log['name']).lower() not in ('testout.log', 'taskout.log'):
+                        continue
+
+                    run_summary['testout.log'] = self._shorten_url(log['href'])
+                    break
+
+                fails[name].append(run_summary)
+
+        self.debug('found fails:\n{}'.format(utils.format_dict(fails)))
+
+        return fails
+
+    def _format_result_url(self, result, key, default):
+        """
+        Format URL stored in the result. This covers collapsing adjacent '.', dealing
+        with '..', and even shortening the URL when asked to do so. Most of the work
+        is offloaded to :py:func:`libci.utils.treat_url` via :py:meth:`NotifyEmail._shorten_url`,
+        the rest - handling missing values - is done here.
+
+        :param libci.results.Result result: result providing URLs.
+        :param str key: key into `result`'s `url` field - denotes what URL caller wants.
+        :param str default: default value returned when the URL is not present.
+        """
+
+        if key not in result.urls:
+            return default
+
+        return self._shorten_url(result.urls[key])
+
     def format_result_wow(self, result, msg):
         # pylint: disable=no-self-use
-        beaker_matrix_url = result.urls.get('beaker_matrix', '<Beaker matrix URL not available>')
+        beaker_matrix_url = self._format_result_url(result, 'beaker_matrix', '<Beaker matrix URL not available>')
 
-        msg.body = WOW_BODY.format(result=result, beaker_matrix_url=beaker_matrix_url)
+        fails = self._gather_failed_tests(result)
+        fails_body = Notify._render_template(FAILS_BODY, fails=fails) if fails else ''
+
+        msg.body = WOW_BODY.format(result=result, beaker_matrix_url=beaker_matrix_url, fails=fails_body)
 
     def format_result_rpmdiff(self, result, msg):
         # pylint: disable=no-self-use
-        rpmdiff_url = result.urls.get('rpmdiff_url', '<RPMdiff URL not available>')
+        rpmdiff_url = self._format_result_url(result, 'rpmdiff_url', '<RPMdiff URL not available>')
 
         msg.body = RPMDIFF_BODY.format(result=result, rpmdiff_url=rpmdiff_url)
 
     def format_result_restraint(self, result, msg):
         # pylint: disable=no-self-use
-        msg.body = RESTRAINT_BODY.format(result=result)
+
+        fails = self._gather_failed_tests(result)
+        fails_body = Notify._render_template(FAILS_BODY, fails=fails) if fails else ''
+
+        msg.body = RESTRAINT_BODY.format(result=result, fails=fails_body.strip())
 
     def format_result_covscan(self, result, msg):
         # pylint: disable=no-self-use
-        covscan_url = result.urls.get('covscan_url', '<Covscan URL not available>')
-        brew_url = result.urls.get('brew_url', '<Covscan URL not available>')
+
+        covscan_url = self._format_result_url(result, 'covscan_url', '<Covscan URL not available>')
+        brew_url = self._format_result_url(result, 'brew_url', '<Covscan URL not available>')
 
         msg.body = COVSCAN_BODY.format(result=result, covscan_url=covscan_url, brew_url=brew_url)
 
@@ -387,10 +554,16 @@ class Notify(Module):
 
             self.info('Sending {} result notifications to: {}'.format(result_type, ', '.join(recipients)))
 
+            if 'jenkins_build' in result.urls:
+                jenkins_build_url = self._shorten_url(result.urls['jenkins_build'])
+
+            else:
+                jenkins_build_url = '<Jenkins build URL not available>'
+
             msg = Message(self,
                           subject=SUBJECT.format(task=task, result=result),
                           header=BODY_HEADER.format(task=task),
-                          footer=BODY_FOOTER.format(jenkins_build_url=result.urls['jenkins_build']),
+                          footer=BODY_FOOTER.format(jenkins_build_url=jenkins_build_url),
                           recipients=recipients,
                           bcc=self.archive_bcc)
 
@@ -425,7 +598,12 @@ class Notify(Module):
 
         self.info('Sending failure-state notifications to: {}'.format(', '.join(recipients)))
 
-        jenkins_build_url = os.getenv('BUILD_URL', '<Jenkins build URL not available>')
+        if 'BUILD_URL' in os.environ:
+            jenkins_build_url = self._shorten_url(os.environ['BUILD_URL'])
+
+        else:
+            jenkins_build_url = '<Jenkins build URL not available>'
+
         task = self.shared('brew_task')
 
         if task is None:

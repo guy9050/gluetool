@@ -38,11 +38,8 @@ class TestResult(object):
         self.urls = urls or {}
         self.payload = payload or []
 
-        if 'jenkins_build' not in self.urls:
-            if 'BUILD_URL' in os.environ:
-                self.urls['jenkins_build'] = os.environ['BUILD_URL']
-            else:
-                self.urls['jenkins_build'] = '<Jenkins job URL not available>'
+        if 'jenkins_build' not in self.urls and 'BUILD_URL' in os.environ:
+            self.urls['jenkins_build'] = os.environ['BUILD_URL']
 
     def serialize(self):
         """
