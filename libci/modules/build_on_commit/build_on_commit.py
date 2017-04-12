@@ -36,20 +36,14 @@ class CIBuildOnCommit(Module):
         },
         'component': {
             'help': 'Component name',
-        },
-        'shared-dir': {
-            'help': 'Shared directory used for cloning repositories',
         }
 
     }
-    required_options = ['component', 'branch', 'shared-dir', 'branch-pattern']
+    required_options = ['component', 'branch', 'branch-pattern']
 
     def sanity(self):
         """
         Make sure that rhpkg tool is available.
-
-        Make sure that shared directory exists as early as possible
-        and change the current working directory to it.
         """
         check_for_commands(REQUIRED_CMDS)
 
@@ -105,23 +99,12 @@ class CIBuildOnCommit(Module):
             raise CIError("failed to detect build-target from branch '{}'".format(branch))
         target = "staging-rhel-{}-candidate".format(match.group(1))
 
-        # create shared directory if needed
-        shared_dir = self.option('shared-dir')
-        if not os.path.isdir(shared_dir):
-            os.mkdir(shared_dir)
-        os.chdir(shared_dir)
-
-        # update existing repository or clone a new one
-        if os.path.isdir(component):
-            os.chdir(component)
-            self.info("updating existing repository of '{}'".format(component))
-            command = ["rhpkg", "switch-branch", "--fetch", branch]
-            self._run_command(command)
-        else:
-            self.info("cloning repository of '{}'".format(component))
-            command = ["git", "clone", GIT_BASE_URL + component]
-            self._run_command(command)
-            os.chdir(component)
+        #  create shallow clone of git repo, just 1 branch, no history
+        self.info("cloning repository of '{}'".format(component))
+        git_args = ["--depth", "1", "--single-branch", "--branch", branch]
+        command = ["git", "clone", GIT_BASE_URL + component] + git_args
+        self._run_command(command)
+        os.chdir(component)
 
         # schedule scratch build
         msg = ['scheduling scratch build of component']
