@@ -312,7 +312,16 @@ def treat_url(url, shorten=False, logger=None):
     :returns: Treated URL.
     """
 
-    url = str(urlnorm.norm(url))
+    try:
+        url = str(urlnorm.norm(url))
+
+    except urlnorm.InvalidUrl as exc:
+        # urlnorm cannot handle localhost: https://github.com/jehiah/urlnorm/issues/3
+        if exc.message == "host u'localhost' is not valid":
+            pass
+
+        else:
+            raise exc
 
     if shorten is True:
         try:
