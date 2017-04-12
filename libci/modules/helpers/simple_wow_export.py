@@ -1,4 +1,3 @@
-import os
 import libci
 
 
@@ -115,11 +114,7 @@ class SimpleWowExport(libci.Module):
 
         self.info('Logging wow results into a log file {}'.format(self.option('log')))
 
-        fake_result = {
-            'result': 'ERROR',
-            'urls': {
-                'jenkins_job_url': os.getenv('BUILD_URL', '')
-            }
-        }
+        from libci.results import TestResult
+        result = TestResult('dummy', 'ERROR')
 
-        self._flush_records([self._format_record(task, fake_result)])
+        self._flush_records([self._format_record(task, result)])
