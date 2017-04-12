@@ -61,11 +61,31 @@ class CIBuildOnCommit(Module):
             error = exc.output.stdout.rstrip("'\n") + exc.output.stderr.rstrip("'\n")
             raise CIError("failure during '{}' execution\n{}'".format(command[0], error))
 
+    def set_build_name(self, label):
+        """
+        Use Jenkins REST API to change build name.
+        """
+        if not self.has_shared('jenkins'):
+            self.warn('Jenkins API is necessary, please provide Jenkins module')
+            return
+
+        build_url = os.getenv('BUILD_URL', None)
+        if build_url is None:
+            self.warn('$BUILD_URL env var not found, was this job started by Jenkins?')
+            return
+
+        self.shared('jenkins').set_build_name(label)
+        self.info("build name set: '{}'".format(label))
+
     def execute(self):
         component = self.option('component')
         branch = self.option('branch')
         blacklist = self.option('blacklist')
         branch_pattern = self.option('branch-pattern')
+
+        # create jenkins build label
+        label = component + ": " + branch
+        self.set_build_name(label)
 
         # blacklist packages
         if blacklist:

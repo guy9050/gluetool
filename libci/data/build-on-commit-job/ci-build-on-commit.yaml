@@ -24,6 +24,7 @@
     builders:
       - shell:
           citool -c -i -o citool-debug.txt
+                 jenkins
                  build-on-commit --component ${repo} --branch ${branch}
     publishers:
       - archive:
