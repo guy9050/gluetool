@@ -179,11 +179,13 @@ class RpmDiffWaiver(libci.Module):
 
     def rpmdiff_id_from_results(self):
         if not self.has_shared("results"):
+            self.warn('Cannot obtain run-id, no \'results\' shared function found')
             return None
         results = self.shared("results")
         for result in results:
-            if 'type' in result and result['type'] == 'rpmdiff':
-                return result['ids']['rpmdiff_run_id']
+            if result.test_type == 'rpmdiff':
+                return result.ids['rpmdiff_run_id']
+        self.warn('Cannot obtain run-id, previous results do not contain rpmdiff result')
         return None
 
     def execute(self):
