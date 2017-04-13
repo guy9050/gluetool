@@ -22,7 +22,7 @@ RPMDIFF_OVERALL_SCORE = {
 # note: waived is mapped to info
 RPMDIFF_SCORE = {
     0: "PASSED",
-    1: "INFO",
+    1: "PASSED",
     2: "INFO",
     3: "NEEDS_INSPECTION",
     4: "FAILED",
