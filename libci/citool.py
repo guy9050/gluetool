@@ -46,6 +46,15 @@ def main():
 
         sentry = raven.Client(os.getenv('SENTRY_DSN'), install_logging_hook=True)
 
+        # Enrich Sentry context with information that are important for us
+        context = {}
+
+        # env variables
+        for name, value in os.environ.iteritems():
+            context['env.{}'.format(name)] = value
+
+        sentry.extra_context(context)
+
     # init used vars
     ci = None
     module = None
@@ -153,6 +162,8 @@ def main():
 
         libci.Logging.get_logger().exception(msg, exc_info=failure.exc_info)
 
+        # we could use ci.sentry_submit_exception but ci may not exist yet,
+        # use sentry client directly
         if not failure.soft and sentry is not None:
             sentry.captureException(exc_info=failure.exc_info)
 

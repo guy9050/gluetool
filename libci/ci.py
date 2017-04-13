@@ -387,6 +387,45 @@ class CI(object):
     #: funcname: (module, fn)
     shared_functions = {}
 
+    def sentry_submit_exception(self, exc_info, **kwargs):
+        """
+        Provide modules way to submit exceptions to Sentry. Unhandled exceptions
+        are submitted automagically, but they might feel the need to share
+        arbitrary issues with the world.
+
+        When Sentry is not enabled (via ``SENTRY_DSN`` env var), this method simply returns
+        without sending anything anywhere.
+
+        :param tuple exc_info: Exception info as provided by :py:func:`sys.exc_info` method
+          or ``exc_info`` attribute of :py:class:`libci.ci.Failure` class.
+        :param dict kwargs: additional arguments that will be passed to Sentry's ``captureException``
+          method.
+        """
+
+        if self._sentry is None:
+            return
+
+        self._sentry.captureException(exc_info=exc_info, **kwargs)
+
+    def sentry_submit_warning(self, msg, **kwargs):
+        """
+        Provide modules way to submit messages to Sentry. They might feel the need
+        to share arbitrary issues - e.g. warning that are not serious enough to kill
+        the citool - with the world.
+
+        When Sentry is not enabled (via ``SENTRY_DSN`` env var), this method simply returns
+        without sending anything anywhere.
+
+        :param str msg: Message describing the issue.
+        :param dict kwargs: additional arguments that will be passed to Sentry's ``captureMessage``
+          method.
+        """
+
+        if self._sentry is None:
+            return
+
+        self._sentry.captureMessage(msg, **kwargs)
+
     # add a shared function, overwrite if exists
     def add_shared(self, funcname, module):
         """
