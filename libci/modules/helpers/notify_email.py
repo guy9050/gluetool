@@ -21,6 +21,8 @@ ARCHIVE_BCC = ['qe-baseos-automation@redhat.com']
 SUBJECT = '[CI] [{result.test_type}] [{result.overall_result}] {task.nvr}, brew task {task.task_id}, \
 build target {task.target.target}'
 
+SUBJECT_RESERVE = '[CI] [RESERVATION] [{result.test_type}] [{result.overall_result}] {task.nvr}, \
+brew task {task.task_id}, build target {task.target.target}'
 
 BODY_HEADER = """
 Brew task:      {task.task_id}
@@ -30,6 +32,7 @@ Build issuer:   {task.owner}@redhat.com
 """
 
 BODY_FOOTER = """
+
 
 Jenkins build:    {jenkins_build_url}
 
@@ -52,7 +55,7 @@ CI pipeline was halted due to the following error:
 WOW_BODY = """
 Result:         {result.overall_result}
 Beaker matrix:  {beaker_matrix_url}
-"""
+{reserved}"""
 
 RPMDIFF_BODY = """
 Result:         {result.overall_result}
@@ -63,6 +66,7 @@ RPMdiff CI Test Plan: http://url.corp.redhat.com/rpmdiff-in-ci
 
 RESTRAINT_BODY = """
 Result:         {result.overall_result}
+{reserved}
 
 {fails}"""
 
@@ -78,6 +82,14 @@ Covscan url:          {covscan_url}
 Covscan wiki:         https://engineering.redhat.com/trac/CoverityScan/wiki/covscan
 Covscan CI Test Plan: https://url.corp.redhat.com/covscan-in-ci
 """
+
+RESERVED_BODY = Template("""
+Reserved machine(s) (password: redhat):
+
+% for guest in guests:
+  ssh root@${guest}
+%endfor
+""")
 
 FAILS_BODY = Template("""
 <%
@@ -207,6 +219,10 @@ class Notify(Module):
             'help': 'If set, it will send copy of every outgoing e-mail to EMAILS (default: {})'.format(', '.join(ARCHIVE_BCC)),
             'metavar': 'EMAILS',
             'default': ', '.join(ARCHIVE_BCC)
+        },
+        'add-reservation': {
+            'help': 'Add reservation message for each tested machine',
+            'action': 'store_true',
         },
 
         # Per-result-type notify lists
@@ -482,6 +498,27 @@ class Notify(Module):
 
         return fails
 
+    def _gather_reserved_guests(self, result):
+        """
+        Gather unique connectable host from results. This list will then be used
+        to provide user with reservation information in the notification e-mails.
+
+        :param libci.result.Result result: result to inspect. So far, only ``workflow-tomorrow`
+          and ``restraint`` provide the summaries, other result types do not support this
+          feature.
+
+        :rtype: set
+        :returns: a set with uniqe connectable guests
+        """
+
+        guests = set()
+        for name, runs in result.payload.iteritems():
+            self.debug('consider task {}'.format(name))
+
+            guests.update({run['connectable_host'] for run in runs})
+
+        return guests
+
     def _format_result_url(self, result, key, default):
         """
         Format URL stored in the result. This covers collapsing adjacent '.', dealing
@@ -506,7 +543,14 @@ class Notify(Module):
         fails = self._gather_failed_tests(result)
         fails_body = Notify._render_template(FAILS_BODY, fails=fails) if fails else ''
 
-        msg.body = WOW_BODY.format(result=result, beaker_matrix_url=beaker_matrix_url, fails=fails_body)
+        reserved_body = ''
+        if self.option('add-reservation'):
+            reserved_body = Notify._render_template(RESERVED_BODY, guests=self._gather_reserved_guests(result))
+
+        msg.body = WOW_BODY.format(result=result,
+                                   beaker_matrix_url=beaker_matrix_url,
+                                   fails=fails_body,
+                                   reserved=reserved_body.rstrip())
 
     def format_result_rpmdiff(self, result, msg):
         # pylint: disable=no-self-use
@@ -520,7 +564,11 @@ class Notify(Module):
         fails = self._gather_failed_tests(result)
         fails_body = Notify._render_template(FAILS_BODY, fails=fails) if fails else ''
 
-        msg.body = RESTRAINT_BODY.format(result=result, fails=fails_body.strip())
+        reserved_body = ''
+        if self.option('add-reservation'):
+            reserved_body = Notify._render_template(RESERVED_BODY, guests=self._gather_reserved_guests(result))
+
+        msg.body = RESTRAINT_BODY.format(result=result, fails=fails_body.strip(), reserved=reserved_body)
 
     def format_result_covscan(self, result, msg):
         # pylint: disable=no-self-use
@@ -536,6 +584,7 @@ class Notify(Module):
             raise CIError('Unable to get brew task')
 
         results = self.shared('results') or []
+        reserve = self.option('add-reservation')
 
         for result in results:
             self.debug('result:\n{}'.format(result))
@@ -560,8 +609,10 @@ class Notify(Module):
             else:
                 jenkins_build_url = '<Jenkins build URL not available>'
 
+            subject = SUBJECT_RESERVE if reserve else SUBJECT
+
             msg = Message(self,
-                          subject=SUBJECT.format(task=task, result=result),
+                          subject=subject.format(task=task, result=result),
                           header=BODY_HEADER.format(task=task),
                           footer=BODY_FOOTER.format(jenkins_build_url=jenkins_build_url),
                           recipients=recipients,
