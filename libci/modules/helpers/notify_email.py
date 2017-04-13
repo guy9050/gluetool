@@ -38,7 +38,7 @@ Jenkins build:    {jenkins_build_url}
 
 
 --
-CI Project page: https://wiki.test.redhat.com/BaseOs/Projects/CI
+CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation
 """
 
 HARD_ERROR_MSG = """
@@ -55,7 +55,11 @@ CI pipeline was halted due to the following error:
 WOW_BODY = """
 Result:         {result.overall_result}
 Beaker matrix:  {beaker_matrix_url}
-{reserved}"""
+
+{reserved}
+
+{fails}
+"""
 
 RPMDIFF_BODY = """
 Result:         {result.overall_result}
@@ -66,9 +70,11 @@ RPMdiff CI Test Plan: http://url.corp.redhat.com/rpmdiff-in-ci
 
 RESTRAINT_BODY = """
 Result:         {result.overall_result}
+
 {reserved}
 
-{fails}"""
+{fails}
+"""
 
 COVSCAN_BODY = """
 Tested build:   {brew_url}
@@ -101,11 +107,8 @@ Failed tests:
 
 % for name, runs in fails.iteritems():
   ${name} failed on:
-  <%
-    table  = [('Output ({}):'.format(run['arch']), run['testout.log']) for run in runs[1:]]
-    table += [('Test source:', runs[0][0])]
-  %>
-${ re.sub(r'(.*)', r'    \\1', tabulate.tabulate(table, tablefmt='plain')) }
+
+${ re.sub(r'(.*)', r'    \\1', tabulate.tabulate(fails_tabulate(name, runs), tablefmt='plain')) }
 
 
 %endfor
@@ -482,7 +485,8 @@ class Notify(Module):
                 run_summary = {
                     'arch': run['bkr_arch'],
                     'status': run['bkr_status'],
-                    'result': run['bkr_result']
+                    'result': run['bkr_result'],
+                    'host': run['connectable_host']
                 }
 
                 for log in run['bkr_logs']:
@@ -536,21 +540,56 @@ class Notify(Module):
 
         return self._shorten_url(result.urls[key])
 
+    def _format_beaker_like_body(self, result, msg, body_template, **kwargs):
+        # pylint: disable=no-self-use
+        adding_reservation = self.option('add-reservation') is not False
+
+        # list failed tests if there are such
+        fails_body = ''
+        fails = self._gather_failed_tests(result)
+
+        if fails:
+            # creating a table of failed runs for a test is quite unclear when written directly in
+            # the template, therefore providing more readable helper
+            def fails_tabulate(name, runs):
+                table = []
+
+                if adding_reservation:
+                    for run in runs[1:]:
+                        table += [
+                            ('Server:', '{} ({})'.format(run['host'], run['arch'])),
+                            ('Output:', run.get('testout.log', '<Not available>'))
+                        ]
+
+                else:
+                    for run in runs[1:]:
+                        table += [('Output ({}):'.format(run['arch']), run.get('testout.log', '<Not available>'))]
+
+                table += [('Test source:', runs[0][0])]
+
+                if adding_reservation:
+                    table += [('Test location on machine:', '/mnt/tests/{}'.format(name))]
+
+                return table
+
+            fails_body = Notify._render_template(FAILS_BODY, fails=fails, fails_tabulate=fails_tabulate)
+
+        # add reservation info if requested by user
+
+        reserved_body = ''
+        if adding_reservation:
+            reserved_body = Notify._render_template(RESERVED_BODY, guests=self._gather_reserved_guests(result))
+
+        msg.body = body_template.format(result=result,
+                                        fails=fails_body.strip(),
+                                        reserved=reserved_body.strip(),
+                                        **kwargs)
+
     def format_result_wow(self, result, msg):
         # pylint: disable=no-self-use
         beaker_matrix_url = self._format_result_url(result, 'beaker_matrix', '<Beaker matrix URL not available>')
 
-        fails = self._gather_failed_tests(result)
-        fails_body = Notify._render_template(FAILS_BODY, fails=fails) if fails else ''
-
-        reserved_body = ''
-        if self.option('add-reservation'):
-            reserved_body = Notify._render_template(RESERVED_BODY, guests=self._gather_reserved_guests(result))
-
-        msg.body = WOW_BODY.format(result=result,
-                                   beaker_matrix_url=beaker_matrix_url,
-                                   fails=fails_body,
-                                   reserved=reserved_body.rstrip())
+        self._format_beaker_like_body(result, msg, WOW_BODY, beaker_matrix_url=beaker_matrix_url)
 
     def format_result_rpmdiff(self, result, msg):
         # pylint: disable=no-self-use
@@ -561,14 +600,7 @@ class Notify(Module):
     def format_result_restraint(self, result, msg):
         # pylint: disable=no-self-use
 
-        fails = self._gather_failed_tests(result)
-        fails_body = Notify._render_template(FAILS_BODY, fails=fails) if fails else ''
-
-        reserved_body = ''
-        if self.option('add-reservation'):
-            reserved_body = Notify._render_template(RESERVED_BODY, guests=self._gather_reserved_guests(result))
-
-        msg.body = RESTRAINT_BODY.format(result=result, fails=fails_body.strip(), reserved=reserved_body)
+        self._format_beaker_like_body(result, msg, RESTRAINT_BODY)
 
     def format_result_covscan(self, result, msg):
         # pylint: disable=no-self-use
