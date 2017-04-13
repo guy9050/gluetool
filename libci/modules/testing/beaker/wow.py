@@ -1,8 +1,11 @@
+import json
 import os
 import shlex
 import sys
 import urlparse
 import imp
+
+import bs4
 
 from libci import CIError, CICommandError, Module, utils
 from libci.utils import run_command, log_blob
@@ -42,6 +45,10 @@ class CIWow(Module):
         },
         'jobwatch-options': {
             'help': 'Additional options for beaker-jobwatch'
+        },
+        'reserve': {
+            'help': 'Do not release machines back to Beaker, keep them reserved',
+            'action': 'store_true'
         }
     }
 
@@ -87,7 +94,7 @@ class CIWow(Module):
                 super(TaskAggregator, self).recordResult(task, caserun)
 
                 if task.status != 'Completed':
-                    self._wow_module.warn('Task {0} not completed'.format(task.name))
+                    citool_module.warn('Task {0} not completed'.format(task.name))
                     return
 
                 DEBUG = citool_module.debug
@@ -185,7 +192,7 @@ class CIWow(Module):
         :param task: brew task info, as returned by `brew_task` shared function
         :param str distro: distribution to install.
         :param list options: additional options, usualy coming from wow-options option.
-        :returns: libci.utils.ProcessOutput with the output of w-t.
+        :returns: ([job #1 ID, job #2 ID, ...], <job />)
         """
 
         distro_option = ['--distro={}'.format(distro)] if distro else []
@@ -201,19 +208,26 @@ class CIWow(Module):
 
         command = [
             'bkr', 'workflow-tomorrow',
-            '--id',
             '--whiteboard', whiteboard,
-            '--no-reserve',
             '--decision'
         ] + distro_option + brew_option + options
 
         for name, value in task_params.iteritems():
             command += ['--taskparam', '{}={}'.format(name, value)]
 
+        # we could use --reserve but we must be sure the reservesys is *the last* taskin the recipe
+        # users may require their own "last" tasks and --last-task is mightier than mere --reserve.
+        if self.option('reserve'):
+            command += ['--last-task', 'RESERVETIME={}h /distribution/reservesys']
+        else:
+            command += ['--no-reserve']
+
+        command += ['--dryrun']
+
         self.info("running 'workflow-tomorrow':\n{}".format(utils.format_command_line([command])))
 
         try:
-            return run_command(command)
+            output = run_command(command)
 
         except CICommandError as exc:
             # Check for most common causes, and raise soft error where necessary
@@ -224,11 +238,41 @@ class CIWow(Module):
 
             raise CIError("Failure during 'wow' execution: {}".format(exc.output.stderr), soft=soft)
 
-    def _run_jobwatch(self, jobs, options):
+        job = bs4.BeautifulSoup(output.stdout, 'xml')
+
+        with open('job.xml', 'w') as f:
+            f.write(output.stdout)
+            f.flush()
+
+        # submit the job to beaker
+        try:
+            output = run_command(['bkr', 'job-submit', 'job.xml'])
+
+        except CICommandError as exc:
+            raise CIError("Failure during 'job-submit' execution: {}".format(exc.output.stderr))
+
+        try:
+            # Submitted: ['J:1806666', 'J:1806667']
+            jobs = output.stdout[output.stdout.index(' ') + 1:]
+            # ['J:1806666', 'J:1806667']
+            jobs = jobs.replace('\'', '"')
+            # ["J:1806666", "J:1806667"]
+            jobs = json.loads(jobs)
+            # ['J:1806666', 'J:1806667']
+            ids = [int(job_id.split(':')[1]) for job_id in jobs]
+            # [1806666, 1806667]
+
+        except Exception as exc:
+            raise CIError('Cannot convert job-submit output to job ID: {}'.format(str(exc)))
+
+        return (ids, job)
+
+    def _run_jobwatch(self, jobs, job, options):
         """
         Start beaker-jobwatch, to baby-sit our jobs, and wait for its completion.
 
         :param list job: list of job IDs.
+        :param element job: Job XML description.
         :param list options: additional options, usualy coming from jobwatch-options option.
         :returns: libci.utils.ProcessOutput with the output of beaker-jobwatch.
         """
@@ -236,7 +280,24 @@ class CIWow(Module):
         command = [
             'beaker-jobwatch',
             '--skip-broken-machines'
-        ] + options + ['--job={}'.format(job) for job in jobs]
+        ] + options + ['--job={}'.format(job_id) for job_id in jobs]
+
+        if self.option('reserve'):
+            next_to_last_tasks = {}
+
+            for recipe_set in job.find_all('recipeSet'):
+                for recipe in recipe_set.find_all('recipe'):
+                    next_to_last_tasks[recipe.find_all('task')[-2]['name']] = True
+
+            if len(next_to_last_tasks) > 1:
+                self.warn('Multiple next-to-last tasks detected, beaker-jobwatch may not check them correctly')
+                self.warn('Next-to-last tasks:\n{}'.format('\n'.join(next_to_last_tasks.keys())))
+
+                self.ci.sentry_submit_warning('[wow] Multiple next-to-last tasks detected')
+
+            command += [
+                '--end-task={}'.format(task) for task in next_to_last_tasks.iterkeys()
+            ]
 
         self.info("running 'beaker-jobwatch':\n{}".format(utils.format_command_line([command])))
 
@@ -355,10 +416,10 @@ class CIWow(Module):
         jobwatch_options = _command_options('jobwatch-options')
 
         # workflow-tomorrow
-        wow_output = self._run_wow(task, distro, wow_options)
+        job_ids, job = self._run_wow(task, distro, wow_options)
 
         # beaker-jobwatch
-        jobwatch_output = self._run_jobwatch(wow_output.stdout.split(), jobwatch_options)
+        jobwatch_output = self._run_jobwatch(job_ids, job, jobwatch_options)
 
         # evaluate jobs
         overall_result, processed_results, matrix_url = self._process_jobs(jobwatch_output.stdout)

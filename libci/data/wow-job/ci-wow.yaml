@@ -8,6 +8,14 @@
     concurrent: true
     display-name: 'ci-wow'
     parameters:
+      - bool:
+          name: reserve
+          default: ''
+          description: 'Reserve machine after testing for troubleshooting.'
+      - string:
+          name: reservation_time
+          default: '24'
+          description: 'Reservation time in hours for troubleshooting. See BaseOS CI User HowTO for more information.'
       - string:
           name: id
           default: ''
@@ -41,7 +49,15 @@
           colormap: xterm
       - workspace-cleanup
     builders:
-      - shell:
+      - shell: |
+          if [ "${reserve}" != "true" ]; then
+            wow_opts=""
+            notify_email_opts=""
+          else
+            wow_opts="--reserve --reserve-time ${reservation_time}"
+            notify_email_opts="--add-reservation"
+          fi
+
           citool -c -i -o citool-debug.txt
             ${pipeline_prepend}
             jenkins
@@ -49,8 +65,8 @@
             brew --id $id
             brew-build-name
             guess-beaker-distro ${guess_distro_options}
-            wow --wow-options="${wow_options}" --jobwatch-options="${jobwatch_options}"
-            notify-email --wow-default="{ISSUER}" ${notify_email_options}
+            wow --wow-options="${wow_options}" --jobwatch-options="${jobwatch_options}" ${wow_opts}
+            notify-email --wow-default="{ISSUER}" ${notify_email_options} ${notify_email_opts}
             ${pipeline_append}
     publishers:
       - archive:
