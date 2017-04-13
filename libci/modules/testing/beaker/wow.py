@@ -114,7 +114,7 @@ class CIWow(Module):
                     'bkr_status': task.status,
                     'bkr_result': task.result,
                     'bkr_host': machine.attributes['value'].value,
-                    'connectable_hostname': machine.attributes['value'].value,
+                    'connectable_host': machine.attributes['value'].value,
                     'bkr_duration': 0,
                     'bkr_params': [],
                     'bkr_packages': [],
