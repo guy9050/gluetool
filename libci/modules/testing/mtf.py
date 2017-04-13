@@ -38,7 +38,8 @@ class CIMTF(Module):
         guest.copy_to(fedmsgf, '/tmp/message.yaml')
 
         try:
-            guest.execute("bash /usr/share/moduleframework/tools/run-them.sh {} /tmp/message.yaml".format(module))
+            cmd = 'bash /usr/share/moduleframework/tools/run-them.sh {} /tmp/message.yaml'.format(module)
+            output = guest.execute(cmd)
 
         except CICommandError as exc:
             output = exc.output
