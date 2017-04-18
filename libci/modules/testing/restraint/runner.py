@@ -329,9 +329,9 @@ class RestraintRunner(libci.Module):
             guests = [guest] + self.shared('openstack_provision', len(tasks) - 1, image=base_snapshot)
             threads = []
 
-            for i, (guest, task) in enumerate(zip(guests, tasks)):
-                thread = libci.utils.WorkerThread(guest.logger, self._run_task_set,
-                                                  fn_args=(guest, [task], recipe_attrs, recipe_set_attrs),
+            for i, (actual_guest, task) in enumerate(zip(guests, tasks)):
+                thread = libci.utils.WorkerThread(actual_guest.logger, self._run_task_set,
+                                                  fn_args=(actual_guest, [task], recipe_attrs, recipe_set_attrs),
                                                   name='task-runner-{}'.format(i))
                 threads.append(thread)
 

@@ -650,6 +650,8 @@ class Notify(Module):
                           recipients=recipients,
                           bcc=self.archive_bcc)
 
+            # we're sure formatter *is* callable
+            # pylint: disable=not-callable
             formatter(result, msg)
             msg.send()
 

@@ -173,7 +173,7 @@ def run_command(cmd, logger=None, **kwargs):
     # in different order with different Pythons, making tests a mess.
     sorted_kwargs = ', '.join(["'%s': '%s'" % (k, printable_kwargs[k]) for k in sorted(printable_kwargs.iterkeys())])
 
-    logger.debug("run command: cmd='%s', kwargs={%s}" % (cmd, sorted_kwargs))
+    logger.debug("run command: cmd='{}', kwargs={{{}}}".format(cmd, sorted_kwargs))
 
     try:
         p = subprocess.Popen(cmd, **kwargs)

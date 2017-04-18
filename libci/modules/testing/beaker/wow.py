@@ -145,6 +145,9 @@ class CIWow(Module):
 
                 # store params, if any
                 params_node = xml.getElementsByTagName('params')
+
+                # not sure whether params_node would evaluate to False when it's empty
+                # pylint: disable=len-as-condition
                 if len(params_node) > 0:
                     for param in params_node[0].getElementsByTagName('param'):
                         # this is caserun.id, safe to ignore

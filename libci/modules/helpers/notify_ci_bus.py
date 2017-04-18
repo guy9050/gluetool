@@ -107,7 +107,9 @@ class CINotifyBus(Module):
 
     def publish_result(self, result):
         publish_function = getattr(self, 'publish_{}'.format(result.test_type), None)
-        if publish_function:
+        if publish_function is not None:
+            # we're sure publish_function *is* callable
+            # pylint: disable=not-callable
             publish_function(result)
         else:
             self.warn("skipping unsupported result type '{}'".format(result.test_type))
