@@ -50,7 +50,8 @@ class Ansible(libci.Module):
                     continue
 
                 message = json.loads(line[line.index('{'):])
-                self.error('Ansible says: {}'.format(message['msg']))
+                if 'msg' in message:
+                    self.error('Ansible says: {}'.format(message['msg']))
 
             raise libci.CIError('Failure during Ansible playbook execution. See log for details.')
 
