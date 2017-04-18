@@ -233,7 +233,7 @@ class CIBrewDispatcher(Module):
         def match(pattern, value):
             return re.match(pattern, value) is not None
 
-        return {
+        variables = {
             # constants
             'BREW_TASK_ID': task.task_id,
             'BREW_TASK_TARGET': task.target.target,
@@ -244,6 +244,10 @@ class CIBrewDispatcher(Module):
             # functions
             'MATCH': match
         }
+
+        self.debug('locals:\n{}'.format(format_dict(variables)))
+
+        return variables
 
     @cached_property
     def _rules_globals(self):
@@ -378,7 +382,7 @@ class CIBrewDispatcher(Module):
 
         raise CIError('Unexpected data found in config', soft=True)
 
-    def _construct_command_sets(self, component):
+    def _construct_command_sets(self, config, component):
         """
         Preprocess configuration for given component, and create a pile of
         "command sets". Each set has a name and list of commands, and can carry
@@ -411,7 +415,7 @@ class CIBrewDispatcher(Module):
         def _reduce_global_section(name):
             self.debug('reducing "{}" section'.format(name))
 
-            commands = self._reduce_section(self.config.get(name, []), is_component=False)
+            commands = self._reduce_section(config.get(name, []), is_component=False)
 
             if commands is None:
                 self.debug('  empty section, empty list')
@@ -430,7 +434,7 @@ class CIBrewDispatcher(Module):
         global_default_commands = _reduce_global_section('default')
         self.debug('global "default" commands:\n{}'.format(global_default_commands))
 
-        packages_config = self.config.get('packages', None)
+        packages_config = config.get('packages', None)
         if packages_config is None:
             # either there's no key "packages", or it's empty
             packages_config = {}
@@ -469,8 +473,32 @@ class CIBrewDispatcher(Module):
         if task is None:
             raise CIError('Need a brew task to continue')
 
+        self.debug('find out which config section we should use')
+
+        matching_config = None
+
+        for section in self.config:
+            if 'rule' not in section:
+                self.warn("Section does not contain 'rule' key, ignored")
+                self.ci.sentry_submit_warning("Section does not contain 'rule' key, ignored")
+                continue
+
+            rules = Rules(section['rule'])
+            self.debug('evaluating rules {}'.format(rules))
+
+            if rules.eval(self._rules_globals, self._rules_locals) is not True:
+                self.debug('denied by rules')
+                continue
+
+            matching_config = section
+            break
+
+        else:
+            self.warn('Cannot select any section, no rules matched current environment')
+            return
+
         # Find command sets for the component
-        commands = self._construct_command_sets(component)
+        commands = self._construct_command_sets(matching_config, component)
         self.debug('commands:\n{}'.format(format_dict(commands)))
 
         def _dispatch_commands(commands):
