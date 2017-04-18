@@ -259,6 +259,7 @@ class NetworkedGuest(Guest):
         return '{}{}:{}'.format((self.username + '@') if self.username is not None else '', self.hostname, self.port)
 
     def setup(self, **kwargs):
+        # pylint: disable=arguments-differ
         if not self._module.has_shared('setup_guest'):
             raise libci.CIError("Module 'guest-setup' is required to actually set the guests up.")
 

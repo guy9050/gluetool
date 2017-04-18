@@ -153,7 +153,7 @@ class CICovscan(Module):
 
         covscan_result.download_artifacts()
 
-        if len(covscan_result.added) > 0:
+        if covscan_result.added:
             self.info('FAIL: New defects in package.')
             overall_result = 'FAIL'
 

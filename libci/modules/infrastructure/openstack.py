@@ -82,6 +82,8 @@ class OpenstackGuest(NetworkedGuest):
                                              options=DEFAULT_SSH_OPTIONS)
 
     def setup(self, variables=None, **kwargs):
+        # pylint: disable=arguments-differ
+
         """
         Custom setup for Openstack guests. Add a resolvable openstack hostname in case there
         is none.

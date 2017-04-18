@@ -314,10 +314,9 @@ class CIBrewDispatcher(Module):
                     'default': default_commands[:]
                 }
 
-            else:
-                return {
-                    'default': []
-                }
+            return {
+                'default': []
+            }
 
         if isinstance(commands, list):
             # foo:
