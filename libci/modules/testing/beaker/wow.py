@@ -8,7 +8,7 @@ import imp
 import bs4
 
 from libci import CIError, CICommandError, Module, utils
-from libci.utils import run_command, log_blob
+from libci.utils import run_command, log_blob, format_dict
 from libci.results import TestResult, publish_result
 
 
@@ -99,14 +99,15 @@ class CIWow(Module):
 
                 DEBUG = citool_module.debug
 
-                xml = task.xml
+                task_xml = task.xml
+                recipe_xml = task.recipe.xml
                 journal = tcms_results.JournalParser(task)
 
                 DEBUG("task: '{}'".format(task.name))
-                log_blob(DEBUG, 'task XML', xml.toprettyxml())
-                log_blob(DEBUG, 'task journal', journal.getDetails())
+                log_blob(DEBUG, 'task XML', task_xml.toprettyxml())
+                DEBUG('task journal:\n{}'.format(format_dict(journal.getDetails())))
 
-                machine = xml.getElementsByTagName('roles')[0].getElementsByTagName('system')[0]
+                machine = task_xml.getElementsByTagName('roles')[0].getElementsByTagName('system')[0]
 
                 if task.name not in processed_results:
                     processed_results[task.name] = []
@@ -115,8 +116,8 @@ class CIWow(Module):
                     'name': task.name,
                     'bkr_recipe_id': int(task.recipe.id),
                     'bkr_distrovariant': str(task.recipe.environment),
-                    'bkr_task_id': int(xml.attributes['id'].value),
-                    'bkr_version': xml.attributes['version'].value,
+                    'bkr_task_id': int(task_xml.attributes['id'].value),
+                    'bkr_version': task_xml.attributes['version'].value,
                     'bkr_arch': task.recipe.arch,
                     'bkr_status': task.status,
                     'bkr_result': task.result,
@@ -132,7 +133,7 @@ class CIWow(Module):
                 # convert test duration in a form of %h:%m:%s to simple integer (sec)
                 # note: duration doesn't always need to be there, e.g. when "External
                 # Watchdog Expired"
-                duration = xml.attributes.get('duration')
+                duration = task_xml.attributes.get('duration')
                 if duration is not None:
                     data['bkr_duration'] = 0
 
@@ -144,7 +145,7 @@ class CIWow(Module):
                     data['bkr_duration'] += _chunks[0] * 60 * 60 + _chunks[1] * 60 + _chunks[2]
 
                 # store params, if any
-                params_node = xml.getElementsByTagName('params')
+                params_node = task_xml.getElementsByTagName('params')
 
                 # not sure whether params_node would evaluate to False when it's empty
                 # pylint: disable=len-as-condition
@@ -165,7 +166,7 @@ class CIWow(Module):
                 data['bkr_packages'] = [k.strip() for k in sorted(packages.keys())]
 
                 # store phases
-                results_nodes = xml.getElementsByTagName('results')
+                results_nodes = task_xml.getElementsByTagName('results')
                 if results_nodes:
                     for result_node in results_nodes[0].getElementsByTagName('result'):
                         phase = result_node.attributes['path'].value
@@ -174,13 +175,29 @@ class CIWow(Module):
                         data['bkr_phases'][phase] = result
 
                 # store log links
-                logs_nodes = xml.getElementsByTagName('logs')
+                logs_nodes = task_xml.getElementsByTagName('logs')
                 if logs_nodes:
                     for log_node in logs_nodes[0].getElementsByTagName('log'):
                         data['bkr_logs'].append({
                             'href': log_node.attributes['href'].value,
                             'name': log_node.attributes['name'].value
                         })
+
+                else:
+                    # For some reason, task XML from beaker - when compared with XML produced by restraint - does
+                    # not contain any <logs/> element. For such case, add at least "generated" URL of TESTOUT.log
+                    # log file.
+
+                    recipe_id = int(recipe_xml.attributes['id'].value)
+                    task_id = int(task_xml.attributes['id'].value)
+
+                    # pylint: disable=line-too-long
+                    url = 'https://beaker.engineering.redhat.com/recipes/{}/tasks/{}/logs/TESTOUT.log'.format(recipe_id, task_id)
+
+                    data['bkr_logs'].append({
+                        'href': url,
+                        'name': 'TESTOUT.log'
+                    })
 
                 processed_results[task.name].append(data)
 
