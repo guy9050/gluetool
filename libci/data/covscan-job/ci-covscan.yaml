@@ -28,7 +28,7 @@
                  brew-build-name
                  covscan
                  notify-ci-bus
-                 notify-email --covscan-default="{ISSUER}" ${notify_email_options}
+                 notify-email ${notify_email_options}
     properties:
       - build-discarder:
           num-to-keep: 500
