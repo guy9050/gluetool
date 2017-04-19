@@ -16,7 +16,7 @@ SMTP = 'smtp.corp.redhat.com'
 
 SENDER = 'qe-baseos-automation@redhat.com'
 HARD_ERROR_CC = ['qe-baseos-automation@redhat.com']
-ARCHIVE_BCC = ['qe-baseos-automation@redhat.com']
+ARCHIVE_CC = ['qe-baseos-automation@redhat.com']
 
 SUBJECT = '[CI] [{result.test_type}] [{result.overall_result}] {task.nvr}, brew task {task.task_id}, \
 build target {task.target.target}'
@@ -118,7 +118,7 @@ ${ re.sub(r'(.*)', r'    \\1', tabulate.tabulate(fails_tabulate(name, runs), tab
 class Message(object):
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, module, subject=None, header=None, footer=None, body=None, recipients=None, bcc=None,
+    def __init__(self, module, subject=None, header=None, footer=None, body=None, recipients=None, cc=None,
                  sender=None):
         # pylint: disable=too-many-arguments
         self._module = module
@@ -128,7 +128,8 @@ class Message(object):
         self.footer = footer or ''
         self.body = body or ''
         self.recipients = recipients or []
-        self.bcc = bcc or []
+        # pylint: disable=invalid-name
+        self.cc = cc or []
         self.sender = sender or self._module.option('sender')
 
     def send(self):
@@ -144,16 +145,16 @@ class Message(object):
         msg['Subject'] = self.subject
         msg['From'] = self.sender
         msg['To'] = ', '.join(self.recipients)
-        msg['Bcc'] = ', '.join(self.bcc)
+        msg['Cc'] = ', '.join(self.cc)
 
         self._module.debug("Recipients: '{}'".format(', '.join(self.recipients)))
-        self._module.debug("Bcc: '{}'".format(', '.join(self.bcc)))
+        self._module.debug("Bcc: '{}'".format(', '.join(self.cc)))
         self._module.debug("Sender: '{}'".format(self.sender))
         self._module.debug("Subject: '{}'".format(self.subject))
         utils.log_blob(self._module.debug, 'Content', content)
 
         smtp = smtplib.SMTP(self._module.option('smtp-server'))
-        smtp.sendmail(self.sender, self.recipients + self.bcc, msg.as_string())
+        smtp.sendmail(self.sender, self.recipients + self.cc, msg.as_string())
         smtp.quit()
 
 
@@ -217,11 +218,11 @@ class Notify(Module):
             'help': 'If set, it will override any and all recipient settings - all e-mails will go to this list',
             'metavar': 'EMAILS'
         },
-        'archive-bcc': {
+        'archive-cc': {
             # pylint: disable=line-too-long
-            'help': 'If set, it will send copy of every outgoing e-mail to EMAILS (default: {})'.format(', '.join(ARCHIVE_BCC)),
+            'help': 'If set, it will send copy of every outgoing e-mail to EMAILS (default: {})'.format(', '.join(ARCHIVE_CC)),
             'metavar': 'EMAILS',
-            'default': ', '.join(ARCHIVE_BCC)
+            'default': ', '.join(ARCHIVE_CC)
         },
         'add-reservation': {
             'help': 'Add reservation message for each tested machine',
@@ -344,12 +345,12 @@ class Notify(Module):
         return self.option_to_mails('force-recipients')
 
     @utils.cached_property
-    def archive_bcc(self):
+    def archive_cc(self):
         """
         List of archive (Bcc) recipients.
         """
 
-        return self.option_to_mails('archive-bcc')
+        return self.option_to_mails('archive-cc')
 
     @utils.cached_property
     def symbolic_recipients(self):
@@ -648,7 +649,7 @@ class Notify(Module):
                           header=BODY_HEADER.format(task=task),
                           footer=BODY_FOOTER.format(jenkins_build_url=jenkins_build_url),
                           recipients=recipients,
-                          bcc=self.archive_bcc)
+                          cc=self.archive_cc)
 
             # we're sure formatter *is* callable
             # pylint: disable=not-callable
@@ -712,6 +713,6 @@ class Notify(Module):
                       footer=BODY_FOOTER.format(jenkins_build_url=jenkins_build_url),
                       body=body,
                       recipients=recipients,
-                      bcc=self.archive_bcc)
+                      cc=self.archive_cc)
 
         msg.send()
