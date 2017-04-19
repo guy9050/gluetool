@@ -57,6 +57,9 @@ class CIWow(Module):
     def sanity(self):
         utils.check_for_commands(REQUIRED_COMMANDS)
 
+        if not self.option('wow-options'):
+            raise CIError('No tests configured for this run', soft=True)
+
         for path in TCMS_RESULTS_LOCATIONS:
             try:
                 self.tcms_results = tcms_results = imp.load_source('tcms_results', os.path.join(path, 'tcms-results'))
