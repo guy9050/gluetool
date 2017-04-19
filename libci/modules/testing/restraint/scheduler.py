@@ -161,6 +161,10 @@ class RestraintScheduler(libci.Module):
         for guest, recipe_set in self._schedule:
             libci.utils.log_blob(self.debug, str(guest), recipe_set.prettify())
 
+    def sanity(self):
+        if not self.option('wow-options'):
+            raise CIError('No tests configured for this run', soft=True)
+
     def execute(self):
         task = self.shared('brew_task')
         if task is None:
