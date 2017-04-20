@@ -289,8 +289,12 @@ def fetch_url(url, logger=None, success_codes=(200,)):
 
     logger.debug("opening URL '{}'".format(url))
 
-    response = urllib2.urlopen(url)
-    code, content = response.getcode(), response.read()
+    try:
+        response = urllib2.urlopen(url)
+        code, content = response.getcode(), response.read()
+
+    except urllib2.HTTPError as exc:
+        raise CIError("Failed to fetch URL '{}': {}".format(url, exc.message))
 
     log_blob(logger.debug, '{}: {}'.format(url, code), content)
 
