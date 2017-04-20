@@ -300,6 +300,7 @@ class CIBrewDispatcher(Module):
 
                 for flag in [flag for flag in flags.iterkeys() if flag not in CIBrewDispatcher.KNOWN_FLAGS]:
                     self.warn("Flag '{}' is not supported (typo maybe?)".format(flag))
+                    self.ci.sentry_submit_warning("Flag '{}' is not supported (typo maybe?)".format(flag))
 
                 self.debug('      final flags:\n{}'.format(format_dict(flags)))
 
