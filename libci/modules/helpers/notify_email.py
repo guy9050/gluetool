@@ -453,6 +453,12 @@ class Notify(Module):
 
         self.debug('searching for failed tests')
 
+        if result.overall_result not in ('PASS', 'FAIL'):
+            # only PASS and FAIL results provide list of individual case runs,
+            # e.g. ERROR result does not carry this information.
+            self.debug('no tasks to inspect (overall result is {})'.format(result.overall_result))
+            return {}
+
         fails = {}
 
         for name, runs in result.payload.iteritems():
