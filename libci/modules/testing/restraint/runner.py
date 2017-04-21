@@ -23,6 +23,25 @@ class RestraintExitCodes(enum.IntEnum):
     RESTRAINT_TASK_RUNNER_RESULT_ERROR = 10
 
 
+class IncompatibleOptionsError(libci.SoftCIError):
+    SUBJECT = 'Incompatible options detected'
+    BODY = """
+Configuration of your component uses incompatible options for `restraint-runner` module:
+
+    {message}
+
+Please, review the configuration of your component - the default settings are usually sane
+and should not lead to this error. For valid options, their values and possible combinations
+see documentation for `restraint-runner` ([1]).
+
+[1] https://url.corp.redhat.com/e19c028
+    """
+
+    def __init__(self):
+        msg = '--parallelize-task-sets is not supported when snapshots are disabled'
+        super(IncompatibleOptionsError, self).__init__(msg)
+
+
 class RestraintTestResult(TestResult):
     # pylint: disable=too-few-public-methods
 
@@ -450,7 +469,7 @@ class RestraintRunner(libci.Module):
                 self.info('Will run recipe set tasks serially, using snapshots')
         else:
             if self.parallelize_task_sets:
-                raise libci.CIError('--parallelize-task-sets is not supported when snapshots are disabled', soft=True)
+                raise IncompatibleOptionsError()
 
             self.info('Will run recipe set tasks serially, without snapshots')
 

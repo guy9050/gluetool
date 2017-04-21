@@ -18,20 +18,58 @@ DATA_PATH = os.path.dirname(os.path.abspath(__file__)) + '/data'
 
 class CIError(Exception):
     """
-    General ``libci`` exception.
-
-    :param bool soft: **Soft** errors are errors CI Ops and/or developers shouldn't be bothered with, things that
-      are up to the user to fix, e.g. empty set of tests. **Hard** errors are supposed to warn Ops/Devel teams
-      about important infrastructure issues, code deficiencies, bugs and other issues that are fixable only by
-      their actions.
-
-    :ivar bool soft: If ``True``, the exception is a soft error.
+    Generic ``libci`` exception.
     """
 
-    def __init__(self, message, soft=False, **kwargs):
-        super(CIError, self).__init__(message, **kwargs)
+    pass
 
-        self.soft = soft
+
+class SoftCIError(CIError):
+    """
+    **Soft** errors are errors CI Ops and/or developers shouldn't be bothered with, things that
+    are up to the user to fix, e.g. empty set of tests. **Hard** errors are supposed to warn Ops/Devel
+    teams about important infrastructure issues, code deficiencies, bugs and other issues that are
+    fixable only by actions of CI staff.
+
+    However, we still must provide notification to user(s), and since we expect them to fix the issues
+    that led to raising the soft error, we must provide them with as much information as possible.
+    Therefore soft errors contain a template that can be used to format the error into a descriptive
+    text, usable e.g. in e-mail.
+    """
+
+    STATUS = 'ABORT'
+    SUBJECT = None
+    BODY = None
+
+    def __init__(self, *args, **kwargs):
+        assert self.STATUS is not None
+        assert self.SUBJECT is not None
+        assert self.BODY is not None
+
+        super(SoftCIError, self).__init__(*args, **kwargs)
+
+    def _template_variables(self):
+        """
+        Override this method to provide more variables for rendering exception template.
+        """
+
+        return {
+            'message': self.message
+        }
+
+    def render(self):
+        """
+        Render template with variables provided by the exception instance.
+        """
+
+        from .utils import render_template
+
+        variables = self._template_variables()
+
+        return {
+            'subject': render_template(self.SUBJECT, **variables),
+            'body': render_template(self.BODY, **variables)
+        }
 
 
 class CIRetryError(CIError):
@@ -78,7 +116,7 @@ class Failure(object):
         if exc_info:
             exc = exc_info[1]
 
-            self.soft = isinstance(exc, CIError) and exc.soft is True
+            self.soft = isinstance(exc, SoftCIError)
 
         else:
             self.soft = False

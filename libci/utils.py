@@ -10,6 +10,7 @@ import subprocess
 import urllib2
 
 import urlnorm
+import mako
 
 from libci import CIError, CICommandError
 from libci.log import Logging, ContextAdapter
@@ -335,3 +336,30 @@ def treat_url(url, shorten=False, logger=None):
             logger.warn('Unable to shorten URL (see log for more details): {}'.format(exc.message))
 
     return url.strip()
+
+
+def render_template(tmpl, **kwargs):
+    """
+    Render template. Logs errors, and raises an exception when it's not possible
+    to correctly render the remplate.
+
+    :param tmpl: Template to render. It can be either :py:class:`mako.template.Template` instance,
+      or a string.
+    :param dict kwargs: Keyword arguments passed to render process.
+    :rtype: str
+    :returns: Rendered template.
+    :raises libci.ci.CIError: when the rednering failed.
+    """
+
+    try:
+        if isinstance(tmpl, str):
+            return tmpl.format(**kwargs).strip()
+
+        if isinstance(tmpl, mako.template.Template):
+            return tmpl.render(**kwargs).strip()
+
+        raise CIError('Unhandled template type {}'.format(type(tmpl)))
+
+    except:
+        details = mako.exceptions.text_error_template().render()
+        raise CIError('Cannot render template:\n{}'.format(details))

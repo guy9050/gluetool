@@ -7,7 +7,7 @@ import imp
 
 import bs4
 
-from libci import CIError, CICommandError, Module, utils
+from libci import CIError, SoftCIError, CICommandError, Module, utils
 from libci.utils import run_command, log_blob, format_dict
 from libci.results import TestResult, publish_result
 
@@ -15,6 +15,30 @@ from libci.results import TestResult, publish_result
 REQUIRED_COMMANDS = ['bkr', 'beaker-jobwatch', 'tcms-results']
 
 TCMS_RESULTS_LOCATIONS = ('/bin', '/usr/bin')
+
+
+class NoTestAvailableError(SoftCIError):
+    SUBJECT = 'No tests found for the component'
+    BODY = """
+
+CI could not find any suitable tests for the component. This can have many different causes, e.g.:
+
+    * component's configuration is incomplete, it does not provide correct test plan with tests
+      for the component, or
+    * the test plan is provided but it's empty, or
+    * the test plan is not empty but there are filters applied in the configuration, and the result
+      is an empty set of tests.
+
+Please, see the documentation on CI configuration and what is required to correctly enable CI for
+a component ([1]), current configuration ([2]), and/or consult with component's QE how to resolve
+this situation.
+
+[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Documentation/UserHOWTO#AddthecomponenttoCI
+[2] https://gitlab.cee.redhat.com/baseos-qe/citool-config/raw/production/brew-dispatcher.yaml
+    """
+
+    def __init__(self):
+        super(NoTestAvailableError, self).__init__('No tests provided for the component')
 
 
 class WowTestResult(TestResult):
@@ -58,7 +82,7 @@ class CIWow(Module):
         utils.check_for_commands(REQUIRED_COMMANDS)
 
         if not self.option('wow-options'):
-            raise CIError('No tests configured for this run', soft=True)
+            raise NoTestAvailableError()
 
         for path in TCMS_RESULTS_LOCATIONS:
             try:
@@ -254,12 +278,10 @@ class CIWow(Module):
 
         except CICommandError as exc:
             # Check for most common causes, and raise soft error where necessary
-            soft = False
-
             if 'No relevant tasks found in test plan' in exc.output.stderr:
-                soft = True
+                raise NoTestAvailableError()
 
-            raise CIError("Failure during 'wow' execution: {}".format(exc.output.stderr), soft=soft)
+            raise CIError("Failure during 'wow' execution: {}".format(exc.output.stderr))
 
         job = bs4.BeautifulSoup(output.stdout, 'xml')
 
