@@ -19,6 +19,17 @@ class BrewTask(object):
         self.brew = session
 
     @cached_property
+    def build_info(self):
+        return self.brew.listBuilds(taskID=self.task_id)
+
+    @cached_property
+    def build_id(self):
+        try:
+            return self.build_info[0]['build_id']
+        except IndexError:
+            raise CIError("Could not find build id, scratch build?")
+
+    @cached_property
     def task_info(self):
         task_info = self.brew.getTaskInfo(self.task_id, request=True)
         if not task_info:
@@ -46,7 +57,7 @@ class BrewTask(object):
         try:
             if "scratch" in self.task_info["request"][2]:
                 return self.task_info["request"][2]["scratch"]
-        except TypeError:
+        except (TypeError, IndexError):
             raise CIError('invalid build task id')
         return False
 
@@ -75,9 +86,8 @@ class BrewTask(object):
             raise CIError("Brew task [%s] is not a successfully completed task" % self.task_id)
 
         # For standard (non-scratch) builds, we may fetch an associated build and dig info from it
-        builds = self.brew.listBuilds(taskID=self.task_id)
-        if len(builds) == 1:
-            build = builds[0]
+        if len(self.build_info) == 1:
+            build = self.build_info[0]
             url = "{0}/packages/%s/%s/%s/src/%s.src.rpm".format(BREW_API_TOPURL)
             return url % (build["package_name"], build["version"], build["release"], build["nvr"])
 
