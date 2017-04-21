@@ -172,7 +172,7 @@ class CIRpmdiff(Module):
 
         if test_type == 'comparison':
             if self.brew_task.latest is None:
-                raise CIError('could not find baseline for this build')
+                raise CIError('could not find baseline for this build', soft=True)
             if self.brew_task.scratch is False and self.brew_task.latest == self.brew_task.nvr:
                 self.info('cowardly refusing to compare same packages')
                 return
