@@ -112,7 +112,8 @@ class CIBuildOnCommit(Module):
         msg = ['scheduling scratch build of component']
         msg += ["'{}' on branch '{}' with build target '{}'".format(component, branch, target)]
         self.info(' '.join(msg))
-        command = ["rhpkg", "build", "--scratch", "--skip-nvr-check", "--arches", "x86_64", "--target", target, "--nowait"]
+        command = ["rhpkg", "build", "--scratch", "--skip-nvr-check", "--arches", "x86_64",
+                   "--target", target, "--nowait"]
         output = self._run_command(command)
 
         # detect brew task id and log it
@@ -123,4 +124,3 @@ class CIBuildOnCommit(Module):
         # wait until brew task finish
         command = ["brew", "watch-task", taskid]
         self._run_command(command)
-
