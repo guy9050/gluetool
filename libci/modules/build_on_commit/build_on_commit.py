@@ -1,7 +1,7 @@
 import os
 import re
 from libci import CICommandError, CIError, Module
-from libci.utils import check_for_commands, run_command, PARENT
+from libci.utils import check_for_commands, run_command
 
 # Base URL of the dit-git repositories
 GIT_BASE_URL = 'git://pkgs.devel.redhat.com/rpms/'
@@ -50,7 +50,7 @@ class CIBuildOnCommit(Module):
     @staticmethod
     def _run_command(command):
         try:
-            run_command(command, stdout=PARENT)
+            run_command(command)
         except CICommandError as exc:
             error = exc.output.stdout.rstrip("'\n") + exc.output.stderr.rstrip("'\n")
             raise CIError("failure during '{}' execution\n{}'".format(command[0], error))
