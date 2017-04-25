@@ -180,8 +180,8 @@ class RestraintRunner(libci.Module):
 
                 journal_root = journal.BEAKER_TEST
 
-                started = datetime.datetime.strptime(journal_root.starttime.string, '%Y-%m-%d %H:%M:%S EDT')
-                ended = datetime.datetime.strptime(journal_root.endtime.string, '%Y-%m-%d %H:%M:%S EDT')
+                started = datetime.datetime.strptime(journal_root.starttime.string, '%Y-%m-%d %H:%M:%S %Z')
+                ended = datetime.datetime.strptime(journal_root.endtime.string, '%Y-%m-%d %H:%M:%S %Z')
                 duration = (ended - started).total_seconds()
 
             else:
