@@ -116,15 +116,15 @@ class RpmDiffWaiver(libci.Module):
             self.info("Manual mapping was successful, product version: {}".format(product_version))
             return product_version
         else:
-            self.info("Manual mapping did not find product version")
+            self.warning("Manual mapping did not find product version")
         self.info("Try query Errata DB to search mapping")
         product_versions = self.query_product_versions(brew_tag)
         self.info("Found product versions: {}".format(product_versions))
         if not product_versions:
-            self.info("Errata mapping did not find any product version")
+            self.warning("Errata mapping did not find any product version")
             return None
         if len(product_versions) > 1:
-            self.info("Errata mapping is ambigous, more product versions found")
+            self.warning("Errata mapping is ambigous, more product versions found")
             return None
         product_version = product_versions[0]
         self.info("Errata mapping was successful, product version: {}".format(product_version))
@@ -191,8 +191,7 @@ class RpmDiffWaiver(libci.Module):
         self.info("Map brew tag '{}' to product version".format(target))
         errata_product = self._map_tag_to_product(target)
         if not errata_product:
-            self.info('No Errata product found for target: {}, quit silently'.format(target))
-            return
+            raise libci.CIError('No Errata product found for target: {}'.format(target))
 
         hub_url = self.option('url')
 
