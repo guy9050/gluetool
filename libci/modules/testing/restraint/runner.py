@@ -282,7 +282,7 @@ class RestraintRunner(libci.Module):
 
             try:
                 output = libci.utils.run_command([
-                    'restraint', '-vvv',
+                    'restraint', '-v',
                     '--host', '1={}@{}'.format(guest.username, self._guest_restraint_address(guest)),
                     '--job', f.name
                 ], logger=guest.logger)
@@ -293,6 +293,7 @@ class RestraintRunner(libci.Module):
                 if e.output.exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_RESULT_ERROR:
                     # "One or more tasks failed" error - this is a good, well behaving error.
                     # We can safely move on and process results stored in restraint's directory.
+                    self.info('restraint reports: One or more tasks failed')
                     output = e.output
 
                 else:
