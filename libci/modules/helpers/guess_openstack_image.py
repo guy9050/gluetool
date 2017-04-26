@@ -3,8 +3,23 @@ import re
 
 import yaml
 
-from libci import CIError, Module
+from libci import CIError, SoftCIError, Module
 from libci.utils import cached_property, format_dict
+
+
+class IncompatibleOptionsError(SoftCIError):
+    SUBJECT = 'Incompatible options detected'
+    BODY = """
+Configuration of your component uses incompatible options for `guess-openstack-image` module:
+
+    {message}
+
+Please, review the configuration of your component - the default settings are usually sane
+and should not lead to this error. For valid options, their values and possible combinations
+see documentation for `guess-openstack-image` ([1]).
+
+[1] https://url.corp.redhat.com/9249e74
+    """
 
 
 class CIGuessOpenstackImage(Module):
@@ -178,15 +193,15 @@ class CIGuessOpenstackImage(Module):
             raise CIError("--pattern-map option is required with method '{}'".format(method), soft=True)
 
         if method in image_required and not image:
-            raise CIError("--image option is required with method '{}'".format(method), soft=True)
+            raise IncompatibleOptionsError("--image option is required with method '{}'".format(method))
 
         if method in image_ignored and image:
-            raise CIError("--image option is ignored with method '{}'".format(method), soft=True)
+            raise IncompatibleOptionsError("--image option is ignored with method '{}'".format(method))
 
     def execute(self):
         method = self._methods.get(self.option('method'), None)
         if method is None:
-            raise CIError("Unknown 'guessing' method '{}'".format(self.option('method')), soft=True)
+            raise IncompatibleOptionsError("Unknown 'guessing' method '{}'".format(self.option('method')))
 
         method(self)
         self.info("Using image '{}'".format(self._image))

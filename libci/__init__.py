@@ -1,5 +1,5 @@
 from .ci import CI
-from .ci import CIError, CIRetryError, CICommandError, Failure
+from .ci import CIError, SoftCIError, CIRetryError, CICommandError, Failure
 from .ci import Module
 from .ci import retry
 from .log import Logging
@@ -12,7 +12,7 @@ except ImportError:
 
 __all__ = ['__version__',
            'CI',
-           'CIError', 'CIRetryError', 'CICommandError', 'Failure',
+           'CIError', 'SoftCIError', 'CIRetryError', 'CICommandError', 'Failure',
            'Module',
            'Logging',
            'retry',

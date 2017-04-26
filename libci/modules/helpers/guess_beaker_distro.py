@@ -2,12 +2,27 @@ import os.path
 import re
 import bs4
 import yaml
-from libci import CIError, Module
+from libci import CIError, SoftCIError, Module
 from libci.utils import format_dict, fetch_url, cached_property
 
 
 DEFAULT_NIGHTLY_LISTING = 'http://download.eng.brq.redhat.com/nightly/'
 DEFAULT_BU_LISTING = 'http://download-node-02.eng.bos.redhat.com/rel-eng/updates/'
+
+
+class IncompatibleOptionsError(SoftCIError):
+    SUBJECT = 'Incompatible options detected'
+    BODY = """
+Configuration of your component uses incompatible options for `guess-beaker-distro` module:
+
+    {message}
+
+Please, review the configuration of your component - the default settings are usually sane
+and should not lead to this error. For valid options, their values and possible combinations
+see documentation for `guess-beaker-distro` ([1]).
+
+[1] https://url.corp.redhat.com/dbb9190
+    """
 
 
 class CIGuessBeakerDistro(Module):
@@ -339,18 +354,18 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
         distro = self.option('distro')
 
         if method == 'target-autodetection' and not self.option('pattern-map'):
-            raise CIError("--pattern-map option is required with method '{}'".format(method), soft=True)
+            raise CIError("--pattern-map option is required with method '{}'".format(method))
 
         if method in distro_required and not distro:
-            raise CIError("--distro option is required with method '{}'".format(method), soft=True)
+            raise IncompatibleOptionsError("--distro option is required with method '{}'".format(method))
 
         if method in distro_ignored and distro:
-            raise CIError("--distro option is ignored with method '{}'".format(method), soft=True)
+            raise IncompatibleOptionsError("--distro option is ignored with method '{}'".format(method))
 
     def execute(self):
         method = self._methods.get(self.option('method'), None)
         if method is None:
-            raise CIError("Unknown 'guessing' method '{}'".format(self.option('method')), soft=True)
+            raise IncompatibleOptionsError("Unknown 'guessing' method '{}'".format(self.option('method')))
 
         method(self)
         self.info("Using distro '{}'".format(self._distro))

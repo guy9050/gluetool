@@ -6,11 +6,34 @@ import StringIO
 import gzip
 from urllib2 import urlopen
 from urlgrabber.grabber import urlgrab
-from libci import Module, CIError
+from libci import Module, CIError, SoftCIError
 from libci.utils import cached_property, log_blob, run_command, check_for_commands, format_dict, CICommandError
 from libci.results import TestResult, publish_result
 
 REQUIRED_CMDS = ['covscan']
+
+
+class NoResultFilesError(SoftCIError):
+    SUBJECT = 'Failed to fetch covscan result files'
+    BODY = """
+CI failed to download necessary files from Covscan site, therefore it cannot
+decide what to do next. It may have been caused by failed covscan task. You
+may find solution on {covscan_result_url}.
+    """
+
+    def __init__(self, result):
+        super(NoResultFilesError, self).__init__('Failed to fetch Covscan files')
+
+        self.result = result
+
+    def _template_variables(self):
+        variables = super(NoResultFilesError, self)._template_variables()
+
+        variables.update({
+            'covscan_result_url': self.result.url
+        })
+
+        return variables
 
 
 class CovscanTestResult(TestResult):
@@ -146,10 +169,7 @@ class CICovscan(Module):
         self.info('Covscan task url: {0}'.format(covscan_result.url))
 
         if covscan_result.status_failed():
-            msg = 'Failed to get result files. '\
-                  'Probably because of covscan task failed. '\
-                  'Try find solution here {}'.format(covscan_result.url)
-            raise CIError(msg, soft=True)
+            raise NoResultFilesError(covscan_result)
 
         covscan_result.download_artifacts()
 

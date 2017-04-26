@@ -5,8 +5,137 @@ import ast
 import _ast
 import yaml
 
-from libci import Module, CIError
+from libci import Module, CIError, SoftCIError
 from libci.utils import format_dict, cached_property
+
+
+class RulesError(SoftCIError):
+    """
+    Base class of rules-related soft exceptions.
+
+    :param str message: descriptive message, passed to parent Exception classes.
+    :param Rules rules: rules in question.
+    :param str intro: introductory text, pasted at the beginning of template.
+    :param str error: specific error message.
+    """
+
+    SUBJECT = 'Unable to parse filtering rules'
+    BODY = """
+{intro}:
+
+    {rules}
+
+    {error}
+
+Please, review the configuration of your component, for complete information on filtering rules
+and supported operators and functions see documentation of `brew-dispatcher` module ([1]).
+
+[1] https://url.corp.redhat.com/dafcf63
+    """
+
+    def __init__(self, message, rules, intro, error):
+        super(RulesError, self).__init__(message)
+
+        self.rules = rules
+        self.intro = intro
+        self.error = error
+
+    def _template_variables(self):
+        variables = super(RulesError, self)._template_variables()
+
+        variables.update({
+            'rules': str(self.rules),
+            'intro': self.intro,
+            'error': self.error
+        })
+
+        return variables
+
+
+class CommandsError(SoftCIError):
+    """
+    Base class of commands-related soft exceptions.
+
+    :param str message: descriptive message, passed to parent Exception classes.
+    :param obj commands: commands in question. Will be formatted and pasted into
+      the template.
+    """
+
+    SUBJECT = 'Invalid component configuration'
+    BODY = """
+{message}:
+
+{commands}
+
+Please, review the configuration of your component, for documentation on how to
+enable CI for a component and how to configure it see our How To page ([1]).
+
+[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Documentation/UserHOWTO#AddthecomponenttoCI
+    """
+
+    def __init__(self, message, commands):
+        super(CommandsError, self).__init__(message)
+
+        self.commands = commands
+
+    def _template_variables(self):
+        variables = super(CommandsError, self)._template_variables()
+
+        variables.update({
+            'commands': format_dict(self.commands)
+        })
+
+        return variables
+
+
+class InvalidASTNodeError(RulesError):
+    def __init__(self, rules, node):
+        super(InvalidASTNodeError, self).__init__(
+            'Node of type {} not allowed in rules'.format(node.__class__.__name__),
+            rules,
+            'Filtering rules employed for component configuration are using disallowed node',
+            'Node of class {} is not allowed or supported.'.format(node.__class__.__name__))
+
+
+class UnsupportedASTCallError(RulesError):
+    def __init__(self, rules, node):
+        super(UnsupportedASTCallError, self).__init__(
+            'Calling function {} not allowed in rules'.format(node.func.id),
+            rules,
+            'Filtering rules employed for component configuration are calling unsupported function'
+            "Function '{}' is not supported.".format(node.func.id))
+
+
+class RulesSyntaxError(RulesError):
+    def __init__(self, rules, exc):
+        super(RulesSyntaxError, self).__init__(
+            "Cannot parse rules '{}': line {}, offset {}".format(rules, exc.lineno, exc.offset),
+            rules,
+            'Syntax error raised while dealing with filtering rules',
+            'line {}, offset {}'.format(exc.lineno, exc.offset))
+
+
+class RulesTypeError(RulesError):
+    def __init__(self, rules, exc):
+        super(RulesTypeError, self).__init__(
+            "Cannot parse rules '{}': {}".format(rules, str(exc)),
+            rules,
+            'Cannot parse filtering rules',
+            str(exc))
+
+
+class NoFilteringRulesError(CommandsError):
+    def __init__(self, name, commands):
+        super(NoFilteringRulesError, self).__init__(
+            "Command set '{}' does not contain any filtering rules".format(name),
+            commands)
+
+
+class UnexpectedConfigDataError(CommandsError):
+    def __init__(self, commands):
+        super(UnexpectedConfigDataError, self).__init__(
+            'Unexpected command or structures foudn in config file',
+            commands)
 
 
 class SanityASTVisitor(ast.NodeVisitor):
@@ -28,12 +157,17 @@ class SanityASTVisitor(ast.NodeVisitor):
 
     _valid_functions = ('MATCH',)
 
+    def __init__(self, rules, *args, **kwargs):
+        super(SanityASTVisitor, self).__init__(*args, **kwargs)
+
+        self._rules = rules
+
     def generic_visit(self, node):
         if not isinstance(node, SanityASTVisitor._valid_classes):
-            raise CIError('Node of type {} not allowed in rules'.format(node.__class__.__name__), soft=True)
+            raise InvalidASTNodeError(self._rules, node)
 
         if isinstance(node, _ast.Call) and node.func.id not in SanityASTVisitor._valid_functions:
-            raise CIError('Calling function {} not allowed in rules'.format(node.func.id), soft=True)
+            raise UnsupportedASTCallError(self._rules, node)
 
         super(SanityASTVisitor, self).generic_visit(node)
 
@@ -65,19 +199,18 @@ class Rules(object):
             tree = ast.parse(self._rules, mode='eval')
 
         except SyntaxError as e:
-            raise CIError("Cannot parse rules '{}': line {}, offset {}".format(self._rules, e.lineno, e.offset),
-                          soft=True)
+            raise RulesSyntaxError(self._rules, e)
 
         except TypeError as e:
-            raise CIError("Cannot parse rules '{}'".format(self._rules), soft=True)
+            raise RulesTypeError(self._rules, e)
 
-        SanityASTVisitor().visit(tree)
+        SanityASTVisitor(self).visit(tree)
 
         try:
             return compile(tree, '<brew-dispatcher.yaml>', 'eval')
 
         except Exception as e:
-            raise CIError("Cannot evaluate rules '{}': {}".format(self._rules, str(e)), soft=True)
+            raise RulesTypeError(self._rules, e)
 
     def eval(self, our_globals, our_locals):
         """
@@ -97,7 +230,7 @@ class CIBrewDispatcher(Module):
     """
     A configurable dispatcher for Brew builds.
 
-    Possible config file formats are:
+    Possible config file formats are::
 
         component:
             - command1
@@ -105,6 +238,7 @@ class CIBrewDispatcher(Module):
 
     The basic form, will dispatch `command1` and `command2` for every build of `component`.
 
+    Another is a bit more complicated::
 
         component:
             extra-testing:
@@ -126,6 +260,7 @@ class CIBrewDispatcher(Module):
     other build, `command5` will run.
 
     Few notes related to the second form:
+
       - filtering rules *must* be the first entry in the set,
       - flags are optional - the come right after rules, but can be omited
       - "default" set is optional - if you don't specify it, no harm to the configuration
@@ -144,21 +279,25 @@ class CIBrewDispatcher(Module):
 
     Filtering rules are Python expressions, limited in offering of available operations:
 
-      Variables:
+      Variables::
+
         BREW_TASK_ID
         BREW_TASK_TARGET
         BREW_TASK_ISSUER
         NVR
         SCRATCH (True if task was a scratch build)
 
-      Types:
+      Types::
+
         str, int, float
 
-      Operators:
+      Operators::
+
         ==, !=, <, <=, >, >=, is, is not, in, not in
         and, or, not
 
-      Functions:
+      Functions::
+
         MATCH(pattern, variable)
     """
 
@@ -361,7 +500,7 @@ class CIBrewDispatcher(Module):
                     continue
 
                 if set_commands is None or len(set_commands) < 2:
-                    raise CIError("Command set '{}' does not contain filtering rules".format(set_name), soft=True)
+                    raise NoFilteringRulesError(set_name, set_commands)
 
                 rules = Rules(set_commands[0])
                 self.debug('    evaluating rules {}'.format(rules))
@@ -381,7 +520,7 @@ class CIBrewDispatcher(Module):
 
             return reduced
 
-        raise CIError('Unexpected data found in config', soft=True)
+        raise UnexpectedConfigDataError(commands)
 
     def _construct_command_sets(self, config, component):
         """

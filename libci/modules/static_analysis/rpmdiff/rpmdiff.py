@@ -2,7 +2,7 @@ import json
 import re
 import time
 from libci import Module
-from libci import CIError, CICommandError
+from libci import CIError, SoftCIError, CICommandError
 from libci import utils
 from libci.results import TestResult, publish_result
 
@@ -30,6 +30,28 @@ RPMDIFF_SCORE = {
 
 # required commands of module
 REQUIRED_CMDS = ['rpmdiff-remote']
+
+
+class NoBaselineFoundError(SoftCIError):
+    SUBJECT = 'Could not find baseline for RPMDiff'
+    BODY = """
+CI skipped the testing due to the fact, that the baseline build for comparison was not found.
+This can be caused by:
+
+    * this is the first build of the package on this build target
+    * there is some issue with build propagation for the build target
+
+To check the tagged packages for given brew build you can user the 'brew' tool (e.g. for build
+target 'rhel-7.4-candidate' and package bash):
+
+    $ brew list-tagged rhel-7.4-candidate bash
+
+Please file an issue to release enginnering if you encounter inconsistencies in  Brew by sending
+out an email to 'release-engineering@redhat.com'.
+    """
+
+    def __init__(self):
+        super(NoBaselineFoundError, self).__init__('Could not find baseline for this build')
 
 
 class RpmdiffTestResult(TestResult):
@@ -152,8 +174,7 @@ class CIRpmdiff(Module):
 
         if test_type == 'comparison':
             if self.brew_task.latest is None:
-                # this is a soft error, not reported to Sentry
-                raise CIError('could not find baseline for this build', soft=True)
+                raise NoBaselineFoundError()
             if self.brew_task.scratch is False and self.brew_task.latest == self.brew_task.nvr:
                 self.info('cowardly refusing to compare same packages')
                 return

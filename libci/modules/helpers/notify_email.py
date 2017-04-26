@@ -7,9 +7,13 @@ import smtplib
 from email.mime.text import MIMEText
 
 from mako.template import Template
-from mako import exceptions
 
+import libci
 from libci import CIError, Module, utils
+
+
+DEFAULT_MODULE_DOCS_URL = 'http://liver3.lab.eng.brq.redhat.com/~citool-doc/'
+DEFAULT_FRONTEND_URL_TEMPLATE = 'http://baseos-ci.engineering.redhat.com/index.php/b-{JOB_NAME}-{BUILD_ID}'
 
 
 SMTP = 'smtp.corp.redhat.com'
@@ -28,15 +32,10 @@ BODY_HEADER = """
 Brew task:      {task.task_id}
 Tested package: {task.nvr}
 Build issuer:   {task.owner}@redhat.com
-
+Summary:        {summary_url}
 """
 
 BODY_FOOTER = """
-
-
-Jenkins build:    {jenkins_build_url}
-
-
 --
 CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation
 """
@@ -208,6 +207,12 @@ class Notify(Module):
             'action': 'store_true',
             'default': False
         },
+        'frontend-url': {
+            'help': """Template for constructing links to frontend website. URL is created using template passed
+to this option, and process environmental variables (default: {})""".format(DEFAULT_FRONTEND_URL_TEMPLATE),
+            'metavar': 'URL-TEMPLATE',
+            'default': DEFAULT_FRONTEND_URL_TEMPLATE
+        },
 
         'hard-error-cc': {
             'help': 'Recipients to notify when hard error occures. Default: {}'.format(', '.join(HARD_ERROR_CC)),
@@ -227,6 +232,10 @@ class Notify(Module):
         'add-reservation': {
             'help': 'Add reservation message for each tested machine',
             'action': 'store_true',
+        },
+        'add-frontend-url': {
+            'help': 'When set, add frontend URL instead of Jenkins build URL',
+            'action': 'store_true'
         },
 
         # Per-result-type notify lists
@@ -390,26 +399,6 @@ class Notify(Module):
         add_recipients = self.option_to_mails('{}-add-notify'.format(result_type))
 
         return default_recipients + add_recipients
-
-    @staticmethod
-    def _render_template(tmpl, **kwargs):
-        """
-        Render template. Logs errors, and raises an exception when it's not possible
-        to correctly render the remplate.
-
-        :param mako.template.Template tmpl: Template to render.
-        :param dict kwargs: Keyword arguments passed to render process.
-        :rtype: str
-        :returns: Rendered template.
-        :raises libci.ci.CIError: when the rednering failed.
-        """
-
-        try:
-            return tmpl.render(**kwargs)
-
-        except:
-            details = exceptions.text_error_template().render()
-            raise CIError('Cannot render template:\n{}'.format(details))
 
     def _shorten_url(self, url):
         """
@@ -579,13 +568,13 @@ class Notify(Module):
 
                 return table
 
-            fails_body = Notify._render_template(FAILS_BODY, fails=fails, fails_tabulate=fails_tabulate)
+            fails_body = utils.render_template(FAILS_BODY, fails=fails, fails_tabulate=fails_tabulate)
 
         # add reservation info if requested by user
 
         reserved_body = ''
         if adding_reservation:
-            reserved_body = Notify._render_template(RESERVED_BODY, guests=self._gather_reserved_guests(result))
+            reserved_body = utils.render_template(RESERVED_BODY, guests=self._gather_reserved_guests(result))
 
         msg.body = body_template.format(result=result,
                                         fails=fails_body.strip(),
@@ -617,6 +606,44 @@ class Notify(Module):
 
         msg.body = COVSCAN_BODY.format(result=result, covscan_url=covscan_url, brew_url=brew_url)
 
+    def _get_summary_url(self, result):
+        jenkins_build_url = None
+        frontend_url = None
+
+        if 'jenkins_build' in result.urls:
+            jenkins_build_url = self._shorten_url(result.urls['jenkins_build'])
+
+        if 'baseosci_frontend' in result.urls:
+            frontend_url = result.urls['baseosci_frontend']
+
+        else:
+            frontend_url_template = self.option('frontend-url')
+
+            try:
+                frontend_url = self._shorten_url(frontend_url_template.format(**os.environ))
+
+            except KeyError as exc:
+                msg = "Cannot create frontend URL from template '{}': {} variable not set".format(
+                    frontend_url_template, exc.args[0])
+
+                self.warn(msg)
+                self.ci.sentry_submit_warning(msg)
+
+        if self.option('add-frontend-url'):
+            self.debug('asked to use frontend url')
+
+            if frontend_url:
+                return frontend_url
+
+            self.warn('Asked to add frontend URL but that is not set')
+
+        if jenkins_build_url:
+            self.debug('jenkins build url exists, using it as summary url')
+
+            return jenkins_build_url
+
+        return '<Summary URL not available>'
+
     def execute(self):
         task = self.shared('brew_task')
         if not task:
@@ -640,20 +667,16 @@ class Notify(Module):
                 self.warn("Result of type '{}' does not provide any recipients".format(result_type))
                 continue
 
+            summary_url = self._get_summary_url(result)
+
             self.info('Sending {} result notifications to: {}'.format(result_type, ', '.join(recipients)))
-
-            if 'jenkins_build' in result.urls:
-                jenkins_build_url = self._shorten_url(result.urls['jenkins_build'])
-
-            else:
-                jenkins_build_url = '<Jenkins build URL not available>'
 
             subject = SUBJECT_RESERVE if reserve else SUBJECT
 
             msg = Message(self,
                           subject=subject.format(task=task, result=result),
-                          header=BODY_HEADER.format(task=task),
-                          footer=BODY_FOOTER.format(jenkins_build_url=jenkins_build_url),
+                          header=BODY_HEADER.format(task=task, summary_url=summary_url).strip(),
+                          footer=BODY_FOOTER.strip(),
                           recipients=recipients,
                           cc=self.archive_cc)
 
@@ -667,7 +690,6 @@ class Notify(Module):
             return
 
         exc = failure.exc_info[1]
-        soft = isinstance(exc, CIError) and exc.soft is True
 
         recipients = []
 
@@ -676,7 +698,7 @@ class Notify(Module):
         for formatter in [name for name in dir(self) if name.startswith('format_result_')]:
             recipients += self.recipients_for_result_type(formatter[14:])
 
-        if soft is not True:
+        if failure.soft is not True:
             self.debug('Failure caused by a non-soft error')
 
             if self.force_recipients:
@@ -690,11 +712,8 @@ class Notify(Module):
 
         self.info('Sending failure-state notifications to: {}'.format(', '.join(recipients)))
 
-        if 'BUILD_URL' in os.environ:
-            jenkins_build_url = self._shorten_url(os.environ['BUILD_URL'])
-
-        else:
-            jenkins_build_url = '<Jenkins build URL not available>'
+        result = libci.results.TestResult('dummy', 'ERROR')
+        summary_url = self._get_summary_url(result)
 
         task = self.shared('brew_task')
 
@@ -707,16 +726,20 @@ class Notify(Module):
             task = DummyTask(task_id='<Task ID not available>', nvr='<NVR not available>',
                              owner='<Owner not available>')
 
-        if soft:
-            body = SOFT_ERROR_MSG.format(msg=exc.message)
+        if failure.soft:
+            message = exc.render()
+
+            subject = '[CI] [{}] {}'.format(exc.STATUS, message['subject'])
+            body = SOFT_ERROR_MSG.format(msg=message['body'])
 
         else:
+            subject = '[CI] [ABORT] CI pipeline crashed, operations team was notified'
             body = HARD_ERROR_MSG
 
         msg = Message(self,
-                      subject='[CI] [ABORT] CI pipeline crashed, operations team was notified',
-                      header=BODY_HEADER.format(task=task),
-                      footer=BODY_FOOTER.format(jenkins_build_url=jenkins_build_url),
+                      subject=subject,
+                      header=BODY_HEADER.format(task=task, summary_url=summary_url),
+                      footer=BODY_FOOTER,
                       body=body,
                       recipients=recipients,
                       cc=self.archive_cc)
