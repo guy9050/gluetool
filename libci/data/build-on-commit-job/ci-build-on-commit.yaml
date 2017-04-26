@@ -28,5 +28,5 @@
                  build-on-commit --component ${repo} --branch ${branch}
     publishers:
       - archive:
-          artifacts: '**/**'
+          artifacts: 'citool-debug.txt'
           allow-empty: 'true'
