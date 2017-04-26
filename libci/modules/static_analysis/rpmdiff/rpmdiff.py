@@ -88,24 +88,6 @@ class CIRpmdiff(Module):
         utils.check_for_commands(REQUIRED_CMDS)
 
     @staticmethod
-    def _parse_run_id(string):
-        # parse JSON once BZ#1405962 is fixed
-        match = re.search(r"u'run_id': (\d+)", string)
-        if not match:
-            msg = "could not find rpmdiff run id in rpmdiff-remote output"
-            raise CIError(msg)
-        return match.group(1)
-
-    @staticmethod
-    def _parse_web_url(string):
-        # parse JSON once BZ#1405962 is fixed
-        match = re.search(r"u'web_url': u'([^'']*)", string)
-        if not match:
-            msg = "could not find rpmdiff web url in rpmdiff-remote output"
-            raise CIError(msg)
-        return match.group(1)
-
-    @staticmethod
     def _run_command(command):
         try:
             return utils.run_command(command)
@@ -140,12 +122,10 @@ class CIRpmdiff(Module):
         if test_type == 'comparison':
             command += ["--baseline", nvr_baseline]
 
-        out = CIRpmdiff._run_command(command).stdout
-        # once we have valid JSON, we can parse that here
-        # https://bugzilla.redhat.com/show_bug.cgi?id=1405962
-        self.info("web url: {}".format(self._parse_web_url(out)))
-        run_id = self._parse_run_id(out)
-        return self._wait_until_finished(run_id)
+        blob = json.loads(CIRpmdiff._run_command(command).stdout)
+        self.debug('rpmdiff-remote schedule returned:\n{}'.format(utils.format_dict(blob)))
+        self.info("web url: {}".format(blob['web_url']))
+        return self._wait_until_finished(str(blob['run_id']))
 
     def execute(self):
         blacklist = self.option('blacklist')
@@ -172,6 +152,7 @@ class CIRpmdiff(Module):
 
         if test_type == 'comparison':
             if self.brew_task.latest is None:
+                # this is a soft error, not reported to Sentry
                 raise CIError('could not find baseline for this build', soft=True)
             if self.brew_task.scratch is False and self.brew_task.latest == self.brew_task.nvr:
                 self.info('cowardly refusing to compare same packages')
