@@ -21,6 +21,14 @@ JOIN product_versions ON rpmdiff_autowaive_product_versions.product_version_id =
 WHERE active = 1 and package_name = %(package)s and product_versions.name LIKE %(product)s
 ORDER BY 1, 2, 3, 4
 """
+RPMDIFF_PRODUCT_VERSIONS_QUERY = """SELECT DISTINCT
+    product_versions.name as product_version
+FROM brew_tags
+JOIN brew_tags_product_versions ON brew_tags.id = brew_tags_product_versions.brew_tag_id
+JOIN product_versions ON brew_tags_product_versions.product_version_id = product_versions.id
+WHERE brew_tags.name = %(brew_tag)s
+"""
+
 ERRATA_AUTOWAIVER_URL = "https://errata.devel.redhat.com/rpmdiff/show_autowaive_rule/{}"
 RPMDIFF_WEBUI_COMMENT = "Autowaived with citool with these rules: {}"
 # for information purpose about how look like errata product version in database
@@ -94,6 +102,34 @@ class RpmDiffWaiver(libci.Module):
             categorized[waiver.test].append(waiver)
         return categorized
 
+    def query_product_versions(self, brew_tag):
+        cursor = self.shared("postgresql").cursor()
+        search = {
+            'brew_tag': brew_tag
+        }
+        cursor.execute(RPMDIFF_PRODUCT_VERSIONS_QUERY, search)
+        return [row.product_version for row in cursor.fetchall()]
+
+    def _map_tag_to_product(self, brew_tag):
+        if brew_tag in RPMDIFF_PRODUCT_VERSION_MAPPING.keys():
+            product_version = RPMDIFF_PRODUCT_VERSION_MAPPING[brew_tag]
+            self.info("Manual mapping was successful, product version: {}".format(product_version))
+            return product_version
+        else:
+            self.info("Manual mapping did not find product version")
+        self.info("Try query Errata DB to search mapping")
+        product_versions = self.query_product_versions(brew_tag)
+        self.info("Found product versions: {}".format(product_versions))
+        if not product_versions:
+            self.info("Errata mapping did not find any product version")
+            return None
+        if len(product_versions) > 1:
+            self.info("Errata mapping is ambigous, more product versions found")
+            return None
+        product_version = product_versions[0]
+        self.info("Errata mapping was successful, product version: {}".format(product_version))
+        return product_version
+
     @staticmethod
     def _download_errors(link):
         rows = BeautifulSoup(requests.get(link).text, "html.parser") \
@@ -151,10 +187,13 @@ class RpmDiffWaiver(libci.Module):
         if not self.has_shared('postgresql'):
             raise libci.CIError(
                 "Module requires PostgreSQL support, did you include 'postgresql' module?")
-        if target not in RPMDIFF_PRODUCT_VERSION_MAPPING.keys():
-            self.info('No Errata product found for target: {}'.format(target))
+
+        self.info("Map brew tag '{}' to product version".format(target))
+        errata_product = self._map_tag_to_product(target)
+        if not errata_product:
+            self.info('No Errata product found for target: {}, quit silently'.format(target))
             return
-        errata_product = RPMDIFF_PRODUCT_VERSION_MAPPING[target]
+
         hub_url = self.option('url')
 
         results_page = requests.get(hub_url + "/run/{}".format(run_id)).text
