@@ -6,7 +6,7 @@ from libci.utils import check_for_commands, run_command
 # Base URL of the dit-git repositories
 GIT_BASE_URL = 'git://pkgs.devel.redhat.com/rpms/'
 # This module requires rhpkg tool installed
-REQUIRED_CMDS = ['rhpkg']
+REQUIRED_CMDS = ['rhpkg', 'brew']
 
 
 class CIBuildOnCommit(Module):
@@ -50,7 +50,7 @@ class CIBuildOnCommit(Module):
     @staticmethod
     def _run_command(command):
         try:
-            run_command(command)
+            return run_command(command)
         except CICommandError as exc:
             error = exc.output.stdout.rstrip("'\n") + exc.output.stderr.rstrip("'\n")
             raise CIError("failure during '{}' execution\n{}'".format(command[0], error))
@@ -110,5 +110,19 @@ class CIBuildOnCommit(Module):
         msg = ['scheduling scratch build of component']
         msg += ["'{}' on branch '{}' with build target '{}'".format(component, branch, target)]
         self.info(' '.join(msg))
-        command = ["rhpkg", "build", "--scratch", "--skip-nvr-check", "--arches", "x86_64", "--target", target]
+        command = ["rhpkg", "build", "--scratch", "--skip-nvr-check", "--arches", "x86_64",
+                   "--target", target, "--nowait"]
+        output = self._run_command(command)
+
+        # detect brew task id
+        taskid = re.search(".*Created task: [0-9]+", output.stdout, re.M).group()
+        taskid = re.sub('^[^0-9]*([0-9]+)[0-9]*$', '\\1', taskid)
+
+        # detect brew task URL and log it
+        task_url = re.search(".*Task info:.*", output.stdout, re.M).group()
+        task_url = re.sub('Task info: ', '', task_url)
+        self.info("Waiting for brew to finish task: {0}".format(task_url))
+
+        # wait until brew task finish
+        command = ["brew", "watch-task", taskid]
         self._run_command(command)
