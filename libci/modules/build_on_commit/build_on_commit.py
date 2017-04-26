@@ -5,8 +5,6 @@ from libci.utils import check_for_commands, run_command
 
 # Base URL of the dit-git repositories
 GIT_BASE_URL = 'git://pkgs.devel.redhat.com/rpms/'
-# Base URL of the brew task
-BREW_TASK_BASE_URL = 'https://brewweb.engineering.redhat.com/brew/taskinfo?taskID='
 # This module requires rhpkg tool installed
 REQUIRED_CMDS = ['rhpkg', 'brew']
 
@@ -116,10 +114,14 @@ class CIBuildOnCommit(Module):
                    "--target", target, "--nowait"]
         output = self._run_command(command)
 
-        # detect brew task id and log it
+        # detect brew task id
         taskid = re.search(".*Created task: [0-9]+", output.stdout, re.M).group()
         taskid = re.sub('^[^0-9]*([0-9]+)[0-9]*$', '\\1', taskid)
-        self.info("Waiting for brew to finish task: {0}".format(BREW_TASK_BASE_URL + taskid))
+
+        # detect brew task URL and log it
+        task_url = re.search(".*Task info:.*", output.stdout, re.M).group()
+        task_url = re.sub('Task info: ', '', task_url)
+        self.info("Waiting for brew to finish task: {0}".format(task_url))
 
         # wait until brew task finish
         command = ["brew", "watch-task", taskid]
