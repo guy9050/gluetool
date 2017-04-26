@@ -14,13 +14,8 @@ class CIGuessBeakerDistro(Module):
     """
     "Guess" distro. User can choose from different possible methods of "guessing":
 
-    * ``target-autodetection``: module will transform target of brew task to a distro:
-
-        * for z-candidate targets (``rhel-7.3-candidate``) will try to find corresponding
-          batch update compose (``RHEL-7.3-updates-20170222.0``)
-
-        * for non-z-candidate targets (``rhel-7.3-candidate``) will transform target into
-          a distro (``rhel-7.3``)
+    * ``target-autodetection``: module will transform target of brew task to a distro,
+      using provided regex patterns in ``--pattern-map`` file
 
     * ``force``: use specified distro no matter what. Use ``--distro`` option to set *what*
       distro you wish to use
@@ -28,6 +23,10 @@ class CIGuessBeakerDistro(Module):
     * ``nightly``: check the nightly composes, and choose the recent available. Use ``--distro``
       option to specify which distro you talk about (e.g. ``RHEL-7.4`` will check RHEL-7.4
       nightlies, and you'll get something like ``RHEL-7.4-20170223.n.0``.
+
+    * ``buc``: check the batch update composes, and choose the recent available. Use ``--distro``
+      option to specify which distro you talk about (e.g. ``RHEL-7.3`` will check RHEL-7.3
+      composes, and you'll get something like ``RHEL-7.3-updates-20170405.0``.
     """
 
     name = 'guess-beaker-distro'
@@ -197,7 +196,7 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
             _, content = fetch_url(base_url, logger=self.logger)
 
         except CIError:
-            raise CIError('Cannot get list of available composes')
+            raise CIError('Cannot get list of available composes at {}'.format(base_url))
 
         # Find all <a/> elements from the index
         soup = bs4.BeautifulSoup(content, 'html.parser')
@@ -261,7 +260,8 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
         except CIError:
             self.warn("Cannot find shortcut '/latest-{}'".format(hint))
 
-        # Ok, so there's no "latest-FOO" directory, lets iterate over all available composes
+        # Ok, so there's no "/latest-<hint>" directory, lets iterate over all available composes
+        # under "/<hint>"
         distro = self._get_latest_finished_compose('{}/{}'.format(self.option('bu-listing'), hint), hint)
 
         if distro is None:
@@ -321,14 +321,18 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
     def _guess_nightly(self):
         self._distro = self._find_nightly_for_distro(self.option('distro'))
 
+    def _guess_buc(self):
+        self._distro = self._find_buc_for_distro(self.option('distro'))
+
     _methods = {
         'force': _guess_force,
         'target-autodetection': _guess_target_autodetection,
-        'nightly': _guess_nightly
+        'nightly': _guess_nightly,
+        'buc': _guess_buc
     }
 
     def sanity(self):
-        distro_required = ('force', 'nightly')
+        distro_required = ('force', 'nightly', 'buc')
         distro_ignored = ('target-autodetection',)
 
         method = self.option('method')
