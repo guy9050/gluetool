@@ -14,6 +14,8 @@ ansible==2.2.2.0
 beautifulsoup4==4.5.3
 # optional - enables logging colors
 colorama==0.3.7
+# required by restraint modules
+enum34==1.1.6
 # required by jenkins module
 jenkinsapi==0.3.3
 # required by jenkins-jobs
@@ -52,7 +54,6 @@ contextlib2==0.5.4
 cryptography==1.8.1
 debtcollector==1.12.0
 deprecation==1.0
-enum34==1.1.6
 funcsigs==1.0.2
 functools32==3.2.3.post2
 idna==2.5

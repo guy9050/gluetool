@@ -3,6 +3,7 @@ import datetime
 import os
 import tempfile
 from collections import defaultdict
+import enum
 import bs4
 
 import libci
@@ -13,6 +14,13 @@ from libci.results import TestResult, publish_result
 DEFAULT_RESTRAINT_PORT = 8081
 
 REQUIRED_COMMANDS = ['restraint']
+
+
+# The exit status values come from restraint sources: https://github.com/p3ck/restraint/blob/master/src/errors.h
+# I failed to find any documentation on this...
+class RestraintExitCodes(enum.IntEnum):
+    # pylint: disable=invalid-name
+    RESTRAINT_TASK_RUNNER_RESULT_ERROR = 10
 
 
 class RestraintTestResult(TestResult):
@@ -274,7 +282,7 @@ class RestraintRunner(libci.Module):
 
             try:
                 output = libci.utils.run_command([
-                    'restraint', '-v',
+                    'restraint', '-vvv',
                     '--host', '1={}@{}'.format(guest.username, self._guest_restraint_address(guest)),
                     '--job', f.name
                 ], logger=guest.logger)
@@ -282,7 +290,9 @@ class RestraintRunner(libci.Module):
             except libci.CICommandError as e:
                 self.debug('restraint exited with invalid exit code {}'.format(e.output.exit_code))
 
-                if e.output.stderr.strip().startswith('One or more tasks failed'):
+                if e.output.exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_RESULT_ERROR:
+                    # "One or more tasks failed" error - this is a good, well behaving error.
+                    # We can safely move on and process results stored in restraint's directory.
                     output = e.output
 
                 else:
