@@ -81,7 +81,7 @@
              guess-openstack-image ${guess_openstack_image_options} \
              restraint-scheduler --wow-options="${wow_options}" \
              restraint-runner ${restraint_runner_options} \
-             notify-email ${notify_email_options} ${notify_email_opts} \
+             notify-email --add-frontend-url ${notify_email_options} ${notify_email_opts} \
              ${pipeline_append}
     publishers:
       - archive:
