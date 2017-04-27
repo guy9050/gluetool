@@ -136,7 +136,8 @@ class Message(object):
             self._module.warn('Subject not set!')
 
         if not self.recipients:
-            raise CIError('Empty list of recipients')
+            self._module.warn('Empty list of recipients')
+            self.recipients = ['nobody@redhat.com']
 
         content = self.header + self.body + self.footer
 
