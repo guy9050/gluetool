@@ -742,7 +742,10 @@ class CI(object):
 
             # pylint: disable=broad-except
             except Exception as exception:
+                exc_info = sys.exc_info()
+
                 self.exception('error in destroy function: {}'.format(str(exception)))
+                self.sentry_submit_exception(exc_info)
 
         self.module_instances = []
 
