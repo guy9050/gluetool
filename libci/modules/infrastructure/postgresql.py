@@ -54,6 +54,7 @@ class CIPostgreSQL(libci.Module):
         dbname = self.option('dbname')
 
         # connect to the instance
+        self.info("Connecting to database {}:{} may take some time".format(host, port))
         try:
             self._connection = pgdb.connect(host=host, port=port, dbname=dbname,
                                             user=user, password=password)
