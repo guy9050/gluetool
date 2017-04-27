@@ -153,8 +153,16 @@ class Message(object):
         utils.log_blob(self._module.debug, 'Content', content)
 
         smtp = smtplib.SMTP(self._module.option('smtp-server'))
-        smtp.sendmail(self.sender, self.recipients + self.cc, msg.as_string())
-        smtp.quit()
+
+        try:
+            smtp.sendmail(self.sender, self.recipients + self.cc, msg.as_string())
+            smtp.quit()
+
+        except smtplib.SMTPException as exc:
+            msg = 'Cannot send e-mail, SMTP raised an exception: {}'.format(str(exc))
+
+            self._module.warn(msg)
+            self._module.ci.sentry_submit_warning(msg)
 
 
 class Notify(Module):
