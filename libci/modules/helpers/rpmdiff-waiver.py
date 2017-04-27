@@ -1,9 +1,12 @@
 import re
+import os
 from collections import defaultdict, namedtuple
+import yaml
 import requests
 from requests_kerberos import HTTPKerberosAuth, OPTIONAL
 from bs4 import BeautifulSoup
-import libci
+from libci import CIError, Module
+from libci.utils import format_dict
 
 RPMDIFF_RESULTS_TO_WAIVE = ["needs inspection", "failed"]
 RPMDIFF_AUTOWAIVERS_QUERY = """SELECT
@@ -18,7 +21,7 @@ JOIN rpmdiff_tests ON rpmdiff_autowaive_rule.test_id = rpmdiff_tests.test_id
 JOIN rpmdiff_autowaive_product_versions ON
     rpmdiff_autowaive_rule.autowaive_rule_id = rpmdiff_autowaive_product_versions.autowaive_rule_id
 JOIN product_versions ON rpmdiff_autowaive_product_versions.product_version_id = product_versions.id
-WHERE active = 1 and package_name = %(package)s and product_versions.name LIKE %(product)s
+WHERE active = 1 and package_name = %(package)s and product_versions.name IN %(products)s
 ORDER BY 1, 2, 3, 4
 """
 RPMDIFF_PRODUCT_VERSIONS_QUERY = """SELECT DISTINCT
@@ -31,11 +34,6 @@ WHERE brew_tags.name = %(brew_tag)s
 
 ERRATA_AUTOWAIVER_URL = "https://errata.devel.redhat.com/rpmdiff/show_autowaive_rule/{}"
 RPMDIFF_WEBUI_COMMENT = "Autowaived with citool with these rules: {}"
-# for information purpose about how look like errata product version in database
-# RHEL-6 RHEL-6.8.z RHEL-6-SATELLITE-6.2 RHEL-7 RHEL-7.2.Z RHEL-7-SATELLITE-7.2
-RPMDIFF_PRODUCT_VERSION_MAPPING = {
-    'satellite-6.2.0-rhel-6-candidate': 'RHEL-7-SATELLITE-6.2',
-}
 
 
 class RpmDiffWaiverMatcher(object):
@@ -62,14 +60,24 @@ class RpmDiffWaiverMatcher(object):
         return False
 
 
-class RpmDiffWaiver(libci.Module):
+class RpmDiffWaiver(Module):
     """
     Helper module - give it a rpmdiff run Id, it will autowaive results,
     according to autowaivers in Errata tool.
+
+    Below is an example of the yaml mapping file.
+    .. code-block:: yaml
+        ---
+        # key is brew tag, values are product versions and can be string or list of strings
+        rhel-7.4-candidate: RHEL-7
+        rhel-7.1-z-candidate:
+          - RHEL-7.1-EUS
+          - RHEL-7.1.Z
     """
 
     name = 'rpmdiff-waiver'
     description = 'Run autowaivers from Errata on RPMDiff runs'
+    mapping = None
 
     options = {
         'run-id': {
@@ -83,17 +91,20 @@ class RpmDiffWaiver(libci.Module):
         },
         'url': {
             'help': 'RPMdiff Hub URL'
+        },
+        'mapping': {
+            'help': 'File with brew tag to product versions mapping'
         }
     }
 
     required_options = ['url']
     shared_functions = ['waive_results']
 
-    def query_waivers(self, package, product_version):
+    def query_waivers(self, package, product_versions):
         cursor = self.shared("postgresql").cursor()
         search = {
             'package': package,
-            'product': product_version
+            'products': product_versions
         }
         cursor.execute(RPMDIFF_AUTOWAIVERS_QUERY, search)
         waivers = cursor.fetchall()
@@ -108,27 +119,40 @@ class RpmDiffWaiver(libci.Module):
             'brew_tag': brew_tag
         }
         cursor.execute(RPMDIFF_PRODUCT_VERSIONS_QUERY, search)
-        return [row.product_version for row in cursor.fetchall()]
+        return tuple(row.product_version for row in cursor.fetchall())
+
+    def parse_yaml(self):
+        mapping = os.path.expanduser(self.option('mapping'))
+        try:
+            with open(mapping, 'r') as stream:
+                self.mapping = yaml.load(stream)
+                self.debug("module mapping config:\n{}".format(format_dict(self.mapping)))
+        except yaml.YAMLError as e:
+            raise CIError('unable to load mapping file: {}'.format(str(e)))
 
     def _map_tag_to_product(self, brew_tag):
-        if brew_tag in RPMDIFF_PRODUCT_VERSION_MAPPING.keys():
-            product_version = RPMDIFF_PRODUCT_VERSION_MAPPING[brew_tag]
-            self.info("Manual mapping was successful, product version: {}".format(product_version))
-            return product_version
+        if self.mapping and brew_tag in self.mapping.keys():
+            product_versions = self.mapping[brew_tag]
+            if isinstance(product_versions, basestring):
+                product_versions = (product_versions,)
+            else:
+                product_versions = tuple(product_versions)
+            self.info("Manual mapping was successful, product versions: {}".format(product_versions))
+            return product_versions
         else:
-            self.warning("Manual mapping did not find product version")
-        self.info("Try query Errata DB to search mapping")
+            self.warn("Manual mapping did not find product version")
+        self.info("Search Errata DB for mapping")
         product_versions = self.query_product_versions(brew_tag)
-        self.info("Found product versions: {}".format(product_versions))
+        self.debug("Query results: {}".format(product_versions))
         if not product_versions:
-            self.warning("Errata mapping did not find any product version")
+            self.warn("Errata mapping did not find any product version")
             return None
         if len(product_versions) > 1:
-            self.warning("Errata mapping is ambigous, more product versions found")
-            return None
-        product_version = product_versions[0]
-        self.info("Errata mapping was successful, product version: {}".format(product_version))
-        return product_version
+            self.warn("Errata mapping is ambigous, more product versions found")
+            # if we want continue only if mapping 1:1 exists
+            # return None
+        self.info("Errata mapping was successful, product versions: {}".format(product_versions))
+        return product_versions
 
     @staticmethod
     def _download_errors(link):
@@ -154,7 +178,7 @@ class RpmDiffWaiver(libci.Module):
         url = self.option("url") + "/auth/login/?next=/"
         kerberos_auth = HTTPKerberosAuth(mutual_authentication=OPTIONAL)
         if session.get(url, auth=kerberos_auth).status_code != 200:
-            raise libci.CIError("Authentication failed while waiving RPMDiff tests")
+            raise CIError("Authentication failed while waiving RPMDiff tests")
         # obtain token
         headers = {"Referer": link}
         token = BeautifulSoup(session.get(link, headers=headers).text, "html.parser") \
@@ -182,40 +206,45 @@ class RpmDiffWaiver(libci.Module):
         """
         self.info("run-id: {}, package: {}, target: {}".format(run_id, package, target))
         if not run_id:
-            raise libci.CIError(
-                "you want waive results from RPMDiff but you did not specify run-id")
+            raise CIError("you want waive results from RPMDiff but you did not specify run-id")
         if not self.has_shared('postgresql'):
-            raise libci.CIError(
-                "Module requires PostgreSQL support, did you include 'postgresql' module?")
+            raise CIError("Module requires PostgreSQL support, did you include 'postgresql' module?")
+
+        if self.option('mapping'):
+            self.parse_yaml()
+        else:
+            self.warn("Mapping file not provided, manual mapping wont produce results")
 
         self.info("Map brew tag '{}' to product version".format(target))
-        errata_product = self._map_tag_to_product(target)
-        if not errata_product:
-            raise libci.CIError('No Errata product found for target: {}'.format(target))
+        errata_products = self._map_tag_to_product(target)
+        if not errata_products:
+            raise CIError('No Errata product found for target: {}'.format(target))
 
         hub_url = self.option('url')
 
-        results_page = requests.get(hub_url + "/run/{}".format(run_id)).text
-        table = BeautifulSoup(results_page, "html.parser").find("table", attrs={"class": "summary"})
-        if not table:
-            raise libci.CIError('Table of results was not found on RPMDiff WebUI')
-
-        self.info("Query waivers for product version: {}".format(errata_product))
-        waivers = self.query_waivers(package, errata_product)
+        self.info("Query waivers for product version: {}".format(errata_products))
+        waivers = self.query_waivers(package, errata_products)
         if not waivers:
             self.info('No waivers found')
             return
         self.log_waivers(waivers)
 
+        self.info("Download results from: {}".format(hub_url + "/run/{}".format(run_id)))
+        results_page = requests.get(hub_url + "/run/{}".format(run_id)).text
+        table = BeautifulSoup(results_page, "html.parser").find("table", attrs={"class": "summary"})
+        if not table:
+            raise CIError('Table of results was not found on RPMDiff WebUI')
+
+        self.info("Looking into RPMDiff results for possible errors")
         for test_link in table.find_all("a"):
             test_name = test_link.getText()
-            self.info('Check test: {}'.format(test_name))
+            self.info("Looking into test '{}'".format(test_name))
             if test_name not in waivers.keys():
-                self.info('No waivers for this test')
+                self.info('No waivers for this test, skipping')
                 continue
             self.info('Waivers for this test: {}'.format(len(waivers[test_name])))
             link = hub_url + test_link["href"]
-            self.info('Download result table')
+            self.info('Download result table from: {}'.format(link))
             errors = self._download_errors(link)
             if not errors:
                 self.info("There were no errors")
@@ -231,6 +260,8 @@ class RpmDiffWaiver(libci.Module):
 
             if not self.waive_test(link, RPMDIFF_WEBUI_COMMENT.format(log_msg)):
                 self.info("Test was probably not waived due to error in http")
+
+        self.info("Waiving is complete")
 
     def rpmdiff_id_from_results(self):
         if not self.has_shared("results"):
@@ -255,4 +286,5 @@ class RpmDiffWaiver(libci.Module):
                 target = brew_task.target.destination_tag
         if not run_id:
             run_id = self.rpmdiff_id_from_results()
+
         self.waive_results(run_id, package, target)
