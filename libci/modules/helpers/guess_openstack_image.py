@@ -190,7 +190,7 @@ class CIGuessOpenstackImage(Module):
         image = self.option('image')
 
         if method == 'target-autodetection' and not self.option('pattern-map'):
-            raise CIError("--pattern-map option is required with method '{}'".format(method), soft=True)
+            raise CIError("--pattern-map option is required with method '{}'".format(method))
 
         if method in image_required and not image:
             raise IncompatibleOptionsError("--image option is required with method '{}'".format(method))
