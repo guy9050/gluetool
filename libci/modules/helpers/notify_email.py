@@ -170,32 +170,7 @@ class Notify(Module):
     """
     This module sends notifications of CI results via e-mail.
 
-    All options accepting e-mails - EMAILS - expect comma-separated list of e-mails (and
-    will remove white space characters - 'a@b.cz,c@d.cz' or '   a@b.cz  , c@d.cz   ' are
-    absolutely fine).
-
-    For each result type, module accepts 3 options:
-
-      - foo-default-notify
-
-        Sets the default list of recipients. It's usualy set by CI job, by an admin, or in
-        a config file, and lists people like {ISSUER} and similar "default", calculable
-        recipients.
-
-      - foo-add-notify
-
-        Extends default list of recipients. If you're fine with sending e-mails to default
-        recipients, and you wish only to add more recipients, this option is for you.
-
-      - foo-notify
-
-        Overrides both default and additional recipients. Module will send e-mails to this
-        and only this list of recipients.
-
-    It is possible to use "symbolic" recipients, which will be substituted with the actual
-    value. So far these are available:
-
-      - {ISSUER} - brew task issuer, with '@redhat.com' appended
+    Requires support module that would provide list of recipients, e.g. notify-recipients.
     """
 
     name = 'notify-email'
@@ -228,10 +203,6 @@ to this option, and process environmental variables (default: {})""".format(DEFA
             'metavar': 'EMAILS',
             'default': ', '.join(HARD_ERROR_CC)
         },
-        'force-recipients': {
-            'help': 'If set, it will override any and all recipient settings - all e-mails will go to this list',
-            'metavar': 'EMAILS'
-        },
         'archive-cc': {
             # pylint: disable=line-too-long
             'help': 'If set, it will send copy of every outgoing e-mail to EMAILS (default: {})'.format(', '.join(ARCHIVE_CC)),
@@ -241,60 +212,6 @@ to this option, and process environmental variables (default: {})""".format(DEFA
         'add-reservation': {
             'help': 'Add reservation message for each tested machine',
             'action': 'store_true',
-        },
-        'add-frontend-url': {
-            'help': 'When set, add frontend URL instead of Jenkins build URL',
-            'action': 'store_true'
-        },
-
-        # Per-result-type notify lists
-        'restraint-notify': {
-            'help': 'Notify only the listed recipients.',
-            'metavar': 'EMAILS'
-        },
-        'restraint-default-notify': {
-            'help': 'Default list of recipients. Default: ""',
-            'metavar': 'EMAILS'
-        },
-        'restraint-add-notify': {
-            'help': 'Extends default list of recipients.',
-            'metavar': 'EMAILS'
-        },
-        'rpmdiff-notify': {
-            'help': 'Notify only the listed recipients.',
-            'metavar': 'EMAILS'
-        },
-        'rpmdiff-default-notify': {
-            'help': 'Default list of recipients. Default: ""',
-            'metavar': 'EMAILS'
-        },
-        'rpmdiff-add-notify': {
-            'help': 'Extends default list of recipients.',
-            'metavar': 'EMAILS'
-        },
-        'wow-notify': {
-            'help': 'Notify only the listed recipients.',
-            'metavar': 'EMAILS'
-        },
-        'wow-default-notify': {
-            'help': 'Default list of recipients. Default: ""',
-            'metavar': 'EMAILS'
-        },
-        'wow-add-notify': {
-            'help': 'Extends default list of recipients.',
-            'metavar': 'EMAILS'
-        },
-        'covscan-notify': {
-            'help': 'Notify only the listed recipients.',
-            'metavar': 'EMAILS'
-        },
-        'covscan-default-notify': {
-            'help': 'Default list of recipients. Default: ""',
-            'metavar': 'EMAILS'
-        },
-        'covscan-add-notify': {
-            'help': 'Extends default list of recipients.',
-            'metavar': 'EMAILS'
         }
     }
 
@@ -315,37 +232,6 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
         return [s.strip() for s in mails.split(',')]
 
-    def polish_recipients(self, recipients):
-        """
-        The final step before using recipients. Method substitutes all symbolic recipients
-        with their actual values, removes duplicities, and sorts the list of recipients.
-
-        :param list recipients: list of recipient e-mails.
-        :returns: polished list of recipient e-mails.
-        """
-
-        substituted_recipients = []
-
-        for recipient in recipients:
-            if recipient[0] != '{' or recipient[-1] != '}':
-                substituted_recipients.append(recipient)
-                continue
-
-            pattern = recipient[1:-1]
-            actual = self.symbolic_recipients.get(pattern, None)
-
-            if actual is None:
-                self.warn("Cannot replace recipient '{}' with the actual value".format(recipient))
-                continue
-
-            self.debug("replacing '{}' with '{}'".format(recipient, actual))
-            substituted_recipients.append(actual)
-
-        # remove duplicities
-        recipients = {recipient: None for recipient in substituted_recipients}.keys()
-
-        return sorted(recipients)
-
     @utils.cached_property
     def hard_error_cc(self):
         """
@@ -355,59 +241,12 @@ to this option, and process environmental variables (default: {})""".format(DEFA
         return self.option_to_mails('hard-error-cc')
 
     @utils.cached_property
-    def force_recipients(self):
-        """
-        List of forced recipients.
-        """
-
-        return self.option_to_mails('force-recipients')
-
-    @utils.cached_property
     def archive_cc(self):
         """
         List of archive (Bcc) recipients.
         """
 
         return self.option_to_mails('archive-cc')
-
-    @utils.cached_property
-    def symbolic_recipients(self):
-        """
-        Mapping between symbolic recipients and the actual values.
-        """
-
-        recipients = {}
-
-        task = self.shared('brew_task')
-        if task is not None:
-            recipients['ISSUER'] = '{}@redhat.com'.format(task.owner)
-
-        return recipients
-
-    def recipients_for_result_type(self, result_type):
-        """
-        Create list of recipients, based on options passed for the type of results
-        this formatter handles.
-        """
-
-        self.debug("collecting recipients for a type '{}'".format(result_type))
-
-        recipients = self.force_recipients
-        if recipients:
-            self.debug('overriding recipients by force')
-            return recipients
-
-        recipients = self.option_to_mails('{}-notify'.format(result_type))
-        if recipients:
-            self.debug('overriding recipients with absolute notify')
-            return recipients
-
-        self.debug('using default recipients')
-
-        default_recipients = self.option_to_mails('{}-default-notify'.format(result_type))
-        add_recipients = self.option_to_mails('{}-add-notify'.format(result_type))
-
-        return default_recipients + add_recipients
 
     def _shorten_url(self, url):
         """
@@ -671,14 +510,15 @@ to this option, and process environmental variables (default: {})""".format(DEFA
                 self.warn("Don't know how to process result of type '{}'".format(result_type))
                 continue
 
-            recipients = self.polish_recipients(self.recipients_for_result_type(result_type))
+            recipients = self.shared('notification_recipients', result_type=result_type)
             if not recipients:
                 self.warn("Result of type '{}' does not provide any recipients".format(result_type))
                 continue
 
-            summary_url = self._get_summary_url(result)
-
+            recipients = ['{}@redhat.com'.format(name) for name in recipients]
             self.info('Sending {} result notifications to: {}'.format(result_type, ', '.join(recipients)))
+
+            summary_url = self._get_summary_url(result)
 
             subject = SUBJECT_RESERVE if reserve else SUBJECT
 
@@ -700,24 +540,12 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
         exc = failure.exc_info[1]
 
-        recipients = []
-
-        # Use formatting methods as a "list" of available result types, and gather
-        # their recipients
-        for formatter in [name for name in dir(self) if name.startswith('format_result_')]:
-            recipients += self.recipients_for_result_type(formatter[14:])
+        recipients = ['{}@redhat.com'.format(user) for user in self.shared('notification_recipients')]
 
         if failure.soft is not True:
             self.debug('Failure caused by a non-soft error')
 
-            if self.force_recipients:
-                self.debug('Hard error CC overruled by force recipients')
-                recipients = self.force_recipients
-
-            else:
-                recipients += self.hard_error_cc
-
-        recipients = self.polish_recipients(recipients)
+            recipients += self.hard_error_cc
 
         self.info('Sending failure-state notifications to: {}'.format(', '.join(recipients)))
 

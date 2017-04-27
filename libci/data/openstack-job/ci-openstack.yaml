@@ -45,6 +45,10 @@
           default: ''
           description: 'Additional options for restraint-runner module.'
       - string:
+          name: notify_recipients_options
+          default: ''
+          description: 'Additional options for notify-recipients module.'
+      - string:
           name: notify_email_options
           default: ''
           description: 'Additional options for notify-email module.'
@@ -81,6 +85,7 @@
              guess-openstack-image ${guess_openstack_image_options} \
              restraint-scheduler --wow-options="${wow_options}" \
              restraint-runner ${restraint_runner_options} \
+             notify-recipients ${notify_recipients_options} \
              notify-email --add-frontend-url ${notify_email_options} ${notify_email_opts} \
              ${pipeline_append}
     publishers:

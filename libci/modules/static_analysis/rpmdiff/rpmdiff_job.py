@@ -44,6 +44,9 @@ This module requires an available Jenkins connection - via the jenkins module.
         'type': {
             'help': 'Test type: analysis or comparison',
             'choices': ['analysis', 'comparison'],
+        },
+        'notify-recipients-options': {
+            'help': 'Additional options for notify-recipients module'
         }
     }
     required_options = ['type']
@@ -84,8 +87,12 @@ This module requires an available Jenkins connection - via the jenkins module.
         except UnknownJob:
             self.update_job()
 
-        self.jenkins[self.job_name].invoke(self.tid,
-                                           build_params={
-                                               'id': self.tid
-                                           })
-        self.info("invoked job '{}' with build params id='{}'".format(self.job_name, self.tid))
+        build_params = {
+            'id': self.tid,
+            'notify_recipients_options': self.option('notify-recipients-options')
+        }
+
+        self.jenkins[self.job_name].invoke(build_params=build_params)
+
+        self.info("invoked job '{}' with given parameters".format(self.job_name))
+        self.debug("invoked job '{}' with parameters:\n{}".format(self.job_name, utils.format_dict(build_params)))

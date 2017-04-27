@@ -41,6 +41,10 @@
           default: ''
           description: 'Additional options for beaker-jobwatch'
       - string:
+          name: notify_recipients_options
+          default: ''
+          description: 'Additional options for notify-recipients module.'
+      - string:
           name: notify_email_options
           default: ''
           description: 'Additional options for notify-email module.'
@@ -66,6 +70,7 @@
             brew-build-name \
             guess-beaker-distro ${guess_distro_options} \
             wow --wow-options="${wow_options}" --jobwatch-options="${jobwatch_options}" ${wow_opts} \
+            notify-recipients ${notify_recipients_options} \
             notify-email --add-frontend-url ${notify_email_options} ${notify_email_opts} \
             ${pipeline_append}
     publishers:

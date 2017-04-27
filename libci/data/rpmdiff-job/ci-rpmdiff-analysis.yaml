@@ -14,6 +14,10 @@
           name: id
           default: ''
           description: 'Brew task ID.'
+      - string:
+          name: notify_recipients_options
+          default: ''
+          description: 'Additional options for notify-recipients module.'
     wrappers:
       - ansicolor:
           colormap: xterm
@@ -26,6 +30,7 @@
                  brew --id $id
                  brew-build-name
                  rpmdiff --type analysis
+                 notify-recipients ${notify_recipients_options}
                  notify-ci-bus
     publishers:
       - archive:
