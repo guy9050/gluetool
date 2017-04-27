@@ -153,6 +153,8 @@ def main():
         raise e
 
     except Exception as e:
+        exit_status = -1
+
         failure = Failure(module=module, exc_info=sys.exc_info())
 
         if module:
@@ -162,12 +164,16 @@ def main():
 
         libci.Logging.get_logger().exception(msg, exc_info=failure.exc_info)
 
-        # we could use ci.sentry_submit_exception but ci may not exist yet,
-        # use sentry client directly
-        if not failure.soft and sentry is not None:
+        if failure.soft is True:
+            # soft errors are up to users to fix, no reason to kill pipeline
+            exit_status = 0
+
+        elif sentry is not None:
+            # we could use ci.sentry_submit_exception but ci may not exist yet,
+            # use sentry client directly
             sentry.captureException(exc_info=failure.exc_info)
 
-        sys.exit(-1)
+        sys.exit(exit_status)
 
     finally:
         if ci:
