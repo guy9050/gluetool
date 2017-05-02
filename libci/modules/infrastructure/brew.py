@@ -1,11 +1,22 @@
 import re
 import koji
 import libci
-from libci import CIError
+from libci import CIError, SoftCIError
 from libci.utils import cached_property, format_dict
 
 BREW_API_TOPURL = "http://download.eng.bos.redhat.com/brewroot"
 BREW_WEB_URL = 'https://brewweb.engineering.redhat.com/brew/'
+
+
+class NoArtifactsError(SoftCIError):
+    SUBJECT = 'No artifacts found for the brew task'
+    BODY = """
+Brew task has no artifacts - packages, logs, etc. This can happen e.g. in the case of scratch
+builds - their artifacts are removed from brew few days after their completion.
+    """
+
+    def __init__(self, task_id):
+        super(NoArtifactsError, self).__init__("no brew artifacts found for the task '{}'".format(task_id))
 
 
 class BrewTask(object):
@@ -110,7 +121,7 @@ class BrewTask(object):
             msg = "no artifacts found for the task '{}', builds already gone for scratch build?".format(self.task_id)
             self._module.warn(msg)
 
-            raise CIError("no brew artifacts found for the task '{}'".format(self.task_id))
+            raise NoArtifactsError(self.task_id)
 
         for task, filename in tasks_outputs:
             if not filename.endswith('.src.rpm'):
