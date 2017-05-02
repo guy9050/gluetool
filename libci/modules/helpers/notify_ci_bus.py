@@ -1,3 +1,4 @@
+import os
 import stomp
 from libci import CIError, Module, utils
 
@@ -104,6 +105,80 @@ class CINotifyBus(Module):
 
         self.publish(headers, body)
         self.info('published Covscan results to CI message bus')
+
+    def publish_wow(self, result):
+        self.publish_ci_metricsdata(result, 'wow')
+
+    def publish_restraint(self, result):
+        self.publish_ci_metricsdata(result, 'restraint')
+
+    def publish_ci_metricsdata(self, result, result_type):
+        """
+        Publish CI metricsdata. Note that this code will eventually be changed or replaced
+        in favor of 'resultsdb' format. Currently it should be considered as a legacy format
+        of CI messages used to report results from old BaseOS CI.
+        """
+        task = self.shared('brew_task')
+        if task is None:
+            raise CIError('no brew task found in shared functions')
+        distro = self.shared('distro')
+        if distro is None:
+            raise CIError('no distro found in shared functions')
+
+        if task.scratch:
+            self.warn('ignoring ci_metricsdata export of scratch build')
+            return
+
+        recipients = self.shared('notification_recipients', result_type=result_type)
+        if recipients is None:
+            recipients = 'unknown'
+
+        # count the executed and failed tests from all results
+        executed = 0
+        failed = 0
+        for name, runs in result.payload.iteritems():
+            self.debug('consider task {}'.format(name))
+
+            for run in runs:
+                status, result = str(run['bkr_status']), str(run['bkr_result'])
+
+                if status.lower() == 'completed':
+                    executed += 1
+                    if result.lower() == 'fail':
+                        failed += 1
+
+        results = {
+            'executor': 'CI_OSP' if result_type == 'restraint' else 'beaker',
+            'executed': executed,
+            'failed': failed
+        }
+
+        headers = {
+            'CI_TYPE': 'ci-metricsdata',
+            'component': task.nvr,
+            'taskid': task.task_id,
+        }
+
+        body = {
+            'component': task.nvr,
+            'trigger': 'brew build',
+            'tests': results,
+            'base_distro': distro,
+            'brew_task_id': task.task_id,
+            # fake job name for legacy reasons
+            'job_names': 'ci-{}-brew-{}-2-runtest'.format(task.component, task.target.target),
+            'build_type': os.environ.get('BUILD_TYPE', 'unknown'),
+            'jenkins_job_url': os.environ.get('JOB_URL', 'unknown'),
+            'jenkins_build_url': os.environ.get('BUILD_URL', 'unknown'),
+            'build_number': os.environ.get('BUILD_NUMBER', 'unknown'),
+            # hardcoded information currently
+            'CI_tier': '1',
+            'team': 'baseos',
+            'recipients': ','.join(recipients)
+        }
+
+        self.publish(headers, body)
+        self.info('published CI Metrics data results to CI message bus')
 
     def publish_result(self, result):
         publish_function = getattr(self, 'publish_{}'.format(result.test_type), None)
