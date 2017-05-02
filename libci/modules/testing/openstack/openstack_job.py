@@ -40,6 +40,9 @@ class CIOpenstackJob(Module):
         'restraint-runner-options': {
             'help': 'Additional options for restraint-runner module.'
         },
+        'notify-recipients-options': {
+            'help': 'Additional options for notify-recipients module'
+        },
         'notify-email-options': {
             'help': 'Additional options for notify-email module'
         }
@@ -68,6 +71,7 @@ class CIOpenstackJob(Module):
             'guess_openstack_image_options': self.option('guess-openstack-image-options'),
             'wow_options': self.option('wow-options'),
             'restraint_runner_options': self.option('restraint-runner-options'),
+            'notify_recipients_options': self.option('notify-recipients-options'),
             'notify_email_options': self.option('notify-email-options')
         }
 

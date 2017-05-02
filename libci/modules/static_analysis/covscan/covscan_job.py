@@ -23,6 +23,9 @@ class CICovscanJob(Module):
         'id': {
             'help': 'Brew task id',
         },
+        'notify-recipients-options': {
+            'help': 'Additional options for notify-recipients module'
+        },
         'notify-email-options': {
             'help': 'Additional options for notify-email module'
         }
@@ -67,6 +70,7 @@ class CICovscanJob(Module):
 
         build_params = {
             'id': self.brew_id,
+            'notify_recipients_options': self.option('notify-recipients-options'),
             'notify_email_options': self.option('notify-email-options')
         }
 

@@ -12,6 +12,10 @@
           default: ''
           description: 'Brew task ID.'
       - string:
+          name: notify_recipients_options
+          default: ''
+          description: 'Additional options for notify-recipients module.'
+      - string:
           name: notify_email_options
           default: ''
           description: 'Additional options for notify-email module.'
@@ -27,6 +31,7 @@
                  brew --id $id
                  brew-build-name
                  covscan
+                 notify-recipients ${notify_recipients_options}
                  notify-ci-bus
                  notify-email ${notify_email_options}
     properties:
