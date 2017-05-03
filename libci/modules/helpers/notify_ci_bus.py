@@ -166,7 +166,7 @@ class CINotifyBus(Module):
             'base_distro': distro,
             'brew_task_id': task.task_id,
             # fake job name for legacy reasons
-            'job_names': 'ci-{}-brew-{}-2-runtest'.format(task.component, task.target.target),
+            'job_name': 'ci-{}-brew-{}-2-runtest'.format(task.component, task.target.target),
             'build_type': os.environ.get('BUILD_TYPE', 'unknown'),
             'jenkins_job_url': os.environ.get('JOB_URL', 'unknown'),
             'jenkins_build_url': os.environ.get('BUILD_URL', 'unknown'),
