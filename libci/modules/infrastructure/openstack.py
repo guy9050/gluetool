@@ -50,9 +50,17 @@ class OpenstackGuest(NetworkedGuest):
             # get an floating IP from a random available pool
             self._ip = self._nova.floating_ips.create(details['ip_pool_name'])
 
+            # create instance name with floating IP and optionally add JOB_NAME and BUILD_ID
+            name = [
+                details['name'],
+                self._ip.ip
+            ]
+            if 'JOB_NAME' in os.environ:
+                name.append('{}-{}'.format(os.environ['JOB_NAME'], os.environ['BUILD_ID']))
+            name = '-'.join(name)
+
             # complete userdata - use our default
             # create openstack instance
-            name = '{}-{}'.format(details['name'], self._ip.ip)
             self._instance = self._nova.servers.create(name=name,
                                                        flavor=details['flavor'],
                                                        image=details['image'],
@@ -68,7 +76,7 @@ class OpenstackGuest(NetworkedGuest):
         else:
             self._instance = self._nova.servers.find(id=instance_id)
             self._ip = self._nova.floating_ips.find(instance_id=instance_id)
-            name = '{}-{}'.format(DEFAULT_NAME, self._ip.ip)
+            name = self._instance.to_dict()['name']
             details.update({
                 'username': module.option('ssh-user'),
                 'key': module.option('ssh-key')
