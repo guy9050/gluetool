@@ -81,6 +81,18 @@ class OpenstackGuest(NetworkedGuest):
                                              key=details['key'],
                                              options=DEFAULT_SSH_OPTIONS)
 
+    @cached_property
+    def _image(self):
+        assert self._instance is not None
+
+        img_id = self._instance.image['id']
+
+        try:
+            return self._nova.images.findall(id=img_id)[0]
+
+        except IndexError:
+            raise CIError("Cannot find image by its ID '{}'".format(img_id))
+
     def setup(self, variables=None, **kwargs):
         # pylint: disable=arguments-differ
 
@@ -99,6 +111,9 @@ class OpenstackGuest(NetworkedGuest):
 
         if 'GUEST_DOMAINNAME' not in variables:
             variables['GUEST_DOMAINNAME'] = 'host.centralci.eng.rdu2.redhat.com'
+
+        if 'IMAGE_NAME' not in variables:
+            variables['IMAGE_NAME'] = self._image.to_dict()['name']
 
         super(OpenstackGuest, self).setup(variables=variables, **kwargs)
 
@@ -383,7 +398,8 @@ with '#cloud-config', it's considered a path and module will read the actual use
 
     def _resource_not_found(self, resource, name):
         available = [item.name for item in getattr(self.nova, resource).list()]
-        raise CIError("{0} '{1}' not found, available {0}\n{2}".format(type, name, ', '.join(available)))
+        raise CIError("resource of type {} and value '{}' not found, available:\n{}".format(resource, name,
+                                                                                            format_dict(available)))
 
     def get_image_ref(self, name):
         self.debug("get image reference for '{}'".format(name))
