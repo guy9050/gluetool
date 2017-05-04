@@ -25,12 +25,12 @@
     builders:
       - shell:
           citool -c -i -o citool-debug.txt
+                 notify-recipients ${notify_recipients_options}
                  jenkins
                  testing-results
                  brew --id $id
                  brew-build-name
                  rpmdiff --type analysis
-                 notify-recipients ${notify_recipients_options}
                  notify-ci-bus
     publishers:
       - archive:
