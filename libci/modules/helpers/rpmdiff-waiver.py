@@ -139,8 +139,8 @@ class RpmDiffWaiver(Module):
                 product_versions = tuple(product_versions)
             self.info("Manual mapping was successful, product versions: {}".format(product_versions))
             return product_versions
-        else:
-            self.warn("Manual mapping did not find product version")
+
+        self.warn("Manual mapping did not find product version")
         self.info("Search Errata DB for mapping")
         product_versions = self.query_product_versions(brew_tag)
         self.debug("Query results: {}".format(product_versions))
@@ -213,19 +213,19 @@ class RpmDiffWaiver(Module):
         if self.option('mapping'):
             self.parse_yaml()
         else:
-            self.warn("Mapping file not provided, manual mapping wont produce results")
+            self.warn("Mapping file is not provided, manual mapping will not produce results")
 
         self.info("Map brew tag '{}' to product version".format(target))
         errata_products = self._map_tag_to_product(target)
         if not errata_products:
-            raise CIError('No Errata product found for target: {}'.format(target))
+            raise CIError('Errata product was not found for target: {}'.format(target))
 
         hub_url = self.option('url')
 
         self.info("Query waivers for product version: {}".format(errata_products))
         waivers = self.query_waivers(package, errata_products)
         if not waivers:
-            self.info('No waivers found')
+            self.info('Waivers were not found')
             return
         self.log_waivers(waivers)
 
@@ -240,18 +240,18 @@ class RpmDiffWaiver(Module):
             test_name = test_link.getText()
             self.info("Looking into test '{}'".format(test_name))
             if test_name not in waivers.keys():
-                self.info('No waivers for this test, skipping')
+                self.info('There are not waivers for this test, skipping')
                 continue
             self.info('Waivers for this test: {}'.format(len(waivers[test_name])))
             link = hub_url + test_link["href"]
             self.info('Download result table from: {}'.format(link))
             errors = self._download_errors(link)
             if not errors:
-                self.info("There were no errors")
+                self.info("There are not errors")
                 continue
             matcher = RpmDiffWaiverMatcher(errors, waivers[test_name])
             if not matcher.can_waive():
-                self.info("No all errors can be waived, skipping")
+                self.info("Not all errors can be waived, skipping")
                 continue
             log_msg = ""
             for waiver in matcher.matched:
@@ -265,7 +265,7 @@ class RpmDiffWaiver(Module):
 
     def rpmdiff_id_from_results(self):
         if not self.has_shared("results"):
-            self.warn('Cannot obtain run-id, no \'results\' shared function found')
+            self.warn('Cannot obtain run-id, shared function \'results\' does not exist')
             return None
         results = self.shared("results")
         for result in results:
