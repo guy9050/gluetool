@@ -24,12 +24,16 @@ class Ansible(libci.Module):
         :returns: :py:class:`libci.utils.ProcessOutput` instance.
         """
 
+        self.debug("running playbook '{}'".format(playbook_path))
+
         cmd = [
             'ansible-playbook',
             '-i', '{},'.format(','.join(hosts))  # note the comma
         ]
 
         if variables:
+            self.debug('variables:\n{}'.format(libci.utils.format_dict(variables)))
+
             cmd += [
                 '--extra-vars',
                 ' '.join(['{}="{}"'.format(k, v) for k, v in variables.iteritems()])
