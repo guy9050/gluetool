@@ -212,6 +212,10 @@ to this option, and process environmental variables (default: {})""".format(DEFA
         'add-reservation': {
             'help': 'Add reservation message for each tested machine',
             'action': 'store_true',
+        },
+        'add-frontend-url': {
+            'help': 'Use frontend URL instead of Jenkins when pointing user to the results.',
+            'action': 'store_true'
         }
     }
 
