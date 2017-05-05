@@ -311,14 +311,17 @@ to this option, and process environmental variables (default: {})""".format(DEFA
                 if status.lower() == 'completed' and result.lower() == 'pass':
                     continue
 
-                name_parts = name.split('/')
-
                 if name not in fails:
                     name_parts = name.split('/')
 
                     # guess git URL from test name... this is not good, this is so bad
                     # there's not even a cathegory for this approach...
-                    if len(name_parts) >= 4:
+                    if name_parts[1] == 'distribution':
+                        test_src = 'http://pkgs.devel.redhat.com/cgit/tests/distribution/tree/{}'.format(
+                            '/'.join(name_parts[2:]))
+                        test_src = self._shorten_url(test_src)
+
+                    elif len(name_parts) >= 4:
                         # E.g. /tools/strace/Regressions/bz12345678-foo-bar-crashed
                         test_src = 'http://pkgs.devel.redhat.com/cgit/tests/{}/tree/{}'.format(
                             name_parts[2], '/'.join(name_parts[3:]))
