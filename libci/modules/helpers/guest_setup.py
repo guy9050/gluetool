@@ -21,6 +21,8 @@ class GuestSetup(libci.Module):
 
     def setup_guest(self, hosts, **kwargs):
         """
+        Setup provided guests using predefined list of Ansible playbooks.
+
         :param list host: Hosts specification, forming Ansible inventory.
         :param dict kwargs: Additional arguments which will be passed to
           :py:meth:`libci.modules.helpers.ansible.run_playbook`.
