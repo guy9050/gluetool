@@ -6,6 +6,7 @@ import logging
 import os
 import sys
 
+from .help import LineWrapRawTextHelpFormatter, option_help, docstring_to_help
 from .log import Logging, ContextAdapter, ModuleAdapter
 
 
@@ -142,28 +143,19 @@ def retry(*args):
     return wrap
 
 
-class Module(object):
+class Configurable(object):
     """
-    Base class of all ``citool`` modules.
+    Base class of two main ``citool`` classes - :py:class:`libci.ci.CI` and :py:class:`libci.ci.Module`.
+    Gives them the ability to use `options`, settable from configuration files and/or command-line arguments.
 
-    :param libci.ci.CI ci: CI instance owning the module.
-
-    :ivar libci.ci.CI ci: CI instance owning the module.
+    :ivar dict _config: internal configuration store. Values of all options
+      are stored here, regardless of them being set on command-line or by the
+      configuration file.
     """
-
-    #
-    # static variables, same in all instances
-    #
-
-    name = None
-    """Module name. Usually matches the name of the source file, no suffix."""
-
-    description = None
-    """Short module description, displayed in ``citool``'s module listing."""
 
     options = {}
     """
-    The ``options`` variable defines additional module options and their properties::
+    The ``options`` variable defines options accepted by module, and their properties::
 
         options = {
             <option name>: {
@@ -173,45 +165,248 @@ class Module(object):
 
     where
 
-    * ``option name`` is used to name the option in the parser, and ``--<option name>`` is then accepted
-      option of the module
-    * ``option properties`` are passed to :py:meth:`argparse.ArgumentParser.add_argument` as keyword arguments
-      when the option is being added to the parser, therefore any arguments recognized by :py:mod:`argparse`
-      can be used
+    * ``<option name>`` is used to `name` the option in the parser, and two formats are accepted (don't
+      add any leading dashes (``-`` nor ``--``):
+
+      * ``<long name>``
+      * ``tuple(<short name>, <long name>)``
+
+    * dictionary ``<option properties>`` is passed to :py:meth:`argparse.ArgumentParser.add_argument` as
+      keyword arguments when the option is being added to the parser, therefore any arguments recognized
+      by :py:mod:`argparse` can be used.
     """
 
-    required_options = None
-    """List of names of required options, or ``None``."""
+    required_options = []
+    """Iterable of names of required options."""
+
+    def __init__(self):
+        super(Configurable, self).__init__()
+
+        # Initialize configuration store
+        self._config = {}
+
+        # Initialize values in the store, and make sanity check of option names
+        def _fail_name(name):
+            raise CIError("Option name must be either a string or (<letter>, <string>), '{}' found".format(name))
+
+        for name, params in self.options.iteritems():
+            if isinstance(name, str):
+                if not isinstance(name, str):
+                    _fail_name(name)
+
+                self._config[name] = None
+
+            elif isinstance(name, tuple):
+                if not isinstance(name[0], str) or len(name[0]) != 1:
+                    _fail_name(name)
+
+                if not isinstance(name[1], str) or len(name[1]) < 2:
+                    _fail_name(name)
+
+                self._config[name[1]] = None
+
+            else:
+                _fail_name(name)
+
+            if 'help' not in params:
+                continue
+
+            # Long help texts can be written using triple quotes and docstring-like
+            # formatting. Convert every help string to a single line string.
+            params['help'] = option_help(params['help'])
+
+    def _parse_config(self, paths):
+        """
+        Parse configuration files. Uses :py:mod:`ConfigParser` for the actual parsing.
+        Updates module's configuration store with values found returned by the parser.
+
+        :param list paths: List of paths to possible configuration files.
+        """
+
+        from .utils import format_dict
+
+        self.debug('Loading configuration from following paths:\n{}'.format(format_dict(paths)))
+
+        parser = ConfigParser.ConfigParser()
+        parser.read(paths)
+
+        for name in self.options:
+            if isinstance(name, tuple):
+                name = name[1]
+
+            try:
+                value = parser.get('default', name)
+
+            except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
+                continue
+
+            self._config[name] = value
+            self.debug("Option '{}' set to '{}' by config file".format(name, value))
+
+    def _parse_args(self, args, **kwargs):
+        """
+        Parse command-line arguments. Uses :py:mod:`argparse` for the actual parsing.
+        Updates module's configuration store with values returned by parser.
+
+        :param list args: arguments passed to this module. Similar to what :py:data:`sys.argv` provides on
+          program level.
+        """
+
+        parser = argparse.ArgumentParser(**kwargs)
+
+        for name in sorted(self.options):
+            if isinstance(name, str):
+                names = ('--{}'.format(name),)
+
+            else:
+                names = ('-{}'.format(name[0]), '--{}'.format(name[1]))
+
+            parser.add_argument(*names, **self.options[name])
+
+        # parse the added args
+        options = parser.parse_args(args)
+
+        # add the parsed args to options
+        for name in self.options.iterkeys():
+            if isinstance(name, tuple):
+                name = name[1]
+
+            value = getattr(options, name.replace('-', '_'))
+
+            # if the option was not specified, skip it
+            if value is None and name in self._config:
+                continue
+
+            # do not replace config options with default command line values
+            if name in self._config and self._config[name] is not None:
+                # if default parameter used
+                if 'default' in self.options[name] and value == self.options[name]['default']:
+                    continue
+
+                # with action store_true, the default is False
+                if self.options[name].get('action', '') == 'store_true' and value is False:
+                    continue
+
+                # with action store_false, the default is True
+                if self.options[name].get('action', '') == 'store_false' and value is True:
+                    continue
+
+            self._config[name] = value
+            self.debug("Option '{}' set to '{}' by command-line".format(name, value))
+
+    def parse_config(self):
+        """
+        Public entry point to configuration parsing. Child classes must implement this
+        method, e.g. by calling :py:meth:`libci.ci.Configurable._parse_config` which
+        requires list of paths.
+        """
+
+        # E.g. self._parse_config(<list of possible configuration files>)
+
+        raise NotImplementedError('Implement this method to enable the actual parsing')
+
+    def parse_args(self, args):
+        """
+        Public entry point to argument parsing. Child classes must implement this method,
+        e.g. by calling :py:meth:`libci.ci.Configurable._parse_args` which makes use
+        of additional :py:class:`argparse.ArgumentParser` options.
+        """
+
+        # E.g. self._parse_args(args, description=...)
+
+        raise NotImplementedError('Implement this method to enable the actual parsing')
+
+    def check_required_options(self):
+        if not self.required_options:
+            self.debug('skipping checking of required options')
+            return
+
+        for name in self.required_options:
+            if name not in self._config or not self._config[name]:
+                raise CIError("Missing required '{}' option".format(name))
+
+    def option(self, name):
+        """
+        Return a value of given option from module's configuration store.
+
+        :param str name: name of requested option.
+        :returns: option value or ``None`` when no such option exists.
+        """
+
+        try:
+            return self._config[name]
+
+        except KeyError:
+            return None
+
+
+class Module(Configurable):
+    """
+    Base class of all ``citool`` modules.
+
+    :param libci.ci.CI ci: CI instance owning the module.
+
+    :ivar libci.ci.CI ci: CI instance owning the module.
+    :ivar dict _config: internal configuration store. Values of all module options
+      are stored here, regardless of them being set on command-line or in the
+      configuration file.
+    """
+
+    name = None
+    """Module name. Usually matches the name of the source file, no suffix."""
+
+    description = None
+    """Short module description, displayed in ``citool``'s module listing."""
 
     #: A list of names of module's shared functions
     shared_functions = []
-    """A list of names of shared functions exported by the module."""
+    """Iterable of names of shared functions exported by the module."""
 
     def __init__(self, ci):
-        #
-        # instance specific variables
-        #
+        super(Module, self).__init__()
 
         # initialize citool
         self.ci = ci
 
         # initialize logging helpers
-        # definitely could be done in loop + setattr but pylint can't decode that :(
         self.logger = ModuleAdapter(ci.logger, self)
         self.logger.connect(self)
 
-        # configuration parser
-        self.config_parser = None
-
-        # config values
-        # Here are stored configuration values passed via (in this order)
-        # a) configuration file
-        # b) command line arguments
-        self._config = {}
-
         # initialize data path if exists, else it will be None
-        dpath = os.path.join(self.ci.get_config('data_path') or DATA_PATH, self.name)
+        dpath = os.path.join(self.ci.option('data_path') or DATA_PATH, self.name)
         self.data_path = dpath if os.path.exists(dpath) else None
+
+    def parse_config(self):
+        self._parse_config([os.path.join(c, self.name) for c in MODULE_CONFIG_PATHS])
+
+    def _generate_shared_functions_help(self):
+        """
+        Generate help for shared functions provided by the module.
+
+        :returns: Formatted help, describing module's shared functions.
+        """
+
+        if not self.shared_functions:
+            return ''
+
+        from .help import function_help, SHARED_FUNCTIONS_HELP_TEMPLATE
+
+        functions = []
+
+        for name in self.shared_functions:
+            if not hasattr(self, name):
+                raise CIError("No such shared function '{}' of module '{}'".format(name, self.name))
+
+            functions.append(function_help(getattr(self, name), name=name))
+
+        return SHARED_FUNCTIONS_HELP_TEMPLATE.format(functions='\n'.join(functions))
+
+    def parse_args(self, args):
+        self._parse_args(args,
+                         usage='{} [options]'.format(self.name),
+                         description=docstring_to_help(self.__doc__),
+                         epilog=self._generate_shared_functions_help(),
+                         formatter_class=LineWrapRawTextHelpFormatter)
 
     def destroy(self, failure=None):
         # pylint: disable-msg=no-self-use,unused-argument
@@ -260,162 +455,62 @@ class Module(object):
 
         return None
 
-    def check_required_options(self):
-        if not self.required_options:
-            self.debug('skipping checking of required options')
-            return
-        for opt in self.required_options:
-            if opt not in self._config or not self._config[opt]:
-                raise CIError('Missing required \'{}\' option'.format(opt))
-
     def shared(self, *args, **kwargs):
         return self.ci.shared(*args, **kwargs)
-
-    def option(self, opt):
-        """
-        get an option value from the module config
-        """
-        try:
-            return self._config[opt]
-        except KeyError:
-            return None
-
-    def init_options_config(self):
-        """
-        parse options default values from the configuration file
-        """
-        if self.options:
-            self.config_parser = ConfigParser.ConfigParser()
-            paths = [os.path.join(c, self.name) for c in MODULE_CONFIG_PATHS]
-            self.debug('Parsing {}'.format(paths))
-            self.config_parser.read(paths)
-
-            for opt in self.options:
-                try:
-                    value = self.config_parser.get('default', opt)
-                    self._config[opt] = value
-                    self.debug("Added option '{}' value '{}' from config".format(opt, value))
-                except ConfigParser.NoOptionError:
-                    pass
-                except ConfigParser.NoSectionError:
-                    pass
-
-    @staticmethod
-    def _trim_docstring(docstring):
-        """
-        Quoting `PEP 257 <https://www.python.org/dev/peps/pep-0257/#handling-docstring-indentation>`:
-
-        *Docstring processing tools will strip a uniform amount of indentation from
-        the second and further lines of the docstring, equal to the minimum indentation
-        of all non-blank lines after the first line. Any indentation in the first line
-        of the docstring (i.e., up to the first newline) is insignificant and removed.
-        Relative indentation of later lines in the docstring is retained. Blank lines
-        should be removed from the beginning and end of the docstring.*
-
-        Code bellow follows the quote.
-
-        This method does exactly that, therefore we can keep properly aligned docstrings
-        while still use them for reasonably formatted help texts.
-
-        :param str docstring: raw docstring.
-        :rtype: str
-        :returns: docstring with lines stripped of leading whitespace.
-        """
-
-        if not docstring:
-            return ''
-        # Convert tabs to spaces (following the normal Python rules)
-        # and split into a list of lines:
-        lines = docstring.expandtabs().splitlines()
-        # Determine minimum indentation (first line doesn't count):
-        indent = sys.maxint
-        for line in lines[1:]:
-            stripped = line.lstrip()
-            if stripped:
-                indent = min(indent, len(line) - len(stripped))
-        # Remove indentation (first line is special):
-        trimmed = [lines[0].strip()]
-        if indent < sys.maxint:
-            for line in lines[1:]:
-                trimmed.append(line[indent:].rstrip())
-        # Strip off trailing and leading blank lines:
-        while trimmed and not trimmed[-1]:
-            trimmed.pop()
-        while trimmed and not trimmed[0]:
-            trimmed.pop(0)
-        # Return a single string:
-        return '\n'.join(trimmed)
-
-    def shared_functions_help(self):
-        if not self.shared_functions:
-            return ''
-
-        functions = []
-
-        for funcname in self.shared_functions:
-            func = getattr(self, funcname)
-
-            if func.__doc__:
-                functions.append('  {}\t{}\n'.format(funcname, self._trim_docstring(func.__doc__)))
-            else:
-                functions.append('  {}\tno documentation added :(\n'.format(funcname))
-
-        return '\nshared functions:\n{}\n'.format('\n'.join(functions))
-
-    def parse_args(self, args):
-        """
-        parse options from command line
-        """
-        # add module's parsed options
-        parser = argparse.ArgumentParser(
-            usage='Usage: %s [options]' % self.name,
-            description=self._trim_docstring(self.__doc__),
-            epilog=self.shared_functions_help(),
-            formatter_class=argparse.RawTextHelpFormatter)
-        if self.options:
-            for opt in sorted(self.options):
-                if 'short' in self.options[opt]:
-                    short = self.options[opt].pop('short')
-                    parser.add_argument('-%s' % short, '--%s' % opt,
-                                        **self.options[opt])
-                    self.options[opt]['short'] = short
-                else:
-                    parser.add_argument('--%s' % opt, **self.options[opt])
-
-        # parse the added args
-        options = parser.parse_args(args)
-
-        # add the parsed args to options
-        if self.options:
-            for opt in self.options:
-                try:
-                    value = getattr(options, opt.replace('-', '_'))
-                    # if no option specified, skip it
-                    if value is None and opt in self._config:
-                        continue
-                    # do not replace config options with default command line values
-                    if opt in self._config and self._config[opt] is not None:
-                        # if default parameter used
-                        if 'default' in self.options[opt] and value == self.options[opt]['default']:
-                            continue
-                        # with action store_true, the default is False
-                        if self.options[opt].get('action', '') == 'store_true' and value is False:
-                            continue
-                        # with action store_false, the default is True
-                        if self.options[opt].get('action', '') == 'store_false' and value is True:
-                            continue
-                    self._config[opt] = value
-                    self.debug("Added option '{}' value '{}' from commandline".format(opt, value))
-                except AttributeError:
-                    pass
 
     def run_module(self, module, args=None):
         self.ci.run_module(module, args or [])
 
 
-class CI(object):
-    # configuration
-    config_parser = None
+class CI(Configurable):
+    options = {
+        ('c', 'colors'): {
+            'help': 'Colorize logging on the terminal',
+            'action': 'store_true'
+        },
+        ('V', 'version'): {
+            'help': 'Print version',
+            'action': 'store_true'
+        },
+        ('d', 'debug'): {
+            'help': 'Raise terminal output verbosity to DEBUG (the most verbose)',
+            'action': 'store_true'
+        },
+        ('v', 'verbose'): {
+            'help': 'Raise terminal output verbosity to VERBOSE (one step below DEBUG)',
+            'action': 'store_true'
+        },
+        ('q', 'quiet'): {
+            'help': 'Silence info messages',
+            'action': 'store_true'
+        },
+        ('o', 'output'): {
+            'help': 'Output *everything* to given file, with highest verbosity enabled'
+        },
+        ('i', 'info'): {
+            'help': 'Print command-line that would re-run the citool session',
+            'action': 'store_true'
+        },
+        ('l', 'list'): {
+            'help': 'List all available modules',
+            'action': 'append',
+            'nargs': '?',
+            'const': True
+        },
+        'data-path': {
+            'help': 'Specify data path'
+        },
+        'module-path': {
+            'help': 'Specify one or more directories with modules (IMPORTANT: works only with configuration file)',
+            'metavar': 'DIR',
+            'action': 'append'
+        },
+        ('r', 'retries'): {
+            'help': 'Number of retries',
+            'type': int,
+            'default': 0
+        }
+    }
 
     # module types dictionary
     modules = {}
@@ -495,17 +590,6 @@ class CI(object):
             return None
 
         return self.shared_functions[funcname][1](*args, **kwargs)
-
-    def _load_config(self):
-        self.config_parser = ConfigParser.ConfigParser()
-        self.config_parser.read(CONFIGS)
-        if self.config_parser.has_section('default'):
-            for item in self.config:
-                if self.config_parser.has_option('default', item):
-                    self.config[item] = self.config_parser.get('default', item)
-
-    def get_config(self, key):
-        return self.config[key]
 
     #
     # Module loading
@@ -693,30 +777,13 @@ class CI(object):
         Load all available `citool` modules.
         """
 
-        ppaths = self.get_config('module_path') or MODULE_PATH
+        ppaths = self.option('module_path') or MODULE_PATH
         self.debug('loading modules from these paths: {}'.format(ppaths))
 
         for ppath in ppaths:
             self._load_module_path(ppath)
 
     def __init__(self, sentry=None):
-        self._sentry = sentry
-
-        # configuration defaults
-        self.config = {
-            'colors': None,
-            'data_path': None,
-            'debug': None,
-            'output': None,
-            'info': None,
-            'list': None,
-            'module_path': None,
-            'quiet': None,
-            'retries': None,
-            'verbose': None,
-            'version': None,
-        }
-
         # Initialize logging methods before doing anything else.
         # Right now, we don't know the desired log level, or if
         # output file is in play, just get simple logger before
@@ -724,9 +791,40 @@ class CI(object):
         self.logger = ContextAdapter(Logging.create_logger(sentry=sentry))
         self.logger.connect(self)
 
+        super(CI, self).__init__()
+
+        self._sentry = sentry
+
         # load config and create module list
-        self._load_config()
+        self.parse_config()
         self._load_modules()
+
+    def parse_config(self):
+        self._parse_config(CONFIGS)
+
+    def parse_args(self, args):
+        self._parse_args(args,
+                         usage='%(prog)s [opts] module1 [opts] [args] module2 ...',
+                         epilog=self.module_group_list_usage(),
+                         formatter_class=LineWrapRawTextHelpFormatter)
+
+        # re-create logger - now we have all necessary configuration
+        level = logging.INFO
+        if self.option('debug') or self.option('verbose'):
+            level = logging.VERBOSE
+
+            if not self.option('verbose'):
+                level = logging.DEBUG
+
+        elif self.option('quiet'):
+            level = logging.WARNING
+
+        logger = Logging.create_logger(output_file=self.option('output'), level=level,
+                                       colors=(self.option('colors') is not None),
+                                       sentry=self._sentry)
+
+        self.logger = ContextAdapter(logger)
+        self.logger.connect(self)
 
     def destroy_modules(self, failure=None):
         if not self.module_instances:
@@ -758,70 +856,15 @@ class CI(object):
 
     def run_module(self, module_name, args):
         module = self.init_module(module_name)
-        module.init_options_config()
+
+        # Process options from all sources
+        module.parse_config()
         module.parse_args(args)
-        module.check_required_options()
         module.sanity()
+        module.check_required_options()
+
         module.execute()
         module.add_shared()
-
-    def parse_args(self, args):
-        usage = '%(prog)s [opts] module1 [opts] [args] module2 ...'
-
-        parser = argparse.ArgumentParser(usage=usage,
-                                         epilog=self.module_group_list_usage(),
-                                         formatter_class=argparse.RawTextHelpFormatter)
-        parser.add_argument('-c', '--colors', action='store_true', default=None,
-                            help='Colorize logging on the terminal')
-        parser.add_argument('--data-path', help='Specify data path')
-        parser.add_argument('-d', '--debug', action='store_true',
-                            default=False, help='Debug output')
-        parser.add_argument('-i', '--info', action='store_true',
-                            default=False,
-                            help='Print information about commandline')
-        parser.add_argument('-l', '--list', nargs='*', metavar='GROUP',
-                            help='List all available modules or given GROUPs')
-        # module path can be specified only from configuration file
-        # suppress it from help
-        parser.add_argument('--module-path', action='append',
-                            default=[], help=argparse.SUPPRESS)
-        parser.add_argument('-o', '--output',
-                            help='Output debug/verbose/info to given file')
-        parser.add_argument('-q', '--quiet', action='store_true',
-                            default=False, help='Silence info messages')
-        parser.add_argument('-r', '--retries', default=0,
-                            help='Number of retries', type=int)
-        parser.add_argument('-v', '--verbose', action='store_true',
-                            default=False, help='Verbose output')
-        parser.add_argument('-V', '--version', action='store_true',
-                            default=False, help='Print version')
-
-        # really parse the options
-        parsed_args = parser.parse_args(args)
-
-        # set the config dictionary from the parsed arguments
-        for opt in self.config:
-            value = getattr(parsed_args, opt.replace('-', '_'))
-            if value is not None:
-                self.config[opt] = value
-
-        # re-create logger - now we have all necessary configuration
-        level = logging.INFO
-        if self.config['debug'] or self.config['verbose']:
-            level = logging.VERBOSE
-
-            if not self.config['verbose']:
-                level = logging.DEBUG
-
-        elif self.config['quiet']:
-            level = logging.WARNING
-
-        logger = Logging.create_logger(output_file=self.config['output'], level=level,
-                                       colors=(self.config['colors'] is not None),
-                                       sentry=self._sentry)
-
-        self.logger = ContextAdapter(logger)
-        self.logger.connect(self)
 
     def module_list(self):
         return sorted(self.modules)

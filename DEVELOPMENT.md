@@ -128,7 +128,7 @@ Auto-generated documentation is located in `docs/` directory. To update your loc
 
 ```
   # install requirements
-  pip install -r docs-requirements.txt
+  pip install -r requirements.txt
 
   # regenerate RST sources from Python files
   sphinx-apidoc -T -e -o docs/source/ libci/

@@ -93,13 +93,17 @@ def main():
         ci.debug('parsed module args: %s' % modules_args)
 
         # version
-        if ci.get_config('version'):
+        if ci.option('version'):
             sys.stdout.write('citool %s\n' % libci.__version__.strip())
             sys.exit(0)
 
         # list modules
-        groups = ci.get_config('list')
-        if groups is not None:
+        groups = ci.option('list')
+        if groups == [True]:
+            sys.stdout.write('%s\n' % ci.module_list_usage([]))
+            sys.exit(0)
+
+        elif groups:
             sys.stdout.write('%s\n' % ci.module_list_usage(groups))
             sys.exit(0)
 
@@ -109,12 +113,12 @@ def main():
             raise CIError(msg)
 
         # command-line info
-        if ci.get_config('info'):
+        if ci.option('info'):
             ci.print_cmdline(ci_args, modules_args)
 
         # actually the execution loop is retries+1
         # there is always one execution
-        retries = ci.get_config('retries')
+        retries = ci.option('retries')
         for i in range(retries + 1):
             try:
                 # destroy all modules if they exist
@@ -133,7 +137,9 @@ def main():
                     for module_name, args in module_args.iteritems():
                         module = ci.init_module(module_name)
                         module = ci.add_module_instance(module)
-                        module.init_options_config()
+
+                        # Process options from all sources
+                        module.parse_config()
                         module.parse_args(args)
                         module.sanity()
                         module.check_required_options()

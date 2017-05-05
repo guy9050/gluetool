@@ -30,7 +30,7 @@ build:
 
 docs:
   script:
-    - pip install -r docs-requirements.txt
+    - pip install -r requirements.txt
     - sphinx-apidoc -T -e -o docs/source/ libci/
     - python setup.py develop
     - make -C docs/ html

@@ -34,6 +34,9 @@ raven==6.0.0
 requests==2.12.5
 # required by openstack module
 retrying==1.3.3
+# required for documentation and help processing
+Sphinx==1.5.2
+sphinx-rtd-theme==0.1.9
 # required by notify-bus module
 stomp.py==4.1.17
 # required for better formatting
