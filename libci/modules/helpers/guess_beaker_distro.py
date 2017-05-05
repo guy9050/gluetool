@@ -261,8 +261,6 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
         :returns: BU compose name.
         """
 
-        hint = hint.upper()
-
         self.debug("Looking for latest valid BU compose for '{}'".format(hint))
 
         # First, try to take "latest-FOO" shortcut
@@ -291,8 +289,6 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
         :param str hint: Values like "RHEL-7.3", "RHEL-6.8", etc.
         :returns: Nightly compose name.
         """
-
-        hint = hint.upper()
 
         self.debug("Looking for latest valid nightly compose for '{}'".format(hint))
 
