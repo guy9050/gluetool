@@ -19,10 +19,9 @@ class EnvInject(Module):
     description = 'Allow other modules to add variables that EnvInject module applies when job finishes.'
 
     options = {
-        'file': {
+        ('f', 'file'): {
             'help': 'Properties file, read by EnvInject',
-            'default': DEFAULT_PROPS_FILE,
-            'short': 'f'
+            'default': DEFAULT_PROPS_FILE
         }
     }
 

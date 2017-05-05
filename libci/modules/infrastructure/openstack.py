@@ -367,8 +367,10 @@ expected from the user to cleanup the instance(s).""",
             'help': 'SSH username'
         },
         'user-data': {
-            'help': """User data to pass to OpenStack when requesting guests. If the value doesn't start
-with '#cloud-config', it's considered a path and module will read the actual userdata from it."""
+            'help': """
+                    User data to pass to OpenStack when requesting guests. If the value doesn't start
+                    with '#cloud-config', it's considered a path and module will read the actual userdata from it.
+                    """
         }
     }
     required_options = ['auth-url', 'password', 'project-name', 'username', 'ssh-key', 'ip-pool-name']
@@ -555,16 +557,6 @@ with '#cloud-config', it's considered a path and module will read the actual use
                         os.unlink(path)
 
     def provision(self, count=1, name=DEFAULT_NAME, image=None, flavor=None):
-        """
-        Provision multiple openstack guests from the given image name. The flavor is by
-        default {}. The name of the guests is created from the name parameter plus the floating
-        IPv4 address.
-
-        :param int count: number of openstack guests to create
-        :param str name: box name, by default DEFAULT_NAME
-        :param str image: image to use, by default taken from cmdline/config or `openstack_image` shared function
-        :param str flavor: flavor to use for the instance, by default DEFAULT_FLAVOR
-        """.format(DEFAULT_FLAVOR)
         assert count >= 1, 'count needs to >= 1'
 
         # read image name in this priority order:
@@ -630,6 +622,23 @@ with '#cloud-config', it's considered a path and module will read the actual use
         self.info("created {} instance(s) with flavor '{}' from image '{}'".format(count, flavor, image))
 
         return guests
+
+    provision.__doc__ = """
+        Provision (multiple) OpenStack guests. The name of the guests is created from the ``name`` parameter
+        plus the floating IPv4 address of the guest.
+
+        Image is defined by these options (in this order, first one wins):
+
+            - ``image`` parameter of this function
+            - command-line option ``--image``
+            - configuration file, ``image`` option
+            - ``openstack_image`` shared function
+
+        :param int count: number of openstack guests to create
+        :param str name: box name (default: {default_name})
+        :param str image: image to use (default: see above)
+        :param str flavor: flavor to use for the instance (default: ``{default_flavor}``)
+        """.format(default_name=DEFAULT_NAME, default_flavor=DEFAULT_FLAVOR)
 
     def destroy(self, failure=None):
         if not self._all:

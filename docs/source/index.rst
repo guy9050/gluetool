@@ -12,6 +12,7 @@ Welcome to citool's documentation!
 
    libci.ci
    libci.citool
+   libci.help
    libci.guest
    libci.log
    libci.proxy

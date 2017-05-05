@@ -340,7 +340,6 @@ def test_module_instantiate():
     assert mod.error == mod.logger.error
     assert mod.exception == mod.logger.exception
 
-    assert mod.config_parser is None
     # pylint: disable-msg=protected-access
     assert not mod._config
 

@@ -1,7 +1,0 @@
-# Include the package requirements
--r requirements.txt
-
-# And these are the actual docs requirements
-
-Sphinx
-sphinx-rtd-theme
