@@ -78,6 +78,7 @@ class CIBrewTagBuild(Module):
             tag = tag_map[task.target.target]
         except KeyError:
             self.info("no tags to apply for build target '{}'".format(task.target))
+            return
 
         self.info("applying tag '{}' for package '{}'".format(tag, task.nvr))
         command = ['brew', 'tag-build', tag, task.nvr]
