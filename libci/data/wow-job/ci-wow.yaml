@@ -64,13 +64,13 @@
 
           citool -c -i -o citool-debug.txt \
             ${pipeline_prepend} \
+            notify-recipients ${notify_recipients_options} \
             jenkins \
             testing-results \
             brew --id $id \
             brew-build-name \
             guess-beaker-distro ${guess_distro_options} \
             wow --wow-options="${wow_options}" --jobwatch-options="${jobwatch_options}" ${wow_opts} \
-            notify-recipients ${notify_recipients_options} \
             notify-email --add-frontend-url ${notify_email_options} ${notify_email_opts} \
             ${pipeline_append}
     publishers:

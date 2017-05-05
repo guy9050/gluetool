@@ -74,6 +74,7 @@
 
            citool -c -i -o citool-debug.txt \
              ${pipeline_prepend} \
+             notify-recipients ${notify_recipients_options} \
              ansible \
              guest-setup --playbooks=${CITOOL_CONFIG}/guest-setup/openstack-restraint.yaml \
              jenkins \
@@ -85,7 +86,6 @@
              guess-openstack-image ${guess_openstack_image_options} \
              restraint-scheduler --wow-options="${wow_options}" \
              restraint-runner ${restraint_runner_options} \
-             notify-recipients ${notify_recipients_options} \
              notify-email --add-frontend-url ${notify_email_options} ${notify_email_opts} \
              ${pipeline_append}
     publishers:
