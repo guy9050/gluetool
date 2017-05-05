@@ -501,7 +501,8 @@ class CI(Configurable):
             'help': 'Specify data path'
         },
         'module-path': {
-            'help': argparse.SUPPRESS,
+            'help': 'Specify one or more directories with modules (IMPORTANT: works only with configuration file)',
+            'metavar': 'DIR',
             'action': 'append'
         },
         ('r', 'retries'): {
