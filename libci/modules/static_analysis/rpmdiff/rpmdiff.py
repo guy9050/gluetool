@@ -33,6 +33,7 @@ REQUIRED_CMDS = ['rpmdiff-remote']
 
 
 class NoBaselineFoundError(SoftCIError):
+    STATUS = 'SKIP'
     SUBJECT = 'Could not find baseline for RPMDiff'
     BODY = """
 CI skipped the testing due to the fact, that the baseline build for comparison was not found.
