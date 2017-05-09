@@ -15,6 +15,7 @@ REQUIRED_CMDS = ['covscan']
 
 class NoResultFilesError(SoftCIError):
     SUBJECT = 'Failed to fetch covscan result files'
+    MODULE = 'covscan'
     BODY = """
 CI failed to download necessary files from Covscan site, therefore it cannot
 decide what to do next. It may have been caused by failed covscan task. You
@@ -34,6 +35,30 @@ may find solution on {covscan_result_url}.
         })
 
         return variables
+
+
+class NoCovscanBaselineFoundError(SoftCIError):
+    STATUS = 'SKIP'
+    MODULE = 'covscan'
+    SUBJECT = 'Could not find baseline package for Covscan'
+    BODY = """
+CI skipped the testing due to the fact, that the baseline build for Covscan was not found.
+This can be caused by:
+
+    * this is the first build of the package on this build target
+    * there is some issue with build propagation for the build target
+
+To check the tagged packages for given brew build you can user the 'brew' tool (e.g. for build
+target 'rhel-7.4-candidate' and package bash):
+
+    $ brew list-tagged rhel-7.4-candidate bash
+
+Please file an issue to release enginnering if you encounter inconsistencies in Brew by sending
+out an email to 'release-engineering@redhat.com'.
+    """
+
+    def __init__(self):
+        super(NoCovscanBaselineFoundError, self).__init__('Could not find baseline for this build')
 
 
 class CovscanTestResult(TestResult):
@@ -147,7 +172,7 @@ class CICovscan(Module):
         baseline = self.brew_task.latest
 
         if not baseline:
-            raise CIError('Covscan baseline not detected, skipping job')
+            raise NoCovscanBaselineFoundError()
 
         self.info('Using (second) latest non-scratch build [%s] in tag [%s] as baseline',
                   baseline, self.brew_task.target.destination_tag)
