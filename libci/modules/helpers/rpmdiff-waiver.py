@@ -190,13 +190,40 @@ class RpmDiffWaiver(Module):
         }
         # send post request to waive
         waive_request = session.post(link, data=data, headers=headers)
-        return waive_request.status_code == 200
+        if waive_request.status_code != 200:
+            raise CIError("Test was probably not waived due to error in http, http code is '{}'"
+                          .format(waive_request.status_code))
 
     def log_waivers(self, waivers):
         self.info("Found waivers: {}".format(sum(len(waiver) for waiver in waivers.itervalues())))
         for test_waivers in waivers.itervalues():
             for waiver in test_waivers:
                 self.debug("{}: {}".format(waiver.test, waiver))
+
+    def waive_result(self, test_link, waivers):
+        hub_url = self.option('url')
+        test_name = test_link.getText()
+        self.info("Looking into test '{}'".format(test_name))
+        if test_name not in waivers.keys():
+            self.info('There are not waivers for this test, skipping')
+            return False
+        self.info('Waivers for this test: {}'.format(len(waivers[test_name])))
+        link = hub_url + test_link["href"]
+        self.info('Download result table from: {}'.format(link))
+        errors = self._download_errors(link)
+        if not errors:
+            self.info("There are not errors")
+            return False
+        matcher = RpmDiffWaiverMatcher(errors, waivers[test_name])
+        if not matcher.can_waive():
+            self.info("Not all errors can be waived, skipping")
+            return False
+        log_msg = ""
+        for waiver in matcher.matched:
+            log_msg = "\n".join([log_msg, ERRATA_AUTOWAIVER_URL.format(waiver.id)])
+        self.info("This test will be waived with these rules: {}".format(log_msg))
+        self.waive_test(link, RPMDIFF_WEBUI_COMMENT.format(log_msg))
+        return True
 
     def waive_results(self, run_id, package, target):
         """
@@ -236,32 +263,15 @@ class RpmDiffWaiver(Module):
             raise CIError('Table of results was not found on RPMDiff WebUI')
 
         self.info("Looking into RPMDiff results for possible errors")
+        changed = False
         for test_link in table.find_all("a"):
-            test_name = test_link.getText()
-            self.info("Looking into test '{}'".format(test_name))
-            if test_name not in waivers.keys():
-                self.info('There are not waivers for this test, skipping')
-                continue
-            self.info('Waivers for this test: {}'.format(len(waivers[test_name])))
-            link = hub_url + test_link["href"]
-            self.info('Download result table from: {}'.format(link))
-            errors = self._download_errors(link)
-            if not errors:
-                self.info("There are not errors")
-                continue
-            matcher = RpmDiffWaiverMatcher(errors, waivers[test_name])
-            if not matcher.can_waive():
-                self.info("Not all errors can be waived, skipping")
-                continue
-            log_msg = ""
-            for waiver in matcher.matched:
-                log_msg = "\n".join([log_msg, ERRATA_AUTOWAIVER_URL.format(waiver.id)])
-            self.info("This test will be waived with there rules: {}".format(log_msg))
-
-            if not self.waive_test(link, RPMDIFF_WEBUI_COMMENT.format(log_msg)):
-                self.info("Test was probably not waived due to error in http")
+            changed = changed or self.waive_result(test_link, waivers)
 
         self.info("Waiving is complete")
+
+        if changed and self.has_shared('refresh_rpmdiff_results'):
+            self.info("Some tests were waived, refresh old RPMDiff results")
+            self.shared("refresh_rpmdiff_results", run_id)
 
     def rpmdiff_id_from_results(self):
         if not self.has_shared("results"):
