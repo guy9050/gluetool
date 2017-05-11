@@ -2,12 +2,16 @@
 Heart of the "citool" script. Referred to by setuptools' entry point.
 """
 
+import functools
 import os
 import signal
 import sys
 
 import libci
 from libci import CIError, CIRetryError, Failure
+
+
+DEFAULT_HANDLED_SIGNALS = (signal.SIGUSR1, signal.SIGUSR2)
 
 
 def split_argv(argv_all, modules):
@@ -67,14 +71,20 @@ def main():
     # a KeyboardInterrupt exception. It's so good we want to use
     # it for SIGTERM as well, just wrap the handler with some logging.
     orig_sigint_handler = signal.getsignal(signal.SIGINT)
+    sigmap = {getattr(signal, name): name for name in [name for name in dir(signal) if name.startswith('SIG')]}
 
-    def sigint_handler(signum, frame):
-        ci.warn('Interrupted by SIGINT (Ctrl+C?)')
-        return orig_sigint_handler(signum, frame)
+    def _signal_handler(signum, frame, handler=None, msg=None):
+        msg = msg or 'Signal {} received'.format(sigmap[signum])
 
-    def sigterm_handler(signum, frame):
-        ci.warn('Interrupted by SIGTERM')
-        return orig_sigint_handler(signum, frame)
+        ci.warn(msg)
+
+        if handler is not None:
+            return handler(signum, frame)
+
+    sigint_handler = functools.partial(_signal_handler,
+                                       handler=orig_sigint_handler, msg='Interrupted by SIGINT (Ctrl+C?)')
+    sigterm_handler = functools.partial(_signal_handler,
+                                        handler=orig_sigint_handler, msg='Interrupted by SIGTERM')
 
     # pylint: disable=too-many-nested-blocks,broad-except
     try:
@@ -84,6 +94,9 @@ def main():
         # CI is initialized, we can install our logging handlers
         signal.signal(signal.SIGINT, sigint_handler)
         signal.signal(signal.SIGTERM, sigterm_handler)
+
+        for signum in DEFAULT_HANDLED_SIGNALS:
+            signal.signal(signum, _signal_handler)
 
         # split the args and parse citool args
         (ci_args, modules_args) = split_argv(sys.argv[1:], ci.module_list())
