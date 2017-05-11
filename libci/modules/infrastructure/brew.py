@@ -6,8 +6,8 @@ from libci.utils import cached_property, format_dict, fetch_url
 
 BREW_API_TOPURL = "http://download.eng.bos.redhat.com/brewroot"
 BREW_WEB_URL = 'https://brewweb.engineering.redhat.com/brew/'
-AUTOMATION_USER_ID = 2863 # baseos-ci jenkins
-GIT_COMMIT_URL = 'http://pkgs.devel.redhat.com/cgit/rpms/{0}/commit/?id={1}' # component, hash
+AUTOMATION_USER_ID = 2863  # baseos-ci jenkins
+GIT_COMMIT_URL = 'http://pkgs.devel.redhat.com/cgit/rpms/{0}/commit/?id={1}'  # component, hash
 
 
 class NoArtifactsError(SoftCIError):
@@ -67,7 +67,6 @@ class BrewTask(object):
             git_hash = re.search("#[^']*", request).group()[1:]
             component = re.search("/rpms/[^?]*", request).group()[6:]
             # get git commit html
-            #url_info, commit_html = fetch_url(GIT_COMMIT_URL.format(component, git_hash))
             commit_html = fetch_url(GIT_COMMIT_URL.format(component, git_hash))[1]
             issuer = re.search("committer.*</td>", commit_html).group()
             issuer = re.sub(".*lt;(.*)@.*", "\\1", issuer)
