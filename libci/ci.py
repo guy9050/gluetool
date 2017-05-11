@@ -267,11 +267,13 @@ class Configurable(object):
         options = parser.parse_args(args)
 
         # add the parsed args to options
-        for name in self.options.iterkeys():
+        for name, params in self.options.iteritems():
             if isinstance(name, tuple):
                 name = name[1]
 
-            value = getattr(options, name.replace('-', '_'))
+            dest = params.get('dest', name.replace('-', '_'))
+
+            value = getattr(options, dest)
 
             # if the option was not specified, skip it
             if value is None and name in self._config:
@@ -280,15 +282,15 @@ class Configurable(object):
             # do not replace config options with default command line values
             if name in self._config and self._config[name] is not None:
                 # if default parameter used
-                if 'default' in self.options[name] and value == self.options[name]['default']:
+                if 'default' in params and value == params['default']:
                     continue
 
                 # with action store_true, the default is False
-                if self.options[name].get('action', '') == 'store_true' and value is False:
+                if params.get('action', '') == 'store_true' and value is False:
                     continue
 
                 # with action store_false, the default is True
-                if self.options[name].get('action', '') == 'store_false' and value is True:
+                if params.get('action', '') == 'store_false' and value is True:
                     continue
 
             self._config[name] = value
