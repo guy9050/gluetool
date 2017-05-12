@@ -54,11 +54,15 @@ class BrewTask(object):
 
     @cached_property
     def owner(self):
+        """ return owner property of brew task"""
         owner_id = self.task_info["owner"]
         return self.brew.getUser(owner_id)["name"]
 
     @cached_property
     def issuer(self):
+        """
+        return issuer of brew task and in case of build from CI automation, returns issuer of git commit
+        """
         owner_id = self.task_info["owner"]
         if owner_id != AUTOMATION_USER_ID:
             return self.owner
