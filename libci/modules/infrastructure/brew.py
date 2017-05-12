@@ -60,21 +60,21 @@ class BrewTask(object):
     @cached_property
     def issuer(self):
         owner_id = self.task_info["owner"]
-        if owner_id == AUTOMATION_USER_ID:
-            self._module.info("Automation user detected, need to get git commit issuer")
-            # get git commit hash and component name
-            request = self.task_info["request"][0]
-            git_hash = re.search("#[^']*", request).group()[1:]
-            component = re.search("/rpms/[^?]*", request).group()[6:]
-            # get git commit html
-            commit_html = fetch_url(GIT_COMMIT_URL.format(component, git_hash))[1]
-            issuer = re.search("committer.*</td>", commit_html).group()
-            issuer = re.sub(".*lt;(.*)@.*", "\\1", issuer)
-            self._module.info("Git commit issuer: {0}".format(issuer))
-            return issuer
-        else:
-            name = self.brew.getUser(owner_id)["name"]
-        return name
+        if owner_id != AUTOMATION_USER_ID:
+            return self.owner
+
+        self._module.info("Automation user detected, need to get git commit issuer")
+        # get git commit hash and component name
+        request = self.task_info["request"][0]
+        git_hash = re.search("#[^']*", request).group()[1:]
+        component = re.search("/rpms/[^?]*", request).group()[6:]
+        # get git commit html
+        url = GIT_COMMIT_URL.format(component, git_hash)
+        commit_html = fetch_url(url, logger=self._module.logger)[1]
+        issuer = re.search("committer.*</td>", commit_html).group()
+        issuer = re.sub(".*lt;(.*)@.*", "\\1", issuer)
+        self._module.info("Git commit issuer: {0}".format(issuer))
+        return issuer
 
     @cached_property
     def target(self):
