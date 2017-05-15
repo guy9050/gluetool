@@ -147,11 +147,11 @@ class CINotifyBus(Module):
                     if result.lower() == 'fail':
                         failed += 1
 
-        results = {
+        results = [{
             'executor': 'CI_OSP' if result_type == 'restraint' else 'beaker',
             'executed': executed,
             'failed': failed
-        }
+        }]
 
         headers = {
             'CI_TYPE': 'ci-metricsdata',
@@ -172,7 +172,7 @@ class CINotifyBus(Module):
             'jenkins_build_url': os.environ.get('BUILD_URL', 'unknown'),
             'build_number': os.environ.get('BUILD_NUMBER', 'unknown'),
             # hardcoded information currently
-            'CI_tier': '1',
+            'CI_tier': 1,
             'team': 'baseos',
             'recipients': ','.join(recipients)
         }
