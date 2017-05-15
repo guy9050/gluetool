@@ -2,10 +2,12 @@ import re
 import koji
 import libci
 from libci import CIError, SoftCIError
-from libci.utils import cached_property, format_dict
+from libci.utils import cached_property, format_dict, fetch_url
 
 BREW_API_TOPURL = "http://download.eng.bos.redhat.com/brewroot"
 BREW_WEB_URL = 'https://brewweb.engineering.redhat.com/brew/'
+AUTOMATION_USER_ID = 2863  # baseos-ci jenkins
+GIT_COMMIT_URL = 'http://pkgs.devel.redhat.com/cgit/rpms/{0}/commit/?id={1}'  # component, hash
 
 
 class NoArtifactsError(SoftCIError):
@@ -52,8 +54,31 @@ class BrewTask(object):
 
     @cached_property
     def owner(self):
+        """ return owner property of brew task"""
         owner_id = self.task_info["owner"]
         return self.brew.getUser(owner_id)["name"]
+
+    @cached_property
+    def issuer(self):
+        """
+        return issuer of brew task and in case of build from CI automation, returns issuer of git commit
+        """
+        owner_id = self.task_info["owner"]
+        if owner_id != AUTOMATION_USER_ID:
+            return self.owner
+
+        self._module.info("Automation user detected, need to get git commit issuer")
+        # get git commit hash and component name
+        request = self.task_info["request"][0]
+        git_hash = re.search("#[^']*", request).group()[1:]
+        component = re.search("/rpms/[^?]*", request).group()[6:]
+        # get git commit html
+        url = GIT_COMMIT_URL.format(component, git_hash)
+        commit_html = fetch_url(url, logger=self._module.logger)[1]
+        issuer = re.search("committer.*</td>", commit_html).group()
+        issuer = re.sub(".*lt;(.*)@.*", "\\1", issuer)
+        self._module.info("Git commit issuer: {0}".format(issuer))
+        return issuer
 
     @cached_property
     def target(self):

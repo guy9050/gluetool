@@ -31,7 +31,7 @@ brew task {task.task_id}, build target {task.target.target}'
 BODY_HEADER = """
 Brew task:      {task.task_id}
 Tested package: {task.nvr}
-Build issuer:   {task.owner}@redhat.com
+Build issuer:   {task.issuer}@redhat.com
 Summary:        {summary_url}
 """
 
