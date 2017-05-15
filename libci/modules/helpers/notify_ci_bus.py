@@ -147,11 +147,11 @@ class CINotifyBus(Module):
                     if result.lower() == 'fail':
                         failed += 1
 
-        results = {
+        results = [{
             'executor': 'CI_OSP' if result_type == 'restraint' else 'beaker',
             'executed': executed,
             'failed': failed
-        }
+        }]
 
         headers = {
             'CI_TYPE': 'ci-metricsdata',
