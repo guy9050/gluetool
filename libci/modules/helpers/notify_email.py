@@ -153,9 +153,9 @@ class Message(object):
         self._module.debug("Subject: '{}'".format(self.subject))
         utils.log_blob(self._module.debug, 'Content', content)
 
-        smtp = smtplib.SMTP(self._module.option('smtp-server'))
-
         try:
+            smtp = smtplib.SMTP(self._module.option('smtp-server'))
+
             smtp.sendmail(self.sender, self.recipients + self.cc, msg.as_string())
             smtp.quit()
 
