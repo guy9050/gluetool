@@ -172,7 +172,7 @@ class CINotifyBus(Module):
             'jenkins_build_url': os.environ.get('BUILD_URL', 'unknown'),
             'build_number': os.environ.get('BUILD_NUMBER', 'unknown'),
             # hardcoded information currently
-            'CI_tier': '1',
+            'CI_tier': 1,
             'team': 'baseos',
             'recipients': ','.join(recipients)
         }
