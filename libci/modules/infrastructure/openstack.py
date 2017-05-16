@@ -350,6 +350,10 @@ expected from the user to cleanup the instance(s).""",
             'metavar': 'COUNT',
             'type': int,
         },
+        'setup-provisioned': {
+            'help': "Setup guests after provisioning them. See 'guest-setup' module",
+            'action': 'store_true'
+        },
         'reserve': {
             'help': 'Creates reservation records and keeps the instance(s) provisioned',
             'action': 'store_true',
@@ -701,7 +705,11 @@ expected from the user to cleanup the instance(s).""",
 
         # provision given number of guests right away
         if provision_count:
-            self.provision(provision_count)
+            guests = self.provision(provision_count)
+
+            if self.option('setup-provisioned'):
+                for guest in guests:
+                    guest.setup()
 
         # run cleanup if requested
         if cleanup or cleanup_force:
