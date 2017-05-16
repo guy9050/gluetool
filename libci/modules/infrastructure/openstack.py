@@ -407,7 +407,7 @@ expected from the user to cleanup the instance(s).""",
         return user_data
 
     def _resource_not_found(self, resource, name):
-        available = [item.name for item in getattr(self.nova, resource).list()]
+        available = sorted([item.name for item in getattr(self.nova, resource).list()])
         raise CIError("resource of type {} and value '{}' not found, available:\n{}".format(resource, name,
                                                                                             format_dict(available)))
 
