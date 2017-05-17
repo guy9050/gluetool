@@ -244,8 +244,8 @@ class RpmDiffWaiver(Module):
 
         self.info("Map brew tag '{}' to product version".format(target))
         errata_products = self._map_tag_to_product(target)
-        if not errata_products:
-            raise CIError('Errata product was not found for target: {}'.format(target))
+        if errata_products is None:
+            return
 
         hub_url = self.option('url')
 
