@@ -67,12 +67,12 @@ class RpmDiffWaiver(Module):
 
     Below is an example of the yaml mapping file.
     .. code-block:: yaml
-        ---
-        # key is brew tag, values are product versions and can be string or list of strings
-        rhel-7.4-candidate: RHEL-7
-        rhel-7.1-z-candidate:
-          - RHEL-7.1-EUS
-          - RHEL-7.1.Z
+       ---
+       # key is brew tag, values are product versions and can be string or list of strings
+       rhel-7.4-candidate: RHEL-7
+       rhel-7.1-z-candidate:
+         - RHEL-7.1-EUS
+         - RHEL-7.1.Z
     """
 
     name = 'rpmdiff-waiver'
@@ -90,7 +90,7 @@ class RpmDiffWaiver(Module):
             'help': 'Target'
         },
         'url': {
-            'help': 'RPMdiff Hub URL'
+            'help': 'RPMdiff Web UI URL'
         },
         'mapping': {
             'help': 'File with brew tag to product versions mapping'
@@ -201,14 +201,14 @@ class RpmDiffWaiver(Module):
                 self.debug("{}: {}".format(waiver.test, waiver))
 
     def waive_result(self, test_link, waivers):
-        hub_url = self.option('url')
+        url = self.option('url')
         test_name = test_link.getText()
         self.info("Looking into test '{}'".format(test_name))
         if test_name not in waivers.keys():
-            self.info('There are not waivers for this test, skipping')
+            self.info('There are no waivers for this test, skipping')
             return False
         self.info('Waivers for this test: {}'.format(len(waivers[test_name])))
-        link = hub_url + test_link["href"]
+        link = url + test_link["href"]
         self.info('Download result table from: {}'.format(link))
         errors = self._download_errors(link)
         if not errors:
@@ -247,7 +247,7 @@ class RpmDiffWaiver(Module):
         if errata_products is None:
             return
 
-        hub_url = self.option('url')
+        url = self.option('url')
 
         self.info("Query waivers for product version: {}".format(errata_products))
         waivers = self.query_waivers(package, errata_products)
@@ -256,8 +256,8 @@ class RpmDiffWaiver(Module):
             return
         self.log_waivers(waivers)
 
-        self.info("Download results from: {}".format(hub_url + "/run/{}".format(run_id)))
-        results_page = requests.get(hub_url + "/run/{}".format(run_id)).text
+        self.info("Download results from: {}".format(url + "/run/{}".format(run_id)))
+        results_page = requests.get(url + "/run/{}".format(run_id)).text
         table = BeautifulSoup(results_page, "html.parser").find("table", attrs={"class": "summary"})
         if not table:
             raise CIError('Table of results was not found on RPMDiff WebUI')
