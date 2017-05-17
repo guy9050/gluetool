@@ -565,13 +565,28 @@ to this option, and process environmental variables (default: {})""".format(DEFA
                     self.__dict__.update(kwargs)
 
             task = DummyTask(task_id='<Task ID not available>', nvr='<NVR not available>',
-                             owner='<Owner not available>')
+                             owner='<Owner not available>', issuer='<No issuer available>')
+
+        # default body header and footer
+        body_header = BODY_HEADER.format(task=task, summary_url=summary_url)
+        body_footer = BODY_FOOTER
 
         if failure.soft:
             message = exc.render()
 
-            subject = '[CI] [{}] {}'.format(exc.STATUS, message['subject'])
+            subject = ['[CI]']
+            if exc.MODULE_NAME:
+                subject.append('[{}]'.format(exc.MODULE_NAME))
+            subject.append('[{}]'.format(exc.STATUS))
+            subject.append('{}'.format(message['subject']))
+            subject = ' '.join(subject)
             body = SOFT_ERROR_MSG.format(msg=message['body'])
+
+            # override body header and footer if defined in the soft exception
+            if exc.BODY_HEADER is not None:
+                body_header = exc.BODY_HEADER
+            if exc.BODY_FOOTER is not None:
+                body_footer = exc.BODY_FOOTER
 
         else:
             subject = '[CI] [ABORT] CI pipeline crashed, operations team was notified'
@@ -579,8 +594,8 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
         msg = Message(self,
                       subject=subject,
-                      header=BODY_HEADER.format(task=task, summary_url=summary_url),
-                      footer=BODY_FOOTER,
+                      header=body_header,
+                      footer=body_footer,
                       body=body,
                       recipients=recipients,
                       cc=self.archive_cc)

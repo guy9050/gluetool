@@ -38,9 +38,12 @@ class SoftCIError(CIError):
     text, usable e.g. in e-mail.
     """
 
+    BODY = None
+    BODY_HEADER = None
+    BODY_FOOTER = None
+    MODULE_NAME = None
     STATUS = 'ABORT'
     SUBJECT = None
-    BODY = None
 
     def __init__(self, *args, **kwargs):
         assert self.STATUS is not None
