@@ -281,6 +281,9 @@ class CIWow(Module):
             if 'No relevant tasks found in test plan' in exc.output.stderr:
                 raise NoTestAvailableError()
 
+            if 'No recipe generated (no relevant tasks?)' in exc.output.stderr:
+                raise NoTestAvailableError()
+
             raise CIError("Failure during 'wow' execution: {}".format(exc.output.stderr))
 
         job = bs4.BeautifulSoup(output.stdout, 'xml')
