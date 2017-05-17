@@ -22,10 +22,12 @@
       - shell:
           citool -c -i -o citool-debug.txt
                  jenkins
+                 postgresql
                  testing-results
                  brew --id $id
                  brew-build-name
                  rpmdiff --type comparison
+                 rpmdiff-waiver
                  notify-ci-bus
     publishers:
       - archive:
