@@ -1,12 +1,43 @@
 import os
 import re
-from libci import CICommandError, CIError, Module
+from libci import CICommandError, CIError, SoftCIError, Module
 from libci.utils import check_for_commands, run_command
 
 # Base URL of the dit-git repositories
 GIT_BASE_URL = 'git://pkgs.devel.redhat.com/rpms/'
-# This module requires rhpkg tool installed
-REQUIRED_CMDS = ['rhpkg', 'brew']
+# Required commands
+# rhpkg, rpmbuild - for building scratch build
+# brew - to wait for package build
+REQUIRED_CMDS = ['rhpkg', 'brew', 'rpmbuild']
+
+
+class BocBuildError(SoftCIError):
+    MODULE = 'build-on-commit'
+    SUBJECT = 'Failed to build {component}, branch {branch}'
+    BODY = """
+Build on commit failed for {component} from branch {branch} while trying to build for target {target}
+
+Please, see the brew task for more details about the problem:
+
+    {task_url}
+    """
+    BODY_HEADER = ''
+
+    def __init__(self, branch, component, target, task_url):
+        super(BocBuildError, self).__init__()
+
+        self.branch = branch
+        self.component = component
+        self.target = target
+        self.task_url = task_url
+
+    def _template_variables(self):
+        return {
+            'branch': self.branch,
+            'component': self.component,
+            'target': self.target,
+            'task_url': self.task_url
+        }
 
 
 class CIBuildOnCommit(Module):
@@ -41,18 +72,27 @@ class CIBuildOnCommit(Module):
     }
     required_options = ['component', 'branch', 'branch-pattern']
 
+    branch = None
+    component = None
+    target = None
+    task_url = None
+
     def sanity(self):
         """
         Make sure that rhpkg tool is available.
         """
         check_for_commands(REQUIRED_CMDS)
 
-    @staticmethod
-    def _run_command(command):
+    def _run_command(self, command, exception=None):
         try:
             return run_command(command)
         except CICommandError as exc:
             error = exc.output.stdout.rstrip("'\n") + exc.output.stderr.rstrip("'\n")
+
+            # call a custom exception
+            if exception:
+                raise exception(self.branch, self.component, self.target, self.task_url)
+
             raise CIError("failure during '{}' execution\n{}'".format(command[0], error))
 
     def set_build_name(self, label):
@@ -72,8 +112,8 @@ class CIBuildOnCommit(Module):
         self.info("build name set: '{}'".format(label))
 
     def execute(self):
-        component = self.option('component')
-        branch = self.option('branch')
+        self.component = component = self.option('component')
+        self.branch = branch = self.option('branch')
         blacklist = self.option('blacklist')
         branch_pattern = self.option('branch-pattern')
 
@@ -97,7 +137,7 @@ class CIBuildOnCommit(Module):
         match = re.match('.*rhel-([67]).*', branch)
         if match is None:
             raise CIError("failed to detect build-target from branch '{}'".format(branch))
-        target = "staging-rhel-{}-candidate".format(match.group(1))
+        self.target = target = "staging-rhel-{}-candidate".format(match.group(1))
 
         #  create shallow clone of git repo, just 1 branch, no history
         self.info("cloning repository of '{}'".format(component))
@@ -119,10 +159,10 @@ class CIBuildOnCommit(Module):
         taskid = re.sub('^[^0-9]*([0-9]+)[0-9]*$', '\\1', taskid)
 
         # detect brew task URL and log it
-        task_url = re.search(".*Task info:.*", output.stdout, re.M).group()
+        self.task_url = task_url = re.search(".*Task info:.*", output.stdout, re.M).group()
         task_url = re.sub('Task info: ', '', task_url)
         self.info("Waiting for brew to finish task: {0}".format(task_url))
 
         # wait until brew task finish
         command = ["brew", "watch-task", taskid]
-        self._run_command(command)
+        self._run_command(command, exception=BocBuildError)

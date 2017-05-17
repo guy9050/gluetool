@@ -49,7 +49,7 @@ class NotifyRecipients(Module):
     name = 'notify-recipients'
     description = 'Notification module - recipient management'
 
-    supported_result_types = ('covscan', 'restraint', 'rpmdiff', 'wow')
+    supported_result_types = ('boc', 'covscan', 'restraint', 'rpmdiff', 'wow')
 
     options = {
         'force-recipients': {
