@@ -57,12 +57,12 @@ class CIPostgreSQL(libci.Module):
         dbname = self.option('dbname')
 
         # connect to the instance
-        self.info("Connecting to database {}:{} may take some time".format(host, port))
+        self.info("connecting to database {}:{} may take some time".format(host, port))
         try:
             self._connection = pgdb.connect(host=host, port=port, dbname=dbname,
                                             user=user, password=password)
         except Exception as e:
-            self.debug('Connection error: {}'.format(e))
+            self.debug('connection error: {}'.format(e))
             raise libci.CIError("could not connect to PostgreSQL '{}': {}".format(host, str(e)))
 
     def server_version(self):
