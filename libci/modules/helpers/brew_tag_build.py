@@ -15,11 +15,12 @@ class CIBrewTagBuild(Module):
     Below is an example of the yaml configuration file.
 
     .. code-block:: yaml
-        ---
-        # specifies the tag group
-        tier1:
-          - rhel-7.4-candidate: rhel-7.4-tier1
-          - rhel-6.9-candidate: rhel-6.9-tier1
+
+       ---
+       # specifies the tag group
+       tier1:
+         - rhel-7.4-candidate: rhel-7.4-tier1
+         - rhel-6.9-candidate: rhel-6.9-tier1
     """
 
     name = 'brew-tag-build'

@@ -61,13 +61,19 @@ class LineWrapRawTextHelpFormatter(argparse.RawDescriptionHelpFormatter):
 # our docstring to a plain text.
 #
 
-# Sphinx 'py:' directives handler
-def py_class_role(role, rawtext, text, lineno, inliner, options=None, content=None):
+def py_default_role(role, rawtext, text, lineno, inliner, options=None, content=None):
     # pylint: disable=unused-argument,too-many-arguments
-    return [docutils.nodes.literal(rawsource=rawtext, text='`{}`'.format(text))], []
+
+    """
+    Default handler we use for ``py:...`` roles, translates text to literal node.
+    """
+
+    return [docutils.nodes.literal(rawsource=rawtext, text='{}'.format(text))], []
 
 
-docutils.parsers.rst.roles.register_canonical_role('py:class', py_class_role)
+# register default handler for roles we're interested in
+for python_role in ('py:class', 'py:meth', 'py:mod'):
+    docutils.parsers.rst.roles.register_canonical_role(python_role, py_default_role)
 
 
 class DummyTextBuilder:

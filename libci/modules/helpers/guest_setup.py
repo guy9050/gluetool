@@ -25,7 +25,8 @@ class GuestSetup(libci.Module):
 
         :param list host: Hosts specification, forming Ansible inventory.
         :param dict kwargs: Additional arguments which will be passed to
-          :py:meth:`libci.modules.helpers.ansible.run_playbook`.
+          `run_playbook` shared function of :py:class:`libci.modules.helpers.ansible.Ansible`
+          module.
         """
 
         if not self.has_shared('run_playbook'):
