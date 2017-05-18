@@ -37,6 +37,7 @@ Summary:        {summary_url}
 
 BODY_FOOTER = """
 --
+Troubleshooting Tips: http://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/Troubleshoot
 CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation
 """
 
