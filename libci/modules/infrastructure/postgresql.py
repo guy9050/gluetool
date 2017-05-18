@@ -5,10 +5,13 @@ import libci
 class CIPostgreSQL(libci.Module):
     """
     This module provides connection to a PostgreSQL database via PyGreSQL library:
-        http://www.pygresql.org/
+
+    http://www.pygresql.org/
+
     Connection is compliant with Python Database API Specification v2.0
     Documentation of connection object can be found on:
-        http://www.pygresql.org/contents/pgdb/index.html
+
+    http://www.pygresql.org/contents/pgdb/index.html
     """
 
     name = 'postgresql'
