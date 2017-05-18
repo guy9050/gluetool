@@ -16,6 +16,8 @@ REQUIRED_COMMANDS = ['bkr', 'beaker-jobwatch', 'tcms-results']
 
 TCMS_RESULTS_LOCATIONS = ('/bin', '/usr/bin')
 
+DEFAULT_RESERVE_TIME = 24
+
 
 class NoTestAvailableError(SoftCIError):
     SUBJECT = 'No tests found for the component'
@@ -73,6 +75,12 @@ class CIWow(Module):
         'reserve': {
             'help': 'Do not release machines back to Beaker, keep them reserved',
             'action': 'store_true'
+        },
+        'reserve-time': {
+            'help': 'Reservation time in hours (default: {})'.format(DEFAULT_RESERVE_TIME),
+            'default': DEFAULT_RESERVE_TIME,
+            'metavar': 'HOURS',
+            'type': int
         }
     }
 
@@ -265,7 +273,7 @@ class CIWow(Module):
         # we could use --reserve but we must be sure the reservesys is *the last* taskin the recipe
         # users may require their own "last" tasks and --last-task is mightier than mere --reserve.
         if self.option('reserve'):
-            command += ['--last-task', 'RESERVETIME={}h /distribution/reservesys']
+            command += ['--last-task', 'RESERVETIME={}h /distribution/reservesys'.format(self.option('reserve-time'))]
         else:
             command += ['--no-reserve']
 
