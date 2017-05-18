@@ -27,10 +27,12 @@
           citool -c -i -o citool-debug.txt
                  notify-recipients ${notify_recipients_options}
                  jenkins
+                 postgresql
                  testing-results
                  brew --id $id
                  brew-build-name
                  rpmdiff --type analysis
+                 rpmdiff-waiver
                  notify-ci-bus
     publishers:
       - archive:
