@@ -245,7 +245,14 @@ class BrewBuildTarget(object):
 
 
 class CIBrew(libci.Module):
-    """Provide connection to Brew via koji python module"""
+    """
+    Provide various information related to a Brew task. This modules uses koji python module
+    to connect to Brew.
+
+    The brew task ID can be passed in using the option '--id' or via the shared `brew_task`
+    function. When specified via the brew_task function it replaces the BrewTask instance
+    previously intialized from the option.
+    """
 
     name = 'brew'
     description = 'Connect to Brew instance via koji python module'
@@ -259,16 +266,25 @@ class CIBrew(libci.Module):
             'help': 'Brew API server URL',
         },
         'id': {
-            'help': 'Brew task ID',
+            'help': 'Intialize with given brew task ID',
             'type': int,
         }
     }
-    required_options = ['url', 'id']
+    required_options = ['url']
 
     shared_functions = ['brew_task']
 
-    def brew_task(self):
-        """ return a BrewTask instance of passed task_id """
+    def _init_brew_task(self, task_id):
+        self.brew_task_instance = BrewTask(self, task_id, self.brew_instance)
+        self.info(self.brew_task_instance.full_name)
+
+    def brew_task(self, task_id=None):
+        """
+        Return a BrewTask instance. If task_id passed, initialize BrewTask instance
+        from it first.
+        """
+        if task_id:
+            self._init_brew_task(task_id)
         return self.brew_task_instance
 
     def execute(self):
@@ -280,5 +296,5 @@ class CIBrew(libci.Module):
         self.info('connected to brew instance \'{}\' API version {}'.format(url, version))
 
         # print information about the task
-        self.brew_task_instance = BrewTask(self, task_id, self.brew_instance)
-        self.info(self.brew_task_instance.full_name)
+        if task_id:
+            self._init_brew_task(task_id)
