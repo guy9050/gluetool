@@ -66,9 +66,10 @@ class RpmDiffWaiver(Module):
     according to autowaivers in Errata tool.
 
     Below is an example of the yaml mapping file.
+
     .. code-block:: yaml
+
        ---
-       # key is brew tag, values are product versions and can be string or list of strings
        rhel-7.4-candidate: RHEL-7
        rhel-7.1-z-candidate:
          - RHEL-7.1-EUS
