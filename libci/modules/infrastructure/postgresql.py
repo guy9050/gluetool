@@ -5,10 +5,13 @@ import libci
 class CIPostgreSQL(libci.Module):
     """
     This module provides connection to a PostgreSQL database via PyGreSQL library:
-        http://www.pygresql.org/
+
+    http://www.pygresql.org/
+
     Connection is compliant with Python Database API Specification v2.0
     Documentation of connection object can be found on:
-        http://www.pygresql.org/contents/pgdb/index.html
+
+    http://www.pygresql.org/contents/pgdb/index.html
     """
 
     name = 'postgresql'
@@ -54,12 +57,12 @@ class CIPostgreSQL(libci.Module):
         dbname = self.option('dbname')
 
         # connect to the instance
-        self.info("Connecting to database {}:{} may take some time".format(host, port))
+        self.info("connecting to database {}:{} may take some time".format(host, port))
         try:
             self._connection = pgdb.connect(host=host, port=port, dbname=dbname,
                                             user=user, password=password)
         except Exception as e:
-            self.debug('Connection error: {}'.format(e))
+            self.debug('connection error: {}'.format(e))
             raise libci.CIError("could not connect to PostgreSQL '{}': {}".format(host, str(e)))
 
     def server_version(self):

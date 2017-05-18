@@ -32,6 +32,8 @@ raven==6.0.0
 # required by many packages - we must list it explicitly to force version
 # compatible with all their requirements
 requests==2.12.5
+# simplify usage of kerberos auth in requests
+requests-kerberos==0.11.0
 # required by openstack module
 retrying==1.3.3
 # required for documentation and help processing
