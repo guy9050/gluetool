@@ -138,21 +138,20 @@ class RpmDiffWaiver(Module):
                 product_versions = (product_versions,)
             else:
                 product_versions = tuple(product_versions)
-            self.info("Manual mapping was successful, product versions: {}".format(product_versions))
+            self.info("manual mapping was successful, product versions: {}".format(product_versions))
             return product_versions
 
-        self.warn("Manual mapping did not find product version")
-        self.info("Search Errata DB for mapping")
+        self.debug("searching Errata DB for mapping")
         product_versions = self.query_product_versions(brew_tag)
-        self.debug("Query results: {}".format(product_versions))
+        self.debug("query results: {}".format(product_versions))
         if not product_versions:
-            self.warn("Errata mapping did not find any product version")
+            self.warn("errata mapping did not find any product version")
             return None
         if len(product_versions) > 1:
-            self.warn("Errata mapping is ambigous, more product versions found")
+            self.warn("errata mapping is ambigous, more product versions found")
             # if we want continue only if mapping 1:1 exists
             # return None
-        self.info("Errata mapping was successful, product versions: {}".format(product_versions))
+        self.info("errata mapping was successful, product versions: {}".format(product_versions))
         return product_versions
 
     @staticmethod
@@ -196,7 +195,7 @@ class RpmDiffWaiver(Module):
                           .format(waive_request.status_code))
 
     def log_waivers(self, waivers):
-        self.info("Found waivers: {}".format(sum(len(waiver) for waiver in waivers.itervalues())))
+        self.info("found waivers: {}".format(sum(len(waiver) for waiver in waivers.itervalues())))
         for test_waivers in waivers.itervalues():
             for waiver in test_waivers:
                 self.debug("{}: {}".format(waiver.test, waiver))
@@ -204,25 +203,25 @@ class RpmDiffWaiver(Module):
     def waive_result(self, test_link, waivers):
         url = self.option('url')
         test_name = test_link.getText()
-        self.info("Looking into test '{}'".format(test_name))
+        self.info("looking into test '{}'".format(test_name))
         if test_name not in waivers.keys():
-            self.info('There are no waivers for this test, skipping')
+            self.info('there are no waivers for this test, skipping')
             return False
-        self.info('Waivers for this test: {}'.format(len(waivers[test_name])))
+        self.info('waivers for this test: {}'.format(len(waivers[test_name])))
         link = url + test_link["href"]
-        self.info('Download result table from: {}'.format(link))
+        self.info('download result table from: {}'.format(link))
         errors = self._download_errors(link)
         if not errors:
-            self.info("There are not errors")
+            self.info("there are no errors")
             return False
         matcher = RpmDiffWaiverMatcher(errors, waivers[test_name])
         if not matcher.can_waive():
-            self.info("Not all errors can be waived, skipping")
+            self.info("not all errors can be waived, skipping")
             return False
         log_msg = ""
         for waiver in matcher.matched:
             log_msg = "\n".join([log_msg, ERRATA_AUTOWAIVER_URL.format(waiver.id)])
-        self.info("This test will be waived with these rules: {}".format(log_msg))
+        self.info("this test will be waived with these rules: {}".format(log_msg))
         self.waive_test(link, RPMDIFF_WEBUI_COMMENT.format(log_msg))
         return True
 
@@ -241,48 +240,48 @@ class RpmDiffWaiver(Module):
         if self.option('mapping'):
             self.parse_yaml()
         else:
-            self.warn("Mapping file is not provided, manual mapping will not produce results")
+            self.warn("mapping file is not provided, manual mapping will not produce results")
 
-        self.info("Map brew tag '{}' to product version".format(target))
+        self.info("map brew tag '{}' to product version".format(target))
         errata_products = self._map_tag_to_product(target)
         if errata_products is None:
             return
 
         url = self.option('url')
 
-        self.info("Query waivers for product version: {}".format(errata_products))
+        self.info("query waivers for product version: {}".format(errata_products))
         waivers = self.query_waivers(package, errata_products)
         if not waivers:
-            self.info('Waivers were not found')
+            self.info('waivers were not found')
             return
         self.log_waivers(waivers)
 
-        self.info("Download results from: {}".format(url + "/run/{}".format(run_id)))
+        self.info("download results from: {}".format(url + "/run/{}".format(run_id)))
         results_page = requests.get(url + "/run/{}".format(run_id)).text
         table = BeautifulSoup(results_page, "html.parser").find("table", attrs={"class": "summary"})
         if not table:
-            raise CIError('Table of results was not found on RPMDiff WebUI')
+            raise CIError('table of results was not found on RPMDiff WebUI')
 
-        self.info("Looking into RPMDiff results for possible errors")
+        self.info("looking into RPMDiff results for possible errors")
         changed = False
         for test_link in table.find_all("a"):
             changed = changed or self.waive_result(test_link, waivers)
 
-        self.info("Waiving is complete")
+        self.info("waiving is complete")
 
         if changed and self.has_shared('refresh_rpmdiff_results'):
-            self.info("Some tests were waived, refresh old RPMDiff results")
+            self.info("some tests were waived, refresh old RPMDiff results")
             self.shared("refresh_rpmdiff_results", run_id)
 
     def rpmdiff_id_from_results(self):
         if not self.has_shared("results"):
-            self.warn('Cannot obtain run-id, shared function \'results\' does not exist')
+            self.warn('cannot obtain run-id, shared function \'results\' does not exist')
             return None
         results = self.shared("results")
         for result in results:
             if result.test_type == 'rpmdiff':
                 return result.ids['rpmdiff_run_id']
-        self.warn('Cannot obtain run-id, previous results do not contain rpmdiff result')
+        self.warn('cannot obtain run-id, previous results do not contain rpmdiff result')
         return None
 
     def execute(self):
