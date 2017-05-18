@@ -87,6 +87,8 @@ class CIWow(Module):
     _processed_results = None
 
     def sanity(self):
+        # pylint: disable=too-many-statements
+
         utils.check_for_commands(REQUIRED_COMMANDS)
 
         if not self.option('wow-options'):
@@ -209,22 +211,31 @@ class CIWow(Module):
 
                         data['bkr_phases'][phase] = result
 
-                # store log links
-                logs_nodes = task_xml.getElementsByTagName('logs')
-                if logs_nodes:
-                    for log_node in logs_nodes[0].getElementsByTagName('log'):
+                # store log links - job results and journal do not have these, we have to ask
+                # elsewhere...
+                task_id = int(task_xml.attributes['id'].value)
+
+                try:
+                    output = run_command(['bkr', 'job-logs', 'T:{}'.format(task_id)])
+
+                    for url in output.stdout.strip().splitlines():
+                        url = url.strip()
+                        name = url.split('/')[-1]
+
                         data['bkr_logs'].append({
-                            'href': log_node.attributes['href'].value,
-                            'name': log_node.attributes['name'].value
+                            'href': url,
+                            'name': name
                         })
 
-                else:
-                    # For some reason, task XML from beaker - when compared with XML produced by restraint - does
-                    # not contain any <logs/> element. For such case, add at least "generated" URL of TESTOUT.log
-                    # log file.
+                except CICommandError:
+                    msg = 'Cannot find logs for task {}. See log for details.'.format(task_id)
 
+                    citool_module.warn(msg)
+                    citool_module.ci.sentry_submit_warning(msg)
+
+                if not data['bkr_logs']:
+                    # construct at least TESTOUT.log
                     recipe_id = int(recipe_xml.attributes['id'].value)
-                    task_id = int(task_xml.attributes['id'].value)
 
                     # pylint: disable=line-too-long
                     url = 'https://beaker.engineering.redhat.com/recipes/{}/tasks/{}/logs/TESTOUT.log'.format(recipe_id, task_id)
