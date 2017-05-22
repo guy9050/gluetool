@@ -13,26 +13,31 @@ from libci.results import TestResult, publish_result
 REQUIRED_CMDS = ['covscan']
 
 
-class NoResultFilesError(SoftCIError):
-    SUBJECT = 'Failed to fetch covscan result files'
+class CovscanFailedError(SoftCIError):
+    SUBJECT = 'Failed to test {nvr}'
     MODULE = 'covscan'
     BODY = """
-CI failed to download necessary files from Covscan site, therefore it cannot
-decide what to do next. It may have been caused by failed covscan task. You
-may find solution on {covscan_result_url}.
+CI aborted while trying to test the build via Covscan.
+This is usually caused by:
+
+* build via Covscan failed
+* Covscan failed to finish testing for some reason
+
+See Covscan logs for more details {covscan_result_url}.
     """
 
-    def __init__(self, result):
-        super(NoResultFilesError, self).__init__('Failed to fetch Covscan files')
+    def __init__(self, result, brew_task):
+        super(CovscanFailedError, self).__init__()
 
         self.result = result
         self.brew_task = brew_task
 
     def _template_variables(self):
-        variables = super(NoResultFilesError, self)._template_variables()
+        variables = super(CovscanFailedError, self)._template_variables()
 
         variables.update({
-            'covscan_result_url': self.result.url
+            'covscan_result_url': self.result.url,
+            'nvr': self.brew_task.nvr
         })
 
         return variables
