@@ -1,7 +1,9 @@
 import collections
 import json
 import os
+import re
 import signal
+import sys
 
 import stomp
 
@@ -45,6 +47,10 @@ class Listener(stomp.listener.ConnectionListener):
         module.logger.connect(self)
 
         self.keep_running = True
+
+        # callbacks are processed in a separate thread, therefore exceptions raised there
+        # won't make it into the main thread.
+        self.exc_info = None
 
         self._callbacks = collections.defaultdict(dict)
 
@@ -96,12 +102,20 @@ class Listener(stomp.listener.ConnectionListener):
             actual_args = (self,) + args + preset_args
             actual_kwargs = dict(kwargs, **preset_kwargs)
 
-            callback(*actual_args, **actual_kwargs)
+            try:
+                callback(*actual_args, **actual_kwargs)
+
+            # pylint: disable=broad-except
+            except Exception:
+                self.exc_info = sys.exc_info()
+                self.stop()
 
     def on_error(self, headers, body):
         self.debug("'on_error' event raised, dispatching callbacks")
 
-        self._dispatch_callbacks('on_error', headers, json.loads(body))
+        # errors' bodies are not guaranteed to be a JSON, therefore pass it further
+        # in their raw form.
+        self._dispatch_callbacks('on_error', headers, body)
 
     def on_message(self, headers, body):
         self.debug("'on_message' event raised, dispatching callbacks")
@@ -116,6 +130,11 @@ class BusListener(libci.Module):
     """
 
     name = 'bus-listener'
+    description = """
+                  Generic, event-based bus listening module. Allows other modules to setup
+                  callbacks for bus events, e.g. calling other modules when specific
+                  message arrives.
+                  """
 
     options = {
         'user': {
@@ -223,7 +242,10 @@ class BusListener(libci.Module):
     def _on_error(self, listener, headers, body):
         # pylint: disable=unused-argument
 
-        self.debug("'ERROR' frame received:\nheaders: {}\nmessage: {}".format(format_dict(headers), format_dict(body)))
+        if 'message' in headers and re.match(r'User name \[.*?\] or password is invalid\.', headers['message']):
+            raise libci.CIError('Invalid username or password')
+
+        self.debug("'ERROR' frame received:\nheaders: {}\nmessage: {}".format(format_dict(headers), body))
 
     def _quit_after_n_messages(self, listener, headers, body):
         """
@@ -267,8 +289,11 @@ class BusListener(libci.Module):
                                id='catch-all selector',
                                ack='auto')
 
+        except stomp.exception.ConnectFailedException as exc:
+            raise libci.CIError('Unable to connect to the message bus: {}'.format(str(exc)))
+
         except stomp.exception.StompException as exc:
-            raise libci.CIError('Exception raise when connecting to message bus: {}'.format(exc))
+            raise libci.CIError('Exception raised when connecting to message bus: {}'.format(exc))
 
         self.add_bus_callback('on_error', 'dump message', self._on_error)
         self.add_bus_callback('on_message', 'dump message', self._dump_message)
@@ -283,3 +308,6 @@ class BusListener(libci.Module):
 
         if self.option('listen'):
             self.bus_accept()
+
+        if listener.exc_info is not None:
+            raise listener.exc_info[1]
