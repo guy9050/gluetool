@@ -139,8 +139,16 @@ class OpenstackGuest(NetworkedGuest):
 
             self.debug("storing console output in '{}'".format(filename))
 
+            console = self._instance.get_console_output()
+
+            # Some servers may return empty console output. Observed with rhel-7.1-server-x86_64-released image
+            if not console:
+                self.warn('empty console output')
+
+                console = '<Server returned empty console output>'
+
             with gzip.open(filename, 'wb') as f:
-                f.write(self._instance.get_console_output())
+                f.write(console)
                 f.flush()
 
         # pylint: disable=broad-except
