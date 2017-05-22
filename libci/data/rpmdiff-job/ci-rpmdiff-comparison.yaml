@@ -21,6 +21,7 @@
     builders:
       - shell:
           citool -c -i -o citool-debug.txt
+                 notify-recipients ${notify_recipients_options}
                  jenkins
                  postgresql
                  testing-results
