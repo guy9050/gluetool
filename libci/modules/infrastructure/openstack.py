@@ -1,6 +1,8 @@
 import errno
+import gzip
 import os
 import re
+import sys
 from time import gmtime, strftime
 from datetime import datetime, timedelta
 
@@ -130,6 +132,31 @@ class OpenstackGuest(NetworkedGuest):
         The destroy function makes sure that assigned floating IP is freed, all snapshots are removed
         and the instance is deleted.
         """
+
+        # save console log, if possible
+        try:
+            filename = 'console-{}-{}.log.gz'.format(self.name, self.instance_id)
+
+            self.debug("storing console output in '{}'".format(filename))
+
+            console = self._instance.get_console_output()
+
+            # Some servers may return empty console output. Observed with rhel-7.1-server-x86_64-released image
+            if not console:
+                self.warn('empty console output')
+
+                console = '<Server returned empty console output>'
+
+            with gzip.open(filename, 'wb') as f:
+                f.write(console)
+                f.flush()
+
+        # pylint: disable=broad-except
+        except Exception as exc:
+            self.error('Failed to store console output in the file: {}'.format(str(exc)))
+
+            self._module.ci.sentry_submit_exception(sys.exc_info())
+
         try:
             self._ip.delete()
             self.verbose("removed floating IP '{}'".format(self._ip.ip))
