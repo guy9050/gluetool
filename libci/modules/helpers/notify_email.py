@@ -9,7 +9,7 @@ from email.mime.text import MIMEText
 from mako.template import Template
 
 import libci
-from libci import CIError, Module, utils
+from libci import Module, utils
 
 
 DEFAULT_MODULE_DOCS_URL = 'http://liver3.lab.eng.brq.redhat.com/~citool-doc/'
@@ -501,11 +501,24 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
         return '<Summary URL not available>'
 
-    def execute(self):
+    @utils.cached_property
+    def task(self):
         task = self.shared('brew_task')
-        if not task:
-            raise CIError('Unable to get brew task')
 
+        if task:
+            return task
+
+        self.warn('Unable to get brew task')
+
+        class DummyTask(object):
+            # pylint: disable=too-few-public-methods
+            def __init__(self, **kwargs):
+                self.__dict__.update(kwargs)
+
+        return DummyTask(task_id='<Task ID not available>', nvr='<NVR not available>',
+                         owner='<Owner not available>', issuer='<No issuer available>')
+
+    def execute(self):
         results = self.shared('results') or []
         reserve = self.option('add-reservation')
 
@@ -532,8 +545,8 @@ to this option, and process environmental variables (default: {})""".format(DEFA
             subject = SUBJECT_RESERVE if reserve else SUBJECT
 
             msg = Message(self,
-                          subject=subject.format(task=task, result=result),
-                          header=BODY_HEADER.format(task=task, summary_url=summary_url).strip(),
+                          subject=subject.format(task=self.task, result=result),
+                          header=BODY_HEADER.format(task=self.task, summary_url=summary_url).strip(),
                           footer=BODY_FOOTER.strip(),
                           recipients=recipients,
                           cc=self.archive_cc)
@@ -561,19 +574,8 @@ to this option, and process environmental variables (default: {})""".format(DEFA
         result = libci.results.TestResult('dummy', 'ERROR')
         summary_url = self._get_summary_url(result)
 
-        task = self.shared('brew_task')
-
-        if task is None:
-            class DummyTask(object):
-                # pylint: disable=too-few-public-methods
-                def __init__(self, **kwargs):
-                    self.__dict__.update(kwargs)
-
-            task = DummyTask(task_id='<Task ID not available>', nvr='<NVR not available>',
-                             owner='<Owner not available>', issuer='<No issuer available>')
-
         # default body header and footer
-        body_header = BODY_HEADER.format(task=task, summary_url=summary_url)
+        body_header = BODY_HEADER.format(task=self.task, summary_url=summary_url)
         body_footer = BODY_FOOTER
 
         if failure.soft:
