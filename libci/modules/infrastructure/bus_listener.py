@@ -218,12 +218,12 @@ class BusListener(libci.Module):
 
         # pylint: disable=unused-argument
 
-        self.debug("message received:\nheaders: {}\nmessage: {}".format(format_dict(headers), body))
+        self.debug("message received:\nheaders: {}\nmessage: {}".format(format_dict(headers), format_dict(body)))
 
     def _on_error(self, listener, headers, body):
         # pylint: disable=unused-argument
 
-        self.debug("'ERROR' frame received:\nheaders: {}\nmessage: {}".format(format_dict(headers), body))
+        self.debug("'ERROR' frame received:\nheaders: {}\nmessage: {}".format(format_dict(headers), format_dict(body)))
 
     def _quit_after_n_messages(self, listener, headers, body):
         """
