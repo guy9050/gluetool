@@ -29,6 +29,7 @@
                  rpmdiff --type comparison
                  rpmdiff-waiver
                  notify-ci-bus
+                 notify-email
     publishers:
       - archive:
           artifacts: '**/**'
