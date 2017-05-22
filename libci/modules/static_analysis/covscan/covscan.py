@@ -26,17 +26,17 @@ This is usually caused by:
 See Covscan logs for more details {covscan_result_url}.
     """
 
-    def __init__(self, result, brew_task):
-        super(CovscanFailedError, self).__init__()
+    def __init__(self, url, brew_task):
+        super(CovscanFailedError, self).__init__('Covscan testing failed, task did not pass')
 
-        self.result = result
+        self.url = url
         self.brew_task = brew_task
 
     def _template_variables(self):
         variables = super(CovscanFailedError, self)._template_variables()
 
         variables.update({
-            'covscan_result_url': self.result.url,
+            'covscan_result_url': self.url,
             'nvr': self.brew_task.nvr
         })
 
@@ -91,7 +91,10 @@ class CovscanResult(object):
 
     def _fetch_diff(self, url):
         diff_json = urlopen(url).read()
-        diff = json.loads(diff_json)
+        try:
+            diff = json.loads(diff_json)
+        except ValueError:
+            raise CovscanFailedError(url, self.module.brew_task)
         log_blob(self.module.debug, 'This is what we got from covscan', diff)
         defects = diff['defects']
         self.module.debug('Defects:\n{}\nfetched from {}'.format(format_dict(defects), url))
@@ -208,7 +211,7 @@ class CICovscan(Module):
         self.info('Covscan task url: {0}'.format(covscan_result.url))
 
         if covscan_result.status_failed():
-            raise CovscanFailedError(covscan_result, self.brew_task)
+            raise CovscanFailedError(covscan_result.url, self.brew_task)
 
         covscan_result.download_artifacts()
 
