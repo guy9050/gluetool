@@ -233,7 +233,8 @@ class RpmDiffWaiver(Module):
         """
         self.info("run-id: {}, package: {}, target: {}".format(run_id, package, target))
         if not run_id:
-            raise CIError("you want waive results from RPMDiff but you did not specify run-id")
+            self.info('looks like rpmdiff was not run, cowardly refusing to run')
+            return
         if not self.has_shared('postgresql'):
             raise CIError("Module requires PostgreSQL support, did you include 'postgresql' module?")
 
