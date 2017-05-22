@@ -66,6 +66,7 @@ Result:         {result.overall_result}
 RPMdiff run:    {rpmdiff_url}
 
 RPMdiff CI Test Plan: http://url.corp.redhat.com/rpmdiff-in-ci
+RPMdiff CI Autowaivers: https://errata.devel.redhat.com/rpmdiff/list_autowaive_rules
 """
 
 RESTRAINT_BODY = """
