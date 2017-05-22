@@ -549,6 +549,14 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
         exc = failure.exc_info[1]
 
+        if not self.has_shared('notification_recipients'):
+            msg = 'Cannot get a list of recipients, please add e.g. notify-recipients module'
+
+            self.warn(msg)
+            self.ci.sentry_submit_warning(msg)
+
+            return
+
         recipients = ['{}@redhat.com'.format(user) for user in self.shared('notification_recipients')]
 
         if failure.soft is not True:
