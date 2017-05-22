@@ -13,25 +13,31 @@ from libci.results import TestResult, publish_result
 REQUIRED_CMDS = ['covscan']
 
 
-class NoResultFilesError(SoftCIError):
-    SUBJECT = 'Failed to fetch covscan result files'
+class CovscanFailedError(SoftCIError):
+    SUBJECT = 'Failed to test {nvr}'
     MODULE = 'covscan'
     BODY = """
-CI failed to download necessary files from Covscan site, therefore it cannot
-decide what to do next. It may have been caused by failed covscan task. You
-may find solution on {covscan_result_url}.
+CI aborted while trying to test the build via Covscan.
+This is usually caused by:
+
+* build via Covscan failed
+* Covscan failed to finish testing for some reason
+
+See Covscan logs for more details {covscan_result_url}.
     """
 
-    def __init__(self, result):
-        super(NoResultFilesError, self).__init__('Failed to fetch Covscan files')
+    def __init__(self, result, brew_task):
+        super(CovscanFailedError, self).__init__()
 
         self.result = result
+        self.brew_task = brew_task
 
     def _template_variables(self):
-        variables = super(NoResultFilesError, self)._template_variables()
+        variables = super(CovscanFailedError, self)._template_variables()
 
         variables.update({
-            'covscan_result_url': self.result.url
+            'covscan_result_url': self.result.url,
+            'nvr': self.brew_task.nvr
         })
 
         return variables
@@ -139,6 +145,9 @@ class CICovscan(Module):
         'blacklist': {
             'help': 'A comma separated list of blacklisted package names'
         },
+        'task-id': {
+            'help': 'Do not schedule Covscan task, just report from given task id',
+        },
         'target_pattern': {
             'help': 'A comma separated list of regexes, which define enabled targets'
         }
@@ -169,32 +178,37 @@ class CICovscan(Module):
         return CovscanResult(self, covscan_task_id)
 
     def scan(self):
-        baseline = self.brew_task.latest
+        task_id = self.option('task-id')
+        if task_id:
+            self.info('Skipping covscan testing, using existing Covscan task id')
+            covscan_result = CovscanResult(self, task_id)
+        else:
+            baseline = self.brew_task.latest
 
-        if not baseline:
-            raise NoCovscanBaselineFoundError()
+            if not baseline:
+                raise NoCovscanBaselineFoundError()
 
-        self.info('Using (second) latest non-scratch build [%s] in tag [%s] as baseline',
-                  baseline, self.brew_task.target.destination_tag)
+            self.info('Using (second) latest non-scratch build [%s] in tag [%s] as baseline',
+                      baseline, self.brew_task.target.destination_tag)
 
-        self.info('Obtaining source RPM from Brew build')
-        srcrpm = urlgrab(self.brew_task.srcrpm)
+            self.info('Obtaining source RPM from Brew build')
+            srcrpm = urlgrab(self.brew_task.srcrpm)
 
-        self.info('Issuing Covscan request')
+            self.info('Issuing Covscan request')
 
-        config = 'rhel-{0}-x86_64'.format(self.brew_task.target.rhel)
-        base_config = 'rhel-{0}-x86_64-basescan'.format(self.brew_task.target.rhel)
+            config = 'rhel-{0}-x86_64'.format(self.brew_task.target.rhel)
+            base_config = 'rhel-{0}-x86_64-basescan'.format(self.brew_task.target.rhel)
 
-        try:
-            covscan_result = self.version_diff_build(srcrpm, baseline, config, base_config)
-        finally:
-            self.debug('Removing the downloaded source RPM')
-            os.unlink(srcrpm)
+            try:
+                covscan_result = self.version_diff_build(srcrpm, baseline, config, base_config)
+            finally:
+                self.debug('Removing the downloaded source RPM')
+                os.unlink(srcrpm)
 
         self.info('Covscan task url: {0}'.format(covscan_result.url))
 
         if covscan_result.status_failed():
-            raise NoResultFilesError(covscan_result)
+            raise CovscanFailedError(covscan_result, self.brew_task)
 
         covscan_result.download_artifacts()
 
