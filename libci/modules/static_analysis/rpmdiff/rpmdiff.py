@@ -119,7 +119,8 @@ class CIRpmdiff(Module):
             raise CIError("Failure during 'rpmdiff-remote' execution: {}".format(exc.output.stderr))
 
     def _get_runinfo(self, run_id):
-        command = self.rpmdiff_cmd + ["runinfo", run_id]
+        # make sure run_id is a string here, as utils run_command requires it
+        command = self.rpmdiff_cmd + ["runinfo", str(run_id)]
 
         blob = json.loads(CIRpmdiff._run_command(command).stdout)
         utils.log_blob(self.debug, 'rpmdiff-remote runinfo returned', utils.format_dict(blob))
