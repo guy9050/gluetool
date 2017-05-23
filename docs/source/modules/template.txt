@@ -1,0 +1,10 @@
+``{name}``: {description}
+{title_underline}
+
+.. automoddesc:: {full_path}
+   :noindex:
+
+.. argparse::
+   :filename: source/module_parsers.py
+   :func: get_parser_{klass}
+   :prog: {name}
