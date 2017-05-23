@@ -103,6 +103,9 @@ class RestraintScheduler(libci.Module):
             if 'No relevant tasks found in test plan' in exc.output.stderr:
                 raise NoTestAvailableError()
 
+            if 'No recipe generated (no relevant tasks?)' in exc.output.stderr:
+                raise NoTestAvailableError()
+
             raise CIError("Failure during 'wow' execution: {}".format(exc.output.stderr))
 
     def _setup_guest(self, task_id, guest):
