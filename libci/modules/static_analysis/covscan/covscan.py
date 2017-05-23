@@ -15,7 +15,7 @@ REQUIRED_CMDS = ['covscan']
 
 class CovscanFailedError(SoftCIError):
     SUBJECT = 'Failed to test {nvr}'
-    MODULE = 'covscan'
+    MODULE_NAME = 'covscan'
     BODY = """
 CI aborted while trying to test the build via Covscan.
 This is usually caused by:
@@ -45,7 +45,7 @@ See Covscan logs for more details {covscan_result_url}.
 
 class NoCovscanBaselineFoundError(SoftCIError):
     STATUS = 'SKIP'
-    MODULE = 'covscan'
+    MODULE_NAME = 'covscan'
     SUBJECT = 'Could not find baseline package for Covscan'
     BODY = """
 CI skipped the testing due to the fact, that the baseline build for Covscan was not found.

@@ -12,7 +12,7 @@ REQUIRED_CMDS = ['rhpkg', 'brew', 'rpmbuild']
 
 
 class BocBuildError(SoftCIError):
-    MODULE = 'build-on-commit'
+    MODULE_NAME = 'build-on-commit'
     SUBJECT = 'Failed to build {component}, branch {branch}'
     BODY = """
 Build on commit failed for {component} from branch {branch} while trying to build for target {target}
