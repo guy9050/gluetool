@@ -246,6 +246,28 @@ class Configurable(object):
             self._config[name] = value
             self.debug("Option '{}' set to '{}' by config file".format(name, value))
 
+    @classmethod
+    def _create_args_parser(cls, **kwargs):
+        """
+        Create an argument parser. Used by Sphinx to document "command-line" options
+        of the module - which are, by the way, the module options as well.
+
+        :param dict kwargs: Additional arguments passed to :py:class:`argparse.ArgumentParser`.
+        """
+
+        parser = argparse.ArgumentParser(**kwargs)
+
+        for name in sorted(cls.options):
+            if isinstance(name, str):
+                names = ('--{}'.format(name),)
+
+            else:
+                names = ('-{}'.format(name[0]), '--{}'.format(name[1]))
+
+            parser.add_argument(*names, **cls.options[name])
+
+        return parser
+
     def _parse_args(self, args, **kwargs):
         """
         Parse command-line arguments. Uses :py:mod:`argparse` for the actual parsing.
@@ -255,16 +277,8 @@ class Configurable(object):
           program level.
         """
 
-        parser = argparse.ArgumentParser(**kwargs)
-
-        for name in sorted(self.options):
-            if isinstance(name, str):
-                names = ('--{}'.format(name),)
-
-            else:
-                names = ('-{}'.format(name[0]), '--{}'.format(name[1]))
-
-            parser.add_argument(*names, **self.options[name])
+        # construct the parser
+        parser = self._create_args_parser(**kwargs)
 
         # parse the added args
         options = parser.parse_args(args)

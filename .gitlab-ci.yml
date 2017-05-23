@@ -33,6 +33,7 @@ docs:
     - pip install -r requirements.txt
     - sphinx-apidoc -T -e -o docs/source/ libci/
     - python setup.py develop
+    - python docs/generate-module-page.py
     - make -C docs/ html
     - chmod u=rw,go= docs/citool-doc.key
     - rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i docs/citool-doc.key" docs/build/html/ citool-doc@liver3.lab.eng.brq.redhat.com:/home/citool-doc/public_html

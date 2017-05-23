@@ -17,3 +17,6 @@ libatt.egg-info
 
 # auto-generated *.rst docs
 docs/source/libci.*
+docs/source/modules.rst
+docs/source/module_parsers.py
+docs/source/modules/*.rst

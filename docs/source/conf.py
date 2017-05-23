@@ -21,6 +21,7 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
+import sphinx.ext.autodoc
 import sphinx.environment
 import sphinx_rtd_theme
 from docutils.utils import get_source_line
@@ -39,7 +40,9 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',
     'sphinx.ext.coverage',
-    'sphinx.ext.viewcode'
+    'sphinxcontrib.programoutput',
+    'sphinx.ext.viewcode',
+    'sphinxarg.ext'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -104,7 +107,7 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = []
 
 
 # -- Options for HTMLHelp output ------------------------------------------
@@ -166,6 +169,11 @@ texinfo_documents = [
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {'https://docs.python.org/': None}
 
+# Disable verification of certificates - intersphinx can have some issues,
+# and it's not critical
+tls_verify = False
+
+# default autodoc flags
 autodoc_default_flags = ['members', 'undoc-members', 'show-inheritance', 'private-members']
 
 
@@ -177,3 +185,17 @@ def _warn_node(self, msg, node, *args, **kwargs):
 
 
 sphinx.environment.BuildEnvironment.warn_node = _warn_node
+
+
+# Include module description as a part of documentation
+class ModuleDescriptionDocumenter(sphinx.ext.autodoc.DataDocumenter):
+    objtype = "moddesc"
+    content_indent = ""
+
+    # pylint: disable=unused-argument
+    def add_directive_header(self, sig):
+        pass
+
+
+def setup(app):
+    app.add_autodocumenter(ModuleDescriptionDocumenter)

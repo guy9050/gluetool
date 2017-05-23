@@ -130,11 +130,7 @@ class BusListener(libci.Module):
     """
 
     name = 'bus-listener'
-    description = """
-                  Generic, event-based bus listening module. Allows other modules to setup
-                  callbacks for bus events, e.g. calling other modules when specific
-                  message arrives.
-                  """
+    description = 'Generic, event-based bus listening module.'
 
     options = {
         'user': {
