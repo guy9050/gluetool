@@ -68,7 +68,6 @@ Jinja2==2.9.6
 jsonpatch==1.15
 jsonpointer==1.10
 jsonschema==2.6.0
-kerberos==1.2.5
 keystoneauth1==2.19.0
 lxml==3.7.3
 MarkupSafe==1.0
