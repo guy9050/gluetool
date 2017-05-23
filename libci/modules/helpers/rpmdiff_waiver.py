@@ -1,8 +1,9 @@
-import re
 import os
+import re
 from collections import defaultdict, namedtuple
-import yaml
+import pgdb
 import requests
+import yaml
 from requests_kerberos import HTTPKerberosAuth, OPTIONAL
 from bs4 import BeautifulSoup
 from libci import CIError, Module
@@ -244,16 +245,32 @@ class RpmDiffWaiver(Module):
             self.warn("mapping file is not provided, manual mapping will not produce results")
 
         self.info("map brew tag '{}' to product version".format(target))
-        errata_products = self._map_tag_to_product(target)
+        try:
+            errata_products = self._map_tag_to_product(target)
+        # pylint: disable=no-member
+        except pgdb.OperationalError as e:
+            msg = "TEIID returned error while querying for errata products:\n{}".format(str(e))
+            self.warn(msg)
+            self.ci.sentry_submit_warning(msg)
+            return
+
         if errata_products is None:
             return
 
         url = self.option('url')
 
         self.info("query waivers for product version: {}".format(errata_products))
-        waivers = self.query_waivers(package, errata_products)
+        try:
+            waivers = self.query_waivers(package, errata_products)
+        # pylint: disable=no-member
+        except pgdb.OperationalError as e:
+            msg = "TEIID returned error while querying for waivers:\n{}".format(str(e))
+            self.warn(msg)
+            self.ci.sentry_submit_warning(msg)
+            return
+
         if not waivers:
-            self.info('waivers were not found')
+            self.info('no waivers were found')
             return
         self.log_waivers(waivers)
 
