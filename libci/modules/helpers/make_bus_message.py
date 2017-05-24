@@ -31,7 +31,7 @@ class CIMakeBusMessage(Module):
                 'taskid': subresult['data']['taskid'],
                 'item': subresult['data']['item'],
             }
-            self.store(headers, subresult)
+            self.store(headers, subresult, result.test_type)
 
     def process_covscan(self, result):
         task = self.shared('brew_task')
@@ -136,7 +136,7 @@ class CIMakeBusMessage(Module):
             'recipients': ','.join(recipients)
         }
 
-        self.store(headers, body)
+        self.store(headers, body, result.test_type)
 
     def process_result(self, result):
         process_function = getattr(self, 'process_{}'.format(result.test_type), None)
