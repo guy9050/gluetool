@@ -73,6 +73,9 @@
             wow --wow-options="${wow_options}" --jobwatch-options="${jobwatch_options}" ${wow_opts} \
             notify-email --add-frontend-url ${notify_email_options} ${notify_email_opts} \
             ${pipeline_append}
+    properties:
+      - build-discarder:
+        num-to-keep: 500
     publishers:
       - archive:
           artifacts: '**/**'
