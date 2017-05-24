@@ -268,6 +268,10 @@ class CIBrewDispatcher(Module):
       - if you use one name of the set multiple times, the last will overwrite all former
         ones.
 
+    In both forms, ``component`` is being considered a regular expression, and the actual
+    component name is then matched against these patterns to find out which section of
+    the config file belongs to the current component.
+
     There are two global sections: "default" which applies for components that don't have
     their own configuration, and "all" which is appended to commands for every component.
     Both sections can use filtering to better specify commands.
@@ -579,7 +583,25 @@ class CIBrewDispatcher(Module):
             # either there's no key "packages", or it's empty
             packages_config = {}
 
-        return self._reduce_section(packages_config.get(component, None),
+        component_commands = None
+
+        for pattern, commands in packages_config.iteritems():
+            self.debug("pattern: '{}'".format(pattern))
+
+            try:
+                if not re.match('^' + pattern + '$', component):
+                    continue
+
+            except re.error as exc:
+                raise CIError("Cannot compile regexp pattern '{}': {}".format(pattern, str(exc)))
+
+            if component_commands:
+                raise CIError("Multiple patterns matching component name '{}'".format(component))
+
+            self.debug('  match!')
+            component_commands = commands
+
+        return self._reduce_section(component_commands,
                                     all_commands=global_all_commands,
                                     default_commands=global_default_commands)
 
