@@ -65,8 +65,14 @@ RPMDIFF_BODY = """
 Result:         {result.overall_result}
 RPMdiff run:    {rpmdiff_url}
 
-RPMdiff CI Test Plan: http://url.corp.redhat.com/rpmdiff-in-ci
+See RPMdiff run link ^^ for more details. Note that waiving of results is not required until
+the build is added to Erratum.
+
+Existing autowaiving rules from Errata Tool are applied, add or change these directly there.
 RPMdiff CI Autowaivers: https://errata.devel.redhat.com/rpmdiff/list_autowaive_rules
+
+In case of obvious issues with an RPMDiff test, please report a bug:
+https://bugzilla.redhat.com/enter_bug.cgi?product=RPMDiff
 """
 
 RESTRAINT_BODY = """
@@ -75,6 +81,12 @@ Result:         {result.overall_result}
 {reserved}
 
 {fails}
+"""
+
+RPMDIFF_FOOTER = """
+--
+RPMdiff CI Test Plan: http://url.corp.redhat.com/rpmdiff-in-ci
+CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation
 """
 
 COVSCAN_BODY = """
@@ -449,6 +461,7 @@ to this option, and process environmental variables (default: {})""".format(DEFA
         rpmdiff_url = self._format_result_url(result, 'rpmdiff_url', '<RPMdiff URL not available>')
 
         msg.body = RPMDIFF_BODY.format(result=result, rpmdiff_url=rpmdiff_url)
+        msg.footer = RPMDIFF_FOOTER
 
     def format_result_restraint(self, result, msg):
         # pylint: disable=no-self-use
