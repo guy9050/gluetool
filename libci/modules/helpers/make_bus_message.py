@@ -1,66 +1,27 @@
 import os
-import stomp
-from libci import CIError, Module, utils
-
-# defaults
-CI_BUS_HOST = 'ci-bus.lab.eng.rdu2.redhat.com'
-CI_BUS_PORT = 61613
-CI_BUS_TOPIC = '/topic/CI'
+from libci import CIError, Module
 
 
-class CINotifyBus(Module):
+class CIMakeBusMessage(Module):
     """
-    This module sends notifications of CI results via CI message bus.
-
-    Inspiration of this code comes from:
-    http://git.app.eng.bos.redhat.com/git/ci-ops-tools.git/tree/jenkins/plugins/redhat-ci-plugin/scripts/publish.py
+    This module converts results of testing to messages, which can be sent to some message bus.
     """
 
-    name = 'notify-ci-bus'
-    description = 'Notification module - CI msg bus'
-    options = {
-        'destination': {
-            'help': 'Message bus topic/subscription (default: {})'.format(CI_BUS_TOPIC),
-            'default': CI_BUS_TOPIC,
-        },
-        'dry-run': {
-            'help': 'Do not send notifications.',
-            'action': 'store_true',
-        },
-        'host': {
-            'help': 'Message bus host (default: {})'.format(CI_BUS_HOST),
-            'default': CI_BUS_HOST,
-        },
-        'password': {
-            'help': 'Password used for authentication',
-        },
-        'port': {
-            'help': 'Message bus port (default: {})'.format(CI_BUS_PORT),
-            'default': CI_BUS_PORT,
-        },
-        'user': {
-            'help': 'User used for authentication',
-        },
-    }
-    required_options = ['user', 'password']
+    name = 'make-bus-message'
+    description = 'Make messages, which can be send to message bus by other modules'
+    options = {}
 
-    def publish(self, headers, body):
-        # body needs to be a string
-        body = utils.format_dict(body)
-        utils.log_blob(self.debug,
-                       'sent following message to CI message bus',
-                       'header:\n{}\nbody:\n{}'.format(utils.format_dict(headers), body))
+    shared_functions = ['bus_messages']
 
-        if self.option('dry-run'):
-            return
+    messages = []
 
-        if stomp.__version__[0] < 4:
-            # pylint: disable=no-value-for-parameter
-            self.cibus.send(message=body, headers=headers, destination=self.option('destination'))
-        else:
-            self.cibus.send(body=body, headers=headers, destination=self.option('destination'))
+    def store(self, headers, body, test_type):
+        self.messages.append([headers, body, test_type])
 
-    def publish_rpmdiff(self, result):
+    def bus_messages(self):
+        return self.messages
+
+    def process_rpmdiff(self, result):
         for subresult in result.payload:
             headers = {
                 'CI_TYPE': 'resultsdb',
@@ -70,10 +31,9 @@ class CINotifyBus(Module):
                 'taskid': subresult['data']['taskid'],
                 'item': subresult['data']['item'],
             }
-            self.publish(headers, subresult)
-        self.info('published RPMdiff results to CI message bus')
+            self.store(headers, subresult)
 
-    def publish_covscan(self, result):
+    def process_covscan(self, result):
         task = self.shared('brew_task')
         item = '{} {}'.format(task.nvr, result.baseline)
 
@@ -103,18 +63,17 @@ class CINotifyBus(Module):
             }
         }
 
-        self.publish(headers, body)
-        self.info('published Covscan results to CI message bus')
+        self.store(headers, body, result.test_type)
 
-    def publish_wow(self, result):
-        self.publish_ci_metricsdata(result, 'wow')
+    def process_wow(self, result):
+        self.process_ci_metricsdata(result, 'wow')
 
-    def publish_restraint(self, result):
-        self.publish_ci_metricsdata(result, 'restraint')
+    def process_restraint(self, result):
+        self.process_ci_metricsdata(result, 'restraint')
 
-    def publish_ci_metricsdata(self, result, result_type):
+    def process_ci_metricsdata(self, result, result_type):
         """
-        Publish CI metricsdata. Note that this code will eventually be changed or replaced
+        Process CI metricsdata, to be published. Note that this code will eventually be changed or replaced
         in favor of 'resultsdb' format. Currently it should be considered as a legacy format
         of CI messages used to report results from old BaseOS CI.
         """
@@ -177,37 +136,20 @@ class CINotifyBus(Module):
             'recipients': ','.join(recipients)
         }
 
-        self.publish(headers, body)
-        self.info('published CI Metrics data results to CI message bus')
+        self.store(headers, body)
 
-    def publish_result(self, result):
-        publish_function = getattr(self, 'publish_{}'.format(result.test_type), None)
-        if publish_function is not None:
-            # we're sure publish_function *is* callable
+    def process_result(self, result):
+        process_function = getattr(self, 'process_{}'.format(result.test_type), None)
+        if process_function is not None:
+            # we're sure process_function *is* callable
             # pylint: disable=not-callable
-            publish_function(result)
+            process_function(result)
+            self.info('{} results processed'.format(result.test_type))
         else:
             self.warn("skipping unsupported result type '{}'".format(result.test_type))
 
-    def sanity(self):
-        # skip connecting if in dry mode
-        if self.option('dry-run'):
-            return
-
-        # connect to message bus
-        self.cibus = stomp.Connection([(self.option('host'), self.option('port'))])
-        self.cibus.start()
-        try:
-            self.cibus.connect(login=self.option('user'), passcode=self.option('password'), wait=True)
-        except stomp.exception.ConnectFailedException:
-            raise CIError('could not connect to CI message bus')
-        if self.cibus.is_connected() is not True:
-            raise CIError('could not connect to CI message bus')
-
     def execute(self):
         results = self.shared('results') or []
-        if self.option('dry-run'):
-            self.info('running in dry-run mode, no messages will be sent out')
 
         for result in results:
-            self.publish_result(result)
+            self.process_result(result)

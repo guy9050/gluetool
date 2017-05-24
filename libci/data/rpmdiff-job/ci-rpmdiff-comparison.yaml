@@ -29,7 +29,8 @@
                  brew-build-name
                  rpmdiff --type comparison
                  rpmdiff-waiver
-                 notify-ci-bus
+                 make-bus-message
+                 publish-ci-bus
                  notify-email
     publishers:
       - archive:
