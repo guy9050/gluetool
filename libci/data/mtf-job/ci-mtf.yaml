@@ -37,6 +37,9 @@
                  openstack --user-data=$CITOOL_CONFIG/default-user-data.yaml \
                  mtf --fedmsgfile=exported-fedmsg.yaml --module=$MODULENAME \
                  ${pipeline_append}
+    properties:
+      - build-discarder:
+        num-to-keep: 500
     publishers:
       - archive:
           artifacts: '**/**'

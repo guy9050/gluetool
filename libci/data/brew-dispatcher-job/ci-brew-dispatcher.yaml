@@ -40,6 +40,9 @@
                  brew --id $id
                  brew-build-name
                  brew-dispatcher
+    properties:
+      - build-discarder:
+        num-to-keep: 500
     publishers:
       - archive:
           artifacts: '**/**'
