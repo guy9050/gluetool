@@ -1,7 +1,7 @@
 import os
 import re
 from collections import defaultdict, namedtuple
-import pgdb
+import psycopg2
 import requests
 import yaml
 from requests_kerberos import HTTPKerberosAuth, OPTIONAL
@@ -248,7 +248,7 @@ class RpmDiffWaiver(Module):
         try:
             errata_products = self._map_tag_to_product(target)
         # pylint: disable=no-member
-        except pgdb.OperationalError as e:
+        except psycopg2.OperationalError as e:
             msg = "TEIID returned error while querying for errata products:\n{}".format(str(e))
             self.warn(msg)
             self.ci.sentry_submit_warning(msg)
@@ -263,7 +263,7 @@ class RpmDiffWaiver(Module):
         try:
             waivers = self.query_waivers(package, errata_products)
         # pylint: disable=no-member
-        except pgdb.OperationalError as e:
+        except psycopg2.OperationalError as e:
             msg = "TEIID returned error while querying for waivers:\n{}".format(str(e))
             self.warn(msg)
             self.ci.sentry_submit_warning(msg)
