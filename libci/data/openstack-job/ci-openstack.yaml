@@ -54,7 +54,7 @@
           description: 'Additional options for notify-email module.'
     properties:
       - build-discarder:
-        num-to-keep: 500
+          num-to-keep: 500
       - inject:
           properties-content: |
             # Tell Ansible to store its *.retry file locally, to avoid possible race conditions.
