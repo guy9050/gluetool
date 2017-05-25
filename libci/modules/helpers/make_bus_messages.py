@@ -1,24 +1,29 @@
 import os
+import collections
 from libci import CIError, Module
 
+Message = collections.namedtuple('Message', 'type headers body')
 
-class CIMakeBusMessage(Module):
+
+class CIMakeBusMessages(Module):
     """
     This module converts results of testing to messages, which can be sent to some message bus.
     """
 
-    name = 'make-bus-message'
+    name = 'make-bus-messages'
     description = 'Make messages, which can be send to message bus by other modules'
-    options = {}
 
     shared_functions = ['bus_messages']
 
     messages = []
 
-    def store(self, headers, body, test_type):
-        self.messages.append([headers, body, test_type])
+    def store(self, new_message):
+        self.messages.append(new_message)
 
     def bus_messages(self):
+        """
+        Returns list of messages. Message consists of type, headers and body. Use message.body to get its value.
+        """
         return self.messages
 
     def process_rpmdiff(self, result):
@@ -31,7 +36,8 @@ class CIMakeBusMessage(Module):
                 'taskid': subresult['data']['taskid'],
                 'item': subresult['data']['item'],
             }
-            self.store(headers, subresult, result.test_type)
+
+            self.store(Message(type=result.test_type, headers=headers, body=subresult))
 
     def process_covscan(self, result):
         task = self.shared('brew_task')
@@ -63,7 +69,7 @@ class CIMakeBusMessage(Module):
             }
         }
 
-        self.store(headers, body, result.test_type)
+        self.store(Message(type=result.test_type, headers=headers, body=body))
 
     def process_wow(self, result):
         self.process_ci_metricsdata(result, 'wow')
@@ -136,7 +142,7 @@ class CIMakeBusMessage(Module):
             'recipients': ','.join(recipients)
         }
 
-        self.store(headers, body, result.test_type)
+        self.store(Message(type=result.test_type, headers=headers, body=body))
 
     def process_result(self, result):
         process_function = getattr(self, 'process_{}'.format(result.test_type), None)

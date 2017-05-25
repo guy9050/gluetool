@@ -32,8 +32,8 @@
                  brew --id $id
                  brew-build-name
                  covscan
-                 make-bus-message
-                 publish-ci-bus
+                 make-bus-messages
+                 publisher-ci-bus
                  notify-email ${notify_email_options}
     properties:
       - build-discarder:
