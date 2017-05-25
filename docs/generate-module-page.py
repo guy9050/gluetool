@@ -10,58 +10,138 @@ import os
 import libci
 
 
-CI = libci.CI()
+LOGGER = libci.log.Logging.create_logger()
 
-CWD = os.getcwd() + '/'
+MOD_TEMPLATE = """
+``{name}``
+{title_underline}
 
-with open('docs/source/modules/template.txt', 'r') as g:
-    TEMPLATE = g.read()
+**{description}.**
 
-# generate page for each module
-with open('docs/source/module_parsers.py', 'w') as f:
-    f.write('# pylint: disable=invalid-name,protected-access\n')
+.. automoddesc:: {modpath}.{klass}
+   :noindex:
 
-    for name, properties in CI.modules.iteritems():
-        # get file where class is stored
-        filepath = inspect.getfile(properties['class'])
 
-        # strip the CWD out
-        filepath = filepath.replace(os.path.commonprefix([CWD, filepath]), '')
+Shared functions
+----------------
 
-        # cut away the extension
-        filepath = os.path.splitext(filepath)[0]
+{shared_functions}
 
-        # convert it to a Python module path
-        modpath = filepath.replace('/', '.')
 
-        description = properties['description'] if properties['description'] is not None else ''
+Options
+-------
 
-        variables = {
-            'name': name,
-            'description': description,
-            'title_underline': '=' * (2 + len(name) + 4 + len(description)),
-            'full_path': '{}.{}'.format(modpath, properties['class'].__name__),
-            'modpath': modpath,
-            'klass': properties['class'].__name__
-        }
+.. argparse::
+   :filename: source/module_parsers.py
+   :func: get_parser_{klass}
+   :prog: {name}
+"""
 
-        with open('docs/source/modules/{}.rst'.format(name), 'w') as g:
-            g.write(libci.utils.render_template(TEMPLATE, **variables))
-            g.flush()
+SHARED_TEMPLATE = """
+.. automethod:: {modpath}.{klass}.{shared_name}
+   :noindex:
 
-        f.write("""
+"""
+
+ARGS_TEMPLATE = """
 
 def get_parser_{klass}():
     from {modpath} import {klass}
     return {klass}._create_args_parser()
-""".format(**variables))
+"""
 
-    f.flush()
 
-# generate index page
-with open('docs/source/modules.txt', 'r') as f:
-    with open('docs/source/modules.rst', 'w') as g:
-        g.write(f.read().format(modules='\n'.join(sorted([
-            '   modules/{}'.format(name) for name in CI.modules.iterkeys()
-        ]))))
-        g.flush()
+def gather_module_data():
+    LOGGER.info('gathering data on all available modules')
+
+    ci = libci.CI()
+
+    cwd = os.getcwd() + '/'
+    modules = []
+
+    for name, properties in ci.modules.iteritems():
+        # get file where class is stored
+        filepath = inspect.getfile(properties['class'])
+
+        # strip the CWD out
+        filepath = filepath.replace(os.path.commonprefix([cwd, filepath]), '')
+
+        description = properties['description'] if properties['description'] is not None else ''
+
+        modules.append({
+            'name': name,
+            'description': description,
+            'klass': properties['class'].__name__,
+            'filepath': filepath,
+            'modclass': properties['class'],
+            'modpath': os.path.splitext(filepath)[0].replace('/', '.'),
+            'filepath_mtime': os.stat(filepath).st_mtime
+        })
+
+    return modules
+
+
+def write_module_doc(module_data):
+    doc_file = 'docs/source/modules/{}.rst'.format(module_data['name'])
+
+    try:
+        doc_mtime = os.stat(doc_file).st_mtime
+
+    # pylint: disable-msg=bare-except
+    except:
+        doc_mtime = 0
+
+    if module_data['filepath_mtime'] <= doc_mtime:
+        LOGGER.info('skipping module {} because it was not modified'.format(module_data['name']))
+        return
+
+    module_data['title_underline'] = '=' * (4 + len(module_data['name']))
+
+    shared_functions = module_data['modclass'].shared_functions
+    if shared_functions:
+        module_data['shared_functions'] = '\n'.join([
+            SHARED_TEMPLATE.format(shared_name=name, **module_data) for name in shared_functions
+        ])
+
+    else:
+        module_data['shared_functions'] = ''
+
+    with open(doc_file, 'w') as f:
+        f.write(libci.utils.render_template(MOD_TEMPLATE, **module_data))
+        f.flush()
+
+    LOGGER.info('module {} doc page written'.format(module_data['name']))
+
+
+def write_args_parser_getters(modules):
+    with open('docs/source/module_parsers.py', 'w') as f:
+        f.write('# pylint: disable=invalid-name,protected-access\n')
+
+        for module_data in modules:
+            f.write(ARGS_TEMPLATE.format(**module_data))
+
+        f.flush()
+
+
+def write_index_doc(modules):
+    with open('docs/source/modules.txt', 'r') as f:
+        with open('docs/source/modules.rst', 'w') as g:
+            g.write(f.read().format(modules='\n'.join(sorted([
+                # pylint: disable=line-too-long
+                '   ' + libci.utils.render_template('{name}: {description} <modules/{name}>', **module_data) for module_data in modules
+            ]))))
+            g.flush()
+
+
+def main():
+    modules = gather_module_data()
+
+    for module_data in modules:
+        write_module_doc(module_data)
+
+    write_args_parser_getters(modules)
+    write_index_doc(modules)
+
+
+if __name__ == '__main__':
+    main()

@@ -133,6 +133,9 @@ Auto-generated documentation is located in `docs/` directory. To update your loc
   # regenerate RST sources from Python files
   sphinx-apidoc -T -e -o docs/source/ libci/
 
+  # regenerate RST sources for citool modules
+  python docs/generate-module-page.py
+
   # generate HTML
   make -C docs/ html
 ```
