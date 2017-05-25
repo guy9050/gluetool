@@ -1,17 +1,17 @@
-import pgdb
+import psycopg2
 import libci
 
 
 class CIPostgreSQL(libci.Module):
     """
-    This module provides connection to a PostgreSQL database via PyGreSQL library:
+    This module provides connection to a PostgreSQL database via psycopg2 module:
 
-    http://www.pygresql.org/
+    http://initd.org/psycopg/
 
     Connection is compliant with Python Database API Specification v2.0
-    Documentation of connection object can be found on:
+    Documentation of connection class can be found on:
 
-    http://www.pygresql.org/contents/pgdb/index.html
+    http://initd.org/psycopg/docs/connection.html
     """
 
     name = 'postgresql'
@@ -43,7 +43,13 @@ class CIPostgreSQL(libci.Module):
     shared_functions = ['postgresql']
 
     def postgresql(self, reconnect=False):
-        """ return pgdb.Connection object instance """
+        """
+        Return psycopg2.connection class instance
+
+        :param bool reconnect: Recreate connection if True (default: False)
+        :return: posgtgresql connection
+        :rtype: ``psycopg2.connection`` instance
+        """
         if reconnect:
             self.connect()
 
@@ -59,16 +65,19 @@ class CIPostgreSQL(libci.Module):
         # connect to the instance
         self.info("connecting to database {}:{} may take some time".format(host, port))
         try:
-            self._connection = pgdb.connect(host=host, port=port, dbname=dbname,
-                                            user=user, password=password)
+            self._connection = psycopg2.connect(host=host, port=port, dbname=dbname,
+                                                user=user, password=password)
         except Exception as e:
             self.debug('connection error: {}'.format(e))
             raise libci.CIError("could not connect to PostgreSQL '{}': {}".format(host, str(e)))
 
     def server_version(self):
         cursor = self._connection.cursor()
-        row = cursor.execute("SELECT VERSION()").fetchone()
-        return row[0] if row else None
+        cursor.execute("SELECT version()")
+        row = cursor.fetchone()
+        if row is None:
+            raise libci.CIError("could not fetch server version")
+        return row[0]
 
     def execute(self):
         # connecto to database
