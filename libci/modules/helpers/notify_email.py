@@ -97,9 +97,17 @@ Added defects:  {result.added}
 
 Final result:   {result.overall_result}
 
+See Covscan url for more details. Result is based on diff to previous known build.
+The testing fails if your build added new defects from the previous one.
+
 Covscan url:          {covscan_url}
 Covscan wiki:         https://engineering.redhat.com/trac/CoverityScan/wiki/covscan
 Covscan CI Test Plan: https://url.corp.redhat.com/covscan-in-ci
+"""
+
+COVSCAN_FOOTER = """
+---
+CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation
 """
 
 RESERVED_BODY = Template("""
@@ -475,6 +483,7 @@ to this option, and process environmental variables (default: {})""".format(DEFA
         brew_url = self._format_result_url(result, 'brew_url', '<Covscan URL not available>')
 
         msg.body = COVSCAN_BODY.format(result=result, covscan_url=covscan_url, brew_url=brew_url)
+        msg.footer = COVSCAN_FOOTER
 
     def _get_summary_url(self, result):
         jenkins_build_url = None
