@@ -121,7 +121,7 @@ class RpmDiffWaiver(Module):
             'brew_tag': brew_tag
         }
         cursor.execute(RPMDIFF_PRODUCT_VERSIONS_QUERY, search)
-        return tuple(row.product_version for row in cursor.fetchall())
+        return tuple(row[0] for row in cursor.fetchall())
 
     def parse_yaml(self):
         mapping = os.path.expanduser(self.option('mapping'))
