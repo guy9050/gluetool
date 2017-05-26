@@ -24,7 +24,7 @@ Please, see the brew task for more details about the problem:
     BODY_HEADER = ''
 
     def __init__(self, branch, component, target, task_url):
-        super(BocBuildError, self).__init__()
+        super(BocBuildError, self).__init__('Build failed')
 
         self.branch = branch
         self.component = component
