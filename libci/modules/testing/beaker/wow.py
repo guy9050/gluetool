@@ -262,7 +262,20 @@ class CIWow(Module):
         """
 
         distro_option = ['--distro={}'.format(distro)] if distro else []
-        brew_option = ['--brew-task={}'.format(task.task_id)] if task is not None else []
+
+        if task:
+            install_option = [
+                '--brew-task={}'.format(task.task_id)
+            ]
+
+            verify_option = [
+                '--first-testing-task',
+                'NVR={} /distribution/runtime_tests/verify-nvr-installed'.format(task.nvr)
+            ]
+
+        else:
+            install_option = []
+            verify_option = []
 
         whiteboard = 'CI run {} brew task id {} build target {}'.format(task.nvr, task.task_id, task.target.target)
 
@@ -276,7 +289,7 @@ class CIWow(Module):
             'bkr', 'workflow-tomorrow',
             '--whiteboard', whiteboard,
             '--decision'
-        ] + distro_option + brew_option + options
+        ] + distro_option + install_option + verify_option + options
 
         for name, value in task_params.iteritems():
             command += ['--taskparam', '{}={}'.format(name, value)]
