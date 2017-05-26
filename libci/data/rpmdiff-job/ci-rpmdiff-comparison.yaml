@@ -23,11 +23,11 @@
           citool -c -i -o citool-debug.txt
                  notify-recipients ${notify_recipients_options}
                  jenkins
-                 postgresql
                  testing-results
                  brew --id $id
                  brew-build-name
                  rpmdiff --type comparison
+                 postgresql
                  rpmdiff-waiver
                  notify-ci-bus
                  notify-email
