@@ -1,4 +1,5 @@
 import psycopg2
+from psycopg2.extras import NamedTupleCursor
 import libci
 
 
@@ -40,7 +41,7 @@ class CIPostgreSQL(libci.Module):
         }
     }
     required_options = ['dbname']
-    shared_functions = ['postgresql']
+    shared_functions = ['postgresql', 'postgresql_cursor']
 
     def postgresql(self, reconnect=False):
         """
@@ -54,6 +55,18 @@ class CIPostgreSQL(libci.Module):
             self.connect()
 
         return self._connection
+
+    def postgresql_cursor(self, cursor_factory=NamedTupleCursor):
+        """
+        Return psycopg2.connection.cursor class instance with cursor_factory
+        by default `psycopg2.extras.NamedTupleCursor` is used.
+
+        :param cursor_factory: A cursor factory class from psycopg2.extras, by default `NamedTupleCursor``
+        :return: posgtgresql cursor
+        :rtype: psycopg2.connection.cursor
+        """
+
+        return self._connection.cursor(cursor_factory=cursor_factory)
 
     def connect(self):
         user = self.option('user')
