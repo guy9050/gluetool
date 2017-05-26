@@ -75,7 +75,7 @@
             ${pipeline_append}
     properties:
       - build-discarder:
-        num-to-keep: 500
+          num-to-keep: 500
     publishers:
       - archive:
           artifacts: '**/**'
