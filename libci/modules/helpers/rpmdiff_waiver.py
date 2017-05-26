@@ -103,7 +103,7 @@ class RpmDiffWaiver(Module):
     shared_functions = ['waive_results']
 
     def query_waivers(self, package, product_versions):
-        cursor = self.shared("postgresql").cursor()
+        cursor = self.shared("postgresql_cursor")
         search = {
             'package': package,
             'products': product_versions
@@ -116,12 +116,12 @@ class RpmDiffWaiver(Module):
         return categorized
 
     def query_product_versions(self, brew_tag):
-        cursor = self.shared("postgresql").cursor()
+        cursor = self.shared("postgresql_cursor")
         search = {
             'brew_tag': brew_tag
         }
         cursor.execute(RPMDIFF_PRODUCT_VERSIONS_QUERY, search)
-        return tuple(row[0] for row in cursor.fetchall())
+        return tuple(row.product_version for row in cursor.fetchall())
 
     def parse_yaml(self):
         mapping = os.path.expanduser(self.option('mapping'))
