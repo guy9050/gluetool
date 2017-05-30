@@ -1,13 +1,11 @@
-import os
 import re
 from collections import defaultdict, namedtuple
 import psycopg2
 import requests
-import yaml
 from requests_kerberos import HTTPKerberosAuth, OPTIONAL
 from bs4 import BeautifulSoup
 from libci import CIError, Module
-from libci.utils import format_dict
+from libci.utils import load_yaml
 
 RPMDIFF_RESULTS_TO_WAIVE = ["needs inspection", "failed"]
 RPMDIFF_AUTOWAIVERS_QUERY = """SELECT
@@ -123,15 +121,6 @@ class RpmDiffWaiver(Module):
         cursor.execute(RPMDIFF_PRODUCT_VERSIONS_QUERY, search)
         return tuple(row.product_version for row in cursor.fetchall())
 
-    def parse_yaml(self):
-        mapping = os.path.expanduser(self.option('mapping'))
-        try:
-            with open(mapping, 'r') as stream:
-                self.mapping = yaml.load(stream)
-                self.debug("module mapping config:\n{}".format(format_dict(self.mapping)))
-        except yaml.YAMLError as e:
-            raise CIError('unable to load mapping file: {}'.format(str(e)))
-
     def _map_tag_to_product(self, brew_tag):
         if self.mapping and brew_tag in self.mapping.keys():
             product_versions = self.mapping[brew_tag]
@@ -240,7 +229,7 @@ class RpmDiffWaiver(Module):
             raise CIError("Module requires PostgreSQL support, did you include 'postgresql' module?")
 
         if self.option('mapping'):
-            self.parse_yaml()
+            self.mapping = load_yaml(self.option('mapping'), logger=self.logger)
         else:
             self.warn("mapping file is not provided, manual mapping will not produce results")
 

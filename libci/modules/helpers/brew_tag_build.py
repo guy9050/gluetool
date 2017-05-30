@@ -1,7 +1,5 @@
-import os
-import yaml
 from libci import CIError, CICommandError, Module
-from libci.utils import check_for_commands, format_dict, run_command
+from libci.utils import check_for_commands, run_command, load_yaml
 
 REQUIRED_CMDS = ['brew']
 TEST_TYPES = ['wow', 'restraint']
@@ -59,14 +57,7 @@ class CIBrewTagBuild(Module):
             return
 
         # read yaml configuration
-        config = os.path.expanduser(self.option('config'))
-        try:
-            with open(config, 'r') as stream:
-                self.config = yaml.load(stream)
-                self.debug("module config:\n{}".format(format_dict(self.config)))
-
-        except yaml.YAMLError as e:
-            raise CIError('unable to load configuration: {}'.format(str(e)))
+        self.config = load_yaml(self.option('config'), logger=self.logger)
 
         # get tag group configuration
         group = self.option('tag-group')

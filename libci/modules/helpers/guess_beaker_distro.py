@@ -1,9 +1,8 @@
-import os.path
 import re
 import bs4
-import yaml
+
 from libci import CIError, SoftCIError, Module
-from libci.utils import format_dict, fetch_url, cached_property
+from libci.utils import format_dict, fetch_url, cached_property, load_yaml
 
 
 DEFAULT_NIGHTLY_LISTING = 'http://download.eng.brq.redhat.com/nightly/'
@@ -94,22 +93,10 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
         distro name.
         """
 
-        path = os.path.expanduser(self.option('pattern-map'))
-
-        if not os.path.exists(path):
-            raise CIError("pattern map '{}' does not exist".format(path))
-
-        try:
-            with open(path, 'r') as f:
-                pattern_map = yaml.load(f)
-
-        except yaml.YAMLError as e:
-            raise CIError('Unable to load configuration: {}'.format(str(e)))
+        pattern_map = load_yaml(self.option('pattern-map'), logger=self.logger)
 
         if pattern_map is None:
-            raise CIError("pattern map '{}' does not contain any patterns".format(path))
-
-        self.debug('pattern-map:\n{}'.format(format_dict(pattern_map)))
+            raise CIError("pattern map '{}' does not contain any patterns".format(self.option('pattern-map')))
 
         def _create_simple_repl(repl):
             def _replace(pattern, target):

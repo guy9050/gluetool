@@ -8,6 +8,7 @@ import os
 import threading
 import subprocess
 import urllib2
+import yaml
 
 import urlnorm
 import mako
@@ -363,3 +364,32 @@ def render_template(tmpl, **kwargs):
     except:
         details = mako.exceptions.text_error_template().render()
         raise CIError('Cannot render template:\n{}'.format(details))
+
+
+def load_yaml(filepath, logger=None):
+    """
+    Load data stored in YAML file, and return their Python representation.
+
+    :param str filepath: Path to a file. ``~`` or ``~<username>`` are expanded before using.
+    :param libci.log.ContextLogger logger: Logger used for logging.
+    :rtype: object
+    :returns: structures representing data in the file.
+    :raises libci.ci.CIError: if it was not possible to successfully load content of the file.
+    """
+
+    logger = logger or Logging.get_logger()
+
+    real_filepath = os.path.expanduser(filepath)
+
+    if not os.path.exists(real_filepath):
+        raise CIError("File '{}' does not exist".format(filepath))
+
+    try:
+        with open(real_filepath, 'r') as f:
+            data = yaml.load(f)
+            logger.debug("loaded YAML data from '{}':\n{}".format(filepath, format_dict(data)))
+
+            return data
+
+    except yaml.YAMLError as e:
+        raise CIError("Unable to load YAML file '{}': {}".format(filepath, str(e)))

@@ -3,10 +3,9 @@ import re
 import shlex
 import ast
 import _ast
-import yaml
 
 from libci import Module, CIError, SoftCIError
-from libci.utils import format_dict, cached_property
+from libci.utils import format_dict, cached_property, load_yaml
 
 
 class RulesError(SoftCIError):
@@ -353,31 +352,6 @@ class CIBrewDispatcher(Module):
 
     required_options = ['config']
 
-    def _load_config(self):
-        """
-        Load dispatcher configuration from a config file.
-        """
-
-        config = os.path.expanduser(self.option('config'))
-
-        # check if configuration exists
-        if not os.path.exists(config):
-            raise CIError('file \'{}\' does not exist'.format(config))
-
-        # read yaml configuration
-        try:
-            with open(config, 'r') as stream:
-                self.config = yaml.load(stream)
-
-        except yaml.YAMLError as e:
-            raise CIError('Unable to load configuration: {}'.format(str(e)))
-
-        if self.config is None:
-            self.warn('Empty dispatcher configuration')
-            self.config = {}
-
-        self.debug('config:\n{}'.format(format_dict(self.config)))
-
     @cached_property
     def job_result_types(self):
         # we accept multiple --job-result-type options, and when set in config
@@ -672,7 +646,11 @@ class CIBrewDispatcher(Module):
 
     def sanity(self):
         # parse configuration
-        self._load_config()
+        self.config = load_yaml(self.option('config'), logger=self.logger)
+
+        if self.config is None:
+            self.warn('Empty dispatcher configuration')
+            self.config = {}
 
         # set options from command line or environment
         for option in ['name', 'version', 'release', 'target', 'id']:
