@@ -41,7 +41,9 @@ class CIOpenstackJob(Module):
             'help': 'Additional options for restraint-runner module.'
         },
         'notify-recipients-options': {
-            'help': 'Additional options for notify-recipients module'
+            'help': 'Additional options for notify-recipients module',
+            'action': 'append',
+            'default': []
         },
         'notify-email-options': {
             'help': 'Additional options for notify-email module'
@@ -63,6 +65,13 @@ class CIOpenstackJob(Module):
         if jenkins is None:
             raise CIError('No jenkins connection found')
 
+        notify_recipients_options = self.option('notify-recipients-options')
+        if notify_recipients_options:
+            notify_recipients_options = ' '.join(notify_recipients_options)
+
+        else:
+            notify_recipients_options = None
+
         build_params = {
             'id': self._task_id,
             'pipeline_prepend': self.option('pipeline-prepend'),
@@ -71,7 +80,7 @@ class CIOpenstackJob(Module):
             'guess_openstack_image_options': self.option('guess-openstack-image-options'),
             'wow_options': self.option('wow-options'),
             'restraint_runner_options': self.option('restraint-runner-options'),
-            'notify_recipients_options': self.option('notify-recipients-options'),
+            'notify_recipients_options': notify_recipients_options,
             'notify_email_options': self.option('notify-email-options')
         }
 

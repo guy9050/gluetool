@@ -46,7 +46,9 @@ This module requires an available Jenkins connection - via the jenkins module.
             'choices': ['analysis', 'comparison'],
         },
         'notify-recipients-options': {
-            'help': 'Additional options for notify-recipients module'
+            'help': 'Additional options for notify-recipients module',
+            'action': 'append',
+            'default': []
         }
     }
     required_options = ['type']
@@ -82,6 +84,13 @@ This module requires an available Jenkins connection - via the jenkins module.
         if self.jenkins is None:
             raise CIError('no jenkins connection found')
 
+        notify_recipients_options = self.option('notify-recipients-options')
+        if notify_recipients_options:
+            notify_recipients_options = ' '.join(notify_recipients_options)
+
+        else:
+            notify_recipients_options = None
+
         try:
             self.jenkins[self.job_name]
         except UnknownJob:
@@ -89,7 +98,7 @@ This module requires an available Jenkins connection - via the jenkins module.
 
         build_params = {
             'id': self.tid,
-            'notify_recipients_options': self.option('notify-recipients-options')
+            'notify_recipients_options': notify_recipients_options
         }
 
         self.jenkins[self.job_name].invoke(build_params=build_params)

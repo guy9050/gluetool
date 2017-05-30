@@ -24,7 +24,9 @@ class CICovscanJob(Module):
             'help': 'Brew task id',
         },
         'notify-recipients-options': {
-            'help': 'Additional options for notify-recipients module'
+            'help': 'Additional options for notify-recipients module',
+            'action': 'append',
+            'default': []
         },
         'notify-email-options': {
             'help': 'Additional options for notify-email module'
@@ -63,6 +65,13 @@ class CICovscanJob(Module):
         if self.jenkins is None:
             raise CIError('no jenkins connection found')
 
+        notify_recipients_options = self.option('notify-recipients-options')
+        if notify_recipients_options:
+            notify_recipients_options = ' '.join(notify_recipients_options)
+
+        else:
+            notify_recipients_options = None
+
         try:
             self.jenkins[self.job_name]
         except UnknownJob:
@@ -70,7 +79,7 @@ class CICovscanJob(Module):
 
         build_params = {
             'id': self.brew_id,
-            'notify_recipients_options': self.option('notify-recipients-options'),
+            'notify_recipients_options': notify_recipients_options,
             'notify_email_options': self.option('notify-email-options')
         }
 
