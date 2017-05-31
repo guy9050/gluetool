@@ -808,7 +808,9 @@ class CI(Configurable):
         # Right now, we don't know the desired log level, or if
         # output file is in play, just get simple logger before
         # the actual configuration is known.
-        self.logger = ContextAdapter(Logging.create_logger(sentry=sentry))
+        logger = Logging.create_logger(sentry=sentry, sentry_submit_warning=self.sentry_submit_warning)
+
+        self.logger = ContextAdapter(logger)
         self.logger.connect(self)
 
         super(CI, self).__init__()

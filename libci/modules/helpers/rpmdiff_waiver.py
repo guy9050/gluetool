@@ -249,9 +249,7 @@ class RpmDiffWaiver(Module):
             errata_products = self._map_tag_to_product(target)
         # pylint: disable=no-member
         except psycopg2.OperationalError as e:
-            msg = "TEIID returned error while querying for errata products:\n{}".format(str(e))
-            self.warn(msg)
-            self.ci.sentry_submit_warning(msg)
+            self.warn("TEIID returned error while querying for errata products:\n{}".format(str(e)), sentry=True)
             return
 
         if errata_products is None:
@@ -264,9 +262,7 @@ class RpmDiffWaiver(Module):
             waivers = self.query_waivers(package, errata_products)
         # pylint: disable=no-member
         except psycopg2.OperationalError as e:
-            msg = "TEIID returned error while querying for waivers:\n{}".format(str(e))
-            self.warn(msg)
-            self.ci.sentry_submit_warning(msg)
+            self.warn("TEIID returned error while querying for waivers:\n{}".format(str(e)), sentry=True)
             return
 
         if not waivers:

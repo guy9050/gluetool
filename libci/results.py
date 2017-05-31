@@ -73,7 +73,7 @@ def publish_result(module, result_class, *args, **kwargs):
     """
 
     if not module.has_shared('results'):
-        module.warn("Cannot publish results, no 'results' shared function found")
+        module.warn("Cannot publish results, no 'results' shared function found", sentry=True)
         return
 
     result = result_class(*args, **kwargs)
