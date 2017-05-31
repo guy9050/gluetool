@@ -213,8 +213,12 @@ class RestraintRunner(libci.Module):
 
                 journal_root = journal.BEAKER_TEST
 
-                started = datetime.datetime.strptime(journal_root.starttime.string, '%Y-%m-%d %H:%M:%S %Z')
-                ended = datetime.datetime.strptime(journal_root.endtime.string, '%Y-%m-%d %H:%M:%S %Z')
+                # remove timezone
+                starttime = ' '.join(journal_root.starttime.string.split(' ')[0:-1])
+                endtime = ' '.join(journal_root.endtime.string.split(' ')[0:-1])
+
+                started = datetime.datetime.strptime(starttime, '%Y-%m-%d %H:%M:%S')
+                ended = datetime.datetime.strptime(endtime, '%Y-%m-%d %H:%M:%S')
                 duration = (ended - started).total_seconds()
 
             else:
@@ -261,7 +265,7 @@ class RestraintRunner(libci.Module):
                 ],
                 'bkr_phases': {
                     phase['path']: phase['result'] for phase in task_results.results.find_all('result')
-                },
+                } if task_results.find_all('results') else {},
                 'bkr_recipe_id': job_results.recipeSet.recipe['id'],
                 'bkr_result': task_results['result'],
                 'bkr_status': task_results['status'],
