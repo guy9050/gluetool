@@ -22,14 +22,14 @@ SENDER = 'qe-baseos-automation@redhat.com'
 HARD_ERROR_CC = ['qe-baseos-automation@redhat.com']
 ARCHIVE_CC = ['qe-baseos-automation@redhat.com']
 
-SUBJECT = '[CI] [{result.test_type}] [{result.overall_result}] {task.nvr}, brew task {task.task_id}, \
-build target {task.target.target}'
+SUBJECT = '[CI] [{result.test_type}] [{result.overall_result}] {task.nvr}, brew task {task.task_id}, branch {branch}'
 
 SUBJECT_RESERVE = '[CI] [RESERVATION] [{result.test_type}] [{result.overall_result}] {task.nvr}, \
-brew task {task.task_id}, build target {task.target.target}'
+brew task {task.task_id}, branch {branch}'
 
 BODY_HEADER = """
 Brew task:      {task.task_id}
+Build target:   {task.target.target}
 Tested package: {task.nvr}
 Build issuer:   {task.issuer}@redhat.com
 Summary:        {summary_url}
@@ -568,9 +568,10 @@ to this option, and process environmental variables (default: {})""".format(DEFA
             summary_url = self._get_summary_url(result)
 
             subject = SUBJECT_RESERVE if reserve else SUBJECT
+            branch = self.task.branch or '<unknown>'
 
             msg = Message(self,
-                          subject=subject.format(task=self.task, result=result),
+                          subject=subject.format(task=self.task, result=result, branch=branch),
                           header=BODY_HEADER.format(task=self.task, summary_url=summary_url).strip(),
                           footer=BODY_FOOTER.strip(),
                           recipients=recipients,
