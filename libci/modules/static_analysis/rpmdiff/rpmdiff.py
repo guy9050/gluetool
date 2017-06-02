@@ -58,7 +58,7 @@ out an email to 'release-engineering@redhat.com'.
 class RpmdiffTestResult(TestResult):
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, runinfo, **kwargs):
+    def __init__(self, runinfo, test_type, **kwargs):
         overall_result = RPMDIFF_OVERALL_SCORE[runinfo['overall_score']['description']]
 
         ids = {
@@ -69,7 +69,11 @@ class RpmdiffTestResult(TestResult):
             'rpmdiff_url': runinfo['web_url']
         }
 
-        super(RpmdiffTestResult, self).__init__('rpmdiff', overall_result, ids=ids, urls=urls, **kwargs)
+        super(RpmdiffTestResult, self).__init__('rpmdiff-{}'.format(test_type),
+                                                overall_result,
+                                                ids=ids,
+                                                urls=urls,
+                                                **kwargs)
 
 
 class CIRpmdiff(Module):
@@ -202,7 +206,7 @@ class CIRpmdiff(Module):
 
         tests.extend(_parse_results(self._get_runinfo('{}/results'.format(runinfo['run_id']))))
 
-        publish_result(self, RpmdiffTestResult, runinfo, payload=tests)
+        publish_result(self, RpmdiffTestResult, runinfo, test_type, payload=tests)
 
     def refresh_rpmdiff_results(self, run_id):
         if not self.has_shared("results"):
