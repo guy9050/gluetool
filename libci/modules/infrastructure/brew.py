@@ -10,6 +10,16 @@ AUTOMATION_USER_ID = 2863  # baseos-ci jenkins
 GIT_COMMIT_URL = 'http://pkgs.devel.redhat.com/cgit/rpms/{0}/commit/?id={1}'  # component, hash
 
 
+class NotBuildTaskError(SoftCIError):
+    SUBJECT = 'Task id does not point to a valid build task'
+    BODY = """
+Task id passed to the brew module does not point to a valid build task. CI needs a valid build task to work. If you entered the task id manually you might have passed in an incorrect id. If this failure comes from automated build, something is obviously wrong and this incident should be reported as a bug.
+    """
+
+    def __init__(self, task_id):
+        super(NotBuildTaskError, self).__init__("task '{}' is not a valid build task".format(task_id))
+
+
 class NoArtifactsError(SoftCIError):
     SUBJECT = 'No artifacts found for the brew task'
     BODY = """
@@ -85,7 +95,7 @@ class BrewTask(object):
         try:
             target = self.task_info["request"][1]
         except IndexError:
-            raise CIError('invalid build task id')
+            raise NotBuildTaskError(self.task_id)
         return BrewBuildTarget(target, session=self.brew)
 
     @cached_property
@@ -94,7 +104,7 @@ class BrewTask(object):
             if "scratch" in self.task_info["request"][2]:
                 return self.task_info["request"][2]["scratch"]
         except (TypeError, IndexError):
-            raise CIError('invalid build task id')
+            raise NotBuildTaskError(self.task_id)
         return False
 
     @cached_property
@@ -133,8 +143,9 @@ class BrewTask(object):
                                               'state': [koji.TASK_STATES['CLOSED']], 'decode': True})
         elif self.task_info['method'] == 'buildArch':
             tasks = [self.task_info]
+
         else:
-            raise CIError('brew task [%i] is not a build or buildArch task' % self.task_id)
+            raise NotBuildTaskError(self.task_id)
 
         # Gather list of files for each (sub-)task. We'll end up with this list:
         #  [(task1, file1), (task1, file2), ..., (taskN, fileM)]
@@ -155,7 +166,7 @@ class BrewTask(object):
             base_path = koji.pathinfo.taskrelpath(task['id'])
             return "/".join([base_url, base_path, filename])
 
-        raise CIError("Source RPM not found in Brew task [%s]." % self.task_id)
+        raise NotBuildTaskError(self.task_id)
 
     @cached_property
     def nvr(self):
@@ -197,7 +208,7 @@ class BrewBuildTarget(object):
         try:
             return self.brew.getBuildTarget(self.target)["dest_tag_name"]
         except TypeError:
-            raise CIError('invalid build task id')
+            raise NotBuildTaskError(self.brew.task_id)
 
     @cached_property
     def is_rhscl(self):
