@@ -33,7 +33,8 @@
                  rpmdiff --type analysis
                  postgresql
                  rpmdiff-waiver
-                 notify-ci-bus
+                 make-bus-messages
+                 publisher-ci-bus
                  notify-email
     properties:
       - build-discarder:
