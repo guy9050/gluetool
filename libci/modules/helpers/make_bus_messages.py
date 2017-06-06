@@ -2,7 +2,7 @@ import os
 import collections
 from libci import CIError, Module
 
-Message = collections.namedtuple('Message', 'type headers body')
+Message = collections.namedtuple('Message', 'headers body')
 
 
 class CIMakeBusMessages(Module):
@@ -15,14 +15,17 @@ class CIMakeBusMessages(Module):
 
     shared_functions = ['bus_messages']
 
-    messages = []
+    messages = {}
 
-    def store(self, new_message):
-        self.messages.append(new_message)
+    def store(self, type, new_message):
+        if self.messages.has_key(type):
+            self.messages[type].append(new_message)
+        else:
+            self.messages[type] = [new_message]
 
     def bus_messages(self):
         """
-        Returns list of messages. Message consists of type, headers and body. Use message.body to get its value.
+        Returns dictionary of messages. Message are sorted by their types. Message consists of headers and body.
         """
         return self.messages
 
@@ -37,10 +40,12 @@ class CIMakeBusMessages(Module):
                 'item': subresult['data']['item'],
             }
 
-            self.store(Message(type=result.test_type, headers=headers, body=subresult))
+            self.store(result.test_type, Message(headers=headers, body=subresult))
 
     def process_covscan(self, result):
         task = self.shared('brew_task')
+        if task is None:
+            raise CIError('no brew task found in shared functions')
         item = '{} {}'.format(task.nvr, result.baseline)
 
         headers = {
@@ -69,7 +74,7 @@ class CIMakeBusMessages(Module):
             }
         }
 
-        self.store(Message(type=result.test_type, headers=headers, body=body))
+        self.store(result.test_type, Message(headers=headers, body=body))
 
     def process_wow(self, result):
         self.process_ci_metricsdata(result, 'wow')
@@ -142,7 +147,7 @@ class CIMakeBusMessages(Module):
             'recipients': ','.join(recipients)
         }
 
-        self.store(Message(type=result.test_type, headers=headers, body=body))
+        self.store(result.test_type, Message(headers=headers, body=body))
 
     def process_result(self, result):
         process_function = getattr(self, 'process_{}'.format(result.test_type), None)

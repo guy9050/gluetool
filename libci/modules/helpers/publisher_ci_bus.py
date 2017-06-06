@@ -40,8 +40,6 @@ class CIPublisherCiBus(Module):
                        'sent following message to CI message bus',
                        'header:\n{}\nbody:\n{}'.format(utils.format_dict(message.headers), body))
 
-        self.info('{} message published to CI message bus'.format(message.type))
-
         if self.option('dry-run'):
             return
 
@@ -67,7 +65,7 @@ class CIPublisherCiBus(Module):
             raise CIError('could not connect to CI message bus')
 
     def execute(self):
-        messages = self.shared('bus_messages') or []
+        messages = self.shared('bus_messages') or {}
 
         if not messages:
             self.warn('No messages to send, did you call make-bus-messages module before this one?')
@@ -75,5 +73,13 @@ class CIPublisherCiBus(Module):
         if self.option('dry-run'):
             self.info('running in dry-run mode, no messages will be sent out')
 
-        for message in messages:
-            self.publish(message)
+        for message_type in messages.keys():
+            messages_of_one_type = messages[message_type]
+
+            for message in messages_of_one_type:
+                self.publish(message)
+
+            count = len(messages_of_one_type)
+            plural = "message" if count == 1 else "messages"
+
+            self.info('{0} {1} {2} published to CI message bus'.format(count, message_type, plural))
