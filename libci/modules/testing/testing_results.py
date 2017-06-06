@@ -55,6 +55,10 @@ class TestingResults(libci.Module):
             raise libci.CIError(e)
 
     def destroy(self, failure=None):
+        # the results-file option can be empty if parsing of arguments failed
+        if self.option('results-file') is None:
+            return
+
         with open(self.option('results-file'), 'w') as f:
             f.write(libci.utils.format_dict([result.serialize() for result in self._results]))
             f.flush()
