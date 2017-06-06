@@ -17,11 +17,11 @@ class CIMakeBusMessages(Module):
 
     messages = {}
 
-    def store(self, type, new_message):
-        if self.messages.has_key(type):
-            self.messages[type].append(new_message)
+    def store(self, message_type, new_message):
+        if self.messages.has_key(message_type):
+            self.messages[message_type].append(new_message)
         else:
-            self.messages[type] = [new_message]
+            self.messages[message_type] = [new_message]
 
     def bus_messages(self):
         """
