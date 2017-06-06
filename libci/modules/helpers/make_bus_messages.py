@@ -110,11 +110,11 @@ class CIMakeBusMessages(Module):
             self.debug('consider task {}'.format(name))
 
             for run in runs:
-                status, result = str(run['bkr_status']), str(run['bkr_result'])
+                bkr_status, bkr_result = str(run['bkr_status']), str(run['bkr_result'])
 
-                if status.lower() == 'completed':
+                if bkr_status.lower() == 'completed':
                     executed += 1
-                    if result.lower() == 'fail':
+                    if bkr_result.lower() == 'fail':
                         failed += 1
 
         results = [{
