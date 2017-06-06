@@ -18,7 +18,7 @@ class CIMakeBusMessages(Module):
     messages = {}
 
     def store(self, message_type, new_message):
-        if self.messages.has_key(message_type):
+        if message_type in self.messages.keys():
             self.messages[message_type].append(new_message)
         else:
             self.messages[message_type] = [new_message]
