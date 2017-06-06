@@ -531,14 +531,6 @@ class CI(Configurable):
         }
     }
 
-    # module types dictionary
-    modules = {}
-    module_instances = []
-
-    #: Shared function registry.
-    #: funcname: (module, fn)
-    shared_functions = {}
-
     def sentry_submit_exception(self, exc_info, **kwargs):
         """
         Provide modules way to submit exceptions to Sentry. Unhandled exceptions
@@ -811,6 +803,14 @@ class CI(Configurable):
         self.logger.connect(self)
 
         super(CI, self).__init__()
+
+        # module types dictionary
+        self.modules = {}
+        self.module_instances = []
+
+        #: Shared function registry.
+        #: funcname: (module, fn)
+        self.shared_functions = {}
 
         self._sentry = sentry
 
