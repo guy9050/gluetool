@@ -18,8 +18,35 @@ class NonLoadingCI(libci.CI):
     def _load_modules(self):
         pass
 
-    def _load_config(self):
+    def parse_config(self, *args, **kwargs):
+        # pylint: disable=arguments-differ
+
         pass
+
+    def parse_args(self, *args, **kwargs):
+        # pylint: disable=arguments-differ
+
+        pass
+
+
+class Caplog(object):
+    """
+    Thin wrapper around pytest's caplog plugin.
+    """
+
+    def __init__(self, caplog):
+        self._caplog = caplog
+
+    @property
+    def records(self):
+        return self._caplog.records
+
+    def clear(self):
+        """
+        Clear list of captured records.
+        """
+
+        self._caplog.handler.records = []
 
 
 def create_module(module_class, ci_class=NonLoadingCI):
