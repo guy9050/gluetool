@@ -58,6 +58,3 @@ class Ansible(libci.Module):
                     self.error('Ansible says: {}'.format(message['msg']))
 
             raise libci.CIError('Failure during Ansible playbook execution. See log for details.')
-
-    def execute(self):
-        pass

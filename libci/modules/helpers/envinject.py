@@ -36,9 +36,6 @@ class EnvInject(Module):
 
         return self._variables
 
-    def execute(self):
-        pass
-
     def destroy(self, failure=None):
         self.info('Saving exported variables for EnvInject plugin')
         self.debug('variables:\n{}'.format(format_dict(self._variables)))

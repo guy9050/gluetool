@@ -318,9 +318,6 @@ class DummyModule(libci.Module):
 
     name = 'Dummy module'
 
-    def execute(self):
-        pass
-
 
 def test_module_instantiate():
     """
