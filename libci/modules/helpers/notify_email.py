@@ -464,12 +464,15 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
         self._format_beaker_like_body(result, msg, WOW_BODY, beaker_matrix_url=beaker_matrix_url)
 
-    def format_result_rpmdiff(self, result, msg):
+    def format_result_rpmdiff_analysis(self, result, msg):
         # pylint: disable=no-self-use
         rpmdiff_url = self._format_result_url(result, 'rpmdiff_url', '<RPMdiff URL not available>')
 
         msg.body = RPMDIFF_BODY.format(result=result, rpmdiff_url=rpmdiff_url)
         msg.footer = RPMDIFF_FOOTER
+
+    # pylint: disable=invalid-name
+    format_result_rpmdiff_comparison = format_result_rpmdiff_analysis
 
     def format_result_restraint(self, result, msg):
         # pylint: disable=no-self-use
@@ -549,7 +552,7 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
             result_type = result.test_type
 
-            formatter = getattr(self, 'format_result_{}'.format(result_type), None)
+            formatter = getattr(self, 'format_result_{}'.format(result_type.replace('-', '_')), None)
             if formatter is None:
                 self.warn("Don't know how to process result of type '{}'".format(result_type))
                 continue
