@@ -218,6 +218,7 @@ class Logging(object):
 
         if Logging.logger is None:
             logger = Logging.logger = logging.getLogger('citool')
+            logger.propagate = False
 
             # logger actually emits everything, handlers do filtering
             logger.setLevel(logging.VERBOSE)
