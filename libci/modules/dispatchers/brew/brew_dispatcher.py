@@ -368,6 +368,10 @@ class CIBrewDispatcher(Module):
         except yaml.YAMLError as e:
             raise CIError('Unable to load configuration: {}'.format(str(e)))
 
+        if self.config is None:
+            self.warn('Empty dispatcher configuration')
+            self.config = {}
+
         self.debug('config:\n{}'.format(format_dict(self.config)))
 
     @cached_property
