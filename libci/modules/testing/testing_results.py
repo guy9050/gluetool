@@ -10,6 +10,15 @@ DEFAULT_RESULTS_FILE = 'results.json'
 class TestingResults(libci.Module):
     """
     Provides support for gathering and exporting testing results.
+
+    Keeps internal ``list`` of produced results (instances of :py:class:`libci.results.TestResult`),
+    and provides it to callers via its shared function :py:meth:`results`. Users can then modify the
+    list and results it carries.
+
+    The module is able to store results in the file (in JSON format), or initialize its internal
+    store from provided file.
+
+    :ivar list _results': Internal storage of results.
     """
 
     name = 'testing-results'
@@ -26,12 +35,19 @@ class TestingResults(libci.Module):
 
     shared_functions = ('results',)
 
-    _results = []
+    def __init__(self, *args, **kwargs):
+        super(TestingResults, self).__init__(*args, **kwargs)
+
+        self._results = []
 
     def results(self):
         """
-        Returns list of gathered results.
+        Return list of gathered results.
+
+        :rtype: list
+        :returns: list of gathered results (instances of :py:class:`libci.results.TestResult`).
         """
+
         return self._results
 
     def execute(self):
