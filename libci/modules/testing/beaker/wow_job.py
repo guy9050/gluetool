@@ -50,7 +50,9 @@ This module requires an available Jenkins connection - via the jenkins module.
             'help': 'Additional options for beaker-jobwatch'
         },
         'notify-recipients-options': {
-            'help': 'Additional options for notify-recipients module'
+            'help': 'Additional options for notify-recipients module',
+            'action': 'append',
+            'default': []
         },
         'notify-email-options': {
             'help': 'Additional options for notify-email module'
@@ -75,6 +77,13 @@ This module requires an available Jenkins connection - via the jenkins module.
         if self.jenkins is None:
             raise CIError('no jenkins connection found')
 
+        notify_recipients_options = self.option('notify-recipients-options')
+        if notify_recipients_options:
+            notify_recipients_options = ' '.join(notify_recipients_options)
+
+        else:
+            notify_recipients_options = None
+
         build_params = {
             'id': self.tid,
             'pipeline_prepend': self.option('pipeline-prepend'),
@@ -82,7 +91,7 @@ This module requires an available Jenkins connection - via the jenkins module.
             'guess_distro_options': self.option('guess-distro-options'),
             'wow_options': self.option('wow-options'),
             'jobwatch_options': self.option('jobwatch-options'),
-            'notify_recipients_options': self.option('notify-recipients-options'),
+            'notify_recipients_options': notify_recipients_options,
             'notify_email_options': self.option('notify-email-options')
         }
 
