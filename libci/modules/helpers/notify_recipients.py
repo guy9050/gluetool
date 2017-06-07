@@ -63,15 +63,18 @@ class NotifyRecipients(Module):
         options.update({
             '{}-notify'.format(result_type): {
                 'help': 'Notify only the listed recipients.',
-                'metavar': 'NAMES'
+                'metavar': 'NAMES',
+                'action': 'append'
             },
             '{}-default-notify'.format(result_type): {
                 'help': 'Default list of recipients. Default: ""',
-                'metavar': 'NAMES'
+                'metavar': 'NAMES',
+                'action': 'append'
             },
             '{}-add-notify'.format(result_type): {
                 'help': 'Extends default list of recipients.',
-                'metavar': 'NAMES'
+                'metavar': 'NAMES',
+                'action': 'append'
             }
         })
 
@@ -87,8 +90,15 @@ class NotifyRecipients(Module):
         """
 
         users = self.option(name)
+
         if not users:
             return []
+
+        # Some recipient options can be specified multiple times, in that case
+        # their values are stored as a list of comma-separated lists of usernames.
+        # Joining these string into a single string by a comma is good enough.
+        if isinstance(users, list):
+            users = ','.join(users)
 
         return [s.strip() for s in users.split(',')]
 
