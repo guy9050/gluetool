@@ -38,11 +38,11 @@ def test_run_command(monkeypatch, caplog):
 
     # Accept lists only
     caplog_clear()
-    with pytest.raises(AssertionError, message='Only list of strings accepted as a command'):
+    with pytest.raises(AssertionError, match=r'^Only list of strings accepted as a command$') as excinfo:
         run_command('/bin/ls')
 
     caplog_clear()
-    with pytest.raises(AssertionError, message='Only list of strings accepted as a command'):
+    with pytest.raises(AssertionError, match=r'^Only list of strings accepted as a command$'):
         run_command(['/bin/ls', 13])
 
     # Test some common binary
@@ -60,13 +60,13 @@ def test_run_command(monkeypatch, caplog):
 
     # Test non-existent binary
     caplog_clear()
-    with pytest.raises(libci.CIError, message="Command '/bin/non-existent-binary' not found"):
+    with pytest.raises(libci.CIError, match=r"^Command '/bin/non-existent-binary' not found$"):
         run_command(['/bin/non-existent-binary'])
 
     assert_logging(1, "run command: cmd='['/bin/non-existent-binary']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
 
     # Test existing but failing binary
-    with pytest.raises(libci.CICommandError, message="Command '/bin/false' failed with exit code 1") as excinfo:
+    with pytest.raises(libci.CICommandError, match=r"^Command '\['/bin/false'\]' failed with exit code 1$") as excinfo:
         run_command(['/bin/false'])
 
     assert_logging(4, "run command: cmd='['/bin/non-existent-binary']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
@@ -121,7 +121,7 @@ def test_run_command(monkeypatch, caplog):
     stdout = (13, 17)
     caplog_clear()
     cmd = ['/bin/ls']
-    with pytest.raises(AttributeError, message="'tuple' object has no attribute 'fileno'"):
+    with pytest.raises(AttributeError, match=r"^'tuple' object has no attribute 'fileno'$"):
         run_command(cmd, stdout=stdout)
 
     assert_logging(1, "run command: cmd='['/bin/ls']', kwargs={'stderr': 'PIPE', 'stdout': '(13, 17)'}")
@@ -134,7 +134,7 @@ def test_run_command(monkeypatch, caplog):
     caplog_clear()
     monkeypatch.setattr(subprocess, 'Popen', faulty_popen_enoent)
 
-    with pytest.raises(libci.CIError, message="Command '/bin/ls' not found"):
+    with pytest.raises(libci.CIError, match=r"^Command '/bin/ls' not found$"):
         run_command(['/bin/ls'])
 
     assert_logging(1, "run command: cmd='['/bin/ls']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
@@ -148,7 +148,7 @@ def test_run_command(monkeypatch, caplog):
     caplog_clear()
     monkeypatch.setattr(subprocess, 'Popen', faulty_popen_foo)
 
-    with pytest.raises(OSError, message='foo'):
+    with pytest.raises(OSError, match=r'^foo$'):
         run_command(['/bin/ls'])
 
     assert_logging(1, "run command: cmd='['/bin/ls']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}")
@@ -177,7 +177,7 @@ def test_check_for_commands():
     for cmd in commands:
         cmd = 'does-not-exists-' + cmd
 
-        with pytest.raises(libci.CIError, message='\'{0}\' command not found on the system'.format(cmd)):
+        with pytest.raises(libci.CIError, match=r"^Command '{0}' not found on the system$".format(cmd)):
             libci.utils.check_for_commands([cmd])
 
 
@@ -232,7 +232,7 @@ def test_cached_property():
     assert obj.__dict__['foo'] == 3
 
     # when exception is raised, there should be no changes in __dict__
-    with pytest.raises(Exception, message='This property raised an exception'):
+    with pytest.raises(Exception, match=r'^This property raised an exception$'):
         # pylint: disable=pointless-statement
         obj.bar
 
@@ -383,7 +383,7 @@ def test_module_add_shared():
     mod.shared_functions = ['baz']
     ci.shared_functions = {}
 
-    with pytest.raises(libci.CIError, message="No such shared function 'baz' of module 'Dummy module'"):
+    with pytest.raises(libci.CIError, match=r"^No such shared function 'baz' of module 'Dummy module'$"):
         mod.add_shared()
 
     assert ci.shared_functions == {}
