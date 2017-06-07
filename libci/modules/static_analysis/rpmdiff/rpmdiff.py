@@ -32,6 +32,7 @@ RPMDIFF_SCORE = {
 REQUIRED_CMDS = ['rpmdiff-remote']
 
 
+# not used currently, keeping here for future usage
 class NoBaselineFoundError(SoftCIError):
     STATUS = 'SKIP'
     SUBJECT = 'Could not find baseline for RPMDiff'
@@ -243,7 +244,8 @@ class CIRpmdiff(Module):
 
         if test_type == 'comparison':
             if self.brew_task.latest is None:
-                raise NoBaselineFoundError()
+                self.warn('no baseline found, refusing to continue testing')
+                return
             if self.brew_task.scratch is False and self.brew_task.latest == self.brew_task.nvr:
                 self.info('cowardly refusing to compare same packages')
                 return
