@@ -1,7 +1,7 @@
 import re
 import koji
-import libci
-from libci import CIError, SoftCIError
+from bs4 import BeautifulSoup
+from libci import CIError, SoftCIError, Module
 from libci.utils import cached_property, format_dict, fetch_url
 
 BREW_API_TOPURL = "http://download.eng.bos.redhat.com/brewroot"
@@ -69,6 +69,36 @@ class BrewTask(object):
         return self.brew.getUser(owner_id)["name"]
 
     @cached_property
+    def _parsed_commit_html(self):
+        """
+        return a BeatifulSoup4 parsed html from cgit for given component and commit hash
+        """
+        # get git commit hash and component name
+        request = self.task_info["request"][0]
+        try:
+            git_hash = re.search("#[^']*", request).group()[1:]
+            component = re.search("/rpms/[^?]*", request).group()[6:]
+        except AttributeError:
+            return None
+        # get git commit html
+        url = GIT_COMMIT_URL.format(component, git_hash)
+        return BeautifulSoup(fetch_url(url, logger=self._module.logger)[1], 'html.parser')
+
+    @cached_property
+    def branch(self):
+        """
+        return git branches of brew task or None if branch could not be found
+        """
+        if self._parsed_commit_html is None:
+            return None
+
+        try:
+            branches = [branch.string for branch in self._parsed_commit_html.find_all(class_='branch-deco')]
+            return ' '.join(branches)
+        except AttributeError:
+            raise CIError("could not find 'branch-deco' class in html output, please inspect")
+
+    @cached_property
     def issuer(self):
         """
         return issuer of brew task and in case of build from CI automation, returns issuer of git commit
@@ -78,16 +108,12 @@ class BrewTask(object):
             return self.owner
 
         self._module.info("Automation user detected, need to get git commit issuer")
-        # get git commit hash and component name
-        request = self.task_info["request"][0]
-        git_hash = re.search("#[^']*", request).group()[1:]
-        component = re.search("/rpms/[^?]*", request).group()[6:]
-        # get git commit html
-        url = GIT_COMMIT_URL.format(component, git_hash)
-        commit_html = fetch_url(url, logger=self._module.logger)[1]
-        issuer = re.search("committer.*</td>", commit_html).group()
-        issuer = re.sub(".*lt;(.*)@.*", "\\1", issuer)
-        self._module.info("Git commit issuer: {0}".format(issuer))
+        if self._parsed_commit_html is None:
+            raise CIError('could not find git commit issuer')
+
+        issuer = self._parsed_commit_html.find(class_='commit-info').find('td')
+        issuer = re.sub(".*lt;(.*)@.*", "\\1", str(issuer))
+
         return issuer
 
     @cached_property
@@ -255,7 +281,7 @@ class BrewBuildTarget(object):
         return target.startswith("extras")
 
 
-class CIBrew(libci.Module):
+class CIBrew(Module):
     """
     Provide various information related to a Brew task. This modules uses koji python module
     to connect to Brew.
