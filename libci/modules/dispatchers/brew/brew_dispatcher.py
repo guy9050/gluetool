@@ -302,7 +302,7 @@ class CIBrewDispatcher(Module):
     """
 
     # Supported flags - keep them alphabetically sorted
-    KNOWN_FLAGS = ('apply-all',)
+    KNOWN_FLAGS = ('apply-all', 'recipients')
 
     name = 'brew-dispatcher'
     description = 'Configurable brew dispatcher'
@@ -324,6 +324,11 @@ class CIBrewDispatcher(Module):
         # 'list': {
         #    'help': 'List dispatcher configuration',
         # },
+        'job-result-type': {
+            'help': 'List of comma-separated pairs <job>:<result type>',
+            'action': 'append',
+            'default': []
+        },
         'release': {
             'help': 'Package release',
         },
@@ -363,7 +368,35 @@ class CIBrewDispatcher(Module):
         except yaml.YAMLError as e:
             raise CIError('Unable to load configuration: {}'.format(str(e)))
 
+        if self.config is None:
+            self.warn('Empty dispatcher configuration')
+            self.config = {}
+
         self.debug('config:\n{}'.format(format_dict(self.config)))
+
+    @cached_property
+    def job_result_types(self):
+        # we accept multiple --job-result-type options, and when set in config
+        # file, one can have multiple pairs...
+
+        mapping = {}
+
+        value = self.option('job-result-type')
+
+        if isinstance(value, str):
+            value = [value]
+
+        for entry in value:
+            for pair in entry.strip().split(','):
+                job, result_type = pair.strip().split(':')
+
+                job = job.strip()
+                result_type = result_type.strip()
+
+                mapping[job] = result_type
+                self.debug("job '{}' provides results of type '{}'".format(job, result_type))
+
+        return mapping
 
     @cached_property
     def _rules_locals(self):
@@ -397,6 +430,8 @@ class CIBrewDispatcher(Module):
         }
 
     def _reduce_section(self, commands, is_component=True, default_commands=None, all_commands=None):
+        # pylint: disable=too-many-statements
+
         """
         Reduce commands to a minimal set - apply filtering rules, apply global sections,
         and return set of command sets.
@@ -426,11 +461,12 @@ class CIBrewDispatcher(Module):
 
                 return
 
-            if is_component is True:
-                flags = {
-                    'apply-all': True
-                }
+            flags = {
+                'apply-all': True,
+                'recipients': None
+            }
 
+            if is_component is True:
                 if isinstance(set_commands[0], dict):
                     self.debug('      specifies flags:\n{}'.format(format_dict(set_commands[0])))
 
@@ -446,6 +482,32 @@ class CIBrewDispatcher(Module):
                 if flags['apply-all'] is True:
                     self.debug("      allows 'all' section to be appended")
                     set_commands = set_commands[:] + all_commands
+
+            if flags['recipients']:
+                self.debug('set-wide recipients set to: {}'.format(flags['recipients']))
+
+                recipients = ','.join([s.strip() for s in flags['recipients'].split(',')])
+
+                for i, command in enumerate(set_commands):
+                    splitted = shlex.split(command)
+                    self.debug('splitted command: {}'.format(splitted))
+
+                    # [wow-job, --option1, --option2, ...]
+                    command_module = splitted[0]
+                    if command_module not in self.job_result_types:
+                        msg = 'Cannot add recipients to {} pipeline'.format(command_module)
+
+                        self.warn(msg)
+                        self.ci.sentry_submit_warning(msg)
+
+                        continue
+
+                    result_type = self.job_result_types[splitted[0]]
+
+                    splitted.append("--notify-recipients-options='--{}-add-notify {}'".format(result_type, recipients))
+                    self.debug('with set recipients applied: {}'.format(format_dict(splitted)))
+
+                    set_commands[i] = ' '.join(splitted)
 
             reduced[name] = set_commands[:]
 
@@ -569,10 +631,10 @@ class CIBrewDispatcher(Module):
             return commands.values()[0]
 
         global_all_commands = _reduce_global_section('all')
-        self.debug('global "all" commands:\n{}'.format(global_all_commands))
+        self.debug('global "all" commands:\n{}'.format(format_dict(global_all_commands)))
 
         global_default_commands = _reduce_global_section('default')
-        self.debug('global "default" commands:\n{}'.format(global_default_commands))
+        self.debug('global "default" commands:\n{}'.format(format_dict(global_default_commands)))
 
         packages_config = config.get('packages', None)
         if packages_config is None:
