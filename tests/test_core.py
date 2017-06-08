@@ -5,6 +5,8 @@ import pytest
 
 import libci
 
+from mako.template import Template
+
 from . import NonLoadingCI
 
 
@@ -247,6 +249,84 @@ def test_cached_property():
     assert counter['count'] == 3
     assert obj.__dict__['foo'] == 3
     assert 'bar' not in obj.__dict__
+
+
+def test_render_template():
+    from libci.utils import render_template
+
+    tmpl_str = """
+    This is a dummy string template: {foo}
+    """
+
+    tmpl_mako = Template("""
+    This is a dummy Mako template: ${bar}
+    """)
+
+    # these should work out of the box
+    assert render_template(tmpl_str, foo='baz') == 'This is a dummy string template: baz'
+
+    assert render_template(tmpl_mako, bar='baz') == 'This is a dummy Mako template: baz'
+
+    # check that unexpected template types raise an exception
+    with pytest.raises(libci.CIError, message="Unhandled template type <type 'unicode'>"):
+        render_template(u'fake template')
+
+    # check that exception pops up when variable is not passed to render_template
+    with pytest.raises(libci.CIError):
+        render_template(tmpl_str)
+
+    with pytest.raises(libci.CIError):
+        render_template(tmpl_mako)
+
+
+def test_treat_url(caplog, monkeypatch):
+    from libci.utils import treat_url
+
+    # Add more patterns bellow when necessary
+    urls = {
+        'HTTP://FoO.bAr.coM././foo/././../foo/index.html': 'http://foo.bar.com/foo/index.html',
+        # urlnorm cannot handle localhost but treat_url should handle such situation
+        'http://localhost/index.html': 'http://localhost/index.html'
+    }
+
+    for original, expected in urls.iteritems():
+        assert treat_url(original, shorten=False) == expected
+
+    # check shoretning
+    def fetch_shorten(url, **kwargs):
+        # pylint: disable=unused-argument
+        assert url.endswith('http://foo.bar.com/')
+
+        return None, 'dummy shortened URL from {}'.format(url.split('?')[-1])
+
+    monkeypatch.setattr(libci.utils, 'fetch_url', fetch_shorten)
+
+    assert treat_url('http://foo.bar.com/', shorten=True) == 'dummy shortened URL from http://foo.bar.com/'
+
+    # check the final strip() call
+    def fetch_whitespace(url, **kwargs):
+        # pylint: disable=unused-argument
+        return None, '   so much whitespace   '
+
+    monkeypatch.setattr(libci.utils, 'fetch_url', fetch_whitespace)
+
+    assert treat_url('http://foo.bar.com/', shorten=True) == 'so much whitespace'
+
+    # handle exceptions from URL shortener web
+    logger = libci.Logging.create_logger()
+    caplog.handler.records = []
+
+    def fetch_raise(url, **kwargs):
+        # pylint: disable=unused-argument
+        raise libci.CIError('simply bad request')
+
+    monkeypatch.setattr(libci.utils, 'fetch_url', fetch_raise)
+    assert treat_url('http://foo.bar.com/', shorten=True, logger=logger) == 'http://foo.bar.com/'
+
+    records = caplog.handler.records
+    assert len(records) == 1
+    assert records[0].levelno == logging.WARN
+    assert records[0].message == 'Unable to shorten URL (see log for more details): simply bad request'
 
 
 #
