@@ -36,6 +36,3 @@ class GuestSetup(libci.Module):
             self.info("setting the guests '{}' up with '{}'".format(', '.join(hosts), playbook))
 
             self.shared('run_playbook', playbook, hosts, **kwargs)
-
-    def execute(self):
-        pass

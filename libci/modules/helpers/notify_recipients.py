@@ -195,6 +195,3 @@ class NotifyRecipients(Module):
         self.info('recipients: {}'.format(', '.join(recipients)))
 
         return recipients
-
-    def execute(self):
-        pass

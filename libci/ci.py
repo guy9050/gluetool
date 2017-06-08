@@ -456,10 +456,17 @@ class Module(Configurable):
         return self.ci.has_shared(funcname)
 
     def execute(self):
+        # pylint: disable-msg=no-self-use
+
         """
-        execute is a required module function
+        In this method, modules can perform any work they deemed necessary for
+        completing their purpose. E.g. if the module promises to run some tests,
+        this is the place where the code belongs to.
+
+        By default, this method does nothing. Reimplement as needed.
         """
-        raise NotImplementedError
+
+        pass
 
     def sanity(self):
         # pylint: disable-msg=no-self-use
@@ -470,9 +477,11 @@ class Module(Configurable):
 
         * Advanced checks on passed options
         * Check for additional requirements (tools, data, etc.)
+
+        By default, this method does nothing. Reimplement as needed.
         """
 
-        return None
+        pass
 
     def shared(self, *args, **kwargs):
         return self.ci.shared(*args, **kwargs)
