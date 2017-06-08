@@ -7,7 +7,7 @@ import libci
 
 from mako.template import Template
 
-from . import NonLoadingCI
+from . import NonLoadingCI, Caplog
 
 
 # Without this, caplog cannot "see" citool's messages since they are
@@ -24,15 +24,14 @@ def test_run_command(monkeypatch, caplog):
     import subprocess
     from libci.utils import run_command, DEVNULL
 
-    def caplog_clear():
-        caplog.handler.records = []
+    caplog = Caplog(caplog)
 
     # initialize logger - this is done by CI instance but we don't have any
     libci.Logging.create_logger()
-    caplog_clear()
+    caplog.clear()
 
     def assert_logging(record_count, cmd, stdout=None, stderr=None):
-        records = caplog.handler.records
+        records = caplog.records
 
         assert len(records) == record_count
         assert all([r.levelno == logging.DEBUG for r in records])
@@ -46,16 +45,16 @@ def test_run_command(monkeypatch, caplog):
             assert records[2].message == stderr
 
     # Accept lists only
-    caplog_clear()
+    caplog.clear()
     with pytest.raises(AssertionError, match=r'^Only list of strings accepted as a command$') as excinfo:
         run_command('/bin/ls')
 
-    caplog_clear()
+    caplog.clear()
     with pytest.raises(AssertionError, match=r'^Only list of strings accepted as a command$'):
         run_command(['/bin/ls', 13])
 
     # Test some common binary
-    caplog_clear()
+    caplog.clear()
     output = run_command(['/bin/ls', '/'])
     assert output.exit_code == 0
     assert 'bin' in output.stdout
@@ -68,7 +67,7 @@ def test_run_command(monkeypatch, caplog):
     assert len(caplog.records[1].message.split('\n')) >= 5
 
     # Test non-existent binary
-    caplog_clear()
+    caplog.clear()
     with pytest.raises(libci.CIError, match=r"^Command '/bin/non-existent-binary' not found$"):
         run_command(['/bin/non-existent-binary'])
 
@@ -84,7 +83,7 @@ def test_run_command(monkeypatch, caplog):
     assert excinfo.value.output.stderr == ''
 
     # Test stdout and stderr are not mixed together
-    caplog_clear()
+    caplog.clear()
     cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
     output = run_command(cmd)
     assert output.exit_code == 0
@@ -95,7 +94,7 @@ def test_run_command(monkeypatch, caplog):
                    stderr='stderr:\n---v---v---v---v---v---\nThis goes to stderr\n\n---^---^---^---^---^---')
 
     # Test overriding stdout and stderr
-    caplog_clear()
+    caplog.clear()
     cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
     output = run_command(cmd, stdout=DEVNULL)
     assert output.exit_code == 0
@@ -105,7 +104,7 @@ def test_run_command(monkeypatch, caplog):
                    stdout='stdout:\n  command produced no output',
                    stderr='stderr:\n---v---v---v---v---v---\nThis goes to stderr\n\n---^---^---^---^---^---')
 
-    caplog_clear()
+    caplog.clear()
     cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
     output = run_command(cmd, stderr=DEVNULL)
     assert output.exit_code == 0
@@ -116,7 +115,7 @@ def test_run_command(monkeypatch, caplog):
                    stderr='stderr:\n  command produced no output')
 
     # Test merging stdout & stderr into one
-    caplog_clear()
+    caplog.clear()
     cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
     output = run_command(cmd, stderr=subprocess.STDOUT)
     assert output.exit_code == 0
@@ -128,7 +127,7 @@ def test_run_command(monkeypatch, caplog):
 
     # Pass weird stdout value, and test its formatting in log
     stdout = (13, 17)
-    caplog_clear()
+    caplog.clear()
     cmd = ['/bin/ls']
     with pytest.raises(AttributeError, match=r"^'tuple' object has no attribute 'fileno'$"):
         run_command(cmd, stdout=stdout)
@@ -140,7 +139,7 @@ def test_run_command(monkeypatch, caplog):
         # pylint: disable=unused-argument
         raise OSError(errno.ENOENT, '')
 
-    caplog_clear()
+    caplog.clear()
     monkeypatch.setattr(subprocess, 'Popen', faulty_popen_enoent)
 
     with pytest.raises(libci.CIError, match=r"^Command '/bin/ls' not found$"):
@@ -154,7 +153,7 @@ def test_run_command(monkeypatch, caplog):
         # pylint: disable=unused-argument
         raise OSError('foo')
 
-    caplog_clear()
+    caplog.clear()
     monkeypatch.setattr(subprocess, 'Popen', faulty_popen_foo)
 
     with pytest.raises(OSError, match=r'^foo$'):
@@ -164,7 +163,7 @@ def test_run_command(monkeypatch, caplog):
     monkeypatch.undo()
 
     # Don't capture stdout and stderr, let them pass
-    caplog_clear()
+    caplog.clear()
     output = run_command(['/bin/ls', '/'], stdout=libci.utils.PARENT, stderr=libci.utils.PARENT)
 
     assert output.exit_code == 0
@@ -339,13 +338,12 @@ def test_check_module_file(caplog, tmpdir):
     mfile = tmpdir.join('dummy.py')
     ci = NonLoadingCI()
 
-    def caplog_clear():
-        caplog.handler.records = []
+    caplog = Caplog(caplog)
 
     def try_pass(file_content):
         mfile.write(file_content)
 
-        caplog_clear()
+        caplog.clear()
         assert ci._check_module_file(str(mfile)) is True
         assert caplog.records[0].message == "check possible module file '{}'".format(mfile)
         assert caplog.records[0].levelno == logging.DEBUG
@@ -353,7 +351,7 @@ def test_check_module_file(caplog, tmpdir):
     def try_fail(file_content, error):
         mfile.write(file_content)
 
-        caplog_clear()
+        caplog.clear()
         assert ci._check_module_file(str(mfile)) is False
         assert caplog.records[0].message == "check possible module file '{}'".format(mfile)
         assert caplog.records[0].levelno == logging.DEBUG
