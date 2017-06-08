@@ -228,10 +228,8 @@ class CIWow(Module):
                         })
 
                 except CICommandError:
-                    msg = 'Cannot find logs for task {}. See log for details.'.format(task_id)
-
-                    citool_module.warn(msg)
-                    citool_module.ci.sentry_submit_warning(msg)
+                    citool_module.warn('Cannot find logs for task {}. See log for details.'.format(task_id),
+                                       sentry=True)
 
                 if not data['bkr_logs']:
                     # construct at least TESTOUT.log
@@ -370,10 +368,9 @@ class CIWow(Module):
                     next_to_last_tasks[recipe.find_all('task')[-2]['name']] = True
 
             if len(next_to_last_tasks) > 1:
-                self.warn('Multiple next-to-last tasks detected, beaker-jobwatch may not check them correctly')
-                self.warn('Next-to-last tasks:\n{}'.format('\n'.join(next_to_last_tasks.keys())))
-
-                self.ci.sentry_submit_warning('[wow] Multiple next-to-last tasks detected')
+                self.warn('Multiple next-to-last tasks:\n{}'.format('\n'.join(next_to_last_tasks.keys())))
+                self.warn('Multiple next-to-last tasks detected, beaker-jobwatch may not check them correctly',
+                          sentry=True)
 
             command += [
                 '--end-task={}'.format(task) for task in next_to_last_tasks.iterkeys()

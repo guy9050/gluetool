@@ -16,12 +16,12 @@ class CIBrewBuildName(Module):
             raise CIError('no brew task found, did you run brew module?')
 
         if not self.has_shared('jenkins'):
-            self.warn('Jenkins API is necessary, please provide Jenkins module')
+            self.warn('Jenkins API is necessary, please provide Jenkins module', sentry=True)
             return
 
         build_url = os.getenv('BUILD_URL', None)
         if build_url is None:
-            self.warn('$BUILD_URL env var not found, was this job started by Jenkins?')
+            self.warn('$BUILD_URL env var not found, was this job started by Jenkins?', sentry=True)
             return
 
         self.shared('jenkins').set_build_name(task.short_name)

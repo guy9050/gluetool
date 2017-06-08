@@ -180,9 +180,6 @@ class BrewTask(object):
             tasks_outputs += [(task, filename) for filename in self.brew.listTaskOutput(task['id'])]
 
         if not any(tasks_outputs):
-            msg = "no artifacts found for the task '{}', builds already gone for scratch build?".format(self.task_id)
-            self._module.warn(msg)
-
             raise NoArtifactsError(self.task_id)
 
         for task, filename in tasks_outputs:

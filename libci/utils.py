@@ -334,7 +334,7 @@ def treat_url(url, shorten=False, logger=None):
             _, url = fetch_url('https://url.corp.redhat.com/new?{}'.format(url), logger=logger)
 
         except CIError as exc:
-            logger.warn('Unable to shorten URL (see log for more details): {}'.format(exc.message))
+            logger.warn('Unable to shorten URL (see log for more details): {}'.format(exc.message), sentry=True)
 
     return url.strip()
 

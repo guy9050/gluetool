@@ -2,7 +2,6 @@ import errno
 import gzip
 import os
 import re
-import sys
 from time import gmtime, strftime
 from datetime import datetime, timedelta
 
@@ -153,9 +152,7 @@ class OpenstackGuest(NetworkedGuest):
 
         # pylint: disable=broad-except
         except Exception as exc:
-            self.error('Failed to store console output in the file: {}'.format(str(exc)))
-
-            self._module.ci.sentry_submit_exception(sys.exc_info())
+            self.warn('Failed to store console output in the file: {}'.format(str(exc)), sentry=True)
 
         try:
             self._ip.delete()

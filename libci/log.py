@@ -1,7 +1,40 @@
 """
 Logging support.
 
-Sets up logging environment for use by citool and modules.
+Sets up logging environment for use by ``citool`` and modules. Based
+on standard library's :py:mod:`logging` module, augmented a bit to
+support features loke colorized messages and stackable context information.
+
+Example usage:
+
+.. code-block:: python
+
+   # initialize logger as soon as possible
+   logger = Logging.create_logger()
+
+   # now it's possible to use it for logging:
+   logger.debug('foo!')
+
+   # or connect it with current instance (if you're doing all this
+   # inside some class' constructor):
+   logger.connect(self)
+
+   # now you can access logger's methods directly:
+   self.debug('foo once again!')
+
+   # find out what your logging should look like, e.g. by parsing command-line options
+   ...
+
+   # tell logger about the final setup
+   logger = Logging.create_logger(output_file='/tmp/foo.log', level=..., colors=True)
+
+   # and, finally, create a root context logger - when we create another loggers during
+   # the code flow, this context logger will be in the root of this tree of loggers.
+   logger = ContextAdapter(logger)
+
+   # don't forget to re-connect with the context logger if you connected your instance
+   # with previous logger, to make sure helpers are set correctly
+   logger.connect(self)
 """
 
 import atexit
@@ -18,6 +51,7 @@ logging.VERBOSE = 5
 logging.addLevelName(logging.VERBOSE, 'VERBOSE')
 
 
+# Methods we "patch" logging.Logger and logging.LoggerAdapter with
 def verbose_logger(self, message, *args, **kwargs):
     if self.isEnabledFor(logging.VERBOSE):
         # pylint: disable-msg=protected-access
@@ -29,6 +63,34 @@ def verbose_adapter(self, message, *args, **kwargs):
     self.logger.verbose(message, *args, **kwargs)
 
 
+def warn_sentry(self, message, *args, **kwargs):
+    """
+    Beside calling the original the ``warning`` method (stored as ``self.orig_warning``),
+    this one also submits warning to the Sentry server when asked to do so by a keyword
+    argument ``sentry`` set to ``True``.
+    """
+
+    if 'sentry' in kwargs:
+        report_to_sentry = kwargs['sentry'] and getattr(self, 'sentry_submit_warning', None) is not None
+        del kwargs['sentry']
+
+    else:
+        report_to_sentry = False
+
+    self.orig_warning(message, *args, **kwargs)
+
+    if report_to_sentry:
+        self.sentry_submit_warning(message, **kwargs)
+
+
+logging.Logger.orig_warning = logging.Logger.warning
+logging.Logger.warning = warn_sentry
+logging.Logger.warn = warn_sentry
+
+logging.LoggerAdapter.orig_warning = logging.LoggerAdapter.warning
+logging.LoggerAdapter.warning = warn_sentry
+logging.LoggerAdapter.warn = warn_sentry
+
 logging.Logger.verbose = verbose_logger
 logging.LoggerAdapter.verbose = verbose_adapter
 
@@ -38,23 +100,29 @@ class ContextAdapter(logging.LoggerAdapter):
     Generic logger adapter that collects "contexts", and prepends them
     to the message.
 
-    "context" is any key in `extra` dictionary starting with `ctx_`,
-    the its is expected to be tuple(priority, value). Contexts are
-    then sorted by their priorities before inserting them into the
-    message (lower priority means context will be placed closer to
-    the beggining of the line - highest priority comes last.
+    "context" is any key in ``extra`` dictionary starting with ``ctx_``,
+    whose value is expected to be tuple of ``(priority, value)``. Contexts
+    are then sorted by their priorities before inserting them into the message
+    (lower priority means context will be placed closer to the beggining of
+    the line - highest priority comes last.
+
+    :param logging.Logger logger: parent logger this adapter modifies.
+    :param dict extras: additional extra keys passed to the parent class.
+        The dictionary is then used to update messages' ``extra`` key with
+        the information about context.
     """
 
     def __init__(self, logger, extra=None):
         super(ContextAdapter, self).__init__(logger, extra or {})
 
         self.warn = self.warning
+        self.sentry_submit_warning = getattr(logger, 'sentry_submit_warning', None)
 
     def process(self, msg, kwargs):
         """
-        Original `process` overwrites `kwargs['extra']` which doesn't work
+        Original ``process`` overwrites ``kwargs['extra']`` which doesn't work
         for us - we want to chain adapters, getting more and more contexts
-        on the way. Therefore `update` instead of assignment.
+        on the way. Therefore ``update`` instead of assignment.
         """
 
         if 'extra' not in kwargs:
@@ -65,10 +133,15 @@ class ContextAdapter(logging.LoggerAdapter):
 
     def connect(self, parent):
         """
-        Create helper loggign methods in parrent, by assigning adapter's
-        methods to it. Simply instantiate adapter and call its `connect`
-        with your instance as `parent` argument, and your instance will
-        get all these logging helpers.
+        Create helper methods in ``parent``, by assigning adapter's methods to its
+        attributes. One can then call ``parent.debug`` and so on, instead of less
+        readable ``parent.logger.debug``.
+
+        Simply instantiate adapter and call its ``connect`` with an object as
+        a ``parent`` argument, and the object will be enhanced with all these
+        logging helpers.
+
+        :param parent: object to enhance with logging helpers.
         """
 
         parent.debug = self.debug
@@ -82,6 +155,9 @@ class ContextAdapter(logging.LoggerAdapter):
 class ModuleAdapter(ContextAdapter):
     """
     Custom logger adapter, adding module name as a context.
+
+    :param logging.Logger logger: parent logger this adapter modifies.
+    :param libci.ci.Module module: module whose name is added as a context.
     """
 
     def __init__(self, logger, module):
@@ -92,9 +168,15 @@ class LoggingFormatter(logging.Formatter):
     """
     Custom log record formatter. Produces output in form of:
 
-      [timestamp] [logelevel] message
+    ``[stamp] [level] [ctx1] [ctx2] ... message``
+
+    :param bool log_tracebacks: if set, add tracebacks to the message. By default,
+        we don't need tracebacks on the terminal, unless its loglevel is verbose enough,
+        but we want them in the debugging file.
+    :param bool colors: if set, colorize messages.
     """
 
+    #: Tags used to express loglevel.
     _level_tags = {
         logging.VERBOSE: 'V',
         logging.DEBUG: 'D',
@@ -105,6 +187,7 @@ class LoggingFormatter(logging.Formatter):
     }
 
     if colorama is not None:
+        #: Colors assigned to loglevels
         _level_color = {
             logging.INFO: colorama.Fore.GREEN,
             logging.WARNING: colorama.Fore.YELLOW,
@@ -119,6 +202,16 @@ class LoggingFormatter(logging.Formatter):
         self.colors = colors
 
     def format(self, record):
+        """
+        Format a logging record. It puts together pieces like time stamp,
+        log level, possibly also different contexts if there are any stored
+        in the record, and finally applies colors if asked to do so.
+
+        :param logging.LogRecord record: record describing the event.
+        :rtype: str
+        :returns: string representation of the event record.
+        """
+
         fmt = ['[{stamp}]', '[{level}]', '{msg}']
         values = {
             'stamp': self.formatTime(record, datefmt='%H:%M:%S'),
@@ -158,10 +251,12 @@ class LoggingFormatter(logging.Formatter):
 
 class Logging(object):
     """
-    Top-level wrapper of a logger instance.
+    Container wrapping configuration and access to :py:mod:`logging` infrastructure ``citool``
+    uses for logging.
     """
 
-    #: Logger singleton - if anyone asks for a logger, they will get this one.
+    #: Logger singleton - if anyone asks for a logger, they will get this one. Needs
+    #: to be properly initialized by calling :py:meth:`create_logger`.
     logger = None
 
     #: Stream handler printing out to stderr.
@@ -176,7 +271,7 @@ class Logging(object):
         """
         If opened, close output file used for logging.
 
-        This method is registered with atexit.
+        This method is registered with :py:mod:`atexit`.
         """
 
         if Logging.output_file_handler is None:
@@ -191,10 +286,14 @@ class Logging(object):
     @staticmethod
     def get_logger():
         """
-        Return a logger instance.
+        Returns a logger instance.
 
-        Expects there was a call to create_logger method somewhere in the
-        history, creating such an instance.
+        Expects there was a call to :py:meth:`create_logger` method before calling this method
+        that would actually create and set up the logger.
+
+        :rtype: logging.Logger
+        :returns: a :py:class:`logging.Logger` instance, set up for logging.
+        :raises AssertionError: when there's no instance yet.
         """
 
         assert Logging.logger is not None
@@ -202,23 +301,40 @@ class Logging(object):
         return Logging.logger
 
     @staticmethod
-    def create_logger(output_file=None, level=None, colors=False, sentry=None):
+    def create_logger(output_file=None, level=logging.INFO, colors=False, sentry=None, sentry_submit_warning=None):
         """
         Create and setup logger.
 
         This method is called at least twice:
-          - when libci.CI is instantiated, only a stderr handler is set up,
-          - when all arguments and options are processed, and CI instance get
-            determine desired log level, and whether it's expected to use an
-            output file. This time, method only modifies log level, and adds
-            FileHandler if necessary.
+
+          - when :py:class:`libci.ci.CI` is instantiated: only a ``stderr`` handler is set up,
+            with loglevel being ``INFO``;
+          - when all arguments and options are processed, and CI instance can determine desired
+            log level, whether it's expected to stream debugging messages into a file, etc. This
+            time, method only modifies propagates necessary updates to already existing logger.
+
+        :param str output_file: if set, new handler will be attached to the logger, streaming
+            messages of **all** log levels into this this file.
+        :param int level: desired log level. One of constants defined in :py:mod:`logging` module,
+            e.g. :py:data:`logging.DEBUG` or :py:data:`logging.ERROR`.
+        :param bool colors: if set and if the :py:mod:`colorama` modules is installed, logger will
+            colorize messages written to the terminal, depending on their level. Messages written to
+            the ``output_file`` will never be colorized.
+        :param bool sentry: if set, logger will be augmented to send every log message to the Sentry
+            server.
+        :param callable sentry_submit_warning: if set, it is used by ``warning`` methods of derived
+            loggers to submit warning to the Sentry server, if asked by a caller to do so.
+        :rtype: logging.Logger
+        :returns: a :py:class:`logging.Logger` instance, set up for logging.
         """
 
         level = level or logging.INFO
 
         if Logging.logger is None:
             logger = Logging.logger = logging.getLogger('citool')
+
             logger.propagate = False
+            logger.sentry_submit_warning = sentry_submit_warning
 
             # logger actually emits everything, handlers do filtering
             logger.setLevel(logging.VERBOSE)

@@ -182,10 +182,7 @@ class Message(object):
             smtp.quit()
 
         except smtplib.SMTPException as exc:
-            msg = 'Cannot send e-mail, SMTP raised an exception: {}'.format(str(exc))
-
-            self._module.warn(msg)
-            self._module.ci.sentry_submit_warning(msg)
+            self._module.warn('Cannot send e-mail, SMTP raised an exception: {}'.format(str(exc)), sentry=True)
 
 
 class Notify(Module):
@@ -350,7 +347,7 @@ to this option, and process environmental variables (default: {})""".format(DEFA
                         test_src = self._shorten_url(test_src)
 
                     else:
-                        self.warn("Cannot assign GIT address to a test '{}'".format(name))
+                        self.warn("Cannot assign GIT address to a test '{}'".format(name), sentry=True)
                         test_src = '<Unknown GIT address>'
 
                     fails[name] = [(test_src,)]
@@ -505,11 +502,8 @@ to this option, and process environmental variables (default: {})""".format(DEFA
                 frontend_url = self._shorten_url(frontend_url_template.format(**os.environ))
 
             except KeyError as exc:
-                msg = "Cannot create frontend URL from template '{}': {} variable not set".format(
-                    frontend_url_template, exc.args[0])
-
-                self.warn(msg)
-                self.ci.sentry_submit_warning(msg)
+                self.warn("Cannot create frontend URL from template '{}': {} variable not set".format(
+                    frontend_url_template, exc.args[0]), sentry=True)
 
         if self.option('add-frontend-url'):
             self.debug('asked to use frontend url')
@@ -517,7 +511,7 @@ to this option, and process environmental variables (default: {})""".format(DEFA
             if frontend_url:
                 return frontend_url
 
-            self.warn('Asked to add frontend URL but that is not set')
+            self.warn('Asked to add frontend URL but that is not set', sentry=True)
 
         if jenkins_build_url:
             self.debug('jenkins build url exists, using it as summary url')
@@ -554,7 +548,7 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
             formatter = getattr(self, 'format_result_{}'.format(result_type.replace('-', '_')), None)
             if formatter is None:
-                self.warn("Don't know how to process result of type '{}'".format(result_type))
+                self.warn("Don't know how to process result of type '{}'".format(result_type), sentry=True)
                 continue
 
             recipients = self.shared('notification_recipients', result_type=result_type)
@@ -589,11 +583,7 @@ to this option, and process environmental variables (default: {})""".format(DEFA
         exc = failure.exc_info[1]
 
         if not self.has_shared('notification_recipients'):
-            msg = 'Cannot get a list of recipients, please add e.g. notify-recipients module'
-
-            self.warn(msg)
-            self.ci.sentry_submit_warning(msg)
-
+            self.warn('Cannot get a list of recipients, please add e.g. notify-recipients module', sentry=True)
             return
 
         recipients = ['{}@redhat.com'.format(user) for user in self.shared('notification_recipients')]

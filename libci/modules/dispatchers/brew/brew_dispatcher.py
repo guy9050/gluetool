@@ -452,8 +452,7 @@ class CIBrewDispatcher(Module):
                     del set_commands[0]
 
                 for flag in [flag for flag in flags.iterkeys() if flag not in CIBrewDispatcher.KNOWN_FLAGS]:
-                    self.warn("Flag '{}' is not supported (typo maybe?)".format(flag))
-                    self.ci.sentry_submit_warning("Flag '{}' is not supported (typo maybe?)".format(flag))
+                    self.warn("Flag '{}' is not supported (typo maybe?)".format(flag), sentry=True)
 
                 self.debug('      final flags:\n{}'.format(format_dict(flags)))
 
@@ -681,8 +680,7 @@ class CIBrewDispatcher(Module):
 
         for section in self.config:
             if 'rule' not in section:
-                self.warn("Section does not contain 'rule' key, ignored")
-                self.ci.sentry_submit_warning("Section does not contain 'rule' key, ignored")
+                self.warn("Section does not contain 'rule' key, ignored", sentry=True)
                 continue
 
             rules = Rules(section['rule'])
