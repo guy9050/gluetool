@@ -1,7 +1,8 @@
+import collections
 import re
 
 from libci import CIError, SoftCIError, Module
-from libci.utils import cached_property, load_yaml
+from libci.utils import cached_property, load_yaml, format_dict
 
 
 class IncompatibleOptionsError(SoftCIError):
@@ -24,10 +25,16 @@ class CIGuessOpenstackImage(Module):
     "Guess" openstack image. User can choose from different possible methods of "guessing":
 
     * ``target-autodetection``: module will try to transform build target of brew task to an image name
-      using provided regex patterns in ``--pattern-map`` file.
+      using provided regex patterns in ``--pattern-map`` file;
 
     * ``force``: use specified image no matter what. Use ``--image`` option to set *what*
-      image you wish to use
+      image you wish to use;
+
+    * ``recent``: use ``--image`` option as a hint - a regular expression, with one matching group,
+      that tells module what image names should be considered for selection, and which part of the
+      image name is the key. Images are then sorted by their respective key values, and the most
+      recent one is used. E.g. ``--image 'Fedora-Cloud-Base-25-(\d+)\.\d'`` will use *date* part
+      of image name as a key (e.g. ``20170102``).
     """
 
     name = 'guess-openstack-image'
@@ -36,6 +43,7 @@ class CIGuessOpenstackImage(Module):
     options = {
         'method': {
             'help': 'What method to use for image "guessing"',
+            'choices': ('target-autodetection', 'force', 'recent'),
             'default': 'target-autodetection'
         },
         'image': {
@@ -51,7 +59,10 @@ class CIGuessOpenstackImage(Module):
 
     shared_functions = ['image']
 
-    _image = None
+    def __init__(self, *args, **kwargs):
+        super(CIGuessOpenstackImage, self).__init__(*args, **kwargs)
+
+        self._image = None
 
     def image(self):
         """ return guessed image name """
@@ -139,6 +150,40 @@ class CIGuessOpenstackImage(Module):
 
         self._image = image
 
+    def _guess_recent(self):
+        hint = '^{}$'.format(self.option('image'))
+        self.debug("using pattern '{}' as a hint".format(hint))
+
+        try:
+            hint_pattern = re.compile(hint)
+
+        except re.error as exc:
+            raise CIError("cannot compile hint pattern '{}': {}".format(hint, str(exc)))
+
+        if not self.has_shared('openstack'):
+            raise CIError("Module requires OpenStack connection, provided e.g. by the 'openstack' module")
+
+        possible_image = collections.namedtuple('possible_image', ['key', 'name'])
+        possible_images = []
+
+        for image in self.shared('openstack').images.list():
+            match = hint_pattern.match(image.name)
+            if not match:
+                continue
+
+            try:
+                possible_images.append(possible_image(key=match.group(1), name=image.name))
+
+            except IndexError:
+                raise CIError("Cannot deduce the key from image name '{}'".format(image.name))
+
+        if not possible_images:
+            raise CIError("No image found for hint '{}'".format(hint))
+
+        self.debug('possible images:\n{}'.format(format_dict(possible_images)))
+
+        self._image = sorted(possible_images, key=lambda x: x.key)[-1].name
+
     def _guess_target_autodetection(self):
         task = self.shared('brew_task')
         if task is None:
@@ -165,10 +210,11 @@ class CIGuessOpenstackImage(Module):
     _methods = {
         'force': _guess_force,
         'target-autodetection': _guess_target_autodetection,
+        'recent': _guess_recent
     }
 
     def sanity(self):
-        image_required = ('force',)
+        image_required = ('force', 'recent')
         image_ignored = ('target-autodetection',)
 
         method = self.option('method')

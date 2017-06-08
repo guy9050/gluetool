@@ -410,7 +410,7 @@ expected from the user to cleanup the instance(s).""",
         }
     }
     required_options = ['auth-url', 'password', 'project-name', 'username', 'ssh-key', 'ip-pool-name']
-    shared_functions = ['provision']
+    shared_functions = ('openstack', 'provision')
 
     # connection handler
     nova = None
@@ -438,6 +438,9 @@ expected from the user to cleanup the instance(s).""",
         available = sorted([item.name for item in getattr(self.nova, resource).list()])
         raise CIError("resource of type {} and value '{}' not found, available:\n{}".format(resource, name,
                                                                                             format_dict(available)))
+
+    def openstack(self):
+        return self.nova
 
     def get_image_ref(self, name):
         self.debug("get image reference for '{}'".format(name))
