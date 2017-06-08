@@ -10,13 +10,6 @@ from mako.template import Template
 from . import NonLoadingCI, Caplog
 
 
-# Without this, caplog cannot "see" citool's messages since they are
-# no longer propagated to citool logger's parent(s)
-@pytest.fixture(name='enable_logger_propagate', scope='session', autouse=True)
-def fixture_enable_logger_propagate():
-    libci.Logging.create_logger().propagate = True
-
-
 def test_run_command(monkeypatch, caplog):
     # pylint: disable-msg=line-too-long,too-many-statements
 
