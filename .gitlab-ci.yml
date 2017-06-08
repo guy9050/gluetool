@@ -1,14 +1,72 @@
+---
+
+stages:
+  - test
+  - build
+  - deploy
+
+
+variables:
+  SSH_OPTIONS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i docs/citool-doc.key"
+  DOCS_UPLOAD: "citool-doc@liver3.lab.eng.brq.redhat.com:/home/citool-doc/public_html"
+  COVERAGE_UPLOAD: "citool-doc@liver3.lab.eng.brq.redhat.com:/home/citool-doc/public_html/coverage-report"
+
+
+#
+# Runs before each and every pipeline job.
+#
 before_script:
-    - yum -y install git make python-setuptools gcc python-devel krb5-devel postgresql-devel openssl-devel
-    - (curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py && rm -f get-pip.py)
-    - pip install -U setuptools
-    - pip install tox
+  - yum -y install git make python-setuptools gcc python-devel krb5-devel postgresql-devel openssl-devel
+  - (curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py && rm -f get-pip.py)
+  - pip install -U setuptools
+  - chmod u=rw,go= docs/citool-doc.key
 
-tests:
+
+#
+# TEST steps
+#
+
+# Run unit tests
+#
+# Note: this step also generates coverage report (HTML).
+unit-tests:
+  stage: test
   script:
-    - tox -e py27
+    - pip install tox
+    - tox -e py27 -- --cov=libci --cov-report=html:coverage-report
+  artifacts:
+    paths:
+      - coverage-report
 
-build:
+
+# Generate documentation from the sources
+#
+# Note: executed for all commits in all branches to make sure it is actually possible
+# to generate the documentation - serves as a sort of a "test" on its own. citool
+# uses docstrings to generate command-line help, it is useful to check whether these
+# docstrings are readable and sane.
+generate-docs:
+  stage: test
+  script:
+    - pip install -r requirements.txt
+    - sphinx-apidoc -T -e -o docs/source/ libci/
+    - python setup.py develop
+    - python docs/generate-module-page.py
+    - make -C docs/ html
+  artifacts:
+    paths:
+      - docs/build/html
+
+
+#
+# BUILD steps
+#
+
+build-rpm:
+  stage: build
+  only:
+    - master@baseos-qe/citool
+  allow_failure: true
   script:
     - pip install copr copr-cli simplejson
     # we need to use python-requests from rpm to have update-ca-trust to work
@@ -25,26 +83,29 @@ build:
     - echo "W2NvcHItY2xpXQpsb2dpbiA9IFkyOXdjZz09IyNpbXZ4eWZibHFoa2dybWdzdHlmaAp1c2VybmFtZSA9IGplbmtpbnNfYmFzZW9zLWplbmtpbnMucmhldi1jaS12bXMuZW5nLnJkdTIucmVkaGF0LmNvbQp0b2tlbiA9IHJqb29lcmN2ZHdrcnh1eGptYmJ1YXNvb2lzdGp3bApjb3ByX3VybCA9IGh0dHBzOi8vY29wci5kZXZlbC5yZWRoYXQuY29tCg==" | base64 -d > ~/.config/copr
     - cat ~/.config/copr
     - build_python_project
-  only:
-    - master
 
-coverage:
-  script:
-    - python setup.py develop
-    - tox -e py27 -- --cov=libci --cov-report=html:coverage-report
-    - chmod u=rw,go= docs/citool-doc.key
-    - rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i docs/citool-doc.key" coverage-report/ citool-doc@liver3.lab.eng.brq.redhat.com:/home/citool-doc/public_html/coverage-report
-  only:
-    - master
 
-docs:
-  script:
-    - pip install -r requirements.txt
-    - sphinx-apidoc -T -e -o docs/source/ libci/
-    - python setup.py develop
-    - python docs/generate-module-page.py
-    - make -C docs/ html
-    - chmod u=rw,go= docs/citool-doc.key
-    - rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i docs/citool-doc.key" docs/build/html/ citool-doc@liver3.lab.eng.brq.redhat.com:/home/citool-doc/public_html
+#
+# DEPLOY steps
+#
+
+# Upload documentation to the remote location
+upload-docs:
+  stage: deploy
   only:
-    - master
+    - master@baseos-qe/citool
+  dependencies:
+    - generate-docs
+  script:
+    - rsync -avz -e "ssh $SSH_OPTIONS" docs/build/html/ $DOCS_UPLOAD
+
+
+# Upload coverage report to the remote location
+upload-coverage:
+  stage: deploy
+  only:
+    - master@baseos-qe/citool
+  dependencies:
+    - unit-tests
+  script:
+    - rsync -avz -e "ssh $SSH_OPTIONS" coverage-report/ $COVERAGE_UPLOAD
