@@ -20,3 +20,11 @@ class NonLoadingCI(libci.CI):
 
     def _load_config(self):
         pass
+
+
+def create_module(module_class, ci_class=NonLoadingCI):
+    ci = ci_class()
+    mod = module_class(ci)
+    mod.add_shared()
+
+    return ci, mod
