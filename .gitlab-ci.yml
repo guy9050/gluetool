@@ -28,6 +28,15 @@ build:
   only:
     - master
 
+coverage:
+  script:
+    - python setup.py develop
+    - tox -e py27 -- --cov=libci --cov-report=html:coverage-report
+    - chmod u=rw,go= docs/citool-doc.key
+    - rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i docs/citool-doc.key" coverage-report/ citool-doc@liver3.lab.eng.brq.redhat.com:/home/citool-doc/public_html/coverage-report
+  only:
+    - master
+
 docs:
   script:
     - pip install -r requirements.txt
