@@ -90,7 +90,7 @@ class RestraintScheduler(libci.Module):
             '--arch', 'x86_64',  # limit to x86_64, we're dealing with openstack - I know :(
             '--restraint',
             '--suppress-install-task',
-            '--first-testing-task', 'NVR={} /distribution/runtime_tests/verify-nvr-installed'.format(task.nvr)
+            '--first-testing-task', '/distribution/runtime_tests/verify-nvr-installed'
         ] + distro_option + options
 
         for name, value in task_params.iteritems():

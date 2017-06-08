@@ -270,7 +270,7 @@ class CIWow(Module):
 
             verify_option = [
                 '--first-testing-task',
-                'NVR={} /distribution/runtime_tests/verify-nvr-installed'.format(task.nvr)
+                '/distribution/runtime_tests/verify-nvr-installed'
             ]
 
         else:
