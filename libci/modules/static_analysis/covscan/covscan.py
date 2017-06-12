@@ -216,12 +216,12 @@ class CICovscan(Module):
         covscan_result.download_artifacts()
 
         if covscan_result.added:
-            self.info('FAIL: New defects in package.')
-            overall_result = 'FAIL'
+            self.info('FAILED: New defects in package.')
+            overall_result = 'FAILED'
 
         else:
-            self.info('PASS: No new defects in package.')
-            overall_result = 'PASS'
+            self.info('PASSED: No new defects in package.')
+            overall_result = 'PASSED'
 
         # Log in format expected by postbuild scripting
         self.info('Result of testing: {}'.format(overall_result))
