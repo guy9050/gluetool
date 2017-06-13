@@ -472,11 +472,7 @@ class CIBrewDispatcher(Module):
                     # [wow-job, --option1, --option2, ...]
                     command_module = splitted[0]
                     if command_module not in self.job_result_types:
-                        msg = 'Cannot add recipients to {} pipeline'.format(command_module)
-
-                        self.warn(msg)
-                        self.ci.sentry_submit_warning(msg)
-
+                        self.warn('Cannot add recipients to {} pipeline'.format(command_module), sentry=True)
                         continue
 
                     result_type = self.job_result_types[splitted[0]]
