@@ -33,7 +33,7 @@ class CIGuessOpenstackImage(Module):
     * ``recent``: use ``--image`` option as a hint - a regular expression, with one matching group,
       that tells module what image names should be considered for selection, and which part of the
       image name is the key. Images are then sorted by their respective key values, and the most
-      recent one is used. E.g. ``--image 'Fedora-Cloud-Base-25-(\d+)\.\d'`` will use *date* part
+      recent one is used. E.g. ``--image 'Fedora-Cloud-Base-25-(\\d+)\\.\\d'`` will use *date* part
       of image name as a key (e.g. ``20170102``).
     """
 
