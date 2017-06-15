@@ -5,6 +5,7 @@ Various helpers.
 import errno
 import json
 import os
+import re
 import threading
 import subprocess
 import urllib2
@@ -393,3 +394,129 @@ def load_yaml(filepath, logger=None):
 
     except yaml.YAMLError as e:
         raise CIError("Unable to load YAML file '{}': {}".format(filepath, str(e)))
+
+
+class PatternMap(object):
+    # pylint: disable=too-few-public-methods
+
+    """
+    `Pattern map` is a list of ``<pattern>``: ``<converter>`` pairs. ``Pattern`` is a
+    regular expression used to match a string, ``converter`` is a function that transforms
+    a string into another one, accepting the pattern and the string as arguments.
+
+    It is defined in a YAML file:
+
+    .. code-block:: yaml
+
+       ---
+       - 'foo-(\\d+)': 'bar-\\1'
+       - 'baz-(\\d+)': 'baz, find_the_most_recent, append_dot'
+
+    Patterns are the keys in each pair, while ``converter`` is a string consisting of multiple
+    items, separated by comma. The first item is **always** a string, let's call it ``R``.
+    ``R``, given some string ``S1`` and the pattern, is used to transform ``S1`` to a new string,
+    ``S2``, by calling ``pattern.sub(R, S1)``. ``R`` can make use of anything :py:meth:`re.sub`
+    supports, including capturing groups.
+
+    If there are other items in the ``converter`` string, they are names of `spices`, additional
+    functions that will be called with ``pattern`` and the output of the previous spicing function,
+    starting with ``S2`` in the case of the first `spice`.
+
+    To allow spicing, user of ``PatternMap`` class must provide `spice makers` - mapping between
+    `spice` names and functions that generate spicing functions. E.g.:
+
+    .. code-block:: python
+
+       def create_spice_append_dot(previous_spice):
+           def _spice(pattern, s):
+               s = previous_spice(pattern, s)
+               return s + '.'
+           return _spice
+
+    ``create_spice_append_dot`` is a `spice maker`, used during creation of a pattern map after
+    its definition is read, ``_spice`` is the actual spicing function used during the transformation
+    process.
+
+    :param str filepath: Path to a YAML file with map definition.
+    :param dict spices: apping between `spices` and their `makers`.
+    :param libci.log.ContextLogger logger: Logger used for logging.
+    """
+
+    def __init__(self, filepath, spices=None, logger=None):
+        self.logger = logger or Logging.get_logger()
+        logger.connect(self)
+
+        spices = spices or {}
+
+        pattern_map = load_yaml(filepath, logger=self.logger)
+
+        if pattern_map is None:
+            raise CIError("pattern map '{}' does not contain any patterns".format(filepath))
+
+        def _create_simple_repl(repl):
+            def _replace(pattern, target):
+                """
+                Use `repl` to construct image from `target`, honoring all backreferences made by `pattern`.
+                """
+
+                self.debug("pattern '{}', repl '{}', target '{}'".format(pattern.pattern, repl, target))
+
+                try:
+                    return pattern.sub(repl, target)
+
+                except re.error as e:
+                    raise CIError("Cannot transform pattern '{}' with target '{}', repl '{}': {}".format(
+                        pattern.pattern, target, repl, str(e)))
+
+            return _replace
+
+        self._compiled_map = []
+
+        for pattern_dict in pattern_map:
+            if not isinstance(pattern_dict, dict):
+                raise CIError("Invalid format: '- <pattern>: <transform>' expected, '{}' found".format(pattern_dict))
+
+            pattern = pattern_dict.keys()[0]
+            converters = [s.strip() for s in pattern_dict[pattern].split(',')]
+
+            # first item in `converters` is always a simple string used by `pattern.sub()` call
+            converter = _create_simple_repl(converters.pop(0))
+
+            # if there any any items left, they name "spices" to apply, one by one,
+            # on the result of the first operation
+            for spice in converters:
+                if spice not in spices:
+                    raise CIError("Unknown 'spice' function '{}'".format(spice))
+
+                converter = spices[spice](converter)
+
+            try:
+                pattern = re.compile(pattern)
+
+            except re.error as e:
+                raise CIError("Pattern '{}' is not valid: {}".format(pattern, str(e)))
+
+            self._compiled_map.append((pattern, converter))
+
+    def match(self, s):
+        """
+        Try to match ``s`` by the map. If the match is found - the first one wins - then its
+        transformation is applied to the ``s``.
+
+        :rtype: str
+        :returns: if matched, output of the corresponding transformation.
+        """
+
+        self.debug("trying to match string '{}' with patterns in the map".format(s))
+
+        for pattern, converter in self._compiled_map:
+            self.debug("testing pattern '{}'".format(pattern.pattern))
+
+            match = pattern.match(s)
+            if match is None:
+                continue
+
+            self.debug('  matched!')
+            return converter(pattern, s)
+
+        raise CIError("Could not match string '{}' with any pattern".format(s))
