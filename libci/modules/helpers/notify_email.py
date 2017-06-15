@@ -52,7 +52,7 @@ CI pipeline was halted due to the following error:
 {msg}
 """
 
-WOW_BODY = """
+BEAKER_BODY = """
 Result:         {result.overall_result}
 Beaker matrix:  {beaker_matrix_url}
 
@@ -455,11 +455,11 @@ to this option, and process environmental variables (default: {})""".format(DEFA
                                         reserved=reserved_body.strip(),
                                         **kwargs)
 
-    def format_result_wow(self, result, msg):
+    def format_result_beaker(self, result, msg):
         # pylint: disable=no-self-use
         beaker_matrix_url = self._format_result_url(result, 'beaker_matrix', '<Beaker matrix URL not available>')
 
-        self._format_beaker_like_body(result, msg, WOW_BODY, beaker_matrix_url=beaker_matrix_url)
+        self._format_beaker_like_body(result, msg, BEAKER_BODY, beaker_matrix_url=beaker_matrix_url)
 
     def format_result_rpmdiff_analysis(self, result, msg):
         # pylint: disable=no-self-use

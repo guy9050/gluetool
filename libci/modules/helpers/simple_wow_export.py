@@ -95,7 +95,7 @@ class SimpleWowExport(libci.Module):
         for result in results:
             self.debug('result:\n{}'.format(result))
 
-            if result.test_type not in ('wow', 'restraint'):
+            if result.test_type not in ('beaker', 'restraint'):
                 continue
 
             records.append(self._format_record(task, result))

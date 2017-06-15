@@ -76,8 +76,8 @@ class CIMakeBusMessages(Module):
 
         self.store(result.test_type, Message(headers=headers, body=body))
 
-    def process_wow(self, result):
-        self.process_ci_metricsdata(result, 'wow')
+    def process_beaker(self, result):
+        self.process_ci_metricsdata(result, 'beaker')
 
     def process_restraint(self, result):
         self.process_ci_metricsdata(result, 'restraint')

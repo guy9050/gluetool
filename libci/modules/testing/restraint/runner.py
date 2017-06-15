@@ -61,7 +61,7 @@ class RestraintRunner(libci.Module):
     It can make use of snapshots (if supported by guests) to isolate each test, and
     it's able to parallelize tests.
 
-    The results are provided in the form similar to what wow module does - short summary
+    The results are provided in the form similar to what beaker module does - short summary
     in console log, artifact file, and shared function to publish results for later
     modules as well.
     """
@@ -183,7 +183,7 @@ class RestraintRunner(libci.Module):
         restraint produces `job.xml` which carries pile of logs, results and so on.
         We open `job.xml`, and find all necessary data to construct dictionaries,
         one for each task, carrying "results" of the task, in a structure very
-        similar to the one produced by `wow` module.
+        similar to the one produced by `beaker` module.
 
         :returns: { <task name>: <task runs> }
         """

@@ -4,13 +4,13 @@ from libci import CIError
 from libci import utils
 
 # Jenkins Job Builder YAML
-JOB_NAME = 'ci-wow'
+JOB_NAME = 'ci-beaker'
 
 # required cmdline tools
 REQUIRED_CMDS = ['jenkins-jobs']
 
 
-class CIWowJob(Module):
+class BeakerJob(Module):
     """
 CI bkr workflow-tomorrow job module
 
@@ -21,13 +21,13 @@ job, where id is exported by the redhat-ci-plugin. The id can be
 also passed as an argument.
 
 The jenkins job is defined via a Jenkins Job Builder yaml file:
-    ci-wow
+    ci-beaker
 
 Important note:
 This module requires an available Jenkins connection - via the jenkins module.
 """
 
-    name = 'wow-job'
+    name = 'beaker-job'
     description = 'Create and run beaker workflow-tomorrow job'
 
     options = {
