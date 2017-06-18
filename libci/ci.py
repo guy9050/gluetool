@@ -579,7 +579,20 @@ class CI(Configurable):
 
         self._sentry.captureMessage(msg, **kwargs)
 
-    # add a shared function, overwrite if exists
+    def _add_shared(self, funcname, module, func):
+        """
+        Register a shared function. Overwrite previously registered function
+        with the same name, if there was any such.
+
+        This is a helper method for easier testability. It is not a part of public API of this class.
+
+        :param str funcname: Name of the shared function.
+        :param libci.ci.Module module: Module instance providing the shared function.
+        :param callable func: Shared function.
+        """
+
+        self.shared_functions[funcname] = (module, func)
+
     def add_shared(self, funcname, module):
         """
         Register a shared function. Overwrite previously registered function
@@ -592,7 +605,7 @@ class CI(Configurable):
         if not hasattr(module, funcname):
             raise CIError("No such shared function '{}' of module '{}'".format(funcname, module.name))
 
-        self.shared_functions[funcname] = (module, getattr(module, funcname))
+        self._add_shared(funcname, module, getattr(module, funcname))
 
     # delete a shared function if exists
     def del_shared(self, funcname):

@@ -2,7 +2,7 @@ import pytest
 
 import libci
 
-from . import NonLoadingCI, Caplog
+from . import NonLoadingCI
 
 
 def _get_mod():
@@ -46,9 +46,7 @@ def test_sanity(tmpdir):
     assert output.stderr == ''
 
 
-def test_error(caplog, tmpdir):
-    caplog = Caplog(caplog)
-
+def test_error(log, tmpdir):
     ci, _ = _get_mod()
 
     playbook = tmpdir.join('error-playbook.yml')
@@ -65,12 +63,10 @@ def test_error(caplog, tmpdir):
       when: FOO_VAR is not defined
 """)
 
-    caplog.clear()
-
     with pytest.raises(libci.CIError, message='Failure during Ansible playbook execution. See log for details.'):
         ci.shared('run_playbook', str(playbook), ['127.0.0.1'])
 
-    assert caplog.records[-1].message == 'Ansible says: FOO_VAR variable is not defined'
+    assert log.records[-1].message == 'Ansible says: FOO_VAR variable is not defined'
 
 
 def test_extra_vars(tmpdir):

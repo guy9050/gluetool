@@ -49,7 +49,7 @@ def test_sanity(module, result):
     assert result in results2
 
 
-def test_store_not_set(caplog, module, result):
+def test_store_not_set(log, module, result):
     """
     Module should not save anything when --results-file is not set.
     """
@@ -60,14 +60,16 @@ def test_store_not_set(caplog, module, result):
 
     # pylint: disable=protected-access
     assert mod._config['results-file'] is None
-    caplog.handler.records = []
+
+    # clear caplog because ci.shared might have produced something
+    log.clear()
     mod.destroy()
 
     # when results are saved, module reports that to user
-    assert not caplog.handler.records
+    assert not log.records
 
 
-def test_store(caplog, module, result, tmpdir):
+def test_store(log, module, result, tmpdir):
     """
     Store test result into a file.
     """
@@ -80,11 +82,12 @@ def test_store(caplog, module, result, tmpdir):
     # pylint: disable=protected-access
     mod._config['results-file'] = str(results_file)
 
-    caplog.handler.records = []
+    # clear caplog because ci.shared might have produced something
+    log.clear()
     mod.destroy()
 
-    assert len(caplog.records) == 1
-    assert caplog.records[0].message == "Results saved into '{}'".format(str(results_file))
+    assert len(log.records) == 1
+    assert log.records[0].message == "Results saved into '{}'".format(str(results_file))
 
     with open(str(results_file), 'r') as f:
         written_results = json.load(f)

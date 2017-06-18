@@ -4,7 +4,7 @@ import pytest
 import libci
 import libci.modules.helpers.guess_openstack_image
 
-from . import NonLoadingCI
+from . import create_module
 
 
 # Mock OpenStack machinery - <client>.images interface
@@ -39,14 +39,6 @@ def inject_openstack(ci, module, images):
 
     module.openstack = _openstack
     ci.add_shared('openstack', module)
-
-
-def create_module(module_class, ci_class=NonLoadingCI):
-    ci = ci_class()
-    mod = module_class(ci)
-    mod.add_shared()
-
-    return ci, mod
 
 
 @pytest.fixture(name='module')

@@ -1,5 +1,7 @@
 # pylint: disable=blacklisted-name
 
+import yaml
+
 import libci
 
 
@@ -29,7 +31,7 @@ class NonLoadingCI(libci.CI):
         pass
 
 
-class Caplog(object):
+class CaplogWrapper(object):
     """
     Thin wrapper around pytest's caplog plugin.
     """
@@ -55,3 +57,9 @@ def create_module(module_class, ci_class=NonLoadingCI):
     mod.add_shared()
 
     return ci, mod
+
+
+def create_yaml(tmpdir, name, data):
+    f = tmpdir.join(name)
+    f.write(yaml.dump(data))
+    return f
