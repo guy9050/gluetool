@@ -469,7 +469,7 @@ class CIBrewDispatcher(Module):
                     splitted = shlex.split(command)
                     self.debug('splitted command: {}'.format(splitted))
 
-                    # [wow-job, --option1, --option2, ...]
+                    # [beaker-job, --option1, --option2, ...]
                     command_module = splitted[0]
                     if command_module not in self.job_result_types:
                         msg = 'Cannot add recipients to {} pipeline'.format(command_module)

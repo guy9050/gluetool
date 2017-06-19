@@ -43,7 +43,7 @@ this situation.
         super(NoTestAvailableError, self).__init__('No tests provided for the component')
 
 
-class WowTestResult(TestResult):
+class BeakerTestResult(TestResult):
     # pylint: disable=too-few-public-methods
 
     def __init__(self, overall_result, matrix_url, **kwargs):
@@ -51,24 +51,22 @@ class WowTestResult(TestResult):
             'beaker_matrix': matrix_url
         }
 
-        super(WowTestResult, self).__init__('wow', overall_result, urls=urls, **kwargs)
+        super(BeakerTestResult, self).__init__('beaker', overall_result, urls=urls, **kwargs)
 
 
-class CIWow(Module):
+class Beaker(Module):
     """
-    This module wraps workflow-tomorrow, beaker-jobwatch and tcms-results, using them
-    to create a simple testing pipeline for given build.
+    This module runs test on Beaker boxes with beah harness.
 
-    w-t is used to kick of beaker jobs, using options passed by user. beaker-jobwatch
-    than babysits jobs, and if everything goes well, tcms-results are used to gather
-    results and create a simple summary.
+    Needs some else to actualy provide the job XML (e.g. :py:mod:`libci.modules.testing.wow.WorkflowTomorrow`),
+    then submits this XML to the Beaker, babysits it with ``beaker-jobwatch``, and finally gets a summary
+    using ``tcms-results``.
     """
 
-    name = 'wow'
+    name = 'beaker'
+    description = 'Runs tests on Beaker boxes.'
+
     options = {
-        'wow-options': {
-            'help': 'Additional options for workflow-tomorrow'
-        },
         'jobwatch-options': {
             'help': 'Additional options for beaker-jobwatch'
         },
@@ -90,9 +88,6 @@ class CIWow(Module):
         # pylint: disable=too-many-statements
 
         utils.check_for_commands(REQUIRED_COMMANDS)
-
-        if not self.option('wow-options'):
-            raise NoTestAvailableError()
 
         for path in TCMS_RESULTS_LOCATIONS:
             try:
@@ -248,73 +243,33 @@ class CIWow(Module):
         # Replace the original TaskAggregator class with our custom version
         tcms_results.TaskAggregator = TaskAggregator
 
-    def _run_wow(self, task, distro, options):
+    def _run_wow(self):
         """
-        Run workflow-tomorrow to create beaker jobs, using options we
-        got from the user.
+        Create job XML and submit it to beaker.
 
-        :param task: brew task info, as returned by `brew_task` shared function
-        :param str distro: distribution to install.
-        :param list options: additional options, usualy coming from wow-options option.
         :returns: ([job #1 ID, job #2 ID, ...], <job />)
         """
 
-        distro_option = ['--distro={}'.format(distro)] if distro else []
+        task = self.shared('brew_task')
 
-        if task:
-            install_option = [
-                '--brew-task={}'.format(task.task_id)
+        options = []
+
+        if task is not None:
+            options += [
+                '--brew-task', str(task.task_id),
+                '--first-testing-task', '/distribution/runtime_tests/verify-nvr-installed',
+                '--whiteboard',
+                'CI run {} brew task id {} build target {}'.format(task.nvr, task.task_id, task.target.target)
             ]
-
-            verify_option = [
-                '--first-testing-task',
-                '/distribution/runtime_tests/verify-nvr-installed'
-            ]
-
-        else:
-            install_option = []
-            verify_option = []
-
-        whiteboard = 'CI run {} brew task id {} build target {}'.format(task.nvr, task.task_id, task.target.target)
-
-        # wow
-        task_params = {
-            'BASEOS_CI': 'true',
-            'BASEOS_CI_COMPONENT': str(task.component)
-        }
-
-        command = [
-            'bkr', 'workflow-tomorrow',
-            '--whiteboard', whiteboard,
-            '--decision'
-        ] + distro_option + install_option + verify_option + options
-
-        for name, value in task_params.iteritems():
-            command += ['--taskparam', '{}={}'.format(name, value)]
 
         # we could use --reserve but we must be sure the reservesys is *the last* taskin the recipe
         # users may require their own "last" tasks and --last-task is mightier than mere --reserve.
         if self.option('reserve'):
-            command += ['--last-task', 'RESERVETIME={}h /distribution/reservesys'.format(self.option('reserve-time'))]
+            options += ['--last-task', 'RESERVETIME={}h /distribution/reservesys'.format(self.option('reserve-time'))]
         else:
-            command += ['--no-reserve']
+            options += ['--no-reserve']
 
-        command += ['--dryrun']
-
-        self.info("running 'workflow-tomorrow':\n{}".format(utils.format_command_line([command])))
-
-        try:
-            output = run_command(command)
-
-        except CICommandError as exc:
-            # Check for most common causes, and raise soft error where necessary
-            if 'No relevant tasks found in test plan' in exc.output.stderr:
-                raise NoTestAvailableError()
-
-            if 'No recipe generated (no relevant tasks?)' in exc.output.stderr:
-                raise NoTestAvailableError()
-
-            raise CIError("Failure during 'wow' execution: {}".format(exc.output.stderr))
+        output = self.shared('beaker_job_xml', options=options)
 
         job = bs4.BeautifulSoup(output.stdout, 'xml')
 
@@ -476,12 +431,6 @@ class CIWow(Module):
         return 'PASS', self._processed_results, matrix_url
 
     def execute(self):
-        task = self.shared('brew_task')
-        if task is None:
-            raise CIError('no brew build found, did you run brew module')
-
-        distro = self.shared('distro')
-
         def _command_options(name):
             opts = self.option(name)
             if opts is None or not opts:
@@ -489,11 +438,10 @@ class CIWow(Module):
 
             return shlex.split(opts)
 
-        wow_options = _command_options('wow-options')
         jobwatch_options = _command_options('jobwatch-options')
 
         # workflow-tomorrow
-        job_ids, job = self._run_wow(task, distro, wow_options)
+        job_ids, job = self._run_wow()
 
         # beaker-jobwatch
         jobwatch_output = self._run_jobwatch(job_ids, job, jobwatch_options)
@@ -503,4 +451,4 @@ class CIWow(Module):
 
         self.info('Result of testing: {}'.format(overall_result))
 
-        publish_result(self, WowTestResult, overall_result, matrix_url, payload=processed_results)
+        publish_result(self, BeakerTestResult, overall_result, matrix_url, payload=processed_results)

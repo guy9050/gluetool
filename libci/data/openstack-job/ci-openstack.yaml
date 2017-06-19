@@ -79,6 +79,7 @@
              notify-recipients ${notify_recipients_options} \
              ansible \
              guest-setup --playbooks=${CITOOL_CONFIG}/guest-setup/openstack-restraint.yaml \
+             wow --wow-options="${wow_options}" \
              jenkins \
              openstack ${openstack_opts} \
              testing-results \
@@ -86,7 +87,7 @@
              brew-build-name \
              guess-beaker-distro ${guess_beaker_distro_options} \
              guess-openstack-image ${guess_openstack_image_options} \
-             restraint-scheduler --wow-options="${wow_options}" \
+             restraint-scheduler \
              restraint-runner ${restraint_runner_options} \
              notify-email --add-frontend-url ${notify_email_options} ${notify_email_opts} \
              ${pipeline_append}

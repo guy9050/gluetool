@@ -2,7 +2,7 @@ from libci import CIError, CICommandError, Module
 from libci.utils import check_for_commands, run_command, load_yaml
 
 REQUIRED_CMDS = ['brew']
-TEST_TYPES = ['wow', 'restraint']
+TEST_TYPES = ['beaker', 'restraint']
 
 
 class CIBrewTagBuild(Module):

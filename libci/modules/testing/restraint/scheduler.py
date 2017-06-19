@@ -2,7 +2,7 @@ import shlex
 import bs4
 
 import libci
-from libci import utils, CIError, SoftCIError, CICommandError
+from libci import utils, CIError, SoftCIError
 
 
 class NoTestAvailableError(SoftCIError):
@@ -39,12 +39,6 @@ class RestraintScheduler(libci.Module):
 
     name = 'restraint-scheduler'
 
-    options = {
-        'wow-options': {
-            'help': 'Additional options for workflow-tomorrow'
-        }
-    }
-
     shared_functions = ['schedule']
 
     _schedule = None
@@ -59,55 +53,27 @@ class RestraintScheduler(libci.Module):
 
         return self._schedule
 
-    def _run_wow(self, task, distro, options):
+    def _run_wow(self):
         """
         Run workflow-tomorrow to create beaker job description, using options we
         got from the user.
 
-        :param task: brew task info, as returned by `brew_task` shared function
-        :param str distro: distribution to install.
-        :param list options: additional options, usualy coming from wow-options option.
         :returns: libci.utils.ProcessOutput with the output of w-t.
         """
 
         self.info('running workflow-tomorrow to get job description')
 
-        distro_option = ['--distro={}'.format(distro)] if distro else []
-
-        # wow
-        task_params = {
-            'BASEOS_CI': 'true',
-            'BASEOS_CI_COMPONENT': str(task.component)
-        }
-
-        command = [
-            'bkr', 'workflow-tomorrow',
-            '--dry',  # this will make wow to print job description in XML
+        options = [
             '--single',  # ignore multihost tests
             '--no-reserve',  # don't reserve hosts
-            '--decision',  # show desicions about including/not including task in the job
             '--hardware-skip',  # ignore tasks with specific hardware requirements
             '--arch', 'x86_64',  # limit to x86_64, we're dealing with openstack - I know :(
             '--restraint',
             '--suppress-install-task',
             '--first-testing-task', '/distribution/runtime_tests/verify-nvr-installed'
-        ] + distro_option + options
+        ]
 
-        for name, value in task_params.iteritems():
-            command += ['--taskparam', '{}={}'.format(name, value)]
-
-        try:
-            return libci.utils.run_command(command)
-
-        except CICommandError as exc:
-            # Check for most common causes, and raise soft error where necessary
-            if 'No relevant tasks found in test plan' in exc.output.stderr:
-                raise NoTestAvailableError()
-
-            if 'No recipe generated (no relevant tasks?)' in exc.output.stderr:
-                raise NoTestAvailableError()
-
-            raise CIError("Failure during 'wow' execution: {}".format(exc.output.stderr))
+        return self.shared('beaker_job_xml', options=options)
 
     def _setup_guest(self, task_id, guest):
         # pylint: disable=no-self-use
@@ -187,10 +153,6 @@ class RestraintScheduler(libci.Module):
         for guest, recipe_set in self._schedule:
             libci.utils.log_blob(self.debug, str(guest), recipe_set.prettify())
 
-    def sanity(self):
-        if not self.option('wow-options'):
-            raise NoTestAvailableError()
-
     def execute(self):
         task = self.shared('brew_task')
         if task is None:
@@ -200,8 +162,6 @@ class RestraintScheduler(libci.Module):
         if image is None:
             raise CIError('No image provided, did you run guess-*-image module?')
 
-        distro = self.shared('distro')
-
         def _command_options(name):
             opts = self.option(name)
             if opts is None or not opts:
@@ -209,10 +169,8 @@ class RestraintScheduler(libci.Module):
 
             return shlex.split(opts)
 
-        wow_options = _command_options('wow-options')
-
         # workflow-tomorrow
-        wow_output = self._run_wow(task, distro, wow_options)
+        wow_output = self._run_wow()
 
         job = bs4.BeautifulSoup(wow_output.stdout, 'xml')
         self.debug('job as planned by wow:\n{}'.format(job.prettify()))

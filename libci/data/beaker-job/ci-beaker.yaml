@@ -1,12 +1,12 @@
 ---
 
 - job:
-    name: 'ci-wow'
+    name: 'ci-beaker'
     node: beaker
     description: |
-        Run testing via beaker workflow tomorrow.
+        Run testing on Beaker boxes.
     concurrent: true
-    display-name: 'ci-wow'
+    display-name: 'ci-beaker'
     parameters:
       - bool:
           name: reserve
@@ -65,12 +65,13 @@
           citool -c -i -o citool-debug.txt \
             ${pipeline_prepend} \
             notify-recipients ${notify_recipients_options} \
+            wow --wow-options="${wow_options}" ${wow_opts} \
             jenkins \
             testing-results \
             brew --id $id \
             brew-build-name \
             guess-beaker-distro ${guess_distro_options} \
-            wow --wow-options="${wow_options}" --jobwatch-options="${jobwatch_options}" ${wow_opts} \
+            beaker --jobwatch-options="${jobwatch_options}" \
             notify-email --add-frontend-url ${notify_email_options} ${notify_email_opts} \
             ${pipeline_append}
     properties:
