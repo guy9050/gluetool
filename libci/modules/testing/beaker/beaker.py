@@ -331,20 +331,13 @@ class Beaker(Module):
                 '--end-task={}'.format(task) for task in next_to_last_tasks.iterkeys()
             ]
 
-        self.info("running 'beaker-jobwatch':\n{}".format(utils.format_command_line([command])))
-
-        command = ['bash', '-c', '{} | tee beaker-jobwatch.log'.format(' '.join(command))]
+        self.info("running 'beaker-jobwatch' to babysit the jobs")
 
         try:
-            output = run_command(command, stdout=utils.PARENT, stderr=utils.PARENT)
+            output = run_command(command, inspect=True)
 
         except CICommandError as exc:
             raise CIError("Failure during 'jobwatch' execution: {}".format(exc.output.stderr))
-
-        self.debug('output of beaker-jobwatch is stored in beaker-jobwatch.log')
-
-        with open('beaker-jobwatch.log', 'r') as f:
-            output.stdout = f.read().strip()
 
         return output
 
@@ -368,7 +361,7 @@ class Beaker(Module):
         # duration: 3:39:03.805050
         # finished successfully
 
-        jobwatch_log = jobwatch_log.split('\n')
+        jobwatch_log = jobwatch_log.strip().split('\n')
 
         if len(jobwatch_log) < 3:
             raise CIError('jobwatch output is unexpectedly short')

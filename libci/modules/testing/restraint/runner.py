@@ -7,14 +7,9 @@ import enum
 import bs4
 
 import libci
-from libci.utils import format_dict, treat_url
+from libci.utils import format_dict, treat_url, log_blob
 from libci.results import TestResult, publish_result
 
-
-SSH_KEX_RETRIES = 5
-# pylint: disable=line-too-long
-SSH_KEX_ERROR = """Error connecting to ssh: kex error : no match for method server host key algo: server [ssh-rsa,ssh-dss], client [ecdsa-sha2-nistp256]
-Failed to establish ssh tunnel [restraint-error-quark, 14]"""
 
 DEFAULT_RESTRAINT_PORT = 8081
 
@@ -309,45 +304,28 @@ class RestraintRunner(libci.Module):
             f.write(job_desc)
             f.flush()
 
-            for _ in range(0, SSH_KEX_RETRIES):
-                try:
-                    output = libci.utils.run_command([
-                        'restraint', '-v',
-                        '--host', '1={}@{}'.format(guest.username, self._guest_restraint_address(guest)),
-                        '--job', f.name
-                    ], logger=guest.logger)
+            try:
+                output = libci.utils.run_command([
+                    'restraint', '-v',
+                    '--host', '1={}@{}'.format(guest.username, self._guest_restraint_address(guest)),
+                    '--job', f.name
+                ], logger=guest.logger, inspect=True)
 
-                    break
+            except libci.CICommandError as e:
+                output = e.output
 
-                except libci.CICommandError as e:
-                    output = e.output
+                self.debug('restraint exited with invalid exit code {}'.format(output.exit_code))
 
-                    self.debug('restraint exited with invalid exit code {}'.format(output.exit_code))
+                if output.exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_RESULT_ERROR:
+                    # "One or more tasks failed" error - this is a good, well behaving error.
+                    # We can safely move on and process results stored in restraint's directory.
+                    self.info('restraint reports: One or more tasks failed')
 
-                    if output.exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_RESULT_ERROR:
-                        # "One or more tasks failed" error - this is a good, well behaving error.
-                        # We can safely move on and process results stored in restraint's directory.
-                        self.info('restraint reports: One or more tasks failed')
-                        break
-
-                    if output.exit_code == RestraintExitCodes.RESTRAINT_SSH_ERROR \
-                            and output.stderr.strip() == SSH_KEX_ERROR:
-                        # This happens quite often, right after guest setup phase ends. Only workaround known to me
-                        # is to try once again. By comparing the exact error message I'd like to make sure
-                        # I'm not mistaking one error for another.
-                        self.warn('ssh-kex error reported by restraint, another attempt might help')
-                        continue
-
+                else:
                     raise libci.CIError('restraint command exited with return code {}: {}'.format(
                         output.exit_code, output.stderr))
 
-            else:
-                # output was set by "except" branch, and it's leftover after SSH-KEX error branch,
-                # no other could lead to "else" branch of this loop
-                raise libci.CIError('restraint command exited with return code {}: {}'.format(output.exit_code,
-                                                                                              output.stderr))
-
-        self.info('Task set output:\n{}'.format(output.stdout))
+        log_blob(self.info, 'Task set output', output.stdout)
 
         result = self._gather_task_set_results(guest, output.stdout)
         self.debug('task set result:\n{}'.format(format_dict(result)))

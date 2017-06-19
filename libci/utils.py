@@ -2,12 +2,15 @@
 Various helpers.
 """
 
+import collections
 import errno
 import json
 import os
 import re
-import threading
 import subprocess
+import sys
+import threading
+import time
 import urllib2
 import yaml
 
@@ -24,15 +27,13 @@ try:
 except ImportError:
     DEVNULL = open(os.devnull, 'wb')
 
-# Use this constant to order run_command to pass child's output stream
-# to its parent's corresponding stream.
-#
-# I don't want this to collide with any subprocess constant, or possible filename
-PARENT = (17,)
+
+BLOB_HEADER = '---v---v---v---v---v---'
+BLOB_FOOTER = '---^---^---^---^---^---'
 
 
 def log_blob(logger, intro, blob):
-    logger("{}:\n---v---v---v---v---v---\n{}\n---^---^---^---^---^---".format(intro, blob))
+    logger("{}:\n{}\n{}\n{}".format(intro, BLOB_HEADER, blob, BLOB_FOOTER))
 
 
 class ThreadAdapter(ContextAdapter):
@@ -87,6 +88,60 @@ class WorkerThread(threading.Thread):
             self.debug('worker thread finished')
 
 
+class StreamReader(object):
+    def __init__(self, stream, block=16):
+        """
+        Wrap blocking ``stream`` with a reading thread. The threads read from
+        the (normal, blocking) `stream` and adds bits and pieces into the `queue`.
+        ``StreamReader`` user then can check the `queue` for new data.
+        """
+
+        self._stream = stream
+
+        # List would fine as well, however deque is better optimized for
+        # FIFO operations, and it provides the same thread safety.
+        self._queue = collections.deque()
+        self._content = []
+
+        def _enqueue():
+            """
+            Read what's available in stream and add it into the queue
+            """
+
+            while True:
+                data = self._stream.read(block)
+
+                if not data:
+                    # signal EOF
+                    self._queue.append('')
+                    return
+
+                self._queue.append(data)
+                self._content.append(data)
+
+        self._thread = threading.Thread(target=_enqueue)
+        self._thread.daemon = True
+        self._thread.start()
+
+    @property
+    def name(self):
+        return self._stream.name
+
+    @property
+    def content(self):
+        return ''.join(self._content)
+
+    def wait(self):
+        self._thread.join()
+
+    def read(self):
+        try:
+            return self._queue.popleft()
+
+        except IndexError:
+            return None
+
+
 class ProcessOutput(object):
     """
     Result of external process.
@@ -114,7 +169,7 @@ class ProcessOutput(object):
             log_blob(logger, stream, content)
 
 
-def run_command(cmd, logger=None, **kwargs):
+def run_command(cmd, logger=None, inspect=False, inspect_callback=None, **kwargs):
     """
     Run external command, and return it's exit code and output.
 
@@ -126,10 +181,31 @@ def run_command(cmd, logger=None, **kwargs):
     will set them to :py:const:`subprocess.PIPE`, to capture both output streams
     in separate strings.
 
+    By default, output of the process is captured for both ``stdout`` and ``stderr``,
+    and returned back to the caller. Under some conditions, caller might want to see
+    the output in "real-time". For that purpose, it can pass callable via ``inspect``
+    parameter - such callable will be called for every received bit of input on both
+    ``stdout`` and ``stderr``. E.g.
+
+    .. code-block:: python
+
+       def foo(stream, s):
+         if s is not None and 'a' in s:
+           print s
+
+       run_command(['/bin/foo'], inspect=foo)
+
+    This example will print all substrings containing letter `a`. Strings passed to ``foo``
+    may be of arbitrary lengths, and may change between subsequent calls of ``run_command``.
+
     :param list cmd: command to execute.
+    :param libci.log.ContextAdapter logger: parent logger whose methods will be used for logging.
+    :param bool inspect: if set, ``inspect_callback`` will receive the output of command in "real-time".
+    :param callable inspect_callback: callable that will receive command output. If not set,
+        default "write to ``sys.stdout``" is used.
     :rtype: libci.utils.ProcessOutput instance
     :returns: :py:class:`libci.utils.ProcessOutput` instance whose attributes contain
-      data returned by the process.
+        data returned by the process.
     :raises libci.ci.CIError: when command was not found.
     :raises libci.ci.CICommandError: when command exited with non-zero exit code.
     :raises Exception: when anything else breaks.
@@ -156,20 +232,12 @@ def run_command(cmd, logger=None, **kwargs):
             return 'DEVNULL'
         if stream == subprocess.STDOUT:
             return 'STDOUT'
-        if stream == PARENT:
-            return 'PARENT'
         return stream
 
     printable_kwargs = kwargs.copy()
     for stream in ('stdout', 'stderr'):
         if stream in printable_kwargs:
             printable_kwargs[stream] = _format_stream(printable_kwargs[stream])
-
-    if kwargs['stdout'] == PARENT:
-        del kwargs['stdout']
-
-    if kwargs['stderr'] == PARENT:
-        del kwargs['stderr']
 
     # Make tests happy by sorting kwargs - it's a dictionary, therefore
     # unpredictable from the observer's point of view. Can print its entries
@@ -181,13 +249,70 @@ def run_command(cmd, logger=None, **kwargs):
     try:
         p = subprocess.Popen(cmd, **kwargs)
 
+        if inspect is True:
+            # let's capture *both* streams - capturing just a single one leads to so many ifs
+            # and elses and messy code
+            p_stdout = StreamReader(p.stdout)
+            p_stderr = StreamReader(p.stderr)
+
+            if inspect_callback is None:
+                def stdout_write(stream, data):
+                    # pylint: disable=unused-argument
+
+                    if data is None:
+                        return
+
+                    # Not suitable for multiple simultaneous commands. Shuffled output will
+                    # ruin your day. And night. And few following weeks, full of debugging, as well.
+                    sys.stdout.write(data)
+
+                inspect_callback = stdout_write
+
+            inputs = (p_stdout, p_stderr)
+
+            logger.info('{} Output of command: {}'.format(BLOB_HEADER, format_command_line([cmd])))
+
+            logger.debug("output of command is inspected by the caller")
+            logger.debug('following blob-like header and footer are expected to be empty')
+            logger.debug('the captured output will follow them')
+
+            # As long as process runs, keep calling callbacks with incoming data
+            while True:
+                for stream in inputs:
+                    inspect_callback(stream, stream.read())
+
+                if p.poll() is not None:
+                    break
+
+                # give up OS' attention and let others run
+                time.sleep(0.1)
+
+            # OK, process finished but we have to wait for our readers to finish as well
+            p_stdout.wait()
+            p_stderr.wait()
+
+            for stream in inputs:
+                while True:
+                    data = stream.read()
+
+                    if data in ('', None):
+                        break
+
+                    inspect_callback(stream, data)
+
+            logger.info('{} End of command output'.format(BLOB_FOOTER))
+
+            stdout, stderr = p_stdout.content, p_stderr.content
+
+        else:
+            stdout, stderr = p.communicate()
+
     except OSError as e:
         if e.errno == errno.ENOENT:
             raise CIError("Command '{}' not found".format(cmd[0]))
 
         raise e
 
-    stdout, stderr = p.communicate()
     exit_code = p.poll()
 
     output = ProcessOutput(cmd, exit_code, stdout, stderr, kwargs)
