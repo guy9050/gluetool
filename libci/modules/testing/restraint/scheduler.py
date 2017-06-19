@@ -139,7 +139,8 @@ class RestraintScheduler(libci.Module):
         # get corresponding number of guests
         guests = self.shared('provision', count=len(recipe_sets), image=image)
 
-        assert guests is not None
+        if guests is None:
+            raise CIError('No guests found. Did you run a guests provider module, e.g. openstack?')
         assert len(guests) == len(recipe_sets)
 
         # there are tags that make not much sense for restraint - we'll filter them out
