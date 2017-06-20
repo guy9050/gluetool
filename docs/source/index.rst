@@ -12,6 +12,7 @@ Welcome to citool's documentation!
    :maxdepth: 1
 
    modules
+   howto-docs
 
 
 .. toctree::
