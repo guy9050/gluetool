@@ -1,8 +1,7 @@
-import re
 import bs4
 
 from libci import CIError, SoftCIError, Module
-from libci.utils import format_dict, fetch_url, cached_property, load_yaml
+from libci.utils import format_dict, fetch_url, cached_property, PatternMap
 
 
 DEFAULT_NIGHTLY_LISTING = 'http://download.eng.brq.redhat.com/nightly/'
@@ -79,42 +78,6 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
 
     @cached_property
     def pattern_map(self):
-        """
-        Pattern map is a list of pattern: transform pairs. Pattern is a regex pattern
-        used to match the build target, transform is either a string with backreferences,
-        describing how to use groups matched by the patter to construct a distro name, or
-        it's a string of multiple items, separated by comma - in that case, the first
-        item is a string used as already described, and the second item names a function
-        that should be applied to the result of that simple replacement.
-
-        This is transformed into a list (to keep the order) of tuples (pattern, transform).
-        Pattern is compiled regex pattern. If it matches the build target, transform is
-        called, with pattern and build target as arguments. It is expected to return
-        distro name.
-        """
-
-        pattern_map = load_yaml(self.option('pattern-map'), logger=self.logger)
-
-        if pattern_map is None:
-            raise CIError("pattern map '{}' does not contain any patterns".format(self.option('pattern-map')))
-
-        def _create_simple_repl(repl):
-            def _replace(pattern, target):
-                """
-                Use `repl` to construct distro from `target`, honoring all backreferences made by `pattern`.
-                """
-
-                self.debug("pattern '{}', repl '{}', target '{}'".format(pattern.pattern, repl, target))
-
-                try:
-                    return pattern.sub(repl, target)
-
-                except re.error as e:
-                    raise CIError("Cannot transform pattern '{}' with target '{}', repl '{}': {}".format(
-                        pattern.pattern, target, repl, str(e)))
-
-            return _replace
-
         def _create_buc_repl(hint_repl):
             def _replace(pattern, target):
                 """
@@ -143,42 +106,10 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
 
             return _replace
 
-        transform_spice = {
+        return PatternMap(self.option('pattern-map'), spices={
             'BUC': _create_buc_repl,
             'NIGHTLY': _create_nightly_repl
-        }
-
-        compiled_map = []
-
-        for pattern_dict in pattern_map:
-            if not isinstance(pattern_dict, dict):
-                raise CIError("Invalid format: '- <pattern>: <transform>' expected, '{}' found".format(pattern_dict))
-
-            pattern = pattern_dict.keys()[0]
-            transform = [s.strip() for s in pattern_dict[pattern].split(',')]
-
-            # first item in `transform` is always a "repl" for `pattern.sub()` call
-            replace = _create_simple_repl(transform[0])
-
-            if len(transform) > 1:
-                # second item is another function that's using our "replace" function
-                # for its own purposes, "spicing up" the transformation process
-
-                spice = transform_spice.get(transform[1], None)
-                if spice is None:
-                    raise CIError("Unknown transform function '{}'".format(transform[1]))
-
-                replace = spice(replace)
-
-            try:
-                pattern = re.compile(pattern)
-
-            except re.error as e:
-                raise CIError("Pattern '{}' is not valid: {}".format(pattern, str(e)))
-
-            compiled_map.append((pattern, replace))
-
-        return compiled_map
+        }, logger=self.logger)
 
     def _get_latest_finished_compose(self, base_url, hint):
         """
@@ -299,22 +230,8 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
 
         target = task.target.target
 
-        self.debug("trying to match target '{}'".format(target))
-
-        for pattern, transform in self.pattern_map:
-            self.debug("testing pattern '{}'".format(pattern.pattern))
-
-            match = pattern.match(target)
-            if match is None:
-                continue
-
-            self.debug('  matched')
-
-            self._distro = transform(pattern, target)
-            break
-
-        else:
-            raise CIError("could not translate build target '{}' to distro".format(target))
+        self._distro = self.pattern_map.match(target)
+        self.debug("transformed target '{}' to the distro '{}'".format(target, self._distro))
 
     def _guess_nightly(self):
         self._distro = self._find_nightly_for_distro(self.option('distro'))

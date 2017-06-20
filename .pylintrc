@@ -1,7 +1,7 @@
 [BASIC]
 max-branches=15
 max-attributes=15
-good-names=_,e,f,g,i,p,ci
+good-names=_,e,f,g,i,p,s,ci
 defining-attr-methods=__init__,sanity
 generated-members=debug,verbose,info,warn,error,exception
 max-line-length=120
