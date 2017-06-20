@@ -40,7 +40,7 @@ class WorkflowTomorrow(libci.Module):
 
     shared_functions = ['beaker_job_xml']
 
-    def beaker_job_xml(self, options=None, environment=None, task_params=None):
+    def beaker_job_xml(self, options=None, environment=None, task_params=None, setup_phases=None):
         """
         Run workflow-tomorrow to create beaker job XML.
 
@@ -52,7 +52,11 @@ class WorkflowTomorrow(libci.Module):
             option.
         :param dict task_params: if set, params will be passed to the tests via multiple
             ``--taskparam`` options.
-        :returns: libci.utils.ProcessOutput with the output of w-t.
+        :param list setup_phases: if set, it's a list of valus which will be passed to
+            ``workflow-tomorrow`` via multiple ``--setup`` options. If ``None`` is passed,
+            ``['beakerlib']`` is used by default (if you don't want your job to use ``--setup=beakerlib``,
+            use ``setup_phases=[]``).
+        :returns: :py:class:`libci.utils.ProcessOutput` instance with the output of ``workflow-tomorrow``.
         """
 
         self.info('running workflow-tomorrow to get job description')
@@ -60,6 +64,14 @@ class WorkflowTomorrow(libci.Module):
         options = options or []
         environment = environment or {}
         task_params = task_params or {}
+
+        #
+        # setup phases
+        if setup_phases is None:
+            setup_phases = ['beakerlib']
+
+        for phase in setup_phases:
+            options += ['--setup', phase]
 
         #
         # add options specified on command-line
