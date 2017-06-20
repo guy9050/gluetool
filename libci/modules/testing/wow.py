@@ -47,6 +47,16 @@ class WorkflowTomorrow(libci.Module):
         It does not take care about any SUT installation, it's up to the caller to provide
         necessary options.
 
+        Caller can control what environmental variables are passed to his tasks with ``task_params`` parameter.
+        Each `key/value` pair is passed to ``workflow-tomorrow`` via ``--taskparam="<key>=<value>"`` option. By
+        default, ``beaker_job_xml`` adds following variables:
+
+        * ``BASEOS_CI=true``
+        * ``BASEOS_CI_COMPONENT=<component name>`` - available only when Brew task is available.
+        * ``BEAKERLIB_RPM_DOWNLOAD_METHODS='yum direct'``
+
+        To override any of these variables, simply pass your own value in ``task_params`` parameter.
+
         :param list options: additional options for workflow-tomorrow.
         :param dict environment: if set, it will be passed to the tests via ``--environment``
             option.
@@ -101,7 +111,8 @@ class WorkflowTomorrow(libci.Module):
         #
         # add global task parameters
         _task_params = {
-            'BASEOS_CI': 'true'
+            'BASEOS_CI': 'true',
+            'BEAKERLIB_RPM_DOWNLOAD_METHODS': 'yum\\ direct'
         }
 
         task = self.shared('brew_task')
