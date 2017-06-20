@@ -28,6 +28,9 @@ class CIOpenstackJob(Module):
         'pipeline-append': {
             'help': 'citool options that will be added at the end of citool pipeline'
         },
+        'guess-product-options': {
+            'help': 'Additional options for guess-product module.'
+        },
         'guess-beaker-distro-options': {
             'help': 'Additional options for guess-beaker-distro module.'
         },
@@ -76,6 +79,7 @@ class CIOpenstackJob(Module):
             'id': self._task_id,
             'pipeline_prepend': self.option('pipeline-prepend'),
             'pipeline_append': self.option('pipeline-append'),
+            'guess_product_options': self.option('guess-product-options'),
             'guess_beaker_distro_options': self.option('guess-beaker-distro-options'),
             'guess_openstack_image_options': self.option('guess-openstack-image-options'),
             'wow_options': self.option('wow-options'),

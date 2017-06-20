@@ -77,7 +77,7 @@ class WorkflowTomorrow(libci.Module):
         _environment.update(environment)
 
         options += [
-            '--environment'
+            '--environment',
             ' && '.join(['{}={}'.format(k, v) for k, v in _environment.iteritems()])
         ] if _environment else []
 
