@@ -5,26 +5,18 @@ import pytest
 
 import libci
 
-from mako.template import Template
-
-from . import NonLoadingCI, Caplog
+from . import NonLoadingCI
 
 
-def test_run_command(monkeypatch, caplog):
+def test_run_command(log, monkeypatch):
     # pylint: disable-msg=line-too-long,too-many-statements
 
     import errno
     import subprocess
     from libci.utils import run_command, DEVNULL
 
-    caplog = Caplog(caplog)
-
-    # initialize logger - this is done by CI instance but we don't have any
-    libci.Logging.create_logger()
-    caplog.clear()
-
     def assert_logging(record_count, cmd, stdout=None, stderr=None):
-        records = caplog.records
+        records = log.records
 
         assert len(records) == record_count
         assert all([r.levelno == logging.DEBUG for r in records])
@@ -38,16 +30,16 @@ def test_run_command(monkeypatch, caplog):
             assert records[2].message == stderr
 
     # Accept lists only
-    caplog.clear()
+    log.clear()
     with pytest.raises(AssertionError, match=r'^Only list of strings accepted as a command$') as excinfo:
         run_command('/bin/ls')
 
-    caplog.clear()
+    log.clear()
     with pytest.raises(AssertionError, match=r'^Only list of strings accepted as a command$'):
         run_command(['/bin/ls', 13])
 
     # Test some common binary
-    caplog.clear()
+    log.clear()
     output = run_command(['/bin/ls', '/'])
     assert output.exit_code == 0
     assert 'bin' in output.stdout
@@ -55,12 +47,12 @@ def test_run_command(monkeypatch, caplog):
     assert_logging(3, "run command: cmd='['/bin/ls', '/']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}",
                    stderr='stderr:\n---v---v---v---v---v---\n\n---^---^---^---^---^---')
 
-    assert caplog.records[1].message.startswith('stdout:\n---v---v---v---v---v---\n')
-    assert caplog.records[1].message.endswith('\n---^---^---^---^---^---')
-    assert len(caplog.records[1].message.split('\n')) >= 5
+    assert log.records[1].message.startswith('stdout:\n---v---v---v---v---v---\n')
+    assert log.records[1].message.endswith('\n---^---^---^---^---^---')
+    assert len(log.records[1].message.split('\n')) >= 5
 
     # Test non-existent binary
-    caplog.clear()
+    log.clear()
     with pytest.raises(libci.CIError, match=r"^Command '/bin/non-existent-binary' not found$"):
         run_command(['/bin/non-existent-binary'])
 
@@ -76,7 +68,7 @@ def test_run_command(monkeypatch, caplog):
     assert excinfo.value.output.stderr == ''
 
     # Test stdout and stderr are not mixed together
-    caplog.clear()
+    log.clear()
     cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
     output = run_command(cmd)
     assert output.exit_code == 0
@@ -87,7 +79,7 @@ def test_run_command(monkeypatch, caplog):
                    stderr='stderr:\n---v---v---v---v---v---\nThis goes to stderr\n\n---^---^---^---^---^---')
 
     # Test overriding stdout and stderr
-    caplog.clear()
+    log.clear()
     cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
     output = run_command(cmd, stdout=DEVNULL)
     assert output.exit_code == 0
@@ -97,7 +89,7 @@ def test_run_command(monkeypatch, caplog):
                    stdout='stdout:\n  command produced no output',
                    stderr='stderr:\n---v---v---v---v---v---\nThis goes to stderr\n\n---^---^---^---^---^---')
 
-    caplog.clear()
+    log.clear()
     cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
     output = run_command(cmd, stderr=DEVNULL)
     assert output.exit_code == 0
@@ -108,7 +100,7 @@ def test_run_command(monkeypatch, caplog):
                    stderr='stderr:\n  command produced no output')
 
     # Test merging stdout & stderr into one
-    caplog.clear()
+    log.clear()
     cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
     output = run_command(cmd, stderr=subprocess.STDOUT)
     assert output.exit_code == 0
@@ -120,7 +112,7 @@ def test_run_command(monkeypatch, caplog):
 
     # Pass weird stdout value, and test its formatting in log
     stdout = (13, 17)
-    caplog.clear()
+    log.clear()
     cmd = ['/bin/ls']
     with pytest.raises(AttributeError, match=r"^'tuple' object has no attribute 'fileno'$"):
         run_command(cmd, stdout=stdout)
@@ -132,7 +124,7 @@ def test_run_command(monkeypatch, caplog):
         # pylint: disable=unused-argument
         raise OSError(errno.ENOENT, '')
 
-    caplog.clear()
+    log.clear()
     monkeypatch.setattr(subprocess, 'Popen', faulty_popen_enoent)
 
     with pytest.raises(libci.CIError, match=r"^Command '/bin/ls' not found$"):
@@ -146,7 +138,7 @@ def test_run_command(monkeypatch, caplog):
         # pylint: disable=unused-argument
         raise OSError('foo')
 
-    caplog.clear()
+    log.clear()
     monkeypatch.setattr(subprocess, 'Popen', faulty_popen_foo)
 
     with pytest.raises(OSError, match=r'^foo$'):
@@ -156,7 +148,7 @@ def test_run_command(monkeypatch, caplog):
     monkeypatch.undo()
 
     # Don't capture stdout and stderr, let them pass
-    caplog.clear()
+    log.clear()
     output = run_command(['/bin/ls', '/'], stdout=libci.utils.PARENT, stderr=libci.utils.PARENT)
 
     assert output.exit_code == 0
@@ -243,113 +235,33 @@ def test_cached_property():
     assert 'bar' not in obj.__dict__
 
 
-def test_render_template():
-    from libci.utils import render_template
-
-    tmpl_str = """
-    This is a dummy string template: {foo}
-    """
-
-    tmpl_mako = Template("""
-    This is a dummy Mako template: ${bar}
-    """)
-
-    # these should work out of the box
-    assert render_template(tmpl_str, foo='baz') == 'This is a dummy string template: baz'
-
-    assert render_template(tmpl_mako, bar='baz') == 'This is a dummy Mako template: baz'
-
-    # check that unexpected template types raise an exception
-    with pytest.raises(libci.CIError, message="Unhandled template type <type 'unicode'>"):
-        render_template(u'fake template')
-
-    # check that exception pops up when variable is not passed to render_template
-    with pytest.raises(libci.CIError):
-        render_template(tmpl_str)
-
-    with pytest.raises(libci.CIError):
-        render_template(tmpl_mako)
-
-
-def test_treat_url(caplog, monkeypatch):
-    from libci.utils import treat_url
-
-    # Add more patterns bellow when necessary
-    urls = {
-        'HTTP://FoO.bAr.coM././foo/././../foo/index.html': 'http://foo.bar.com/foo/index.html',
-        # urlnorm cannot handle localhost but treat_url should handle such situation
-        'http://localhost/index.html': 'http://localhost/index.html'
-    }
-
-    for original, expected in urls.iteritems():
-        assert treat_url(original, shorten=False) == expected
-
-    # check shoretning
-    def fetch_shorten(url, **kwargs):
-        # pylint: disable=unused-argument
-        assert url.endswith('http://foo.bar.com/')
-
-        return None, 'dummy shortened URL from {}'.format(url.split('?')[-1])
-
-    monkeypatch.setattr(libci.utils, 'fetch_url', fetch_shorten)
-
-    assert treat_url('http://foo.bar.com/', shorten=True) == 'dummy shortened URL from http://foo.bar.com/'
-
-    # check the final strip() call
-    def fetch_whitespace(url, **kwargs):
-        # pylint: disable=unused-argument
-        return None, '   so much whitespace   '
-
-    monkeypatch.setattr(libci.utils, 'fetch_url', fetch_whitespace)
-
-    assert treat_url('http://foo.bar.com/', shorten=True) == 'so much whitespace'
-
-    # handle exceptions from URL shortener web
-    logger = libci.Logging.create_logger()
-    caplog.handler.records = []
-
-    def fetch_raise(url, **kwargs):
-        # pylint: disable=unused-argument
-        raise libci.CIError('simply bad request')
-
-    monkeypatch.setattr(libci.utils, 'fetch_url', fetch_raise)
-    assert treat_url('http://foo.bar.com/', shorten=True, logger=logger) == 'http://foo.bar.com/'
-
-    records = caplog.handler.records
-    assert len(records) == 1
-    assert records[0].levelno == logging.WARN
-    assert records[0].message == 'Unable to shorten URL (see log for more details): simply bad request'
-
-
 #
 # Modules
 #
 
-def test_check_module_file(caplog, tmpdir):
+def test_check_module_file(log, tmpdir):
     # pylint: disable=protected-access
 
     mfile = tmpdir.join('dummy.py')
     ci = NonLoadingCI()
 
-    caplog = Caplog(caplog)
-
     def try_pass(file_content):
         mfile.write(file_content)
 
-        caplog.clear()
+        log.clear()
         assert ci._check_module_file(str(mfile)) is True
-        assert caplog.records[0].message == "check possible module file '{}'".format(mfile)
-        assert caplog.records[0].levelno == logging.DEBUG
+        assert log.records[0].message == "check possible module file '{}'".format(mfile)
+        assert log.records[0].levelno == logging.DEBUG
 
     def try_fail(file_content, error):
         mfile.write(file_content)
 
-        caplog.clear()
+        log.clear()
         assert ci._check_module_file(str(mfile)) is False
-        assert caplog.records[0].message == "check possible module file '{}'".format(mfile)
-        assert caplog.records[0].levelno == logging.DEBUG
-        assert caplog.records[1].message == error
-        assert caplog.records[1].levelno == logging.DEBUG
+        assert log.records[0].message == "check possible module file '{}'".format(mfile)
+        assert log.records[0].levelno == logging.DEBUG
+        assert log.records[1].message == error
+        assert log.records[1].levelno == logging.DEBUG
 
     # Test empty Python file
     try_fail('pass', "  no 'import libci' found")
