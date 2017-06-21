@@ -1,22 +1,20 @@
 import pytest
 
 import libci
+import libci.modules.helpers.ansible
 
-from . import NonLoadingCI
-
-
-def _get_mod():
-    from libci.modules.helpers.ansible import Ansible
-
-    ci = NonLoadingCI()
-    mod = Ansible(ci)
-    mod.add_shared()
-
-    return ci, mod
+from . import create_module
 
 
-def test_sanity(tmpdir):
-    ci, _ = _get_mod()
+@pytest.fixture(name='module')
+def fixture_module():
+    # pylint: disable=unused-argument
+
+    return create_module(libci.modules.helpers.ansible.Ansible)
+
+
+def test_sanity(module, tmpdir):
+    ci, _ = module
 
     assert ci.has_shared('run_playbook') is True
 
@@ -46,8 +44,8 @@ def test_sanity(tmpdir):
     assert output.stderr == ''
 
 
-def test_error(log, tmpdir):
-    ci, _ = _get_mod()
+def test_error(log, module, tmpdir):
+    ci, _ = module
 
     playbook = tmpdir.join('error-playbook.yml')
     playbook.write("""---
@@ -69,8 +67,8 @@ def test_error(log, tmpdir):
     assert log.records[-1].message == 'Ansible says: FOO_VAR variable is not defined'
 
 
-def test_extra_vars(tmpdir):
-    ci, _ = _get_mod()
+def test_extra_vars(module, tmpdir):
+    ci, _ = module
 
     playbook = tmpdir.join('extra-vars-playbook.yml')
     playbook.write("""---
