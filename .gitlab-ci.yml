@@ -109,3 +109,20 @@ upload-coverage:
     - unit-tests
   script:
     - rsync -avz -e "ssh $SSH_OPTIONS" coverage-report/ $COVERAGE_UPLOAD
+
+# Automated deployment on staging instance
+staging-deploy:
+  stage: deploy
+  only:
+    - master@baseos-qe/citool
+  script:
+    - yum -y install wget
+    - pip install -r requirements.txt
+    - wget --no-check-certificate -O /etc/pki/ca-trust/source/anchors/RH-IT-Root-CA.crt https://password.corp.redhat.com/RH-IT-Root-CA.crt
+    - update-ca-trust
+    - git clone https://gitlab.cee.redhat.com/baseos-qe/ansible-baseos-ci.git
+    - cd ansible-baseos-ci
+    - ansible-galaxy install -r requirements.yml
+    - chmod 600 secrets/ci_id_rsa
+    - ansible-playbook -l stage-citool -t citool_update infrastructure.yml
+    - ansible-playbook -l stage-citool -t citool_jjb_update -e "citool_jjb_update=true citool_jjb_force_update=true" infrastructure.yml
