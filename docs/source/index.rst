@@ -12,8 +12,12 @@ Welcome to citool's documentation!
    :maxdepth: 1
 
    modules
+   howto-tests
    howto-docs
 
+
+``libci`` API
+-------------
 
 .. toctree::
    :maxdepth: 2
@@ -27,12 +31,6 @@ Welcome to citool's documentation!
    libci.results
    libci.utils
    libci.version
-
-
-.. toctree::
-   :maxdepth: 3
-
-   libci.modules
 
 
 Indices and tables
