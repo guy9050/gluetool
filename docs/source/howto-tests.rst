@@ -24,8 +24,8 @@ Also inspecting existing tests and ``tox.ini`` is a good way to find out how to 
 for your module.
 
 
-Howto run tests?
-----------------
+How to run tests?
+-----------------
 
 You can either use ``setup.py``:
 
@@ -39,6 +39,33 @@ Or ``tox``:
 .. code-block:: bash
 
    tox -e py27
+
+
+Both accept additional options:
+
+.. code-block:: bash
+
+   python setup.py test -a "--option1 --option2=value"
+
+   tox -e py27 -- --option1 --option2=value
+
+
+How to see code coverage?
+-------------------------
+
+By default, coverage measurement is disabled. To enable it, pass following options to the test runner of your choice:
+
+.. code-block:: bash
+
+   --cov=libci --cov-report=html:coverage-report
+
+With these options, coverage will be enabled and when test run finishes, the coverage report (in HTML) will be created
+in ``coverage-report`` directory. Simply open ``coverage-report/index.html`` in your browser then.
+
+.. note::
+
+   Coverage data are stored in ``.coverage`` file - if you'd like to use ``coverage`` utility to create additional
+   reports or filter the output to better suit your needs, feel free to do so, nothing stands in your way :)
 
 
 Module tests should be in the same file
@@ -128,3 +155,13 @@ and other useful tricks. And all patches are undone when your test function retu
 
    with pytest.raises(libci.CIError, match=r"^Command '/bin/ls' not found$"):
        run_command(['/bin/ls'])
+
+
+When your attempts lead to messy tests, cosider refactoring of the tested code
+------------------------------------------------------------------------------
+
+This can happen very often - you'd like to test a method which is way too complex, and the result is huge pile of
+setup/teardown code, unreadable asserts and even more complicated ways to convince the tested function to take different
+path, e.g. when it comes to injecting errors into its flow. In such case, consider refactoring the tested code - it's
+possible it could be rewritten to more separate pieces of code (main function & several helpers) which could greatly
+improve the list of options you have, and it may even lead to more readable code.

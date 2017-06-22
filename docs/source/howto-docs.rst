@@ -25,6 +25,36 @@ Also inspecting sources - and the resulting documentation - is a good way to fin
 to use links to external documents.
 
 
+How to generate HTML documentation locally
+------------------------------------------
+
+* make sure you have installed all ``citool`` requirements:
+
+  .. code-block:: bash
+
+     pip install -r requirements.txt
+
+* regenerate RST documents from their Python sources
+
+  .. code-block:: bash
+
+     sphinx-apidoc -T -e -o docs/source/ libci/
+
+* regenerate RST documents for ``citool`` modules
+
+  .. code-block:: bash
+
+     python docs/generate-module-page.py
+
+* generate documentation
+
+  .. code-block:: bash
+
+     make -C docs/ html
+
+You documentation awaits you at ``docs/build/html/index.html``.
+
+
 Write multi-line docstrings
 ---------------------------
 
@@ -56,6 +86,20 @@ Every module must be documented
 -------------------------------
 
 Longer, detailed description of module's goal, provided services, required resources and possible pitfalls.
+
+
+Check whether the documentation is up-to-date
+---------------------------------------------
+
+Make sure the documentation describes the actual state of the affairs. E.g. developer could have changed semantics
+of a command-line option, or added another one that changed a behavior slightly, and forgot to update its help
+string.
+
+.. note::
+
+   Outdated documentation is probably even worse than no documentation at all. It leads reader to false assumptions
+   which lead to anger. Anger leads to hate. Hate leads to suffering. When revieweing documentation, please take
+   special care of making sure it's up-to-date.
 
 
 Default values of parameters

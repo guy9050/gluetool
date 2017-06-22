@@ -77,7 +77,7 @@ def update_version(version, release):
 
 
 class PyTest(TestCommand):
-    default_pytest_args = ['-v', '-ra', '--pylint', '--flake8', '--cov=libci']
+    default_pytest_args = ['-v', '-ra', '--pylint', '--flake8']
 
     user_options = [
         ('pytest-args=', 'a', 'Arguments to pass to pytest')
