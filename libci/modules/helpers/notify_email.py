@@ -100,6 +100,8 @@ Final result:   {result.overall_result}
 See Covscan url for more details. Result is based on diff to previous known build.
 The testing fails if your build added new defects from the previous one.
 
+If you have any questions, feel free to ask at Red Hat IRC channel #coverity or coverity-users@redhat.com
+
 Covscan url:          {covscan_url}
 Covscan wiki:         https://engineering.redhat.com/trac/CoverityScan/wiki/covscan
 Covscan CI Test Plan: https://url.corp.redhat.com/covscan-in-ci
