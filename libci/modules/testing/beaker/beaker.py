@@ -20,6 +20,7 @@ DEFAULT_RESERVE_TIME = 24
 
 
 class NoTestAvailableError(SoftCIError):
+    MODULE = 'beaker'
     SUBJECT = 'No tests found for the component'
     BODY = """
 
@@ -32,7 +33,7 @@ CI could not find any suitable tests for the component. This can have many diffe
       is an empty set of tests.
 
 Please, see the documentation on CI configuration and what is required to correctly enable CI for
-a component ([1]), current configuration ([2]), and/or consult with component's QE how to resolve
+a component [1], current configuration [2], and/or consult with component's QE how to resolve
 this situation.
 
 [1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Documentation/UserHOWTO#AddthecomponenttoCI
@@ -41,6 +42,38 @@ this situation.
 
     def __init__(self):
         super(NoTestAvailableError, self).__init__('No tests provided for the component')
+
+
+class InvalidTasksError(SoftCIError):
+    MODULE = 'beaker'
+    SUBJECT = 'Invalid tasks provided'
+    BODY = """
+
+One or more tasks provided to CI could not be found:
+
+{tasks}
+
+Please, see the documentation on CI configuration and what is required to correctly enable CI for
+a component [1], current configuration [2], and/or consult with component's QE how to resolve
+this situation.
+
+[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Documentation/UserHOWTO#AddthecomponenttoCI
+[2] https://gitlab.cee.redhat.com/baseos-qe/citool-config/raw/production/brew-dispatcher.yaml
+    """
+
+    def __init__(self, tasks):
+        super(InvalidTasksError, self).__init__('Invalid task names provided')
+
+        self.tasks = tasks
+
+    def _template_variables(self):
+        variables = super(InvalidTasksError, self)._template_variables()
+
+        variables.update({
+            'tasks': '\n'.join(['\t* {}'.format(name) for name in self.tasks])
+        })
+
+        return variables
 
 
 class BeakerTestResult(TestResult):
@@ -282,6 +315,12 @@ class Beaker(Module):
             output = run_command(['bkr', 'job-submit', 'job.xml'])
 
         except CICommandError as exc:
+            if 'Invalid task(s):' in exc.output.stderr:
+                s = exc.output.stderr.strip()
+                tasks = [name.strip() for name in s[s.index('Invalid task(s)') + 17:-2].split(',')]
+
+                raise InvalidTasksError(tasks)
+
             raise CIError("Failure during 'job-submit' execution: {}".format(exc.output.stderr))
 
         try:
