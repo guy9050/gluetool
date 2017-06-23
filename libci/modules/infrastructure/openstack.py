@@ -180,6 +180,15 @@ class OpenstackGuest(NetworkedGuest):
         if obj.status != status:
             raise CIError("{} resource has invalid status '{}', expected '{}'".format(resource, obj.status, status))
 
+    def _wait_alive(self):
+        """
+        "Wait alive" helper - we're using the same options when calling guest.wait_alive, let's
+        put the call in a helper method.
+
+        """
+
+        return self.wait_alive(timeout=self._module.option('activation-time'), tick=1, echo_timeout=20, echo_tick=5)
+
     def create_snapshot(self):
         """
         Creates a snapshot from the current running image of the openstack instance.
@@ -214,7 +223,7 @@ class OpenstackGuest(NetworkedGuest):
 
         # start instance
         self._instance.start()
-        self.wait_alive(timeout=self._module.option('activation-time'), tick=1)
+        self._wait_alive()
         self.debug("server '{}' is up now".format(self.name))
 
         return name
@@ -229,7 +238,7 @@ class OpenstackGuest(NetworkedGuest):
 
         self.info("rebuilding server with snapshot '{}'".format(snapshot))
         self._instance.rebuild(self._module.get_image_ref(snapshot))
-        self.wait_alive(timeout=self._module.option('activation-time'), tick=1)
+        self._wait_alive()
         self.info("instance rebuilt and is up now")
 
         return self
@@ -653,7 +662,7 @@ expected from the user to cleanup the instance(s).""",
         self.debug('created {} guests, waiting for them to become ACTIVE'.format(count))
 
         for guest in guests:
-            guest.wait_alive(timeout=self.option('activation-time'), tick=1)
+            guest._wait_alive()
 
         if self.option('reserve'):
             self._reserve_guests()
