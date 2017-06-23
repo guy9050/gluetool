@@ -303,7 +303,7 @@ class NetworkedGuest(Guest):
                 if output.stdout.strip() == msg:
                     return True
 
-            except libci.CICommandError as exc:
+            except libci.CICommandError:
                 self.debug('echo attempt failed, ignoring error')
 
         self.wait(check_echo, timeout=echo_timeout, tick=echo_tick)

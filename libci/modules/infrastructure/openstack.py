@@ -662,6 +662,7 @@ expected from the user to cleanup the instance(s).""",
         self.debug('created {} guests, waiting for them to become ACTIVE'.format(count))
 
         for guest in guests:
+            # pylint: disable=protected-access
             guest._wait_alive()
 
         if self.option('reserve'):
