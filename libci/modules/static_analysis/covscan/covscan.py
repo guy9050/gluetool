@@ -24,6 +24,8 @@ This is usually caused by:
 * Covscan failed to finish testing for some reason
 
 See Covscan logs for more details {covscan_result_url}.
+
+If you have any questions, feel free to ask at Red Hat IRC channel #coverity or coverity-users@redhat.com
     """
 
     def __init__(self, url, brew_task):
@@ -61,6 +63,8 @@ target 'rhel-7.4-candidate' and package bash):
 
 Please file an issue to release enginnering if you encounter inconsistencies in Brew by sending
 out an email to 'release-engineering@redhat.com'.
+
+If you have any questions, feel free to ask at Red Hat IRC channel #coverity or coverity-users@redhat.com
     """
 
     def __init__(self):
