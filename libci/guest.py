@@ -271,7 +271,7 @@ class NetworkedGuest(Guest):
     def execute(self, cmd, **kwargs):
         return self._execute(self._ssh + [self.hostname] + [cmd], **kwargs)
 
-    def wait_alive(self, **kwargs):
+    def wait_alive(self, echo_timeout=None, echo_tick=30, **kwargs):
         self.debug('waiting for guest to become alive')
 
         addrinfo = socket.getaddrinfo(self.hostname, self.port, 0, socket.SOCK_STREAM)
@@ -296,9 +296,17 @@ class NetworkedGuest(Guest):
 
         msg = 'guest {} is alive'.format(self.hostname)
 
-        output = self.execute("echo '{}'".format(msg))
-        if output.stdout.strip() != msg:
-            raise libci.CIError('Guest did not respond to ping request')
+        def check_echo():
+            try:
+                output = self.execute("echo '{}'".format(msg))
+
+                if output.stdout.strip() == msg:
+                    return True
+
+            except libci.CICommandError:
+                self.debug('echo attempt failed, ignoring error')
+
+        self.wait(check_echo, timeout=echo_timeout, tick=echo_tick)
 
     def copy_to(self, src, dst, recursive=False, **kwargs):
         self.debug("copy to the guest: '{}' => '{}'".format(src, dst))

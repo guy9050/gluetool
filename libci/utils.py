@@ -192,6 +192,7 @@ def run_command(cmd, logger=None, **kwargs):
 
     output = ProcessOutput(cmd, exit_code, stdout, stderr, kwargs)
 
+    logger.debug('command exited with code {}'.format(output.exit_code))
     output.log_stream('stdout', logger.debug)
     output.log_stream('stderr', logger.debug)
 
