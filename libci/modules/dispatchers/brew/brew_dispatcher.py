@@ -477,10 +477,11 @@ class CIBrewDispatcher(Module):
 
                     result_type = self.job_result_types[splitted[0]]
 
-                    splitted.append("--notify-recipients-options='--{}-add-notify {}'".format(result_type, recipients))
+                    command = '{} --notify-recipients-options="--{}-add-notify {}"'.format(
+                        command, result_type, recipients)
                     self.debug('with set recipients applied: {}'.format(format_dict(splitted)))
 
-                    set_commands[i] = ' '.join(splitted)
+                    set_commands[i] = command
 
             reduced[name] = set_commands[:]
 
