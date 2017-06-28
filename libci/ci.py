@@ -381,8 +381,11 @@ class Module(Configurable):
     shared_functions = []
     """Iterable of names of shared functions exported by the module."""
 
-    def __init__(self, ci):
+    def __init__(self, ci, name):
         super(Module, self).__init__()
+
+        # we need to save the unique name in case there are more aliases available
+        self.unique_name = name
 
         # initialize citool
         self.ci = ci
@@ -392,11 +395,11 @@ class Module(Configurable):
         self.logger.connect(self)
 
         # initialize data path if exists, else it will be None
-        dpath = os.path.join(self.ci.option('data_path') or DATA_PATH, self.name)
+        dpath = os.path.join(self.ci.option('data_path') or DATA_PATH, self.unique_name)
         self.data_path = dpath if os.path.exists(dpath) else None
 
     def parse_config(self):
-        self._parse_config([os.path.join(c, self.name) for c in MODULE_CONFIG_PATHS])
+        self._parse_config([os.path.join(c, self.unique_name) for c in MODULE_CONFIG_PATHS])
 
     def _generate_shared_functions_help(self):
         """
@@ -414,7 +417,7 @@ class Module(Configurable):
 
         for name in self.shared_functions:
             if not hasattr(self, name):
-                raise CIError("No such shared function '{}' of module '{}'".format(name, self.name))
+                raise CIError("No such shared function '{}' of module '{}'".format(name, self.unique_name))
 
             functions.append(function_help(getattr(self, name), name=name))
 
@@ -422,7 +425,7 @@ class Module(Configurable):
 
     def parse_args(self, args):
         self._parse_args(args,
-                         usage='{} [options]'.format(self.name),
+                         usage='{} [options]'.format(self.unique_name),
                          description=docstring_to_help(self.__doc__),
                          epilog=self._generate_shared_functions_help(),
                          formatter_class=LineWrapRawTextHelpFormatter)
@@ -767,20 +770,28 @@ class CI(Configurable):
                 raise CIError("No name specified by module class '{}' from file '{}'".format(
                     cls.__name__, filepath))
 
-            if cls.name in self.modules:
-                raise CIError("Name '{}' of module '{}' from '{}' is a duplicate module name".format(
-                    cls.name, cls.__name__, filepath))
+            def add_module(mname, cls):
+                if mname in self.modules:
+                    raise CIError("Name '{}' of module '{}' from '{}' is a duplicate module name".format(
+                        mname, cls.__name__, filepath))
 
-            self.debug("found module '{}', group '{}', in module '{}' from '{}'".format(
-                cls.name, group, module_name, filepath))
+                self.debug("found module '{}', group '{}', in module '{}' from '{}'".format(
+                    mname, group, module_name, filepath))
 
-            self.modules[cls.name] = {
-                'class': cls,
-                'description': cls.description,
-                'group': group
-            }
+                self.modules[mname] = {
+                    'class': cls,
+                    'description': cls.description,
+                    'group': group
+                }
 
-            loaded_modules.append((group, cls))
+                loaded_modules.append((group, cls))
+
+            # if name is a list, add more aliases to the same module
+            if isinstance(cls.name, (list, tuple)):
+                for mname in cls.name:
+                    add_module(mname, cls)
+            else:
+                add_module(cls.name, cls)
 
         return loaded_modules
 
@@ -895,7 +906,7 @@ class CI(Configurable):
         return module
 
     def init_module(self, module):
-        return self.modules[module]['class'](self)
+        return self.modules[module]['class'](self, module)
 
     def run_module(self, module_name, args):
         module = self.init_module(module_name)

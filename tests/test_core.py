@@ -299,6 +299,14 @@ class DummyModule(Module):
     pass
 """)
 
+    # Check if module can have multiple names
+    try_pass("""
+from libci import Module
+
+class DummyModule(Module):
+    name = ['dummy', 'dummy-alias']
+""")
+
 
 class DummyModule(libci.Module):
     """
@@ -315,7 +323,7 @@ def test_module_instantiate():
     """
 
     ci = NonLoadingCI()
-    mod = DummyModule(ci)
+    mod = DummyModule(ci, 'module')
 
     assert mod.ci == ci
 
@@ -347,7 +355,7 @@ def test_module_add_shared():
         def bar(self):
             pass
 
-    mod = UsefulModule(ci)
+    mod = UsefulModule(ci, 'module')
 
     # First, mod has no shared functions, so no should appear in parent's registry
     assert mod.shared_functions == []
@@ -392,7 +400,7 @@ def test_module_del_shared():
         def bar(self):
             pass
 
-    mod = UsefulModule(ci)
+    mod = UsefulModule(ci, 'module')
 
     mod.add_shared()
     assert sorted(ci.shared_functions.keys()) == ['bar', 'foo']
@@ -427,7 +435,7 @@ def test_module_shared():
             # pylint: disable-msg=no-self-use
             return 'foo: {}, {}'.format(args, kwargs)
 
-    mod = UsefulModule(ci)
+    mod = UsefulModule(ci, 'module')
     mod.add_shared()
 
     # call shared function with some arguments, like other modules would do

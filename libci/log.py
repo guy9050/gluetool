@@ -161,7 +161,7 @@ class ModuleAdapter(ContextAdapter):
     """
 
     def __init__(self, logger, module):
-        super(ModuleAdapter, self).__init__(logger, {'ctx_module_name': (10, module.name)})
+        super(ModuleAdapter, self).__init__(logger, {'ctx_module_name': (10, module.unique_name)})
 
 
 class LoggingFormatter(logging.Formatter):
