@@ -29,6 +29,10 @@
           default: ''
           description: 'citool options that will be added at the end of citool pipeline'
       - string:
+          name: guess_product_options
+          default: ''
+          description: 'Additional options for guess-product module.'
+      - string:
           name: guess_beaker_distro_options
           default: ''
           description: 'Additional options for guess-beaker-distro module.'
@@ -85,6 +89,7 @@
              testing-results \
              brew --id $id \
              brew-build-name \
+             guess-product ${guess_product_options} \
              guess-beaker-distro ${guess_beaker_distro_options} \
              guess-openstack-image ${guess_openstack_image_options} \
              restraint-scheduler \
