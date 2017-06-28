@@ -1,5 +1,4 @@
 import copy
-import datetime
 import os
 import tempfile
 from collections import defaultdict
@@ -7,7 +6,7 @@ import enum
 import bs4
 
 import libci
-from libci.utils import format_dict, treat_url, log_blob
+from libci.utils import format_dict
 from libci.results import TestResult, publish_result
 
 
@@ -195,79 +194,38 @@ class RestraintRunner(libci.Module):
 
         # XML produced by restraint
         with open(os.path.join(job_dir, 'job.xml'), 'r') as f:
+            self.debug('XML produced by restraint lies in {}'.format(f.name))
+
             job_results = bs4.BeautifulSoup(f.read(), 'xml')
 
         # results accumulates results (<task name>: <task runs>) we want to return upwards
         results = defaultdict(list)
 
+        build_url = os.getenv('BUILD_URL', '<Jenkins job URL not available>')
+        artifact_root = build_url + '/artifact'
+
         for task_results in job_results.recipeSet.recipe.find_all('task'):
+            # find journal if there's one available for the task
+            journal = None
+
             journal_log = task_results.logs.find_all('log', filename='journal.xml')
             if journal_log:
                 with open(os.path.join(job_dir, journal_log[0]['path']), 'r') as f:
-                    journal = bs4.BeautifulSoup(f.read(), 'xml')
+                    self.debug('Journal lies in {}'.format(f.name))
 
-                journal_root = journal.BEAKER_TEST
-
-                # remove timezone
-                starttime = ' '.join(journal_root.starttime.string.split(' ')[0:-1])
-                endtime = ' '.join(journal_root.endtime.string.split(' ')[0:-1])
-
-                started = datetime.datetime.strptime(starttime, '%Y-%m-%d %H:%M:%S')
-                ended = datetime.datetime.strptime(endtime, '%Y-%m-%d %H:%M:%S')
-                duration = (ended - started).total_seconds()
-
-            else:
-                journal_root = None
-                duration = None
-
-            build_url = os.getenv('BUILD_URL', '<Jenkins job URL not available>')
-            artifact_root = build_url + '/artifact'
-
-            task_name = task_results['name']
+                    journal = bs4.BeautifulSoup(f.read(), 'xml').BEAKER_TEST
 
             # If guest provides hostname, export it to result as well - user may need to connect
             # to it, and its hostname (as set during its setup) may not be resolvable - but
             # we're guaranteed to connect to the guest using guest.hostname value.
-
             if hasattr(guest, 'hostname'):
                 connectable_hostname = guest.hostname
 
-            elif journal_root is not None:
-                connectable_hostname = journal_root.hostname.string
-
-            else:
-                connectable_hostname = None
-
-            results[task_name].append({
-                'bkr_arch': journal_root.arch.string if journal_root is not None else None,
-                'bkr_distrovariant': None,
-                'bkr_duration': duration,
-                'bkr_host': journal_root.hostname.string if journal_root is not None else None,
-                'connectable_host': connectable_hostname,
-                'bkr_logs': [
-                    {
-                        'href': treat_url('{}/{}/{}'.format(artifact_root, job_dir, log['path'])),
-                        'name': log['filename']
-                    } for log in task_results.logs.find_all('log')
-                ],
-                'bkr_packages': sorted([
-                    pkgdetails['sourcerpm'] for pkgdetails in task_results.find_all('pkgdetails')
-                ] + [
-                    pkgdetails.string.strip() for pkgdetails in task_results.find_all('pkgdetails')
-                ]),
-                'bkr_params': [
-                    '{}=\"{}\"'.format(param['name'], param['value']) for param in task_results.params.find_all('param')
-                ],
-                'bkr_phases': {
-                    phase['path']: phase['result'] for phase in task_results.results.find_all('result')
-                } if task_results.find_all('results') else {},
-                'bkr_recipe_id': job_results.recipeSet.recipe['id'],
-                'bkr_result': task_results['result'],
-                'bkr_status': task_results['status'],
-                'bkr_task_id': task_results['id'],
-                'bkr_version': None,
-                'name': task_name
-            })
+            results[task_results['name']].append(
+                self.shared('parse_beah_result', task_results, journal=journal, recipe=job_results.job.recipeSet,
+                            artifact_path=lambda s: '{}/{}/{}'.format(artifact_root, job_dir, s),
+                            connectable_hostname=connectable_hostname)
+            )
 
         return dict(results)
 
@@ -284,7 +242,7 @@ class RestraintRunner(libci.Module):
         soup = bs4.BeautifulSoup('', 'xml')
 
         # Log our task set
-        guest.debug('Task set:\n{}'.format('\n'.join([task.prettify() for task in task_set])))
+        guest.debug('Task set:\n{}'.format('\n'.join([task.prettify(encoding='utf-8') for task in task_set])))
 
         # Wrap task set in <job><recipeSet><recipe>... envelope
         job = soup.new_tag('job')
@@ -295,7 +253,7 @@ class RestraintRunner(libci.Module):
             job.recipeSet.recipe.append(copy.copy(task))
 
         # We'll need this for restraint
-        job_desc = job.prettify()
+        job_desc = job.prettify(encoding='utf-8')
 
         self.debug('Job:\n{}'.format(job_desc))
 
@@ -427,7 +385,7 @@ class RestraintRunner(libci.Module):
         # to bear.
         assert len(recipe_set.find_all('recipe')) == 1
 
-        guest.debug('Running recipe set:\n{}'.format(recipe_set.prettify()))
+        guest.debug('Running recipe set:\n{}'.format(recipe_set.prettify(encoding='utf-8')))
 
         if guest.supports_snapshots() is True and self.use_snapshots:
             results = self._run_recipe_set_isolated(guest, recipe_set)

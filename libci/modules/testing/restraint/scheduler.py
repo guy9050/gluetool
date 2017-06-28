@@ -94,7 +94,7 @@ class RestraintScheduler(libci.Module):
         (guest, tasks) for runner to process.
         """
 
-        libci.utils.log_blob(self.debug, 'full job description', job_desc.prettify())
+        libci.utils.log_blob(self.debug, 'full job description', job_desc.prettify(encoding='utf-8'))
 
         self._schedule = []
 
@@ -120,13 +120,13 @@ class RestraintScheduler(libci.Module):
 
         for guest, recipe_set in zip(guests, recipe_sets):
             self.debug('guest: {}'.format(str(guest)))
-            self.debug('recipe set:\n{}'.format(recipe_set.prettify()))
+            self.debug('recipe set:\n{}'.format(recipe_set.prettify(encoding='utf-8')))
 
             # remove tags we want to filter out
             for tag in ('distroRequires', 'hostRequires', 'repos', 'partitions'):
                 _remove_tags(recipe_set, tag)
 
-            self.debug('final recipe set:\n{}'.format(recipe_set.prettify()))
+            self.debug('final recipe set:\n{}'.format(recipe_set.prettify(encoding='utf-8')))
 
             self._schedule.append((guest, recipe_set))
 
@@ -152,7 +152,7 @@ class RestraintScheduler(libci.Module):
 
         self.debug('Schedule:')
         for guest, recipe_set in self._schedule:
-            libci.utils.log_blob(self.debug, str(guest), recipe_set.prettify())
+            libci.utils.log_blob(self.debug, str(guest), recipe_set.prettify(encoding='utf-8'))
 
     def execute(self):
         task = self.shared('brew_task')
@@ -174,7 +174,7 @@ class RestraintScheduler(libci.Module):
         wow_output = self._run_wow()
 
         job = bs4.BeautifulSoup(wow_output.stdout, 'xml')
-        self.debug('job as planned by wow:\n{}'.format(job.prettify()))
+        self.debug('job as planned by wow:\n{}'.format(job.prettify(encoding='utf-8')))
 
         self.create_schedule(task, job, image)
 
