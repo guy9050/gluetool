@@ -6,7 +6,7 @@ import enum
 import bs4
 
 import libci
-from libci.utils import format_dict
+from libci.utils import format_dict, log_blob
 from libci.results import TestResult, publish_result
 
 
