@@ -271,7 +271,7 @@ class BeahResultParser(libci.Module):
         if task.roles and task.roles.find_all('system'):
             result['bkr_host'] = task.roles.find_all('system')[0]['value']
 
-        elif journal.hostname:
+        elif journal and journal.hostname:
             result['bkr_host'] = journal.hostname.string.strip()
 
         else:
@@ -303,7 +303,7 @@ class BeahResultParser(libci.Module):
                 } for phase in task.results.find_all('result')
             ]
 
-        elif journal.log:
+        elif journal and journal.log:
             result['bkr_phases'] = [
                 {
                     'name': phase['name'],
