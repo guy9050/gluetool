@@ -265,6 +265,7 @@ def run_command(cmd, logger=None, inspect=False, inspect_callback=None, **kwargs
                     # Not suitable for multiple simultaneous commands. Shuffled output will
                     # ruin your day. And night. And few following weeks, full of debugging, as well.
                     sys.stdout.write(data)
+                    sys.stdout.flush()
 
                 inspect_callback = stdout_write
 
