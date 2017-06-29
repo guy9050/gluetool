@@ -15,19 +15,21 @@ def test_run_command(log, monkeypatch):
     import subprocess
     from libci.utils import run_command, DEVNULL
 
-    def assert_logging(record_count, cmd, stdout=None, stderr=None):
+    def assert_logging(record_count, cmd, stdout=None, stderr=None, stdout_index=2, stderr_index=3):
+        # pylint: disable=too-many-arguments
+
         records = log.records
 
         assert len(records) == record_count
-        assert all([r.levelno == logging.DEBUG for r in records])
+        # assert all([r.levelno == logging.DEBUG for r in records])
 
         assert records[0].message == cmd
 
         if stdout is not None:
-            assert records[2].message == stdout
+            assert records[stdout_index].message == stdout
 
         if stderr is not None:
-            assert records[3].message == stderr
+            assert records[stderr_index].message == stderr
 
     # Accept lists only
     log.clear()
@@ -149,14 +151,23 @@ def test_run_command(log, monkeypatch):
 
     # Don't capture stdout and stderr, let them pass
     log.clear()
-    output = run_command(['/bin/ls', '/'], stdout=libci.utils.PARENT, stderr=libci.utils.PARENT)
-
+    cmd = ['/bin/bash', '-c', 'echo "This goes to stdout"; >&2 echo "This goes to stderr"']
+    output = run_command(cmd, inspect=True)
+    for record in log.records:
+        print 'record: {}'.format(record.message)
     assert output.exit_code == 0
-    assert output.stdout is None
-    assert output.stderr is None
-    assert_logging(4, "run command: cmd='['/bin/ls', '/']', kwargs={'stderr': 'PARENT', 'stdout': 'PARENT'}",
-                   stdout='stdout:\n  command forwarded the output to its parent',
-                   stderr='stderr:\n  command forwarded the output to its parent')
+    assert output.stdout == 'This goes to stdout\n'
+    assert output.stderr == 'This goes to stderr\n'
+    assert_logging(9, "run command: cmd='['/bin/bash', '-c', 'echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"']', kwargs={'stderr': 'PIPE', 'stdout': 'PIPE'}",
+                   stdout_index=7, stdout='stdout:\n---v---v---v---v---v---\nThis goes to stdout\n\n---^---^---^---^---^---',
+                   stderr_index=8, stderr='stderr:\n---v---v---v---v---v---\nThis goes to stderr\n\n---^---^---^---^---^---')
+
+    assert log.records[1].message == "---v---v---v---v---v--- Output of command: \"/bin/bash\" \"-c\" \"echo \"This goes to stdout\"; >&2 echo \"This goes to stderr\"\""
+    assert log.records[2].message == 'output of command is inspected by the caller'
+    assert log.records[3].message == 'following blob-like header and footer are expected to be empty'
+    assert log.records[4].message == 'the captured output will follow them'
+    assert log.records[5].message == '---^---^---^---^---^--- End of command output'
+    assert log.records[6].message == 'command exited with code 0'
 
 
 def test_check_for_commands():
