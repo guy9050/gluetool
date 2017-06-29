@@ -621,7 +621,7 @@ def fixture_module_execute(configured_module, monkeypatch, brew_task):
 
     def shared_mock(key):
         return {
-            'brew_task': brew_task,
+            'task': brew_task,
             'results': ci.shared(key)
         }[key]
     monkeypatch.setattr(module, "shared", shared_mock)
@@ -847,7 +847,7 @@ def test_execute_blacklisted(module_for_execute, log):
 ])
 def test_execute_comparison_silent_fail(module_for_execute, baseline, expected_log_msg, log):
     _, module = module_for_execute
-    type(module.shared("brew_task")).latest = PropertyMock(return_value=baseline)
+    type(module.shared("task")).latest = PropertyMock(return_value=baseline)
     module._config["type"] = "comparison"
     module.execute()
     assert any(record.message == expected_log_msg for record in log.records)

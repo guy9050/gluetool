@@ -139,7 +139,7 @@ def run(result, log, module, monkeypatch, tmpdir):
 
     def mocked_shared(key):
         return {
-            'brew_task': mocked_task
+            'task': mocked_task
         }[key]
 
     monkeypatch.setattr(module, 'shared', mocked_shared)

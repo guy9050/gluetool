@@ -43,7 +43,7 @@ def test_covscan_nobrew(module, monkeypatch):
 
     def mocked_shared(key):
         return {
-            'brew_task': None,
+            'task': None,
             'results': [TestResult(result_type, 'overall_results')]
         }[key]
 
@@ -71,7 +71,7 @@ def test_covscan(module, monkeypatch):
 
     def mocked_shared(key):
         return {
-            'brew_task': mocked_task,
+            'task': mocked_task,
             'results': [mocked_result, mocked_result]
         }[key]
 
@@ -128,7 +128,7 @@ def rpmdiff(result_type, module, monkeypatch):
 
     def mocked_shared(key):
         return {
-            'brew_task': mocked_task,
+            'task': mocked_task,
             'results': [mocked_result, mocked_result]
         }[key]
 
@@ -201,7 +201,7 @@ def functional_testing(test_result, module, monkeypatch):
     def mocked_shared(key, **kwargs):
         # pylint: disable=unused-argument
         return {
-            'brew_task': mocked_task,
+            'task': mocked_task,
             'results': [test_result, test_result],
             'distro': distro,
             'notification_recipients': None
@@ -277,7 +277,7 @@ def test_ci_metricsdata_no_distro(module, monkeypatch):
 
     def mocked_shared(key):
         return {
-            'brew_task': True,
+            'task': True,
             'distro': None
         }[key]
 
@@ -294,7 +294,7 @@ def test_ci_metricsdata_scratch(log, module, monkeypatch):
 
     def mocked_shared(key):
         return {
-            'brew_task': MagicMock(scratch=True),
+            'task': MagicMock(scratch=True),
             'distro': True
         }[key]
 

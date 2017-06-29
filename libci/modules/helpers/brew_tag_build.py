@@ -38,7 +38,7 @@ class CIBrewTagBuild(Module):
         check_for_commands(REQUIRED_CMDS)
 
     def execute(self):
-        task = self.shared('brew_task')
+        task = self.shared('task')
         if not task:
             raise CIError('no brew task found')
 

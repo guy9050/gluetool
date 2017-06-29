@@ -114,7 +114,7 @@ class GuessOpenstackImage(Module):
         self._image = sorted(possible_images, key=lambda x: x.key)[-1].name
 
     def _guess_target_autodetection(self):
-        task = self.shared('brew_task')
+        task = self.shared('task')
         if task is None:
             raise CIError("Using 'target-autodetect' method without a brew task does not work")
 

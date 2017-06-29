@@ -118,7 +118,7 @@ def test_symbolic_recipients(module):
         return Bunch(issuer='foo')
 
     # pylint: disable=protected-access
-    ci._add_shared('brew_task', None, fake_task)
+    ci._add_shared('task', None, fake_task)
 
     assert mod._replace_symbolic_recipients(['bar', '{ISSUER}']) == ['bar', 'foo']
 

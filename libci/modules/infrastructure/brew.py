@@ -298,7 +298,7 @@ class CIBrew(Module):
     Provide various information related to a Brew task. This modules uses koji python module
     to connect to Brew.
 
-    The brew task ID can be passed in using the option '--id' or via the shared `brew_task`
+    The brew task ID can be passed in using the option `--id` or via the shared `task`
     function. When specified via the brew_task function it replaces the BrewTask instance
     previously intialized from the option.
     """
@@ -321,13 +321,13 @@ class CIBrew(Module):
     }
     required_options = ['url']
 
-    shared_functions = ['brew_task']
+    shared_functions = ['task']
 
     def _init_brew_task(self, task_id):
         self.brew_task_instance = BrewTask(self, task_id, self.brew_instance)
         self.info(self.brew_task_instance.full_name)
 
-    def brew_task(self, task_id=None):
+    def task(self, task_id=None):
         """
         Return a BrewTask instance. If task_id passed, initialize BrewTask instance
         from it first.

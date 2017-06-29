@@ -241,7 +241,7 @@ class Beaker(Module):
         if self.option('job'):
             return self._reuse_job(self.option('job'))
 
-        task = self.shared('brew_task')
+        task = self.shared('task')
 
         options = []
 

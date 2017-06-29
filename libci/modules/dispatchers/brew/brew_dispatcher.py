@@ -379,7 +379,7 @@ class CIBrewDispatcher(Module):
 
     @cached_property
     def _rules_locals(self):
-        task = self.shared('brew_task')
+        task = self.shared('task')
 
         def match(pattern, value):
             return re.match(pattern, value) is not None
@@ -684,7 +684,7 @@ class CIBrewDispatcher(Module):
 
         component = self.build['name']
 
-        task = self.shared('brew_task')
+        task = self.shared('task')
         if task is None:
             raise CIError('Need a brew task to continue')
 
