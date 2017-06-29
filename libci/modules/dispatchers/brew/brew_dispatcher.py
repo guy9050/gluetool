@@ -305,7 +305,7 @@ class CIBrewDispatcher(Module):
     """
 
     # Supported flags - keep them alphabetically sorted
-    KNOWN_FLAGS = ('apply-all', 'recipients')
+    KNOWN_FLAGS = ('apply-all', 'recipients', 'options')
 
     name = 'brew-dispatcher'
     description = 'Configurable brew dispatcher'
@@ -441,7 +441,8 @@ class CIBrewDispatcher(Module):
 
             flags = {
                 'apply-all': True,
-                'recipients': None
+                'recipients': None,
+                'options': None
             }
 
             if is_component is True:
@@ -455,6 +456,20 @@ class CIBrewDispatcher(Module):
                     self.warn("Flag '{}' is not supported (typo maybe?)".format(flag), sentry=True)
 
                 self.debug('      final flags:\n{}'.format(format_dict(flags)))
+
+                if flags['options']:
+                    options = flags['options']
+
+                    self.debug('set-wide options set to:\n{}'.format(format_dict(options)))
+
+                    for i, command in enumerate(set_commands):
+                        self.debug('adding set-wide options to command: {}'.format(command))
+
+                        command = '{} {}'.format(command, options)
+
+                        self.debug('with set options applied: {}'.format(command))
+
+                        set_commands[i] = command
 
                 if flags['apply-all'] is True:
                     self.debug("      allows 'all' section to be appended")
