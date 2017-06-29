@@ -70,6 +70,7 @@
             ${pipeline_prepend} \
             notify-recipients ${notify_recipients_options} \
             wow --wow-options="${wow_options}" ${wow_opts} \
+            beah-result-parser \
             jenkins \
             testing-results \
             brew --id $id \

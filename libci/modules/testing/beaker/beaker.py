@@ -8,7 +8,7 @@ import imp
 import bs4
 
 from libci import CIError, SoftCIError, CICommandError, Module, utils
-from libci.utils import run_command, log_blob, format_dict
+from libci.utils import run_command, fetch_url
 from libci.results import TestResult, publish_result
 
 
@@ -103,6 +103,11 @@ class Beaker(Module):
         'jobwatch-options': {
             'help': 'Additional options for beaker-jobwatch'
         },
+        'job': {
+            'help': 'Instead of creating a new run, inspect the existing job ID.',
+            'metavar': 'ID',
+            'type': int
+        },
         'reserve': {
             'help': 'Do not release machines back to Beaker, keep them reserved',
             'action': 'store_true'
@@ -158,123 +163,67 @@ class Beaker(Module):
                 # call the original method to fulfill tcms-results duty
                 super(TaskAggregator, self).recordResult(task, caserun)
 
-                if task.status != 'Completed':
-                    citool_module.warn('Task {0} not completed'.format(task.name))
-                    return
-
-                DEBUG = citool_module.debug
-
-                task_xml = task.xml
-                recipe_xml = task.recipe.xml
-                journal = tcms_results.JournalParser(task)
-
-                DEBUG("task: '{}'".format(task.name))
-                log_blob(DEBUG, 'task XML', task_xml.toprettyxml())
-                DEBUG('task journal:\n{}'.format(format_dict(journal.getDetails())))
-
-                machine = task_xml.getElementsByTagName('roles')[0].getElementsByTagName('system')[0]
-
-                if task.name not in processed_results:
-                    processed_results[task.name] = []
-
-                data = {
-                    'name': task.name,
-                    'bkr_recipe_id': int(task.recipe.id),
-                    'bkr_distrovariant': str(task.recipe.environment),
-                    'bkr_task_id': int(task_xml.attributes['id'].value),
-                    'bkr_version': task_xml.attributes['version'].value,
-                    'bkr_arch': task.recipe.arch,
-                    'bkr_status': task.status,
-                    'bkr_result': task.result,
-                    'bkr_host': machine.attributes['value'].value,
-                    'connectable_host': machine.attributes['value'].value,
-                    'bkr_duration': 0,
-                    'bkr_params': [],
-                    'bkr_packages': [],
-                    'bkr_phases': {},
-                    'bkr_logs': []
-                }
-
-                # convert test duration in a form of %h:%m:%s to simple integer (sec)
-                # note: duration doesn't always need to be there, e.g. when "External
-                # Watchdog Expired"
-                duration = task_xml.attributes.get('duration')
-                if duration is not None:
-                    data['bkr_duration'] = 0
-
-                    days_and_hours = duration.value.split(',')  # "1 day, 23:51:43"
-                    if len(days_and_hours) > 1:
-                        data['bkr_duration'] += int(days_and_hours.pop(0).split(' ')[0]) * 24 * 60 * 60
-
-                    _chunks = [int(_chunk) for _chunk in days_and_hours[0].split(':')]
-                    data['bkr_duration'] += _chunks[0] * 60 * 60 + _chunks[1] * 60 + _chunks[2]
-
-                # store params, if any
-                params_node = task_xml.getElementsByTagName('params')
-
-                # not sure whether params_node would evaluate to False when it's empty
-                # pylint: disable=len-as-condition
-                if len(params_node) > 0:
-                    for param in params_node[0].getElementsByTagName('param'):
-                        # this is caserun.id, safe to ignore
-                        if param.attributes['name'].value == 'CASERUNS':
-                            continue
-
-                        data['bkr_params'].append('%s="%s"' % (param.attributes['name'].value,
-                                                               param.attributes['value'].value))
-
-                # store packages, only unique names
-                packages = {}
-                for phase, phase_packages in journal.getDetails().iteritems():
-                    map(packages.__setitem__, phase_packages, [])
-
-                data['bkr_packages'] = [k.strip() for k in sorted(packages.keys())]
-
-                # store phases
-                results_nodes = task_xml.getElementsByTagName('results')
-                if results_nodes:
-                    for result_node in results_nodes[0].getElementsByTagName('result'):
-                        phase = result_node.attributes['path'].value
-                        result = result_node.attributes['result'].value
-
-                        data['bkr_phases'][phase] = result
-
-                # store log links - job results and journal do not have these, we have to ask
-                # elsewhere...
-                task_id = int(task_xml.attributes['id'].value)
-
+                # possible exceptions are captured by tcms-results' code, and
+                # all we get is just the message - not good enough.
                 try:
-                    output = run_command(['bkr', 'job-logs', 'T:{}'.format(task_id)])
+                    if task.status != 'Completed':
+                        citool_module.warn('Task {0} not completed'.format(task.name))
+                        return
 
-                    for url in output.stdout.strip().splitlines():
-                        url = url.strip()
-                        name = url.split('/')[-1]
+                    # This is XML provided by TCMS code - it lacks few interesting elements :/ But! Maybe we can do
+                    # somethign about that...
+                    task_xml = task.xml
+                    task_id = int(task_xml.attributes['id'].value)
 
-                        data['bkr_logs'].append({
-                            'href': url,
-                            'name': name
-                        })
+                    # Ask Beaker! It can return nice XML, with all those <logs> tags we like so much.
+                    try:
+                        output = run_command(['bkr', 'job-results', 'T:{}'.format(task_id)])
 
-                except CICommandError:
-                    citool_module.warn('Cannot find logs for task {}. See log for details.'.format(task_id),
-                                       sentry=True)
+                        task_xml = bs4.BeautifulSoup(output.stdout, 'xml')
 
-                if not data['bkr_logs']:
-                    # construct at least TESTOUT.log
-                    recipe_id = int(recipe_xml.attributes['id'].value)
+                    except CICommandError:
+                        citool_module.warn('Cannot download result XML task {}. See log for details.'.format(task_id),
+                                           sentry=True)
 
-                    # pylint: disable=line-too-long
-                    url = 'https://beaker.engineering.redhat.com/recipes/{}/tasks/{}/logs/TESTOUT.log'.format(recipe_id, task_id)
+                        # Well, Beaker doesn't like use, then just re-wrap provided XML to BautifulSoup - it's
+                        # one of Python's own XML DOMs, and we should stick with a single XML DOM implementation.
+                        task_xml = bs4.BeautifulSoup(task_xml.toprettyxml())
 
-                    data['bkr_logs'].append({
-                        'href': url,
-                        'name': 'TESTOUT.log'
-                    })
+                    journal_log = task_xml.find('log', attrs={'name': 'journal.xml'})
+                    if journal_log:
+                        _, journal_data = fetch_url(journal_log['href'], logger=citool_module.logger)
+                        journal = bs4.BeautifulSoup(journal_data, 'xml').BEAKER_TEST
 
-                processed_results[task.name].append(data)
+                    else:
+                        journal = None
+
+                    if task.name not in processed_results:
+                        processed_results[task.name] = []
+
+                    recipe_xml = bs4.BeautifulSoup(task.recipe.xml.toprettyxml(), 'xml')
+
+                    processed_results[task.name].append(
+                        citool_module.shared('parse_beah_result',
+                                             task_xml.task, journal=journal, recipe=recipe_xml.recipe)
+                    )
+
+                except Exception as exc:
+                    citool_module.exception('Exception raised while processing the task result: {}'.format(str(exc)))
+                    raise
 
         # Replace the original TaskAggregator class with our custom version
         tcms_results.TaskAggregator = TaskAggregator
+
+    def _reuse_job(self, job_id):
+        # pylint: disable=no-self-use
+
+        try:
+            output = run_command(['bkr', 'job-clone', '--dryrun', '--xml', 'J:{}'.format(job_id)])
+
+        except CICommandError as exc:
+            raise CIError('Failed to re-create the job: {}'.format(exc.output.stderr))
+
+        return [job_id], bs4.BeautifulSoup(output.stdout, 'xml')
 
     def _run_wow(self):
         """
@@ -282,6 +231,9 @@ class Beaker(Module):
 
         :returns: ([job #1 ID, job #2 ID, ...], <job />)
         """
+
+        if self.option('job'):
+            return self._reuse_job(self.option('job'))
 
         task = self.shared('brew_task')
 
@@ -437,6 +389,7 @@ class Beaker(Module):
             self.tcms_results.Results().investigate().update()
 
         except Exception as e:
+            self.error('Failed to process beaker results - the actual exception should have been logged already')
             raise CIError('Failed to process beaker results: {}'.format(str(e)))
 
         # Any single task with a result other than "PASS" - or even with

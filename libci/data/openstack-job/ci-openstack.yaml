@@ -84,6 +84,7 @@
              ansible \
              guest-setup --playbooks=${CITOOL_CONFIG}/guest-setup/openstack-restraint.yaml \
              wow --wow-options="${wow_options}" \
+             beah-result-parser \
              jenkins \
              openstack ${openstack_opts} \
              testing-results \
