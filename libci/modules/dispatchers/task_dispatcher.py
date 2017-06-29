@@ -1,5 +1,5 @@
-import os
 import re
+import os
 import shlex
 import ast
 import _ast
@@ -226,9 +226,9 @@ class Rules(object):
         return eval(self._code, our_globals, our_locals)
 
 
-class CIBrewDispatcher(Module):
+class CITaskDispatcher(Module):
     """
-    A configurable dispatcher for Brew builds.
+    A configurable dispatcher for Brew/Koji builds.
 
     Possible config file formats are::
 
@@ -254,7 +254,7 @@ class CIBrewDispatcher(Module):
             default:
                 - command5
 
-    This allows more fine-grained filtering of commands. This way, when brew build's target
+    This allows more fine-grained filtering of commands. This way, when brew/koji build's target
     is `'rhel-7.4-candidate'`, `command1` and `command2` will be dispatched, `command3` and
     `command4` will be dispatched when target is `'rhel-6.5-z-candidate'`, and for every
     other build, `command5` will run.
@@ -308,7 +308,7 @@ class CIBrewDispatcher(Module):
     # Supported flags - keep them alphabetically sorted
     KNOWN_FLAGS = ('apply-all', 'recipients', 'options')
 
-    name = 'brew-dispatcher'
+    name = ['brew-dispatcher', 'koji-dispatcher']
     description = 'Configurable brew dispatcher'
 
     python_requires = 'PyYAML'
@@ -339,7 +339,7 @@ class CIBrewDispatcher(Module):
             'default': False,
         },
         'target': {
-            'help': 'Package brew target',
+            'help': 'Package target',
         },
         'version': {
             'help': 'Package version',
@@ -465,7 +465,7 @@ class CIBrewDispatcher(Module):
                     set_flags.update(set_commands[0])
                     del set_commands[0]
 
-                for flag in [flag for flag in set_flags.iterkeys() if flag not in CIBrewDispatcher.KNOWN_FLAGS]:
+                for flag in [flag for flag in set_flags.iterkeys() if flag not in CITaskDispatcher.KNOWN_FLAGS]:
                     self.warn("Flag '{}' is not supported (typo maybe?)".format(flag), sentry=True)
 
                 self.debug('final set flags:\n{}'.format(format_dict(set_flags)))
@@ -707,7 +707,7 @@ class CIBrewDispatcher(Module):
 
         task = self.shared('task')
         if task is None:
-            raise CIError('Need a brew task to continue')
+            raise CIError('Need a brew/koji task to continue')
 
         self.debug('find out which config section we should use')
 
