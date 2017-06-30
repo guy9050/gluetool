@@ -26,12 +26,12 @@ class BeahResultParser(libci.Module):
 
         Following blocks describe building blocks of the returned dictionary.
 
-        .. json:object:: Artifact location
 
-           Location of a task artifact - log, journal, attached files, etc.
+        **Artifact location** describes a location (URL) of task artifact - log, journal, attached files, etc. It has
+        the following properties:
 
-           :property str name: name of the artifact as reported in the task results.
-           :property url href: URL of the artifact.
+        - ``name`` (string): name of the artifact as reported in the task results.
+        - ``href`` (string): URL of the artifact.
 
         .. code-block:: json
 
@@ -41,14 +41,11 @@ class BeahResultParser(libci.Module):
            }
 
 
-        .. json:object:: Task phase
+        **Task phase** describes a single phase of a task. It has the following properties:
 
-           One phase of the task.
-
-           :property list logs:
-           :property str name: name of the phase.
-           :property str result: result of the task, usually ``PASS`` or ``FAIL``, but other values may
-               appear as well.
+        * ``logs`` (list): list of `Artifact location` items, listing all logs related to the phase.
+        * ``name`` (string): name of the phase.
+        * ``result`` (string): result of the task, usually ``PASS`` or ``FAIL``, but other values may appear as well.
 
         .. code-block:: json
 
@@ -72,32 +69,30 @@ class BeahResultParser(libci.Module):
            }
 
 
-        .. json:object:: Result
+        **Result** is a description of task result as returned by ``parse_beah_result``. Pretty much every field
+        is optional - keys are always present in the result but the value may be ``null`` or an empty ``dict``
+        or ``list``. It has the following properties:
 
-           Description of task result as returned by ``parse_beah_result``. Pretty much every field is optional - keys
-           are always present in the result but the value may be ``null`` or an empty ``dict`` or ``list``.
-
-           :property str bkr_arch: architecture the task ran on, e.g. ``x86_64``.
-           :property str bkr_distro: distribution installed on the machine, e.g. ``RHEL-7.3``.
-           :property number bkr_duration: duration fo the task, in seconds.
-           :property str bkr_host: hostname of the machine the task ran on, e.g. ``foo.bar.com``.
-           :property list bkr_logs: list of :json:object:`Artifact location` instances, listing task artifacts.
-           :property list bkr_packages: list of strings, listing NVR of packages that were, for some reason,
-               considered interesting by the task.
-           :property list bkr_params: list of strings, in form of ``<NAME>="<VALUE>"``, listing task parameters
-               passed to the task, e.g. ``BEAKERLIB_RPM_DOWNLOAD_METHODS="yum direct"``.
-           :property list bkr_phases: list of :json:object:`Task phase` instances, describing each phase of the task,
-               in the order they were executed.
-           :property int bkr_recipe_id: ID of the recipe that contained this task.
-           :property str bkr_result: result of the task, usually ``PASS`` or ``FAIL``, but other values may
-               appear as well.
-           :property str bkr_status: status of the task, e.g. ``New``, ``Processed``, ``Scheduled``, or, in the case
-               of completed task, ``Completed``.
-           :property int bkr_task_id: ID of the task.
-           :property str bkr_variant: distro variant, e.g. ``Server``.
-           :property str connectable_host: hostname user should use when attempting to connect to the machine, e.g.
-               over ssh.
-           :property str name: task name.
+        * ``bkr_arch`` (string): architecture the task ran on, e.g. ``x86_64``.
+        * ``bkr_distro`` (string): distribution installed on the machine, e.g. ``RHEL-7.3``.
+        * ``bkr_duration`` (number): duration fo the task, in seconds.
+        * ``bkr_host`` (string): hostname of the machine the task ran on, e.g. ``foo.bar.com``.
+        * ``bkr_logs`` (list): list of `Artifact location` instances, listing task artifacts.
+        * ``bkr_packages`` (list): list of strings, listing NVR of packages that were, for some reason,
+            considered interesting by the task.
+        * ``bkr_params`` (list): list of strings, in form of ``<NAME>="<VALUE>"``, listing task parameters
+            passed to the task, e.g. ``BEAKERLIB_RPM_DOWNLOAD_METHODS="yum direct"``.
+        * ``bkr_phases`` (list): list of `Task phase` instances, describing each phase of the task,
+            in the order they were executed.
+        * ``bkr_recipe_id`` (integer): ID of the recipe that contained this task.
+        * ``bkr_result`` (string): result of the task, usually ``PASS`` or ``FAIL``, but other values may
+            appear as well.
+        * ``bkr_status`` (string): status of the task, e.g. ``New``, ``Processed``, ``Scheduled``, or, in the case
+            of completed task, ``Completed``.
+        * ``bkr_task_id`` (integer): ID of the task.
+        * ``bkr_variant`` (string): distro variant, e.g. ``Server``.
+        * ``connectable_host`` (string): hostname user should use when attempting to connect to the machine, e.g. over ssh.
+        * ``name`` (string): task name.
 
         .. code-block:: json
 
@@ -148,7 +143,6 @@ class BeahResultParser(libci.Module):
                "connectable_host": "10.11.12.13",
                "name": "/some/beaker/task"
            }
-
 
 
         :param element task: XML describing task result, usualy produced by Beaker or Restraint job.
