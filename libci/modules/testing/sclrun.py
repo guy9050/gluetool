@@ -113,7 +113,7 @@ class SclRun(libci.Module):
         #
         # add global task parameters
         _task_params = {
-            'BASEOS_CI': 'true'
+            'BASEOS_CI': 'true',
             'BEAKERLIB_RPM_DOWNLOAD_METHODS': 'yum\\ direct'
         }
 
