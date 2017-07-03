@@ -40,19 +40,33 @@ class SclRun(libci.Module):
 
     shared_functions = ['beaker_job_xml']
 
-    def beaker_job_xml(self, options=None, environment=None, task_params=None):
+    def beaker_job_xml(self, options=None, environment=None, task_params=None, setup_phases=None):
         """
         Run sclrun to create beaker job XML.
 
         It does not take care about any SUT installation, it's up to the caller to provide
         necessary options.
 
+        Caller can control what environmental variables are passed to his tasks with ``task_params`` parameter.
+        Each `key/value` pair is passed to ``workflow-tomorrow`` via ``--taskparam="<key>=<value>"`` option. By
+        default, ``beaker_job_xml`` adds following variables:
+
+        * ``BASEOS_CI=true``
+        * ``BASEOS_CI_COMPONENT=<component name>`` - available only when Brew task is available.
+        * ``BEAKERLIB_RPM_DOWNLOAD_METHODS='yum direct'``
+
+        To override any of these variables, simply pass your own value in ``task_params`` parameter.
+
         :param list options: additional options for sclrun (or workflow-tomorrow).
         :param dict environment: if set, it will be passed to the tests via ``--environment``
             option.
         :param dict task_params: if set, params will be passed to the tests via multiple
             ``--taskparam`` options.
-        :returns: libci.utils.ProcessOutput with the output of w-t.
+        :param list setup_phases: if set, it's a list of valus which will be passed to
+            ``workflow-tomorrow`` via multiple ``--setup`` options. If ``None`` is passed,
+            ``['beakerlib']`` is used by default (if you don't want your job to use ``--setup=beakerlib``,
+            use ``setup_phases=[]``).
+        :returns: :py:class:`libci.utils.ProcessOutput` instance with the output of ``workflow-tomorrow``.
         """
 
         self.info('running sclrun to get job description')
@@ -60,6 +74,14 @@ class SclRun(libci.Module):
         options = options or []
         environment = environment or {}
         task_params = task_params or {}
+
+        #
+        # setup phases
+        if setup_phases is None:
+            setup_phases = ['beakerlib']
+
+        for phase in setup_phases:
+            options += ['--setup', phase]
 
         #
         # add options specified on command-line
