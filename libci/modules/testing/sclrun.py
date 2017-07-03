@@ -136,9 +136,8 @@ class SclRun(libci.Module):
         distro = target.rhel
 
         # add '"' to strings containing spaces to prevent bad expansion in sclrun
-        for option in options:
-            if ' ' in option:
-                option = '"' + option + '"'
+        options = [('"{}"'.format(option) if ' ' in option and not option.startswith('"') else option)
+                   for option in options]
 
         #
         # construct command-line
