@@ -5,6 +5,17 @@ import yaml
 import libci
 
 
+class Bunch(object):
+    # pylint: disable=too-few-public-methods
+
+    """
+    Object-like access to a dictionary - useful for many mock objects.
+    """
+
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
 class NonLoadingCI(libci.CI):
     """
     Current CI implementation loads modules and configs when instantiated,

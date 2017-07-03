@@ -15,35 +15,32 @@ def polish(recipients):
 
 class NotifyRecipients(Module):
     """
-    This module gathers and provides lists of notification recipients to other modules.
-    It focuses on people - listing usernames is its main purpose.
+    This module gathers and provides lists of notification recipients. It focuses on people - listing usernames
+    is its main purpose.
 
-    All options accepting names - NAMES - expect comma-separated list of usernames (and
-    will remove white space characters - 'a,c' or '   a  , c   ' are absolutely fine).
+    All options accepting names - ``NAMES`` - expect comma-separated list of usernames (and will remove white
+    space characters - ``'a,c'`` or ``'   a  , c   '`` are absolutely fine).
 
     For each result type, module accepts 3 options:
 
-      - foo-default-notify
+      - ``foo-default-notify``
 
-        Sets the default list of recipients. It's usualy set by CI job, by an admin, or in
-        a config file, and lists people like {ISSUER} and similar "default", calculable
-        recipients.
+        Sets the default list of recipients. It's usualy set by CI job, by an admin, or in a config file, and
+        lists people like ``{ISSUER}`` and similar "default", calculable recipients.
 
-      - foo-add-notify
+      - ``foo-add-notify``
 
-        Extends default list of recipients. If you're fine with sending notifications
-        to default recipients, and you wish only to add more recipients, this option
-        is for you.
+        Extends default list of recipients. If you're fine with sending notifications to default recipients, and
+        you wish only to add more recipients, this option is for you.
 
-      - foo-notify
+      - ``foo-notify``
 
-        Overrides both default and additional recipients. Module will notify this and only
-        this list of recipients.
+        Overrides both default and additional recipients. Module will notify this and only this list of recipients.
 
-    It is possible to use "symbolic" recipients, which will be substituted with the actual
-    value. So far these are available:
+    It is possible to use "symbolic" recipients, which will be substituted with the actual values. So far these
+    are available:
 
-      - {ISSUER} - brew task issuer
+      - ``{ISSUER}`` - task issuer
     """
 
     name = 'notify-recipients'
