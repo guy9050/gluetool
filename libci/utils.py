@@ -36,6 +36,13 @@ def log_blob(logger, intro, blob):
     logger("{}:\n{}\n{}\n{}".format(intro, BLOB_HEADER, blob, BLOB_FOOTER))
 
 
+class Bunch(object):
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
 class ThreadAdapter(ContextAdapter):
     """
     Custom logger adapter, adding thread name as a context.

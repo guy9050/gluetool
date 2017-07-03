@@ -531,13 +531,9 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
         self.warn('Unable to get brew task')
 
-        class DummyTask(object):
-            # pylint: disable=too-few-public-methods
-            def __init__(self, **kwargs):
-                self.__dict__.update(kwargs)
-
-        return DummyTask(task_id='<Task ID not available>', nvr='<NVR not available>',
-                         owner='<Owner not available>', issuer='<No issuer available>')
+        return utils.Bunch(task_id='<Task ID not available>', nvr='<NVR not available>',
+                           owner='<Owner not available>', issuer='<No issuer available>',
+                           target=utils.Bunch(target='<Build target not available>'))
 
     def execute(self):
         results = self.shared('results') or []
