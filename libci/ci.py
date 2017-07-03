@@ -1,3 +1,5 @@
+# pylint: disable=too-many-lines
+
 import argparse
 import ConfigParser
 import imp
@@ -177,6 +179,22 @@ class Configurable(object):
     * dictionary ``<option properties>`` is passed to :py:meth:`argparse.ArgumentParser.add_argument` as
       keyword arguments when the option is being added to the parser, therefore any arguments recognized
       by :py:mod:`argparse` can be used.
+
+    It is also possible to use groups:
+
+        options = [
+            ( <group name>,  <group options> ),
+            ...
+        }
+
+    where
+
+    * ``<group name>`` is the name of the group, e.g. ``Debugging options``
+
+    * ``<group options>`` is the ``dict`` with all group options, as described above.
+
+    This way, you can split pile of options into conceptualy closer groups of options. A single ``dict`` you would
+    have is split into multiple smaller dictionaries, and each one is coupled with the group name in a ``tuple``.
     """
 
     required_options = []
@@ -192,31 +210,39 @@ class Configurable(object):
         def _fail_name(name):
             raise CIError("Option name must be either a string or (<letter>, <string>), '{}' found".format(name))
 
-        for name, params in self.options.iteritems():
-            if isinstance(name, str):
-                if not isinstance(name, str):
+        def _verify_options_dict(options):
+            for name, params in options.iteritems():
+                if isinstance(name, str):
+                    if not isinstance(name, str):
+                        _fail_name(name)
+
+                    self._config[name] = None
+
+                elif isinstance(name, tuple):
+                    if not isinstance(name[0], str) or len(name[0]) != 1:
+                        _fail_name(name)
+
+                    if not isinstance(name[1], str) or len(name[1]) < 2:
+                        _fail_name(name)
+
+                    self._config[name[1]] = None
+
+                else:
                     _fail_name(name)
 
-                self._config[name] = None
+                if 'help' not in params:
+                    continue
 
-            elif isinstance(name, tuple):
-                if not isinstance(name[0], str) or len(name[0]) != 1:
-                    _fail_name(name)
+                # Long help texts can be written using triple quotes and docstring-like
+                # formatting. Convert every help string to a single line string.
+                params['help'] = option_help(params['help'])
 
-                if not isinstance(name[1], str) or len(name[1]) < 2:
-                    _fail_name(name)
+        if isinstance(self.options, dict):
+            _verify_options_dict(self.options)
 
-                self._config[name[1]] = None
-
-            else:
-                _fail_name(name)
-
-            if 'help' not in params:
-                continue
-
-            # Long help texts can be written using triple quotes and docstring-like
-            # formatting. Convert every help string to a single line string.
-            params['help'] = option_help(params['help'])
+        elif isinstance(self.options, (list, tuple)):
+            for _, options in self.options:
+                _verify_options_dict(options)
 
     def _parse_config(self, paths):
         """
@@ -233,18 +259,26 @@ class Configurable(object):
         parser = ConfigParser.ConfigParser()
         parser.read(paths)
 
-        for name in self.options:
-            if isinstance(name, tuple):
-                name = name[1]
+        def _inject_values(options):
+            for name in options.iterkeys():
+                if isinstance(name, tuple):
+                    name = name[1]
 
-            try:
-                value = parser.get('default', name)
+                try:
+                    value = parser.get('default', name)
 
-            except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
-                continue
+                except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
+                    continue
 
-            self._config[name] = value
-            self.debug("Option '{}' set to '{}' by config file".format(name, value))
+                self._config[name] = value
+                self.debug("Option '{}' set to '{}' by config file".format(name, value))
+
+        if isinstance(self.options, dict):
+            _inject_values(self.options)
+
+        elif isinstance(self.options, (list, tuple)):
+            for _, options in self.options:
+                _inject_values(options)
 
     @classmethod
     def _create_args_parser(cls, **kwargs):
@@ -257,14 +291,22 @@ class Configurable(object):
 
         parser = argparse.ArgumentParser(**kwargs)
 
-        for name in sorted(cls.options):
-            if isinstance(name, str):
-                names = ('--{}'.format(name),)
+        def _add_options(group_parser, options):
+            for name in sorted(options.iterkeys()):
+                if isinstance(name, str):
+                    names = ('--{}'.format(name),)
 
-            else:
-                names = ('-{}'.format(name[0]), '--{}'.format(name[1]))
+                else:
+                    names = ('-{}'.format(name[0]), '--{}'.format(name[1]))
 
-            parser.add_argument(*names, **cls.options[name])
+                group_parser.add_argument(*names, **options[name])
+
+        if isinstance(cls.options, dict):
+            _add_options(parser, cls.options)
+
+        elif isinstance(cls.options, (list, tuple)):
+            for group_name, options in cls.options:
+                _add_options(parser.add_argument_group(group_name), options)
 
         return parser
 
@@ -281,37 +323,45 @@ class Configurable(object):
         parser = self._create_args_parser(**kwargs)
 
         # parse the added args
-        options = parser.parse_args(args)
+        args = parser.parse_args(args)
 
         # add the parsed args to options
-        for name, params in self.options.iteritems():
-            if isinstance(name, tuple):
-                name = name[1]
+        def _inject_values(options):
+            for name, params in options.iteritems():
+                if isinstance(name, tuple):
+                    name = name[1]
 
-            dest = params.get('dest', name.replace('-', '_'))
+                dest = params.get('dest', name.replace('-', '_'))
 
-            value = getattr(options, dest)
+                value = getattr(args, dest)
 
-            # if the option was not specified, skip it
-            if value is None and name in self._config:
-                continue
-
-            # do not replace config options with default command line values
-            if name in self._config and self._config[name] is not None:
-                # if default parameter used
-                if 'default' in params and value == params['default']:
+                # if the option was not specified, skip it
+                if value is None and name in self._config:
                     continue
 
-                # with action store_true, the default is False
-                if params.get('action', '') == 'store_true' and value is False:
-                    continue
+                # do not replace config options with default command line values
+                if name in self._config and self._config[name] is not None:
+                    # if default parameter used
+                    if 'default' in params and value == params['default']:
+                        continue
 
-                # with action store_false, the default is True
-                if params.get('action', '') == 'store_false' and value is True:
-                    continue
+                    # with action store_true, the default is False
+                    if params.get('action', '') == 'store_true' and value is False:
+                        continue
 
-            self._config[name] = value
-            self.debug("Option '{}' set to '{}' by command-line".format(name, value))
+                    # with action store_false, the default is True
+                    if params.get('action', '') == 'store_false' and value is True:
+                        continue
+
+                self._config[name] = value
+                self.debug("Option '{}' set to '{}' by command-line".format(name, value))
+
+        if isinstance(self.options, dict):
+            _inject_values(self.options)
+
+        elif isinstance(self.options, (list, tuple)):
+            for _, options in self.options:
+                _inject_values(options)
 
     def parse_config(self):
         """
@@ -491,54 +541,60 @@ class Module(Configurable):
 
 
 class CI(Configurable):
-    options = {
-        ('c', 'colors'): {
-            'help': 'Colorize logging on the terminal',
-            'action': 'store_true'
-        },
-        ('V', 'version'): {
-            'help': 'Print version',
-            'action': 'store_true'
-        },
-        ('d', 'debug'): {
-            'help': 'Raise terminal output verbosity to DEBUG (the most verbose)',
-            'action': 'store_true'
-        },
-        ('v', 'verbose'): {
-            'help': 'Raise terminal output verbosity to VERBOSE (one step below DEBUG)',
-            'action': 'store_true'
-        },
-        ('q', 'quiet'): {
-            'help': 'Silence info messages',
-            'action': 'store_true'
-        },
-        ('o', 'output'): {
-            'help': 'Output *everything* to given file, with highest verbosity enabled'
-        },
-        ('i', 'info'): {
-            'help': 'Print command-line that would re-run the citool session',
-            'action': 'store_true'
-        },
-        ('l', 'list'): {
-            'help': 'List all available modules',
-            'action': 'append',
-            'nargs': '?',
-            'const': True
-        },
-        'data-path': {
-            'help': 'Specify data path'
-        },
-        'module-path': {
-            'help': 'Specify one or more directories with modules (IMPORTANT: works only with configuration file)',
-            'metavar': 'DIR',
-            'action': 'append'
-        },
-        ('r', 'retries'): {
-            'help': 'Number of retries',
-            'type': int,
-            'default': 0
-        }
-    }
+    options = [
+        ('Global options', {
+            ('l', 'list'): {
+                'help': 'List all available modules',
+                'action': 'append',
+                'nargs': '?',
+                'const': True
+            },
+            ('r', 'retries'): {
+                'help': 'Number of retries',
+                'type': int,
+                'default': 0
+            },
+            ('V', 'version'): {
+                'help': 'Print version',
+                'action': 'store_true'
+            }
+        }),
+        ('Output control', {
+            ('c', 'colors'): {
+                'help': 'Colorize logging on the terminal',
+                'action': 'store_true'
+            },
+            ('d', 'debug'): {
+                'help': 'Raise terminal output verbosity to DEBUG (the most verbose)',
+                'action': 'store_true'
+            },
+            ('i', 'info'): {
+                'help': 'Print command-line that would re-run the citool session',
+                'action': 'store_true'
+            },
+            ('o', 'output'): {
+                'help': 'Output *everything* to given file, with highest verbosity enabled'
+            },
+            ('q', 'quiet'): {
+                'help': 'Silence info messages',
+                'action': 'store_true'
+            },
+            ('v', 'verbose'): {
+                'help': 'Raise terminal output verbosity to VERBOSE (one step below DEBUG)',
+                'action': 'store_true'
+            }
+        }),
+        ('Directories', {
+            'data-path': {
+                'help': 'Specify data path'
+            },
+            'module-path': {
+                'help': 'Specify one or more directories with modules (IMPORTANT: works only with configuration file)',
+                'metavar': 'DIR',
+                'action': 'append'
+            }
+        })
+    ]
 
     def sentry_submit_exception(self, exc_info, **kwargs):
         """
