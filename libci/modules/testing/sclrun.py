@@ -94,6 +94,8 @@ class SclRun(libci.Module):
 
         if self.has_shared('product'):
             _environment['product'] = self.shared('product')
+        else:
+            _environment['product'] = "rhscl"
 
         # incorporate changes demanded by user
         _environment.update(environment)
@@ -112,6 +114,7 @@ class SclRun(libci.Module):
         # add global task parameters
         _task_params = {
             'BASEOS_CI': 'true'
+            'BEAKERLIB_RPM_DOWNLOAD_METHODS': 'yum\\ direct'
         }
 
         task = self.shared('brew_task')
@@ -145,7 +148,7 @@ class SclRun(libci.Module):
             '--decision',  # show desicions about including/not including task in the job
             '--collection=' + scl,
             '--distro=' + distro,
-            '--environment product=rhscl'   # propagate product for relevancy rules
+            '--environment product=' + _environment['product']'  # propagate product for relevancy rules
         ] + options
 
         #
