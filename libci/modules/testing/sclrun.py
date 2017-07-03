@@ -148,7 +148,7 @@ class SclRun(libci.Module):
             '--decision',  # show desicions about including/not including task in the job
             '--collection=' + scl,
             '--distro=' + distro,
-            '--environment product=' + _environment['product']'  # propagate product for relevancy rules
+            '--environment product=' + _environment['product']  # propagate product for relevancy rules
         ] + options
 
         #
