@@ -14,6 +14,33 @@ def fixture_module():
     return create_module(libci.modules.helpers.notify_recipients.NotifyRecipients)
 
 
+@pytest.fixture(name='configured_module')
+def fixture_configured_module(module):
+    ci, mod = module
+
+    # This is a carefully constructed set of recipients, excercising different features
+    # we want to test. Not all tests use the "configured" version of module, and of those
+    # who does, not all check every of the recipient options, they are usually exclusive.
+
+    # pylint: disable=protected-access
+    mod._config.update({
+        'beaker-notify': ['def', 'ghi'],
+        'boc-notify': ['pqr, {FOO}'],
+        'restraint-notify': ['mno'],
+        'rpmdiff-add-notify': ['jkl, abc', 'abc'],
+        'covscan-default-notify': ['uvw'],
+        'foo-notify': 'xyz',
+        'foo-default-notify': ['def', 'ghi'],
+        'foo-add-notify': ['lkm', 'qwe, tgv']
+    })
+
+    mod.symbolic_recipients = {
+        'FOO': 'some foo recipient'
+    }
+
+    return ci, mod
+
+
 def test_sanity(module):
     _, _ = module
 
@@ -42,15 +69,14 @@ def test_polish():
     assert polish(('foo', 'bar', 'baz', 'baz', 'foo')) == ['bar', 'baz', 'foo']
 
 
-def test_option_to_recipients_empty(module):
+@pytest.mark.parametrize('recipients', [None, ''])
+def test_option_to_recipients_empty(module, recipients):
     _, mod = module
 
     # pylint: disable=protected-access
-    mod._config['foo'] = None
-    mod._config['bar'] = ''
+    mod._config['foo'] = recipients
 
     assert mod.option_to_recipients('foo') == []
-    assert mod.option_to_recipients('bar') == []
 
 
 def test_option_to_recipients_multiple(module):
@@ -89,67 +115,61 @@ def test_symbolic_recipients(module):
     assert mod.symbolic_recipients == {'ISSUER': 'foo'}
 
 
-def test_recipients(module):
-    _, mod = module
+def test_recipients(configured_module):
+    """
+    Tests whether *-default-notify and *-add-notify are correctly merged.
+    """
+
+    _, mod = configured_module
+
+    # Configured module has foo-notify set, and that'd override our test
+    # pylint: disable=protected-access
+    del mod._config['foo-notify']
+
+    assert mod._recipients_by_result('foo') == ['def', 'ghi', 'lkm', 'qwe', 'tgv']
+
+
+def test_notify_recipients(configured_module):
+    """
+    Tests whether *-notify overrides *-default-notify and *-add-notify.
+    """
+
+    _, mod = configured_module
 
     # pylint: disable=protected-access
-    mod._config.update({
-        'foo-default-notify': ['def', 'ghi'],
-        'foo-add-notify': ['jkl, abc', 'abc']
-    })
-
-    assert mod._recipients_by_result('foo') == ['def', 'ghi', 'jkl', 'abc', 'abc']
+    assert mod._recipients_by_result('foo') == ['xyz']
 
 
-def test_notify_recipients(module):
-    _, mod = module
+def test_notify_force_recipients(configured_module):
+    """
+    Tests whether force-recipients overrides result-specific options.
+    """
 
-    # pylint: disable=protected-access
-    mod._config.update({
-        'foo-notify': ['this', 'overrided', 'others'],
-        'foo-default-notify': ['def', 'ghi'],
-        'foo-add-notify': ['jkl, abc', 'abc']
-    })
-
-    assert mod._recipients_by_result('foo') == ['this', 'overrided', 'others']
-
-
-def test_notify_force_recipients(module):
-    _, mod = module
+    _, mod = configured_module
 
     # pylint: disable=protected-access
-    mod._config.update({
-        'force-recipients': ['even', 'more', 'powerful'],
-        'foo-notify': ['this', 'overrided', 'others'],
-        'foo-default-notify': ['def', 'ghi'],
-        'foo-add-notify': ['jkl, abc', 'abc']
-    })
+    mod._config['force-recipients'] = ['even', 'more', 'powerful']
 
     assert mod._recipients_by_result('foo') == ['even', 'more', 'powerful']
 
 
-def test_overall_recipients(module):
-    _, mod = module
+def test_overall_recipients(configured_module):
+    """
+    Testes whether it's possible to get recipients for all known result types.
+    """
+
+    _, mod = configured_module
 
     # pylint: disable=protected-access
-    mod._config.update({
-        'beaker-notify': ['def', 'ghi'],
-        'boc-notify': ['pqr, zuv'],
-        'restraint-notify': ['mno'],
-        'rpmdiff-add-notify': ['jkl, abc', 'abc'],
-        'covscan-default-notify': ['uvw'],
-        'foo-notify': 'xyz'
-    })
-
-    assert mod._recipients_overall() == ['def', 'ghi', 'pqr', 'zuv', 'uvw', 'mno', 'jkl', 'abc', 'abc']
+    assert mod._recipients_overall() == ['def', 'ghi', 'pqr', '{FOO}', 'uvw', 'mno', 'jkl', 'abc', 'abc']
 
 
-def test_finalize_recipients(log, module):
-    _, mod = module
+def test_finalize_recipients(log, configured_module):
+    """
+    Tests finalization of recipient lists.
+    """
 
-    mod.symbolic_recipients = {
-        'FOO': 'some foo recipient',
-    }
+    _, mod = configured_module
 
     # pylint: disable=protected-access
     assert mod._finalize_recipients(['foo', '{BAR}', 'bar', '{FOO}', 'baz']) \
@@ -158,41 +178,22 @@ def test_finalize_recipients(log, module):
     assert log.records[0].levelno == logging.WARN
 
 
-def test_notification_recipients_overall(module):
-    _, mod = module
+@pytest.mark.parametrize('result_type,expected_recipients', [
+    # Without result type, return all recipients
+    (None, ['abc', 'def', 'ghi', 'jkl', 'mno', 'pqr', 'some foo recipient', 'uvw']),
+    # With specific type, return just its recipients
+    ('beaker', ['def', 'ghi']),
+    ('boc', ['pqr', 'some foo recipient']),
+    ('covscan', ['uvw']),
+    ('foo', ['xyz']),
+    ('restraint', ['mno']),
+    ('rpmdiff', ['abc', 'jkl'])
+])
+def test_notification_recipients_overall(configured_module, result_type, expected_recipients):
+    """
+    Tests whether correct recipients are returned for different result types.
+    """
 
-    mod.symbolic_recipients = {
-        'FOO': 'some foo recipient',
-    }
+    _, mod = configured_module
 
-    # pylint: disable=protected-access
-    mod._config.update({
-        'beaker-notify': ['def', 'ghi'],
-        'boc-notify': ['pqr, {FOO}'],
-        'restraint-notify': ['mno'],
-        'rpmdiff-add-notify': ['jkl, abc', 'abc'],
-        'covscan-default-notify': ['uvw'],
-        'foo-notify': 'xyz'
-    })
-
-    assert mod.notification_recipients() == ['abc', 'def', 'ghi', 'jkl', 'mno', 'pqr', 'some foo recipient', 'uvw']
-
-
-def test_notification_recipients_single(module):
-    _, mod = module
-
-    mod.symbolic_recipients = {
-        'FOO': 'some foo recipient',
-    }
-
-    # pylint: disable=protected-access
-    mod._config.update({
-        'beaker-notify': ['def', 'ghi'],
-        'boc-notify': ['pqr, {FOO}'],
-        'restraint-notify': ['mno'],
-        'rpmdiff-add-notify': ['jkl, abc', 'abc'],
-        'covscan-default-notify': ['uvw'],
-        'foo-notify': 'xyz'
-    })
-
-    assert mod.notification_recipients(result_type='boc') == ['pqr', 'some foo recipient']
+    assert mod.notification_recipients(result_type=result_type) == expected_recipients
