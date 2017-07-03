@@ -101,7 +101,7 @@ class SclRun(libci.Module):
         _environment.update(environment)
 
         options += [
-            '--environment'
+            '--environment',
             ' && '.join(['{}={}'.format(k, v) for k, v in _environment.iteritems()])
         ] if _environment else []
 
@@ -146,8 +146,7 @@ class SclRun(libci.Module):
             '--dry',  # this will make sclrun to print job description in XML
             '--decision',  # show desicions about including/not including task in the job
             '--collection=' + scl,
-            '--distro=' + distro,
-            '--environment product=' + _environment['product']  # propagate product for relevancy rules
+            '--distro=' + distro
         ] + options
 
         #
