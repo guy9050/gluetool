@@ -38,6 +38,14 @@ class RestraintScheduler(libci.Module):
     """
 
     name = 'restraint-scheduler'
+    options = {
+        'install-build-not-task': {
+            'help': """Try to install the build instead of the task. This option can help with some non-scratch tasks
+that don't provide RPMs on their web page anymore. You should be fine without this option most of the time, but
+you may need it when dealing some older builds.""",
+            'action': 'store_true'
+        }
+    }
 
     shared_functions = ['schedule']
 
@@ -75,18 +83,37 @@ class RestraintScheduler(libci.Module):
 
         return self.shared('beaker_job_xml', options=options)
 
-    def _setup_guest(self, task_id, guest):
+    def _setup_guest(self, task, guest):
         # pylint: disable=no-self-use
 
         """
         Run necessary command to prepare guest for following procedures.
         """
 
-        guest.debug('setting the guest up')
-        guest.setup(variables={
+        # Variables are passed to Ansible playbook, and that playbook passes them to environment
+        # of executed command - which means, that when the variable does not exist, Ansible will
+        # crash.
+        variables = {
             'BREW_METHOD': 'install',
-            'BREW_TASKS': str(task_id)
-        })
+            'BREW_TASKS': '',
+            'BREW_BUILDS': ''
+        }
+
+        if self.option('install-build-not-task'):
+            if task.scratch:
+                # pylint: disable=line-too-long
+                self.warn('Asked to install SUT by the build ID, but the task is a scratch build - falling back to installing by the task ID.')
+
+                variables['BREW_TASKS'] = str(task.task_id)
+
+            else:
+                variables['BREW_BUILDS'] = str(task.build_id)
+
+        else:
+            variables['BREW_TASKS'] = str(task.task_id)
+
+        guest.debug('setting the guest up')
+        guest.setup(variables=variables)
 
     def create_schedule(self, task, job_desc, image):
         """
@@ -133,7 +160,7 @@ class RestraintScheduler(libci.Module):
             # setup guest
             thread_name = 'setup-guest-{}'.format(guest.name)
             thread = utils.WorkerThread(guest.logger,
-                                        self._setup_guest, fn_args=(task.task_id, guest,),
+                                        self._setup_guest, fn_args=(task, guest,),
                                         name=thread_name)
             setup_threads.append(thread)
 

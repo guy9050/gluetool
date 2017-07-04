@@ -108,6 +108,13 @@ class Beaker(Module):
             'metavar': 'ID',
             'type': int
         },
+        'install-build-not-task': {
+            'help': """Try to install the build instead of the task. This option can help with some non-scratch tasks
+that don't provide RPMs on their web page anymore. You should be fine without this option most of the time, but
+you may need it when dealing some older builds.""",
+            'action': 'store_true',
+            'default': False
+        },
         'reserve': {
             'help': 'Do not release machines back to Beaker, keep them reserved',
             'action': 'store_true'
@@ -241,11 +248,23 @@ class Beaker(Module):
 
         if task is not None:
             options += [
-                '--brew-task', str(task.task_id),
                 '--first-testing-task', '/distribution/runtime_tests/verify-nvr-installed',
                 '--whiteboard',
                 'CI run {} brew task id {} build target {}'.format(task.nvr, task.task_id, task.target.target)
             ]
+
+            if self.option('install-build-not-task'):
+                if task.scratch:
+                    # pylint: disable=line-too-long
+                    self.warn('Asked to install SUT by the build ID, but the task is a scratch build - falling back to installing by the task ID.')
+
+                    options += ['--brew-task', str(task.task_id)]
+
+                else:
+                    options += ['--brew-build', str(task.build_id)]
+
+            else:
+                options += ['--brew-task', str(task.task_id)]
 
         # we could use --reserve but we must be sure the reservesys is *the last* taskin the recipe
         # users may require their own "last" tasks and --last-task is mightier than mere --reserve.
