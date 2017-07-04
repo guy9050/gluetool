@@ -29,7 +29,7 @@ class CIMakeBusMessages(Module):
         """
         return self.messages
 
-    def process_rpmdiff(self, result):
+    def process_rpmdiff_analysis(self, result):
         for subresult in result.payload:
             headers = {
                 'CI_TYPE': 'resultsdb',
@@ -41,6 +41,15 @@ class CIMakeBusMessages(Module):
             }
 
             self.store(result.test_type, Message(headers=headers, body=subresult))
+
+    def process_rpmdiff_comparison(self, result):
+        """
+        Process rpmdiff comparison results. This function just calls rpmdiff analysis handler,
+        as the processing is the same here. The process_* functions are named according to the
+        test type and for rpmdiff we have two test types: rpmdiff-analysis and rpmdiff-comparison,
+        thus the need to have a separate handler method.
+        """
+        self.process_rpmdiff_analysis(result)
 
     def process_covscan(self, result):
         task = self.shared('brew_task')
@@ -150,14 +159,15 @@ class CIMakeBusMessages(Module):
         self.store(result.test_type, Message(headers=headers, body=body))
 
     def process_result(self, result):
-        process_function = getattr(self, 'process_{}'.format(result.test_type), None)
+        # in case the results type is a multi word, replace '-' with '_' to get a valid function name
+        process_function = getattr(self, 'process_{}'.format(result.test_type.replace('-', '_')), None)
         if process_function is not None:
             # we're sure process_function *is* callable
             # pylint: disable=not-callable
             process_function(result)
             self.info('{} results processed'.format(result.test_type))
         else:
-            self.warn("skipping unsupported result type '{}'".format(result.test_type))
+            self.warn("skipping unsupported result type '{}'".format(result.test_type), sentry=True)
 
     def execute(self):
         results = self.shared('results') or []
