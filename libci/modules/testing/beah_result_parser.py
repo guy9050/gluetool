@@ -16,6 +16,201 @@ class BeahResultParser(libci.Module):
 
     shared_functions = ('parse_beah_result',)
 
+    def _find_architecture(self, result, task, journal, recipe):
+        # Architecture is not in <task/> but journal and recipe seem to be a reliable sources
+
+        # pylint: disable=unused-argument
+
+        if recipe and 'arch' in recipe.attrs:
+            result['bkr_arch'] = recipe['arch']
+
+        elif journal and journal.arch:
+            result['bkr_arch'] = journal.arch.string.strip()
+
+        else:
+            self.warn('Cannot deduce architecture')
+
+    def _find_connectable_host(self, result, connectable_hostname):
+        # Connectable hostname
+
+        # pylint: disable=no-self-use
+
+        if connectable_hostname is not None:
+            result['connectable_host'] = connectable_hostname
+
+        else:
+            result['connectable_host'] = result['bkr_host']
+
+    def _find_distro(self, result, task, journal, recipe):
+        # Distro
+
+        # pylint: disable=unused-argument
+
+        if recipe and 'distro' in recipe.attrs:
+            result['bkr_distro'] = recipe['distro']
+
+        else:
+            self.warn('Cannot deduce recipe distro')
+
+    def _find_duration(self, result, task, journal, recipe):
+        # Task duration - Beaker provides this info in <task/>, restraint does not but it's possible
+        # it stores the data into journal
+
+        # pylint: disable=unused-argument
+
+        if task and task.has_attr('duration'):
+            duration = 0
+
+            days_and_hours = task['duration'].split(',')  # "1 day, 23:51:43"
+
+            if len(days_and_hours) > 1:
+                duration += int(days_and_hours.pop(0).split(' ')[0]) * 86400
+
+            _chunks = [int(_chunk) for _chunk in days_and_hours[0].split(':')]
+            duration += _chunks[0] * 3600 + _chunks[1] * 60 + _chunks[2]
+
+            result['bkr_duration'] = duration
+
+        elif journal and journal.starttime and journal.endtime:
+            starttime = ' '.join(journal.starttime.string.strip().split(' ')[0:-1])
+            endtime = ' '.join(journal.endtime.string.strip().split(' ')[0:-1])
+
+            started = datetime.datetime.strptime(starttime, '%Y-%m-%d %H:%M:%S')
+            ended = datetime.datetime.strptime(endtime, '%Y-%m-%d %H:%M:%S')
+
+            result['bkr_duration'] = int((ended - started).total_seconds())
+
+        else:
+            self.warn('Cannot deduce task duration')
+
+    def _find_machine(self, result, task, journal, recipe):
+        # Machine the task ran on
+
+        # pylint: disable=unused-argument
+
+        if task and task.roles and task.roles.find_all('system'):
+            result['bkr_host'] = task.roles.find_all('system')[0]['value']
+
+        elif journal and journal.hostname:
+            result['bkr_host'] = journal.hostname.string.strip()
+
+        else:
+            self.warn('Cannot deduce hostname')
+
+    def _find_packages(self, result, task, journal, recipe):
+        # Packages - sometimes they are listed, sometimes not, but always in journal
+
+        # pylint: disable=unused-argument
+
+        if journal:
+            packages = {}
+
+            for pkgdetails in journal.find_all('pkgdetails'):
+                if pkgdetails.has_attr('sourcerpm'):
+                    packages[pkgdetails['sourcerpm']] = True
+
+                packages[pkgdetails.string.strip()] = True
+
+            result['bkr_packages'] = [k.strip() for k in sorted(packages.keys())]
+
+        else:
+            self.warn('Cannot deduce involved packages')
+
+    def _find_params(self, result, task, journal, recipe):
+        # Task params are just in <task/>
+
+        # pylint: disable=unused-argument
+
+        if task and task.params:
+            result['bkr_params'] = [
+                '{}=\"{}\"'.format(param['name'], param['value']) for param in task.params.find_all('param')
+            ]
+
+        else:
+            self.warn('Cannot deduce task parameters')
+
+    def _find_recipe_id(self, result, task, journal, recipe):
+        # Recipe ID is only in recipe
+
+        # pylint: disable=unused-argument
+
+        if recipe and 'id' in recipe.attrs:
+            result['bkr_recipe_id'] = int(recipe['id'])
+
+        else:
+            self.warn('Cannot deduce recipe ID')
+
+    def _find_variant(self, result, task, journal, recipe):
+        # Distro variant is only in recipe
+
+        # pylint: disable=unused-argument
+
+        if recipe and 'variant' in recipe.attrs:
+            result['bkr_variant'] = recipe['variant']
+
+        else:
+            self.warn('Cannot deduce recipe variant')
+
+    def _find_version(self, result, task, journal, recipe):
+        # Version - restraint does not export this
+
+        # pylint: disable=unused-argument
+
+        if task and task.has_attr('version'):
+            result['bkr_version'] = task['version']
+
+        else:
+            self.warn('Cannot deduce bkr version')
+
+    def _find_logs(self, root, artifact_path):
+        # pylint: disable=no-self-use
+        if root.logs is None:
+            return []
+
+        logs = root.logs.find_all('log')
+        if not logs:
+            return []
+
+        if not artifact_path:
+            def _artifact_path_nop(s):
+                return s
+
+            artifact_path = _artifact_path_nop
+
+        name_attr = 'name' if 'name' in logs[0].attrs else 'filename'
+        path_attr = 'href' if 'href' in logs[0].attrs else 'path'
+
+        return [
+            {
+                'name': str(log[name_attr]),
+                'href': treat_url(artifact_path(log[path_attr]))
+            } for log in logs
+        ]
+
+    def _find_phases(self, result, task, journal, artifact_path):
+        # Task phases are in <task/>, or, lacking some information, in journal
+
+        if task and task.results:
+            result['bkr_phases'] = [
+                {
+                    'name': phase['path'],
+                    'result': phase['result'],
+                    'logs': self._find_logs(phase, artifact_path)
+                } for phase in task.results.find_all('result')
+            ]
+
+        elif journal and journal.log:
+            result['bkr_phases'] = [
+                {
+                    'name': phase['name'],
+                    'result': phase['result'],
+                    'logs': self._find_logs(phase, artifact_path)
+                } for phase in journal.log.find_all('phase')
+            ]
+
+        else:
+            self.warn('Cannot deduce task phases')
+
     def parse_beah_result(self, task, journal=None, recipe=None, artifact_path=None, connectable_hostname=None):
         # pylint: disable=line-too-long
 
@@ -163,30 +358,6 @@ class BeahResultParser(libci.Module):
 
         # pylint: disable=too-many-arguments,too-many-branches,too-many-statements
 
-        if not artifact_path:
-            def _artifact_path_nop(s):
-                return s
-
-            artifact_path = _artifact_path_nop
-
-        def _logs(root):
-            if root.logs is None:
-                return []
-
-            logs = root.logs.find_all('log')
-            if not logs:
-                return []
-
-            name_attr = 'name' if 'name' in logs[0].attrs else 'filename'
-            path_attr = 'href' if 'href' in logs[0].attrs else 'path'
-
-            return [
-                {
-                    'name': log[name_attr],
-                    'href': treat_url(artifact_path(log[path_attr]))
-                } for log in logs
-            ]
-
         log_blob(self.debug, 'task XML', task.prettify(encoding='utf-8'))
 
         if journal:
@@ -208,14 +379,14 @@ class BeahResultParser(libci.Module):
             'bkr_duration': 0,
             'bkr_host': None,
             'connectable_host': None,
-            'bkr_logs': _logs(task),
+            'bkr_logs': self._find_logs(task, artifact_path),
             'bkr_packages': [],
             'bkr_params': [],
             'bkr_phases': [],
             'bkr_recipe_id': None,
             'bkr_result': task['result'],
             'bkr_status': task['status'],
-            'bkr_task_id': task['id'],
+            'bkr_task_id': int(task['id']),
             'bkr_version': None
         }
 
@@ -228,127 +399,11 @@ class BeahResultParser(libci.Module):
         # whether e.g. journal is set, but it's better structured wrt. what key comes
         # from which source.
 
-        # Task duration - Beaker provides this info in <task/>, restraint does not but it's possible
-        # it stores the data into journal
-        if task.has_attr('duration'):
-            days_and_hours = task['duration'].split(',')  # "1 day, 23:51:43"
+        for bit in ('architecture', 'distro', 'duration', 'machine', 'packages', 'params', 'recipe_id', 'variant',
+                    'version'):
+            getattr(self, '_find_{}'.format(bit))(result, task, journal, recipe)
 
-            if len(days_and_hours) > 1:
-                result['bkr_duration'] += int(days_and_hours.pop(0).split(' ')[0]) * 86400
-
-            _chunks = [int(_chunk) for _chunk in days_and_hours[0].split(':')]
-            result['bkr_duration'] += _chunks[0] * 3600 + _chunks[1] * 60 + _chunks[2]
-
-        elif journal:
-            starttime = ' '.join(journal.starttime.string.strip().split(' ')[0:-1])
-            endtime = ' '.join(journal.endtime.string.strip().split(' ')[0:-1])
-
-            started = datetime.datetime.strptime(starttime, '%Y-%m-%d %H:%M:%S')
-            ended = datetime.datetime.strptime(endtime, '%Y-%m-%d %H:%M:%S')
-
-            result['bkr_duration'] = (ended - started).total_seconds()
-
-        else:
-            self.warn('Cannot deduce task duration')
-
-        # Architecture is not in <task/> but journal and recipe seem to be a reliable sources
-        if recipe and 'arch' in recipe.attrs:
-            result['bkr_arch'] = recipe['arch']
-
-        elif journal and journal.arch:
-            result['bkr_arch'] = journal.arch.string.strip()
-
-        else:
-            self.warn('Cannot deduce architecture')
-
-        # Machine the task ran on
-        if task.roles and task.roles.find_all('system'):
-            result['bkr_host'] = task.roles.find_all('system')[0]['value']
-
-        elif journal and journal.hostname:
-            result['bkr_host'] = journal.hostname.string.strip()
-
-        else:
-            self.warn('Cannot deduce hostname')
-
-        # Connectable hostname
-        if connectable_hostname is not None:
-            result['connectable_host'] = connectable_hostname
-
-        else:
-            result['connectable_host'] = result['bkr_host']
-
-        # Task params are just in <task/>
-        if task.params:
-            result['bkr_params'] = [
-                '{}=\"{}\"'.format(param['name'], param['value']) for param in task.params.find_all('param')
-            ]
-
-        else:
-            self.warn('Cannot deduce task parameters')
-
-        # Task phases are in <task/>, or, lacking some information, in journal
-        if task.results:
-            result['bkr_phases'] = [
-                {
-                    'name': phase['path'],
-                    'result': phase['result'],
-                    'logs': _logs(phase)
-                } for phase in task.results.find_all('result')
-            ]
-
-        elif journal and journal.log:
-            result['bkr_phases'] = [
-                {
-                    'name': phase['name'],
-                    'result': phase['result'],
-                    'logs': _logs(phase)
-                } for phase in journal.log.find_all('phase')
-            ]
-
-        else:
-            self.warn('Cannot deduce task phases')
-
-        # Version - restraint does not export this
-        if task.has_attr('version'):
-            result['bkr_version'] = task['version']
-
-        else:
-            self.warn('Cannot deduce bkr version')
-
-        # Packages - sometimes they are listed, sometimes not, but always in journal
-        if journal:
-            packages = {}
-
-            for pkgdetails in journal.find_all('pkgdetails'):
-                if pkgdetails.has_attr('sourcerpm'):
-                    packages[pkgdetails['sourcerpm']] = True
-
-                packages[pkgdetails.string.strip()] = True
-
-            result['bkr_packages'] = [k.strip() for k in sorted(packages.keys())]
-
-        else:
-            self.warn('Cannot deduce involved packages')
-
-        # Recipe ID
-        if recipe and 'id' in recipe.attrs:
-            result['bkr_recipe_id'] = int(recipe['id'])
-
-        else:
-            self.warn('Cannot deduce recipe ID')
-
-        # Additional environment info
-        if recipe and 'distro' in recipe.attrs:
-            result['bkr_distro'] = recipe['distro']
-
-        else:
-            self.warn('Cannot deduce recipe distro')
-
-        if recipe and 'variant' in recipe.attrs:
-            result['bkr_variant'] = recipe['variant']
-
-        else:
-            self.warn('Cannot deduce recipe variant')
+        self._find_phases(result, task, journal, artifact_path)
+        self._find_connectable_host(result, connectable_hostname)
 
         return result
