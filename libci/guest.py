@@ -204,6 +204,10 @@ baseurl={}
         self.create_file(os.path.join(os.sep, 'etc', 'yum.repos.d', '{}.repo'.format(name)), repo)
 
 
+def sshize_options(options):
+    return sum([['-o', option] for option in options], [])
+
+
 class NetworkedGuest(Guest):
     # pylint reports some abstract methods are not implemented by this method.
     # That is expected, methods create_snapshot, restore_snapshot, destroy
@@ -250,7 +254,7 @@ class NetworkedGuest(Guest):
             self._ssh += ['-i', key]
             self._scp += ['-i', key]
 
-        options = sum([['-o', option] for option in self.options], [])
+        options = sshize_options(self.options)
 
         self._ssh += options
         self._scp += options
@@ -268,8 +272,12 @@ class NetworkedGuest(Guest):
     def _execute(self, cmd, **kwargs):
         return libci.utils.run_command(cmd, logger=self.logger, **kwargs)
 
-    def execute(self, cmd, **kwargs):
-        return self._execute(self._ssh + [self.hostname] + [cmd], **kwargs)
+    def execute(self, cmd, ssh_options=None, **kwargs):
+        # pylint: disable=arguments-differ
+
+        ssh_options = ssh_options or []
+
+        return self._execute(self._ssh + sshize_options(ssh_options) + [self.hostname] + [cmd], **kwargs)
 
     def wait_alive(self, echo_timeout=None, echo_tick=30, **kwargs):
         self.debug('waiting for guest to become alive')
@@ -298,7 +306,7 @@ class NetworkedGuest(Guest):
 
         def check_echo():
             try:
-                output = self.execute("echo '{}'".format(msg))
+                output = self.execute("echo '{}'".format(msg), ssh_options=['ConnectTimeout={:d}'.format(echo_tick)])
 
                 if output.stdout.strip() == msg:
                     return True

@@ -24,6 +24,9 @@ MAX_IMAGE_ACTIVATION = 60
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
+WAIT_ECHO_TIMEOUT = 120
+WAIT_ECHO_TICK = 10
+
 
 class OpenstackGuest(NetworkedGuest):
     """
@@ -187,7 +190,8 @@ class OpenstackGuest(NetworkedGuest):
 
         """
 
-        return self.wait_alive(timeout=self._module.option('activation-time'), tick=1, echo_timeout=20, echo_tick=5)
+        return self.wait_alive(timeout=self._module.option('activation-time'), tick=1, echo_timeout=WAIT_ECHO_TIMEOUT,
+                               echo_tick=WAIT_ECHO_TICK)
 
     def create_snapshot(self):
         """
