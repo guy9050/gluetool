@@ -186,7 +186,7 @@ class CIRpmdiff(Module):
         def _parse_results(data):
             parsed_results = []
             for result in data['results']:
-                description = re.sub('[^a-z]', '_', result['test']['description'].lower())
+                description = re.sub('[^a-z0-9]', '_', result['test']['description'].lower())
                 parsed_results.append({
                     'data': {
                         'item': item,
