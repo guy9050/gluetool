@@ -1,5 +1,5 @@
 import re
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 import psycopg2
 import requests
 from requests_kerberos import HTTPKerberosAuth, OPTIONAL
@@ -35,8 +35,29 @@ ERRATA_AUTOWAIVER_URL = "https://errata.devel.redhat.com/rpmdiff/show_autowaive_
 RPMDIFF_WEBUI_COMMENT = "Autowaived with citool with these rules: {}"
 
 
+class RpmDiffError(object):
+    # pylint: disable=too-few-public-methods
+    """
+    Helper class as data container for errors in RPMDiff Web UI
+
+    :param str error_type: possible values (Passed, Info, Waived, Needs inspection, Failed)
+    :param str subpackage: subpackage where the error was found
+    :param str message: message of error against which waiver's regexp is executed
+    """
+    def __init__(self, error_type, subpackage, message):
+        self.error_type = error_type
+        self.subpackage = subpackage
+        self.message = message
+
+
 class RpmDiffWaiverMatcher(object):
     # pylint: disable=too-few-public-methods
+    """
+    Helper class for matching RPMDiff test errors against waivers
+
+    :param list(RpmDiffError) errors: list of errors
+    :param list waivers: list of waivers
+    """
 
     def __init__(self, errors, waivers):
         self.errors = errors
@@ -44,12 +65,21 @@ class RpmDiffWaiverMatcher(object):
         self.matched = []
 
     def can_waive(self):
+        """
+        :rtype: bool
+        :returns: True if all errors are matched by some waivers, False otherwise
+        """
         for error in self.errors:
             if not self._waivers_match(error):
                 return False
         return True
 
     def _waivers_match(self, error):
+        """
+        :param RpmDiffError error: Error
+        :rtype: bool
+        :returns: True if error is matched by some of waivers, False otherwise
+        """
         for waiver in self.waivers:
             if error.subpackage != waiver.subpackage:
                 continue
@@ -61,8 +91,10 @@ class RpmDiffWaiverMatcher(object):
 
 class RpmDiffWaiver(Module):
     """
-    Helper module - give it a rpmdiff run Id, it will autowaive results,
-    according to autowaivers in Errata tool.
+    This module is OSBSOLETE.
+    Module waive RPMDiff results according to autowaivers in Errata tool.
+    It is expected to run this module after RpmDiff and PostgreSQL module.
+    To run module manually, take a look at module options.
 
     Below is an example of the yaml mapping file.
 
@@ -101,6 +133,14 @@ class RpmDiffWaiver(Module):
     shared_functions = ['waive_results']
 
     def query_waivers(self, package, product_versions):
+        """
+        Query waivers from database
+
+        :param str package: package name for which waivers will be queried
+        :param tuple product_versions: allowed package product versions
+        :rtype: dict
+        :returns: waiver lists in dictionary, key is test name
+        """
         cursor = self.shared("postgresql_cursor")
         search = {
             'package': package,
@@ -114,6 +154,13 @@ class RpmDiffWaiver(Module):
         return categorized
 
     def query_product_versions(self, brew_tag):
+        """
+        Query existing product versions in Errata database
+
+        :param str brew_tag: Brew tag to search
+        :rtype: tuple
+        :returns: found product versions
+        """
         cursor = self.shared("postgresql_cursor")
         search = {
             'brew_tag': brew_tag
@@ -122,6 +169,16 @@ class RpmDiffWaiver(Module):
         return tuple(row.product_version for row in cursor.fetchall())
 
     def _map_tag_to_product(self, brew_tag):
+        """
+        Try to map Brew tag to product versions, there are two types of mapping:
+
+        * automatic with help of Errata database
+        * manual by mapping file provided with --mapping option
+
+        :param str brew_tag: Brew tag to search
+        :rtype: tuple
+        :returns: found mapped product versions
+        """
         if self.mapping and brew_tag in self.mapping.keys():
             product_versions = self.mapping[brew_tag]
             if isinstance(product_versions, basestring):
@@ -146,10 +203,16 @@ class RpmDiffWaiver(Module):
 
     @staticmethod
     def _download_errors(link):
+        """
+        Download and parse errors for single test defined by link
+
+        :param str link: URL link to single test of run in RPMDiff WebUI
+        :rtype: list(RpmDiffError)
+        :returns: all found errors in this test
+        """
         rows = BeautifulSoup(requests.get(link).text, "html.parser") \
             .find("table", attrs={"class": "result"}) \
             .find("table").find_all("tr")
-        error = namedtuple('RpmDiffError', 'error_type subpackage message')
         errors = []
         # Remove column names
         rows.pop(0)
@@ -157,14 +220,19 @@ class RpmDiffWaiver(Module):
             columns = row.find_all("td")
             error_type = columns[0].find("b").getText().strip()
             if error_type.lower() in RPMDIFF_RESULTS_TO_WAIVE:
-                errors.append(error(
-                    error_type=error_type,
-                    subpackage=columns[1].getText().strip(),
-                    message=columns[2].find("pre").getText()
-                ))
+                errors.append(
+                    RpmDiffError(error_type, columns[2].getText().strip(), columns[4].find("pre").getText())
+                )
         return errors
 
     def waive_test(self, link, comment):
+        """
+        Execute POST request to RPMDiff WebUI to waive single test
+
+        :param str link: URL link to RPMDiff test
+        :param str comment: comment describing waiving reason
+        :raise libci.CIError: if POST request or authentication failed
+        """
         # try kerberos login
         session = requests.session()
         url = self.option("url") + "/auth/login/?next=/"
@@ -187,12 +255,23 @@ class RpmDiffWaiver(Module):
                           .format(waive_request.status_code))
 
     def log_waivers(self, waivers):
+        """
+        Helper function to log waivers in friendly format
+
+        :param list waivers: list of waivers
+        """
         self.info("found waivers: {}".format(sum(len(waiver) for waiver in waivers.itervalues())))
         for test_waivers in waivers.itervalues():
             for waiver in test_waivers:
                 self.debug("{}: {}".format(waiver.test, waiver))
 
     def waive_result(self, test_link, waivers):
+        """
+        Check if it is possible to waive single test result, if yes execute waiving
+
+        :param bs4.element.Tag test_link: Tag
+        :param list waivers: list of waivers
+        """
         url = self.option('url')
         test_name = test_link.getText()
         self.info("looking into test '{}'".format(test_name))
@@ -219,9 +298,13 @@ class RpmDiffWaiver(Module):
 
     def waive_results(self, run_id, package, target):
         """
-        Waive results.
+        Shared function to check and waive RPMDiff results.
 
-        :param str run_id: run id of rpmdiff run.
+        :param str run_id: ID of rpmdiff run
+        :param str package: package name
+        :param str target: Brew target/tag
+        :raises libci.CIError: if *postgresql* module is not included before this module
+        :raises libci.CIError: if WebUI does not return expected webpage
         """
         self.info("run-id: {}, package: {}, target: {}".format(run_id, package, target))
         if not run_id:
@@ -279,6 +362,12 @@ class RpmDiffWaiver(Module):
             self.shared("refresh_rpmdiff_results", run_id)
 
     def rpmdiff_id_from_results(self):
+        """
+        Searches for RPMDiff result of type *rpmdiff* within shared function *results*
+
+        :rtype: int or None
+        :returns: ID of RPMDiff run if such result is found
+        """
         if not self.has_shared("results"):
             self.warn('cannot obtain run-id, shared function \'results\' does not exist')
             return None
