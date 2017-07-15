@@ -1,7 +1,8 @@
 import subprocess
 import re
+import sys
 
-FILE_NAME = 'citool'
+FILE_NAME = sys.argv[1] if len(sys.argv) > 1 else 'citool'
 
 CONDITION_FRAME = '''elif [[ ${prev} == %s ]] ; then
             COMPREPLY=( $(compgen -W "${%s}" -- ${cur}) )
@@ -60,6 +61,9 @@ def main():
     variable_names = ''
     modules_opts = ''
     conditions = ''
+
+    # be verbose
+    print "generating bash completion script in '{}', this might take a while".format(FILE_NAME)
 
     for module_name in list_modules:
         module_variable = '{}_opts'.format(re.sub('-', '_', module_name))
