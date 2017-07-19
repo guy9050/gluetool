@@ -36,7 +36,7 @@ Please, see the documentation on CI configuration and what is required to correc
 a component [1], current configuration [2], and/or consult with component's QE how to resolve
 this situation.
 
-[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Documentation/UserHOWTO#AddthecomponenttoCI
+[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/UserHOWTO#EnableCIforacomponent
 [2] https://gitlab.cee.redhat.com/baseos-qe/citool-config/raw/production/brew-dispatcher.yaml
     """
 
@@ -57,7 +57,7 @@ Please, see the documentation on CI configuration and what is required to correc
 a component [1], current configuration [2], and/or consult with component's QE how to resolve
 this situation.
 
-[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Documentation/UserHOWTO#AddthecomponenttoCI
+[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/UserHOWTO#EnableCIforacomponent
 [2] https://gitlab.cee.redhat.com/baseos-qe/citool-config/raw/production/brew-dispatcher.yaml
     """
 
