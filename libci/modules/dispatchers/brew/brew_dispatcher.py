@@ -69,7 +69,7 @@ class CommandsError(SoftCIError):
 Please, review the configuration of your component, for documentation on how to
 enable CI for a component and how to configure it see our How To page ([1]).
 
-[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Documentation/UserHOWTO#AddthecomponenttoCI
+[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/UserHOWTO#EnableCIforacomponent
     """
 
     def __init__(self, message, commands):
