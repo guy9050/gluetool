@@ -105,7 +105,8 @@ class RpmDiffWaiver(Module):
          - RHEL-7.1-EUS
          - RHEL-7.1.Z
          
-    Note that this modules will be obsoleted once autowaivers are implemented directly in RPMdiff. This is a part of the Errata Tool / RPMdiff decoupling effort.
+    Note that this module will be obsoleted once autowaivers are implemented directly in RPMdiff.
+    This is a part of the Errata Tool / RPMdiff decoupling effort.
     """
 
     name = 'rpmdiff-waiver'
