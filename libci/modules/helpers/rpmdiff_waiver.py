@@ -91,7 +91,6 @@ class RpmDiffWaiverMatcher(object):
 
 class RpmDiffWaiver(Module):
     """
-    This module is OSBSOLETE.
     Module waive RPMDiff results according to autowaivers in Errata tool.
     It is expected to run this module after RpmDiff and PostgreSQL module.
     To run module manually, take a look at module options.
@@ -105,6 +104,8 @@ class RpmDiffWaiver(Module):
        rhel-7.1-z-candidate:
          - RHEL-7.1-EUS
          - RHEL-7.1.Z
+         
+    Note that this modules will be obsoleted once autowaivers are implemented directly in RPMdiff. This is a part of the Errata Tool / RPMdiff decoupling effort.
     """
 
     name = 'rpmdiff-waiver'
