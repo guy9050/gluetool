@@ -6,6 +6,7 @@ from libci import CIError, SoftCIError, CICommandError
 
 class NoTestAvailableError(SoftCIError):
     SUBJECT = 'No tests found for component'
+    MODULE_NAME = 'sclrun'
     BODY = """
 
 CI could not find any suitable tests for the component. This can have many different causes, e.g.:
