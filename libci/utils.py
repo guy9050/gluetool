@@ -512,6 +512,9 @@ def load_yaml(filepath, logger=None):
     :raises libci.ci.CIError: if it was not possible to successfully load content of the file.
     """
 
+    if not filepath:
+        raise CIError('File path is not valid: {}'.format(filepath))
+
     logger = logger or Logging.get_logger()
 
     real_filepath = os.path.expanduser(filepath)
