@@ -56,6 +56,10 @@
           name: notify_email_options
           default: ''
           description: 'Additional options for notify-email module.'
+      - string:
+          name: timeout_duration
+          default: '24h'
+          description: 'Kill the build when it is still running after this period of time.'
     properties:
       - build-discarder:
           num-to-keep: 500
@@ -78,6 +82,7 @@
              notify_email_opts="--add-reservation"
            fi
 
+           timeout --preserve-status --foreground --signal=SIGTERM ${timeout_duration} \
            citool -c -i -o citool-debug.txt \
              ${pipeline_prepend} \
              notify-recipients ${notify_recipients_options} \

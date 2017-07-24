@@ -575,6 +575,11 @@ class CI(Configurable):
             ('o', 'output'): {
                 'help': 'Output *everything* to given file, with highest verbosity enabled'
             },
+            ('p', 'pid'): {
+                'help': 'Log PID of citool process',
+                'nargs': '?',
+                'const': True
+            },
             ('q', 'quiet'): {
                 'help': 'Silence info messages',
                 'action': 'store_true'
