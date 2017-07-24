@@ -47,33 +47,38 @@ class NotifyRecipients(Module):
     description = 'Notification module - recipient management'
 
     supported_result_types = ('beaker', 'boc', 'covscan', 'restraint', 'rpmdiff')
+    result_type_names = ('Beaker', 'Build-on-commit', 'Covscan', 'Restraint', 'RPMdiff')
 
-    options = {
-        'force-recipients': {
-            'help': 'If set, it will override all recipient settings - all notifications will go to these people',
-            'metavar': 'NAMES'
-        }
-    }
-
-    # Per-result-type notify lists
-    for result_type in supported_result_types:
-        options.update({
-            '{}-notify'.format(result_type): {
-                'help': 'Notify only the listed recipients.',
-                'metavar': 'NAMES',
-                'action': 'append'
-            },
-            '{}-default-notify'.format(result_type): {
-                'help': 'Default list of recipients. Default: ""',
-                'metavar': 'NAMES',
-                'action': 'append'
-            },
-            '{}-add-notify'.format(result_type): {
-                'help': 'Extends default list of recipients.',
-                'metavar': 'NAMES',
-                'action': 'append'
+    options = [
+        ('Global options', {
+            'force-recipients': {
+                'help': 'If set, it will override all recipient settings - all notifications will go to these people',
+                'metavar': 'NAMES'
             }
         })
+    ]
+
+    # Per-result-type notify lists
+    for result_name, result_type in zip(result_type_names, supported_result_types):
+        options.append((
+            '{} recipients'.format(result_name), {
+                '{}-notify'.format(result_type): {
+                    'help': 'Notify only the listed recipients.',
+                    'metavar': 'NAMES',
+                    'action': 'append'
+                },
+                '{}-default-notify'.format(result_type): {
+                    'help': 'Default list of recipients. Default: ""',
+                    'metavar': 'NAMES',
+                    'action': 'append'
+                },
+                '{}-add-notify'.format(result_type): {
+                    'help': 'Extends default list of recipients.',
+                    'metavar': 'NAMES',
+                    'action': 'append'
+                }
+            }
+        ))
 
     shared_functions = ['notification_recipients']
 
