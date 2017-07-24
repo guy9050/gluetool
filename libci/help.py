@@ -20,6 +20,11 @@ import docutils.nodes
 import docutils.parsers.rst
 import docutils.writers
 import sphinx.writers.text
+import sphinx.locale
+
+
+# Initialize Sphinx locale settings
+sphinx.locale.init([os.path.split(sphinx.locale.__file__)], None)
 
 
 DEFAULT_WIDTH = 80
@@ -207,8 +212,10 @@ def option_help(txt):
     # Remove leading whitespace - this won't hurt anyone, and helps docstring-like texts
     trimmed = trim_docstring(txt)
 
+    processed = rst2text(trimmed)
+
     # Merge all lines into a single line
-    return ' '.join(trimmed.splitlines())
+    return ' '.join(processed.splitlines())
 
 
 def function_help(func, name=None):

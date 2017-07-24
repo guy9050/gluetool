@@ -13,7 +13,23 @@
       - string:
           name: id
           default: ''
-          description: 'Brew task ID'
+          description: 'Brew task ID.'
+      - string:
+          name: pipeline_prepend
+          default: ''
+          description: 'citool options that will be added at the beginning of citool pipeline'
+      - string:
+          name: pipeline_append
+          default: ''
+          description: 'citool options that will be added at the end of citool pipeline'
+      - string:
+          name: notify_recipients_options
+          default: ''
+          description: 'Additional options for notify-recipients module.'
+      - string:
+          name: notify_email_options
+          default: ''
+          description: 'Additional options for notify-email module.'
     wrappers:
       - ansicolor:
           colormap: xterm
@@ -21,6 +37,7 @@
     builders:
       - shell:
           citool -c -i -o citool-debug.txt
+                 ${pipeline_prepend}
                  notify-recipients ${notify_recipients_options}
                  jenkins
                  testing-results
@@ -31,7 +48,8 @@
                  rpmdiff-waiver
                  make-bus-messages
                  publisher-ci-bus
-                 notify-email
+                 notify-email ${notify_email_options}
+                 ${pipeline_append}
     properties:
       - build-discarder:
           num-to-keep: 500

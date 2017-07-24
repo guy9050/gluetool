@@ -1,35 +1,31 @@
-import os
 from libci import Module
-from libci import CIError
-from libci import utils
-
-JOB_NAME = 'ci-openstack'
+from libci.dispatch_job import DispatchJenkinsJobMixin
+from libci.utils import cached_property, dict_update
 
 
-class CIOpenstackJob(Module):
+class OpenStackJob(DispatchJenkinsJobMixin, Module):
     """
-    CI module for testing packages using OpenStack guests and restraint harness.
+    Jenkins job module dispatching OpenStack-based testing pipeline, as defined in ``ci-openstack.yaml`` file.
 
-    Expects brew task id on the input (either via command-line option or env variable).
+    .. note::
 
-    The Jenkins job is described in ci-openstack.yaml file.
+       Value of the ``--id`` option is, by default, first searched in the environment, at it is expected
+       to be set by Jenkins' machinery, e.g. by the ``redhat-ci-plugin``.
+
+    .. note::
+
+       This module dispatches a Jenkins job, therefore it requires other module to provide connection
+       to a Jenkins instance via the shared function ``jenkins``.
     """
 
     name = 'openstack-job'
     description = 'Run package tests using restraint and OpenStack guest'
 
-    options = {
-        'id': {
-            'help': 'Brew task id.',
-        },
-        'pipeline-prepend': {
-            'help': 'citool options that will be added at the beginning of citool pipeline'
-        },
-        'pipeline-append': {
-            'help': 'citool options that will be added at the end of citool pipeline'
-        },
+    job_name = 'ci-openstack'
+
+    options = dict_update({}, DispatchJenkinsJobMixin.options, {
         'guess-product-options': {
-            'help': 'Additional options for guess-product module.'
+            'help': 'Additional options for ``guess-product`` module.'
         },
         'guess-beaker-distro-options': {
             'help': 'Additional options for guess-beaker-distro module.'
@@ -42,54 +38,17 @@ class CIOpenstackJob(Module):
         },
         'restraint-runner-options': {
             'help': 'Additional options for restraint-runner module.'
-        },
-        'notify-recipients-options': {
-            'help': 'Additional options for notify-recipients module',
-            'action': 'append',
-            'default': []
-        },
-        'notify-email-options': {
-            'help': 'Additional options for notify-email module'
         }
-    }
+    })
 
-    required_options = ['wow-options']
+    required_options = ('wow-options',)
 
-    _task_id = None
-
-    def sanity(self):
-        self._task_id = self.option('id') or os.environ.get('id', None)
-
-        if not self._task_id:
-            raise CIError('Brew task id not found')
-
-    def execute(self):
-        jenkins = self.shared('jenkins')
-        if jenkins is None:
-            raise CIError('No jenkins connection found')
-
-        notify_recipients_options = self.option('notify-recipients-options')
-        if notify_recipients_options:
-            notify_recipients_options = ' '.join(notify_recipients_options)
-
-        else:
-            notify_recipients_options = None
-
-        build_params = {
-            'id': self._task_id,
-            'pipeline_prepend': self.option('pipeline-prepend'),
-            'pipeline_append': self.option('pipeline-append'),
+    @cached_property
+    def build_params(self):
+        return dict_update(super(OpenStackJob, self).build_params, {
             'guess_product_options': self.option('guess-product-options'),
             'guess_beaker_distro_options': self.option('guess-beaker-distro-options'),
             'guess_openstack_image_options': self.option('guess-openstack-image-options'),
             'wow_options': self.option('wow-options'),
             'restraint_runner_options': self.option('restraint-runner-options'),
-            'notify_recipients_options': notify_recipients_options,
-            'notify_email_options': self.option('notify-email-options')
-        }
-
-        self.debug('build params:\n{}'.format(utils.format_dict(build_params)))
-
-        jenkins[JOB_NAME].invoke(build_params=build_params)
-
-        self.info("invoked job '{}' with given parameters".format(JOB_NAME))
+        })

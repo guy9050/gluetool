@@ -32,6 +32,34 @@ BLOB_HEADER = '---v---v---v---v---v---'
 BLOB_FOOTER = '---^---^---^---^---^---'
 
 
+def dict_update(dst, *args):
+    """
+    Python's ``dict.update`` does not return the dictionary just updated but a ``None``. This function
+    is a helper that does updates the dictionary *and* returns it. So, instead of:
+
+    .. code-block:: python
+
+       d.update(other)
+       return d
+
+    you can use:
+
+    .. code-block:: python
+
+       return dict_update(d, other)
+
+    :param dict dst: dictionary to be updated.
+    :param args: dictionaries to update ``dst`` with.
+    """
+
+    for other in args:
+        assert isinstance(other, dict)
+
+        dst.update(other)
+
+    return dst
+
+
 def log_blob(logger, intro, blob):
     logger("{}:\n{}\n{}\n{}".format(intro, BLOB_HEADER, blob, BLOB_FOOTER))
 
