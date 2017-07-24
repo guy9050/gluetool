@@ -54,7 +54,7 @@ def main():
 
     # first item of list is not a name of module
     list_modules.pop(0)
-    # citool is also some kind of module in this case
+    # citool is also some kind of module for this moment
     list_modules.append('citool')
 
     # this strings will be merged into frame
@@ -78,6 +78,7 @@ def main():
 
         conditions += CONDITION_FRAME % (module_name, module_variable)
 
+    list_modules.remove('citool')
     list_modules = ' '.join(list_modules)
 
     output_text = MAIN_FRAME % (variable_names, list_modules, modules_opts, conditions)
