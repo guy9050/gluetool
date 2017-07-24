@@ -8,7 +8,7 @@ import sys
 import stomp
 
 import libci
-from libci.utils import format_dict
+from libci.log import format_dict
 
 
 DEFAULT_BUS_HOST = 'ci-bus.lab.eng.rdu2.redhat.com'

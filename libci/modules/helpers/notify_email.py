@@ -10,6 +10,7 @@ from mako.template import Template
 
 import libci
 from libci import Module, utils
+from libci.log import log_blob, format_dict
 
 
 DEFAULT_MODULE_DOCS_URL = 'http://liver3.lab.eng.brq.redhat.com/~citool-doc/'
@@ -175,7 +176,7 @@ class Message(object):
         self._module.debug("Bcc: '{}'".format(', '.join(self.cc)))
         self._module.debug("Sender: '{}'".format(self.sender))
         self._module.debug("Subject: '{}'".format(self.subject))
-        utils.log_blob(self._module.debug, 'Content', content)
+        log_blob(self._module.debug, 'Content', content)
 
         try:
             smtp = smtplib.SMTP(self._module.option('smtp-server'))
@@ -370,7 +371,7 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
                 fails[name].append(run_summary)
 
-        self.debug('found fails:\n{}'.format(utils.format_dict(fails)))
+        self.debug('found fails:\n{}'.format(format_dict(fails)))
 
         return fails
 

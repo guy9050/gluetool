@@ -2,7 +2,8 @@ import re
 import koji
 from bs4 import BeautifulSoup
 from libci import CIError, SoftCIError, Module
-from libci.utils import cached_property, format_dict, fetch_url
+from libci.log import log_dict
+from libci.utils import cached_property, fetch_url
 
 BREW_API_TOPURL = "http://download.eng.bos.redhat.com/brewroot"
 BREW_WEB_URL = 'https://brewweb.engineering.redhat.com/brew/'
@@ -58,7 +59,7 @@ class BrewTask(object):
         if not task_info:
             raise CIError("brew task '{}' not found".format(self.task_id))
 
-        self._module.debug('task info:\n{}'.format(format_dict(task_info)))
+        log_dict(self._module.debug, 'task info', task_info)
 
         return task_info
 

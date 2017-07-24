@@ -9,7 +9,7 @@ import sys
 import ast
 
 from .help import LineWrapRawTextHelpFormatter, option_help, docstring_to_help
-from .log import Logging, ContextAdapter, ModuleAdapter
+from .log import Logging, ContextAdapter, ModuleAdapter, log_dict
 
 
 CONFIGS = ['/etc/citool.d/citool', os.path.expanduser('~/.citool.d/citool')]
@@ -252,9 +252,7 @@ class Configurable(object):
         :param list paths: List of paths to possible configuration files.
         """
 
-        from .utils import format_dict
-
-        self.debug('Loading configuration from following paths:\n{}'.format(format_dict(paths)))
+        log_dict(self.debug, 'Loading configuration from following paths', paths)
 
         parser = ConfigParser.ConfigParser()
         parser.read(paths)

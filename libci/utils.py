@@ -4,7 +4,6 @@ Various helpers.
 
 import collections
 import errno
-import json
 import os
 import re
 import subprocess
@@ -18,7 +17,7 @@ import urlnorm
 import mako
 
 from libci import CIError, CICommandError
-from libci.log import Logging, ContextAdapter
+from libci.log import Logging, ContextAdapter, log_blob, BlobLogger, format_dict
 
 
 try:
@@ -26,10 +25,6 @@ try:
     from subprocess import DEVNULL
 except ImportError:
     DEVNULL = open(os.devnull, 'wb')
-
-
-BLOB_HEADER = '---v---v---v---v---v---'
-BLOB_FOOTER = '---^---^---^---^---^---'
 
 
 def dict_update(dst, *args):
@@ -58,10 +53,6 @@ def dict_update(dst, *args):
         dst.update(other)
 
     return dst
-
-
-def log_blob(logger, intro, blob):
-    logger("{}:\n{}\n{}\n{}".format(intro, BLOB_HEADER, blob, BLOB_FOOTER))
 
 
 class Bunch(object):
@@ -306,37 +297,35 @@ def run_command(cmd, logger=None, inspect=False, inspect_callback=None, **kwargs
 
             inputs = (p_stdout, p_stderr)
 
-            logger.info('{} Output of command: {}'.format(BLOB_HEADER, format_command_line([cmd])))
+            with BlobLogger('Output of command: {}'.format(format_command_line([cmd])), outro='End of command output',
+                            writer=logger.info):
+                logger.debug("output of command is inspected by the caller")
+                logger.debug('following blob-like header and footer are expected to be empty')
+                logger.debug('the captured output will follow them')
 
-            logger.debug("output of command is inspected by the caller")
-            logger.debug('following blob-like header and footer are expected to be empty')
-            logger.debug('the captured output will follow them')
-
-            # As long as process runs, keep calling callbacks with incoming data
-            while True:
-                for stream in inputs:
-                    inspect_callback(stream, stream.read())
-
-                if p.poll() is not None:
-                    break
-
-                # give up OS' attention and let others run
-                time.sleep(0.1)
-
-            # OK, process finished but we have to wait for our readers to finish as well
-            p_stdout.wait()
-            p_stderr.wait()
-
-            for stream in inputs:
+                # As long as process runs, keep calling callbacks with incoming data
                 while True:
-                    data = stream.read()
+                    for stream in inputs:
+                        inspect_callback(stream, stream.read())
 
-                    if data in ('', None):
+                    if p.poll() is not None:
                         break
 
-                    inspect_callback(stream, data)
+                    # give up OS' attention and let others run
+                    time.sleep(0.1)
 
-            logger.info('{} End of command output'.format(BLOB_FOOTER))
+                # OK, process finished but we have to wait for our readers to finish as well
+                p_stdout.wait()
+                p_stderr.wait()
+
+                for stream in inputs:
+                    while True:
+                        data = stream.read()
+
+                        if data in ('', None):
+                            break
+
+                        inspect_callback(stream, data)
 
             stdout, stderr = p_stdout.content, p_stderr.content
 
@@ -425,15 +414,6 @@ def format_command_line(cmdline):
         cmd.append('    ' + _format_options(row))
 
     return ' \\\n'.join(cmd)
-
-
-def format_dict(dictionary):
-    # Use custom "default" handler, to at least encode obj's repr() output when
-    # json encoder does not know how to encode such class
-    def default(obj):
-        return repr(obj)
-
-    return json.dumps(dictionary, sort_keys=True, indent=4, separators=(',', ': '), default=default)
 
 
 def fetch_url(url, logger=None, success_codes=(200,)):

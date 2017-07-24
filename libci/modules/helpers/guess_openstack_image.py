@@ -2,7 +2,8 @@ import collections
 import re
 
 from libci import CIError, SoftCIError, Module
-from libci.utils import cached_property, format_dict, PatternMap
+from libci.log import format_dict
+from libci.utils import cached_property, PatternMap
 
 
 class IncompatibleOptionsError(SoftCIError):

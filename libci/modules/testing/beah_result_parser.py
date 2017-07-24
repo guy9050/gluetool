@@ -1,7 +1,8 @@
 import datetime
 
 import libci
-from libci.utils import treat_url, log_blob
+from libci.log import log_blob
+from libci.utils import treat_url
 
 
 class BeahResultParser(libci.Module):

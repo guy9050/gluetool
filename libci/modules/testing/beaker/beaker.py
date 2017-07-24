@@ -8,6 +8,7 @@ import imp
 import bs4
 
 from libci import CIError, SoftCIError, CICommandError, Module, utils
+from libci.log import BlobLogger
 from libci.utils import run_command, fetch_url
 from libci.results import TestResult, publish_result
 
@@ -401,15 +402,24 @@ you may need it when dealing some older builds.""",
         finally:
             sys.argv = old_argv
 
+        # tcms-results just dumps its output to its (our...) sys.stdout/stderr, and does not allow for better
+        # control all we can do is to flush stdout and stderr before doing any more logging from our code, to
+        # avoid having tcms-results' output messing with our messages.
+        def _flush_stdouts(*args, **kwargs):
+            # pylint: disable=unused-argument
+
+            sys.stdout.flush()
+            sys.stderr.flush()
+
         # Now "run" tcms-results, to get a view on the results
-        self.info('tcms-results are working')
+        with BlobLogger('Output of tcms-results', outro='End of tcms-results output', on_finally=_flush_stdouts,
+                        writer=self.info):
+            try:
+                self.tcms_results.Results().investigate().update()
 
-        try:
-            self.tcms_results.Results().investigate().update()
-
-        except Exception as e:
-            self.error('Failed to process beaker results - the actual exception should have been logged already')
-            raise CIError('Failed to process beaker results: {}'.format(str(e)))
+            except Exception as e:
+                self.error('Failed to process beaker results - the actual exception should have been logged already')
+                raise CIError('Failed to process beaker results: {}'.format(str(e)))
 
         # Any single task with a result other than "PASS" - or even with
         # a status other than "COMPLETED" - means testing failed.

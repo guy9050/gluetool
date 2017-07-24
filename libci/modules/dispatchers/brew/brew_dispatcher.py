@@ -5,7 +5,8 @@ import ast
 import _ast
 
 from libci import Module, CIError, SoftCIError
-from libci.utils import format_dict, cached_property, load_yaml
+from libci.log import format_dict
+from libci.utils import cached_property, load_yaml
 
 
 class RulesError(SoftCIError):

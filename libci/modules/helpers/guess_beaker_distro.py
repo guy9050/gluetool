@@ -1,7 +1,8 @@
 import bs4
 
 from libci import CIError, SoftCIError, Module
-from libci.utils import format_dict, fetch_url, cached_property, PatternMap
+from libci.log import format_dict
+from libci.utils import fetch_url, cached_property, PatternMap
 
 
 DEFAULT_NIGHTLY_LISTING = 'http://download.eng.brq.redhat.com/nightly/'
