@@ -69,10 +69,10 @@ To begin digging into `citool` sources, there are few requirements:
   # and install citool in development mode
   python setup.py develop
   
-  # optional: activate bash completion
+  # optional: activate bash completion in virtualenv
   python bash_completion.py
-  sudo mv citool /etc/bash_completion.d/
-  source /etc/bash_completion.d/citool
+  mv citool $VIRTUAL_ENV/bin/citool-bash-completition
+  echo "source $VIRTUAL_ENV/bin/citool-bash-completition" >> $VIRTUAL_ENV/bin/activate
 ```
 
 `citool`'s modules may require additional commands as well, e.g. tools like `tcms-results` or `restraint`. You'd have
