@@ -62,9 +62,9 @@ class CaplogWrapper(object):
         self._caplog.handler.records = []
 
 
-def create_module(module_class, ci_class=NonLoadingCI):
+def create_module(module_class, ci_class=NonLoadingCI, name='dummy-module'):
     ci = ci_class()
-    mod = module_class(ci)
+    mod = module_class(ci, name)
     mod.add_shared()
 
     return ci, mod

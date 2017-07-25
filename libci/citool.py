@@ -163,7 +163,7 @@ def main():
                     module.execute()
                     module.add_shared()
             except CIRetryError as e:
-                sys.stderr.write('error in %s: %s\n' % (module.name, e))
+                sys.stderr.write('error in %s: %s\n' % (module.unique_name, e))
                 continue
             break
 
@@ -177,7 +177,7 @@ def main():
         failure = Failure(module=module, exc_info=sys.exc_info())
 
         if module:
-            msg = "Exception raised in module '{}': {}".format(module.name, e.message)
+            msg = "Exception raised in module '{}': {}".format(module.unique_name, e.message)
         else:
             msg = "Exception raised: {}".format(e.message)
 
