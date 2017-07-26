@@ -8,3 +8,4 @@ pytest-flake8
 pytest-cov
 pytest-catchlog
 pytest
+pytest-mock

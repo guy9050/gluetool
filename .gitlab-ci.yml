@@ -16,8 +16,9 @@ variables:
 # Runs before each and every pipeline job.
 #
 before_script:
-  - yum -y install git make python-setuptools gcc python-devel krb5-devel postgresql-devel openssl-devel
+  - yum -y install git make python-setuptools gcc python-devel krb5-devel postgresql-devel openssl-devel libcurl-devel
   - (curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py && rm -f get-pip.py)
+  - export PYCURL_SSL_LIBRARY=nss
   - pip install -U setuptools
   - chmod u=rw,go= docs/citool-doc.key
 
@@ -78,7 +79,7 @@ build-rpm:
     # RH IT Root CA is required for copr to work
     - curl -sko /etc/pki/ca-trust/source/anchors/RH-IT-Root-CA.crt https://password.corp.redhat.com/RH-IT-Root-CA.crt
     - update-ca-trust
-    # add copr config for the jenkins/baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com@REDHAT.COM user 
+    # add copr config for the jenkins/baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com@REDHAT.COM user
     - mkdir ~/.config
     - echo "W2NvcHItY2xpXQpsb2dpbiA9IFkyOXdjZz09IyNpbXZ4eWZibHFoa2dybWdzdHlmaAp1c2VybmFtZSA9IGplbmtpbnNfYmFzZW9zLWplbmtpbnMucmhldi1jaS12bXMuZW5nLnJkdTIucmVkaGF0LmNvbQp0b2tlbiA9IHJqb29lcmN2ZHdrcnh1eGptYmJ1YXNvb2lzdGp3bApjb3ByX3VybCA9IGh0dHBzOi8vY29wci5kZXZlbC5yZWRoYXQuY29tCg==" | base64 -d > ~/.config/copr
     - cat ~/.config/copr
