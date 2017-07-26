@@ -128,6 +128,11 @@
                       manager.createSummary("green.gif").appendText("<h1>Tests passed</h1>",
                                                                     false, false, false, "green");
 
+                  } else if (manager.logContains(".*No tests provided.*")) {
+                      manager.listener.logger.println("[groovy-postbuild]: Skippped testing because no tests found");
+                      manager.addBadge("info.gif", "Testing skipped - no tests found");
+                      manager.createSummary("grey.gif").appendText("<h1>Testing skipped</h1>",
+                                                                   false, false, false, "grey");
                   } else {
                       manager.listener.logger.println("[groovy-postbuild]: Cannot find result of the testing process");
                       manager.addBadge("warning.gif", "Tests result unknown");
