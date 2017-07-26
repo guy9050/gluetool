@@ -11,7 +11,8 @@ from retrying import retry
 
 from libci import Module, CIError, CICommandError
 from libci.guest import NetworkedGuest
-from libci.utils import format_dict, cached_property
+from libci.log import format_dict
+from libci.utils import cached_property
 
 DEFAULT_FLAVOR = 'm1.small'
 DEFAULT_NAME = 'citool'

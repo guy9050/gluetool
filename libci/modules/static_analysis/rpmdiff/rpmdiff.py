@@ -4,6 +4,7 @@ import time
 from libci import Module
 from libci import CIError, SoftCIError, CICommandError
 from libci import utils
+from libci.log import log_blob
 from libci.results import TestResult, publish_result
 
 # map RPMdiff overal score to resultsdb 2.0 API outcome states
@@ -128,7 +129,7 @@ class CIRpmdiff(Module):
         command = self.rpmdiff_cmd + ["runinfo", str(run_id)]
 
         blob = json.loads(CIRpmdiff._run_command(command).stdout)
-        utils.log_blob(self.debug, 'rpmdiff-remote runinfo returned', utils.format_dict(blob))
+        log_blob(self.debug, 'rpmdiff-remote runinfo returned', utils.format_dict(blob))
 
         return blob
 

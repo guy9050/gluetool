@@ -121,7 +121,7 @@ you may need it when dealing some older builds.""",
         (guest, tasks) for runner to process.
         """
 
-        libci.utils.log_blob(self.debug, 'full job description', job_desc.prettify(encoding='utf-8'))
+        libci.log.log_blob(self.debug, 'full job description', job_desc.prettify(encoding='utf-8'))
 
         self._schedule = []
 
@@ -179,7 +179,7 @@ you may need it when dealing some older builds.""",
 
         self.debug('Schedule:')
         for guest, recipe_set in self._schedule:
-            libci.utils.log_blob(self.debug, str(guest), recipe_set.prettify(encoding='utf-8'))
+            libci.log.log_blob(self.debug, str(guest), recipe_set.prettify(encoding='utf-8'))
 
     def execute(self):
         task = self.shared('brew_task')

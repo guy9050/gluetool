@@ -38,6 +38,7 @@ Example usage:
 """
 
 import atexit
+import json
 import logging
 import traceback
 
@@ -46,6 +47,11 @@ try:
 
 except ImportError:
     colorama = None
+
+
+BLOB_HEADER = '---v---v---v---v---v---'
+BLOB_FOOTER = '---^---^---^---^---^---'
+
 
 # Add our custom "verbose" loglevel - it's even bellow DEBUG
 logging.VERBOSE = 5
@@ -94,6 +100,134 @@ logging.LoggerAdapter.warn = warn_sentry
 
 logging.Logger.verbose = verbose_logger
 logging.LoggerAdapter.verbose = verbose_adapter
+
+
+class BlobLogger(object):
+    """
+    Context manager to help with "real time" logging - some code may produce output continuously,
+    e.g. when running a command and streaming its output to our stdout, and yet we still want to
+    wrap it with boundaries and add a header.
+
+    This code:
+
+    .. code-block:: python
+
+       with BlobLogger('ls of root', outro='end of ls'):
+           subprocess.call(['ls', '/'])
+
+    will lead to the output similar to this:
+
+
+    .. code-block:: bash
+
+       [20:30:50] [+] ---v---v---v---v---v--- ls of root
+       bin  boot  data  dev ...
+       [20:30:50] [+] ---^---^---^---^---^--- end of ls
+
+    .. note::
+
+       When you already hold the data you wish to log, please use :py:func:`libci.log.log_blob`
+       or :py:func:`libci.log.log_dict`. The example above could be rewritten using ``log_blob``
+       by using :py:meth:`subprocess.check_output` and passing its return value to ``log_blob``.
+       ``BlobLogger`` is designed to wrap output whose creation caller don't want to (or cannot)
+       control.
+
+    :param str intro: Label to show what is the meaning of the logged data.
+    :param str outro: Label to show by the final boundary to mark the end of logging.
+    :param callable on_finally: When set, it will be called in ``__exit__`` method. User of
+        this context manager might need to flush used streams or close resources even in case
+        the exception was raised while inside the context manager. ``on_finally`` is called
+        with all arguments the ``__exit__`` was called, and its return value is returned by
+        ``__exit__`` itself, therefore it can examine possible exceptions, and override them.
+    :param callable writer: A function which is used to actually log the text. Usually a one of some logger methods.
+    """
+
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, intro, outro=None, on_finally=None, writer=None):
+        self.writer = Logging.get_logger().info if writer is None else writer
+
+        self.intro = intro
+        self.outro = outro
+        self.on_finally = on_finally
+
+    def __enter__(self):
+        self.writer('{} {}'.format(BLOB_HEADER, self.intro))
+
+    def __exit__(self, *args, **kwargs):
+        self.writer('{} {}'.format(BLOB_FOOTER, self.outro or ''))
+
+        if self.on_finally:
+            return self.on_finally(*args, **kwargs)
+
+
+def format_dict(dictionary):
+    """
+    Format a Python data structure for printing. Uses :py:func:`json.dumps` formatting
+    capabilities to present readable representation of a given structure.
+    """
+
+    # Use custom "default" handler, to at least encode obj's repr() output when
+    # json encoder does not know how to encode such class
+    def default(obj):
+        return repr(obj)
+
+    return json.dumps(dictionary, sort_keys=True, indent=4, separators=(',', ': '), default=default)
+
+
+def log_dict(writer, intro, data):
+    """
+    Log structured data, e.g. JSON responses or a Python ``list``.
+
+    .. note::
+
+       For logging unstructured "blobs" of text, use :py:func:`libci.log.log_blob`. It does not
+       attempt to format the output, and wraps it by header and footer to mark its boundaries.
+
+    .. note::
+
+       Using :py:func:`libci.log.format_dict` directly might be shorter, depending on your your code.
+       For example, this code:
+
+       .. code-block:: python
+
+          self.debug('Some data:\\n{}'.format(format_dict(data)))
+
+       is equivalent to:
+
+       .. code-block:: python
+
+          log_dict(self.debug, 'Some data', data)
+
+       If you need more formatting, or you wish to fit more information into a single message, using
+       logger methods with ``format_dict`` is a way to go, while for logging a single structure ``log_dict``
+       is more suitable.
+
+    :param callable writer: A function which is used to actually log the text. Usually a one of some logger methods.
+    :param str intro: Label to show what is the meaning of the logged structure.
+    :param str blob: The actual data to log.
+    """
+
+    writer('{}:\n{}'.format(intro, format_dict(data)))
+
+
+def log_blob(writer, intro, blob):
+    """
+    Log "blob" of characters of unknown structure, e.g. output of a command or response
+    of a HTTP request. The blob is preceded by a header and followed by a footer to mark
+    exactly the blob boundaries.
+
+    .. note::
+
+       For logging structured data, e.g. JSON or Python structures, use :py:func:`libci.log.log_dict`. It will
+       make structure of the data more visible, resulting in better readability of the log.
+
+    :param callable writer: A function which is used to actually log the text. Usually a one of some logger methods.
+    :param str intro: Label to show what is the meaning of the logged blob.
+    :param str blob: The actual blob of text.
+    """
+
+    writer("{}:\n{}\n{}\n{}".format(intro, BLOB_HEADER, blob, BLOB_FOOTER))
 
 
 class ContextAdapter(logging.LoggerAdapter):

@@ -1,5 +1,6 @@
 import stomp
-from libci import CIError, Module, utils
+from libci import CIError, Module
+from libci.log import log_blob, format_dict
 
 
 class CIPublisherCiBus(Module):
@@ -34,11 +35,11 @@ class CIPublisherCiBus(Module):
 
     def publish(self, message):
         # body needs to be a string
-        body = utils.format_dict(message.body)
+        body = format_dict(message.body)
 
-        utils.log_blob(self.debug,
-                       'sent following message to CI message bus',
-                       'header:\n{}\nbody:\n{}'.format(utils.format_dict(message.headers), body))
+        log_blob(self.debug,
+                 'sent following message to CI message bus',
+                 'header:\n{}\nbody:\n{}'.format(format_dict(message.headers), body))
 
         if self.option('dry-run'):
             return

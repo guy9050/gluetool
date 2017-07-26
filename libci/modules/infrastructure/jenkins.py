@@ -11,6 +11,7 @@ from requests.exceptions import RequestException
 
 import libci
 from libci import CIError
+from libci.log import format_dict
 from libci.proxy import Proxy
 
 JJB_CONFIG = os.path.expanduser('~/.config/jenkins_jobs/jenkins_jobs.ini')
@@ -149,7 +150,7 @@ class CIJenkins(libci.Module):
         :returns: (response, resonse-content)
         """
 
-        self.debug("Jenkins REST request: url='{}'\n{}".format(url, libci.utils.format_dict(data)))
+        self.debug("Jenkins REST request: url='{}'\n{}".format(url, format_dict(data)))
 
         if url.startswith('/'):
             url = self.option('url') + url
@@ -176,7 +177,7 @@ class CIJenkins(libci.Module):
         response = urllib2.urlopen(request, data)
         code, content = response.getcode(), response.read()
 
-        libci.utils.log_blob(self.debug, 'response: {}'.format(code), content)
+        libci.log.log_blob(self.debug, 'response: {}'.format(code), content)
 
         if code != 200:
             raise CIError('Jenkins REST request failed')

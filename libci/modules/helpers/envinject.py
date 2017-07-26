@@ -3,7 +3,7 @@ Allow modules to inject enviroment variables via EnvInject module
 """
 
 from libci import Module
-from libci.utils import format_dict
+from libci.log import format_dict
 
 
 DEFAULT_PROPS_FILE = 'envinject-citool.props'

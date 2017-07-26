@@ -1,6 +1,7 @@
 import json
 
 import libci
+from libci.log import format_dict
 
 
 class Ansible(libci.Module):
@@ -32,7 +33,7 @@ class Ansible(libci.Module):
         ]
 
         if variables:
-            self.debug('variables:\n{}'.format(libci.utils.format_dict(variables)))
+            self.debug('variables:\n{}'.format(format_dict(variables)))
 
             cmd += [
                 '--extra-vars',

@@ -6,7 +6,7 @@ import enum
 import bs4
 
 import libci
-from libci.utils import format_dict, log_blob
+from libci.log import log_blob, log_dict
 from libci.results import TestResult, publish_result
 
 
@@ -286,7 +286,7 @@ class RestraintRunner(libci.Module):
         log_blob(self.info, 'Task set output', output.stdout)
 
         result = self._gather_task_set_results(guest, output.stdout)
-        self.debug('task set result:\n{}'.format(format_dict(result)))
+        log_dict(self.debug, 'task set result', result)
 
         return result
 
@@ -471,7 +471,7 @@ class RestraintRunner(libci.Module):
 
         results = self._merge_task_results(recipe_sets_results)
 
-        self.debug('Recipe sets results:\n{}'.format(format_dict(results)))
+        log_dict(self.debug, 'Recipe sets results', results)
 
         overall_result = self._process_results(results)
 

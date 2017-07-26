@@ -7,7 +7,8 @@ import gzip
 from urllib2 import urlopen
 from urlgrabber.grabber import urlgrab
 from libci import Module, CIError, SoftCIError
-from libci.utils import cached_property, log_blob, run_command, check_for_commands, format_dict, CICommandError
+from libci.log import log_blob, format_dict
+from libci.utils import cached_property, run_command, check_for_commands, CICommandError
 from libci.results import TestResult, publish_result
 
 REQUIRED_CMDS = ['covscan']
