@@ -1,5 +1,6 @@
 # pylint: disable=blacklisted-name
 
+import bs4
 import yaml
 
 import libci
@@ -74,3 +75,7 @@ def create_yaml(tmpdir, name, data):
     f = tmpdir.join(name)
     f.write(yaml.dump(data))
     return f
+
+
+def xml(text):
+    return bs4.BeautifulSoup(text, 'xml').contents[0]
