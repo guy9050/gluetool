@@ -1,6 +1,6 @@
 import os
 
-from libci import Module, CICommandError
+from libci import Module, CIError, CICommandError
 
 
 class CIMTF(Module):
@@ -24,8 +24,20 @@ class CIMTF(Module):
 
         self.shared('jenkins').set_build_name(module)
 
-        guests = self.shared('provision', image='Fedora-Cloud-Base-25-compose-latest')
-        assert guests and len(guests) == 1, 'bad provision'
+        if not self.has_shared('image'):
+            raise CIError('No image provided, did you run guess-*-image module?')
+
+        image = self.shared('image')
+        if image is None:
+            raise CIError('No image provided')
+
+        if not self.has_shared('provision'):
+            raise CIError('No guest provider found, did you run a guests provider module, e.g. openstack?')
+
+        guests = self.shared('provision', image=image)
+
+        if not guests or len(guests) != 1:
+            raise CIError('No guest provided')
 
         guest = guests[0]
 

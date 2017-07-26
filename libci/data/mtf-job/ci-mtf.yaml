@@ -34,6 +34,7 @@
           citool -c -i -o citool-debug.txt \
                  ${pipeline_prepend} \
                  jenkins \
+                 guess-openstack-image --method force --image Fedora-Cloud-Base-25-compose-latest \
                  openstack --user-data=$CITOOL_CONFIG/default-user-data.yaml \
                  mtf --fedmsgfile=exported-fedmsg.yaml --module=$MODULENAME \
                  ${pipeline_append}
