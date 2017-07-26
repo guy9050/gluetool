@@ -105,6 +105,9 @@ def main():
         ci.debug('parsed ci args: %s' % ci_args)
         ci.debug('parsed module args: %s' % modules_args)
 
+        if ci.option('pid'):
+            ci.info('PID: {} PGID: {}'.format(os.getpid(), os.getpgrp()))
+
         # version
         if ci.option('version'):
             sys.stdout.write('citool %s\n' % libci.__version__.strip())
