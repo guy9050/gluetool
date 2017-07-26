@@ -6,7 +6,7 @@ from time import gmtime, strftime
 from datetime import datetime, timedelta
 
 from novaclient import client
-from novaclient.exceptions import NotFound, Unauthorized
+from novaclient.exceptions import BadRequest, NotFound, Unauthorized
 from retrying import retry
 
 from libci import Module, CIError, CICommandError
@@ -62,6 +62,9 @@ class OpenstackGuest(NetworkedGuest):
             # get an floating IP from a random available pool
             self._ip = self._nova.floating_ips.create(details['ip_pool_name'])
 
+            # add additional network if specified
+            nics = [{'net-id': network.id} for network in details['network']] if details.get('network', None) else []
+
             # create instance name with floating IP and optionally add JOB_NAME and BUILD_ID
             name = [
                 details['name'],
@@ -76,7 +79,7 @@ class OpenstackGuest(NetworkedGuest):
             self._instance = self._nova.servers.create(name=name,
                                                        flavor=details['flavor'],
                                                        image=details['image'],
-                                                       network=details['network'],
+                                                       nics=nics,
                                                        key_name=details['key_name'],
                                                        userdata=details['user_data'])
 
@@ -479,8 +482,8 @@ class CIOpenstack(Module):
         self.debug('userdata:\n{}'.format(user_data))
         return user_data
 
-    def _resource_not_found(self, resource, name):
-        available = sorted([item.name for item in getattr(self.nova, resource).list()])
+    def _resource_not_found(self, resource, name, name_attr='name'):
+        available = sorted([getattr(item, name_attr) for item in getattr(self.nova, resource).list()])
         raise CIError("resource of type {} and value '{}' not found, available:\n{}".format(resource, name,
                                                                                             format_dict(available)))
 
@@ -664,13 +667,21 @@ class CIOpenstack(Module):
             self._resource_not_found('flavors', flavor)
 
         # get network reference
-        network = self.option('network')
-        if network is not None:
-            # get flavor reference
-            try:
-                network_ref = self.nova.networks.find(label=network)
-            except NotFound:
-                self._resource_not_found('network', network)
+        networks = self.option('network')
+        if networks is not None:
+
+            def _get_network_ref(network):
+                # get network reference label
+                try:
+                    return self.nova.networks.find(label=network)
+                except (NotFound, BadRequest):
+                    try:
+                        return self.nova.networks.find(id=network)
+                    except NotFound:
+                        # get network reference by id
+                        self._resource_not_found('networks', network, name_attr='label')
+
+            network_ref = [_get_network_ref(network) for network in networks.split(',')]
         else:
             network_ref = None
 
