@@ -46,8 +46,8 @@ class NotifyRecipients(Module):
     name = 'notify-recipients'
     description = 'Notification module - recipient management'
 
-    supported_result_types = ('beaker', 'boc', 'covscan', 'restraint', 'rpmdiff')
-    result_type_names = ('Beaker', 'Build-on-commit', 'Covscan', 'Restraint', 'RPMdiff')
+    supported_result_types = ('beaker', 'boc', 'covscan', 'restraint', 'rpmdiff-analysis', 'rpmdiff-comparison')
+    result_type_names = ('Beaker', 'Build-on-commit', 'Covscan', 'Restraint', 'RPMdiff analysis', 'RPMdiff comparison')
 
     options = [
         ('Global options', {
