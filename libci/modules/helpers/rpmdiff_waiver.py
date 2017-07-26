@@ -282,7 +282,7 @@ class RpmDiffWaiver(Module):
             return None
         results = self.shared("results")
         for result in results:
-            if result.test_type == 'rpmdiff':
+            if result.test_type in ["rpmdiff-analysis", "rpmdiff-comparison"]:
                 return result.ids['rpmdiff_run_id']
         self.warn('cannot obtain run-id, previous results do not contain rpmdiff result')
         return None

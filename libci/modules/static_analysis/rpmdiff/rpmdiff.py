@@ -215,7 +215,8 @@ class CIRpmdiff(Module):
 
         results = self.shared("results")
         for result in results:
-            if result.test_type == 'rpmdiff' and result.ids['rpmdiff_run_id'] == run_id:
+            if (result.test_type in ["rpmdiff-analysis", "rpmdiff-comparison"] and
+                    result.ids['rpmdiff_run_id'] == run_id):
                 results.remove(result)
         self._publish_results(self._get_runinfo(run_id), self.option('type'))
 
