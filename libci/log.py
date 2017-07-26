@@ -39,6 +39,7 @@ Example usage:
 
 import atexit
 import logging
+import traceback
 
 try:
     import colorama
@@ -222,7 +223,7 @@ class LoggingFormatter(logging.Formatter):
         if record.exc_info \
                 and (self.log_tracebacks is True or Logging.stderr_handler.level in (logging.DEBUG, logging.VERBOSE)):
             fmt.append('{exc_text}')
-            values['exc_text'] = '\n' + self.formatException(record.exc_info)
+            values['exc_text'] = '\n\nTraceback:\n' + ''.join(traceback.format_tb(record.exc_info[2]))
 
         # List all context properties of record
         ctx_properties = [prop for prop in dir(record) if prop.startswith('ctx_')]
