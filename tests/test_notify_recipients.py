@@ -27,7 +27,8 @@ def fixture_configured_module(module):
         'beaker-notify': ['def', 'ghi'],
         'boc-notify': ['pqr, {FOO}'],
         'restraint-notify': ['mno'],
-        'rpmdiff-add-notify': ['jkl, abc', 'abc'],
+        'rpmdiff-analysis-add-notify': ['jkl, abc', 'abc'],
+        'rpmdiff-comparison-add-notify': ['jkl, abc', 'abc'],
         'covscan-default-notify': ['uvw'],
         'foo-notify': 'xyz',
         'foo-default-notify': ['def', 'ghi'],
@@ -161,7 +162,8 @@ def test_overall_recipients(configured_module):
     _, mod = configured_module
 
     # pylint: disable=protected-access
-    assert mod._recipients_overall() == ['def', 'ghi', 'pqr', '{FOO}', 'uvw', 'mno', 'jkl', 'abc', 'abc']
+    assert mod._recipients_overall() == ['def', 'ghi', 'pqr', '{FOO}', 'uvw', 'mno', 'jkl', 'abc', 'abc',
+                                         'jkl', 'abc', 'abc']
 
 
 def test_finalize_recipients(log, configured_module):
@@ -187,7 +189,8 @@ def test_finalize_recipients(log, configured_module):
     ('covscan', ['uvw']),
     ('foo', ['xyz']),
     ('restraint', ['mno']),
-    ('rpmdiff', ['abc', 'jkl'])
+    ('rpmdiff-analysis', ['abc', 'jkl']),
+    ('rpmdiff-comparison', ['abc', 'jkl'])
 ])
 def test_notification_recipients_overall(configured_module, result_type, expected_recipients):
     """
