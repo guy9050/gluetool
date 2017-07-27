@@ -482,22 +482,23 @@ class CIBrewDispatcher(Module):
                 recipients = ','.join([s.strip() for s in flags['recipients'].split(',')])
 
                 for i, command in enumerate(set_commands):
-                    splitted = shlex.split(command)
-                    self.debug('splitted command: {}'.format(splitted))
+                    command = command.strip()
 
-                    # [beaker-job, --option1, --option2, ...]
-                    command_module = splitted[0]
-                    if command_module not in self.job_result_types:
-                        self.warn('Cannot add recipients to {} pipeline'.format(command_module), sentry=True)
-                        continue
+                    self.debug("command: '{}'".format(command))
 
-                    result_type = self.job_result_types[splitted[0]]
+                    for job, result_type in self.job_result_types.iteritems():
+                        if not command.startswith(job):
+                            continue
 
-                    command = '{} --notify-recipients-options="--{}-add-notify {}"'.format(
-                        command, result_type, recipients)
-                    self.debug('with set recipients applied: {}'.format(format_dict(splitted)))
+                        command = '{} --notify-recipients-options="--{}-add-notify {}"'.format(command, result_type,
+                                                                                               recipients)
+                        self.debug("with set recipients applied: '{}'".format(command))
 
-                    set_commands[i] = command
+                        set_commands[i] = command
+                        break
+
+                    else:
+                        self.warn("Cannot add recipients to '{}' pipeline".format(command), sentry=True)
 
             reduced[name] = set_commands[:]
 
