@@ -359,7 +359,8 @@ to this option, and process environmental variables (default: {})""".format(DEFA
                     'arch': run['bkr_arch'],
                     'status': run['bkr_status'],
                     'result': run['bkr_result'],
-                    'host': run['connectable_host']
+                    'host': run['connectable_host'],
+                    'phases': []
                 }
 
                 for log in run['bkr_logs']:
@@ -368,6 +369,19 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
                     run_summary['testout.log'] = self._shorten_url(log['href'])
                     break
+
+                phase_names = [phase['name'] for phase in run['bkr_phases']]
+
+                for i, phase in enumerate(run['bkr_phases']):
+                    if str(phase['result']).lower() == 'pass':
+                        continue
+
+                    run_summary['phases'].append({
+                        'name': phase['name'],
+                        'result': phase['result'],
+                        'follows': phase_names[i - 1],
+                        'logs': [self._shorten_url(log['href']) for log in phase['logs']]
+                    })
 
                 fails[name].append(run_summary)
 
@@ -425,23 +439,37 @@ to this option, and process environmental variables (default: {})""".format(DEFA
             # creating a table of failed runs for a test is quite unclear when written directly in
             # the template, therefore providing more readable helper
             def fails_tabulate(name, runs):
+                self.debug('formatting fail:\n{}'.format(utils.format_dict(runs)))
+
                 table = []
 
                 if adding_reservation:
                     for run in runs[1:]:
-                        table += [
-                            ('Server:', '{} ({})'.format(run['host'], run['arch'])),
-                            ('Output:', run.get('testout.log', '<Not available>'))
-                        ]
-
-                else:
-                    for run in runs[1:]:
-                        table += [('Output ({}):'.format(run['arch']), run.get('testout.log', '<Not available>'))]
+                        table += [('Server:', '{} ({})'.format(run['host'], run['arch']))]
 
                 table += [('Test source:', runs[0][0])]
 
                 if adding_reservation:
                     table += [('Test location on machine:', '/mnt/tests/{}'.format(name))]
+
+                table += [(None, None)]
+
+                for run in runs[1:]:
+                    table += [('Output ({}):'.format(run['arch']), run.get('testout.log', '<Not available>'))]
+
+                    for phase in run['phases']:
+                        if phase['name'] == '/10_avc_check':
+                            label = 'Phase {} (follows {}):'.format(phase['name'], phase['follows'])
+                        else:
+                            label = 'Phase {}:'.format(phase['name'])
+
+                        table += [(label, phase['result'])]
+
+                        if str(phase['result']).lower() == 'pass':
+                            continue
+
+                        for log in phase['logs']:
+                            table += [('', log)]
 
                 return table
 
@@ -534,7 +562,7 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
         return utils.Bunch(task_id='<Task ID not available>', nvr='<NVR not available>',
                            owner='<Owner not available>', issuer='<No issuer available>',
-                           target=utils.Bunch(target='<Build target not available>'))
+                           branch='<Branch not available>', target=utils.Bunch(target='<Build target not available>'))
 
     def execute(self):
         results = self.shared('results') or []
