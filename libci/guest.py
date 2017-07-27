@@ -8,7 +8,8 @@ the modules.
 import os
 import socket
 import tempfile
-import time
+
+from functools import partial
 
 import libci
 
@@ -139,44 +140,19 @@ class Guest(object):
 
         raise NotImplementedError()
 
-    def wait(self, check, timeout=None, tick=30):
+    def wait(self, label, check, timeout=None, tick=30):
         """
         Wait for the guest to become responsive (e.g. after reboot).
 
-        :param check: callable performing the actual test. If its return
-          value evaluates to `True`, the waiting finishes successfully.
-        :param int timeout: if set, wait at max TIMEOUT seconds. If `None`,
-          wait indefinitely.
-        :param int tick: check guest status every TICK seconds.
+        :param str label: printable label used for logging.
+        :param callable check: called to test the condition. If its return value evaluates as ``True``,
+            the condition is assumed to pass the test and waiting ends.
+        :param int timeout: fail after this many seconds. ``None`` means test forever.
+        :param int tick: test condition every ``tick`` seconds.
+        :raises CIError: when ``timeout`` elapses while condition did not pass the check.
         """
 
-        assert isinstance(tick, int) and tick > 0
-
-        if timeout is not None:
-            end_time = time.time() + timeout
-
-        def _timeout():
-            return '{} seconds'.format(int(end_time - time.time())) if timeout is not None else 'infinite'
-
-        self.debug("waiting for check '{}', {} timeout, check every {} seconds".format(check.func_name,
-                                                                                       _timeout(), tick))
-
-        while timeout is None or time.time() < end_time:
-            self.debug('{} left, sleeping for {} seconds'.format(_timeout(), tick))
-            time.sleep(tick)
-
-            try:
-                ret = check()
-                if ret:
-                    self.debug('check passed, assuming success')
-                    return ret
-
-            except libci.CICommandError:
-                pass
-
-            self.debug('check failed, assuming failure')
-
-        raise libci.CIError('Check did not manage to pass for guest')
+        return libci.utils.wait(label, check, timeout=timeout, tick=tick, logger=self.logger)
 
     def create_file(self, dst, content):
         """
@@ -229,6 +205,9 @@ class NetworkedGuest(Guest):
 
     DEFAULT_SSH_PORT = 22
 
+    #: List of services that are allowed to be degraded when boot process finishes.
+    ALLOW_DEGRADED = []
+
     # pylint: disable=too-many-arguments
     def __init__(self, module, hostname, name=None, port=None, username=None, key=None, options=None):
         name = name or hostname
@@ -259,6 +238,9 @@ class NetworkedGuest(Guest):
         self._ssh += options
         self._scp += options
 
+        self._supports_systemctl = None
+        self._supports_initctl = None
+
     def __repr__(self):
         return '{}{}:{}'.format((self.username + '@') if self.username is not None else '', self.hostname, self.port)
 
@@ -279,42 +261,160 @@ class NetworkedGuest(Guest):
 
         return self._execute(self._ssh + sshize_options(ssh_options) + [self.hostname] + [cmd], **kwargs)
 
-    def wait_alive(self, echo_timeout=None, echo_tick=30, **kwargs):
-        self.debug('waiting for guest to become alive')
+    def _discover_rc_support(self):
+        self._supports_systemctl = False
+        self._supports_initctl = False
+
+        try:
+            output = self.execute('type systemctl')
+        except libci.CICommandError as exc:
+            output = exc.output
+
+        if output.exit_code == 0:
+            self._supports_systemctl = True
+            return
+
+        try:
+            output = self.execute('type initctl')
+        except libci.CICommandError as exc:
+            output = exc.output
+
+        if output.exit_code == 0:
+            self._supports_initctl = True
+            return
+
+    def _check_connectivity(self):
+        """
+        Check whether guest is reachable over network by inspecting its ssh port.
+        """
 
         addrinfo = socket.getaddrinfo(self.hostname, self.port, 0, socket.SOCK_STREAM)
         (family, socktype, proto, _, sockaddr) = addrinfo[0]
 
-        def check_ssh():
-            sock = socket.socket(family, socktype, proto)
-            sock.settimeout(1)
+        sock = socket.socket(family, socktype, proto)
+        sock.settimeout(1)
 
-            # pylint: disable=bare-except
-            try:
-                sock.connect(sockaddr)
-                return True
+        # pylint: disable=bare-except
+        try:
+            sock.connect(sockaddr)
+            return True
 
-            except:
-                pass
+        except:
+            pass
 
-            finally:
-                sock.close()
+        finally:
+            sock.close()
 
-        self.wait(check_ssh, **kwargs)
+        return False
+
+    def _check_echo(self, ssh_options=None):
+        """
+        Check whether remote shell is available by running simple ``echo`` command.
+        """
 
         msg = 'guest {} is alive'.format(self.hostname)
 
-        def check_echo():
-            try:
-                output = self.execute("echo '{}'".format(msg), ssh_options=['ConnectTimeout={:d}'.format(echo_tick)])
+        try:
+            output = self.execute("echo '{}'".format(msg), ssh_options=ssh_options)
 
-                if output.stdout.strip() == msg:
-                    return True
+            if output.stdout.strip() == msg:
+                return True
 
-            except libci.CICommandError:
-                self.debug('echo attempt failed, ignoring error')
+        except libci.CICommandError:
+            self.debug('echo attempt failed, ignoring error')
 
-        self.wait(check_echo, timeout=echo_timeout, tick=echo_tick)
+        return False
+
+    def _check_boot_systemctl(self, ssh_options=None):
+        """
+        Check whether boot process finished using ``systemctl``.
+        """
+
+        try:
+            output = self.execute('systemctl is-system-running', ssh_options=ssh_options)
+
+        except libci.CICommandError as exc:
+            output = exc.output
+
+        if output.exit_code not in (0, 1):
+            # systemctl should return a reasonable exit code, anything too high is weird
+            raise libci.CIError('Boot process check failed: {}'.format(str(exc)))
+
+        status = output.stdout.strip()
+
+        if status == 'running':
+            self.debug('systemctl reports ready')
+            return True
+
+        if status == 'degraded':
+            output = self.execute('systemctl --plain --no-pager --failed', ssh_options=ssh_options)
+            report = output.stdout.strip().split('\n')
+
+            degraded_services = [line.strip() for line in report if line.startswith(' ')]
+
+            def _allowed_degraded(line):
+                return any((line.startswith(service) for service in self.ALLOW_DEGRADED))
+
+            filtered = [line for line in degraded_services if not _allowed_degraded(line)]
+
+            if not filtered:
+                self.debug('only ignored services are degraded, report ready')
+                return True
+
+            raise libci.CIError('unexpected services reported as degraded')
+
+        self.debug("systemctl not reporting ready: '{}'".format(status))
+        return False
+
+    def _check_boot_initctl(self, ssh_options=None):
+        """
+        Check whether boot process finished using ``initctl``.
+        """
+
+        try:
+            output = self.execute('initctl status rc', ssh_options=ssh_options)
+
+        except libci.CICommandError as exc:
+            output = exc.output
+
+        status = output.stdout.strip()
+
+        if status == 'rc stop/waiting':
+            self.debug('initctl reports ready')
+            return True
+
+        return False
+
+    def wait_alive(self, connect_timeout=None, connect_tick=10,
+                   echo_timeout=None, echo_tick=30,
+                   boot_timeout=None, boot_tick=10):
+        self.debug('waiting for guest to become alive')
+
+        # Step #1: check connectivity first - let's see whether ssh port is connectable
+        self.wait('connectivity', self._check_connectivity,
+                  timeout=connect_timeout, tick=connect_tick)
+
+        # Step #2: connect to ssh and see whether shell works by printing something
+        self.wait('shell available', partial(self._check_echo, ssh_options=['ConnectTimeout={:d}'.format(echo_tick)]),
+                  timeout=echo_timeout, tick=echo_tick)
+
+        # Step #3: check system services, there are ways to tell system boot process finished
+        if self._supports_systemctl is None or self._supports_initctl is None:
+            self._discover_rc_support()
+
+        if self._supports_systemctl is True:
+            check_boot = self._check_boot_systemctl
+
+        elif self._supports_initctl is True:
+            check_boot = self._check_boot_initctl
+
+        else:
+            self.warn("Don't know how to check boot process status - assume it finished and hope for the best")
+            return
+
+        check_boot = partial(check_boot, ssh_options=['ConnectTimeout={:d}'.format(boot_tick)])
+
+        self.wait('boot finished', check_boot, timeout=boot_timeout, tick=boot_tick)
 
     def copy_to(self, src, dst, recursive=False, **kwargs):
         self.debug("copy to the guest: '{}' => '{}'".format(src, dst))

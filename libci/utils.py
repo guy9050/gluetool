@@ -665,3 +665,43 @@ class PatternMap(object):
             return converter(pattern, s)
 
         raise CIError("Could not match string '{}' with any pattern".format(s))
+
+
+def wait(label, check, timeout=None, tick=30, logger=None):
+    """
+    Wait for a condition to be true.
+
+    :param str label: printable label used for logging.
+    :param callable check: called to test the condition. If its return value evaluates as ``True``,
+        the condition is assumed to pass the test and waiting ends.
+    :param int timeout: fail after this many seconds. ``None`` means test forever.
+    :param int tick: test condition every ``tick`` seconds.
+    :param libci.log.ContextAdapter logger: parent logger whose methods will be used for logging.
+    :raises CIError: when ``timeout`` elapses while condition did not pass the check.
+    """
+
+    assert isinstance(tick, int) and tick > 0
+
+    logger = logger or Logging.get_logger()
+
+    if timeout is not None:
+        end_time = time.time() + timeout
+
+    def _timeout():
+        return '{} seconds'.format(int(end_time - time.time())) if timeout is not None else 'infinite'
+
+    logger.debug("waiting for condition '{}', timeout {} seconds, check every {} seconds".format(label, _timeout(),
+                                                                                                 tick))
+
+    while timeout is None or time.time() < end_time:
+        logger.debug('{} left, sleeping for {} seconds'.format(_timeout(), tick))
+        time.sleep(tick)
+
+        ret = check()
+        if ret:
+            logger.debug('check passed, assuming success')
+            return ret
+
+        logger.debug('check failed, assuming failure')
+
+    raise CIError("Condition '{}' failed to pass within given time".format(label))

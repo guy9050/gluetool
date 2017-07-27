@@ -19,20 +19,27 @@ DEFAULT_NAME = 'citool'
 DEFAULT_RESERVE_DIR = '~/openstack-reservations'
 DEFAULT_REMOTE_RESERVE_FILE = '~/.openstack-reservation'
 DEFAULT_RESERVE_TIME = 24
-MAX_SERVER_ACTIVATION = 240
+
+DEFAULT_ACTIVATION_TIMEOUT = 240
+ACTIVATION_TICK = 5
+DEFAULT_ECHO_TIMEOUT = 240
+ECHO_TICK = 10
+DEFAULT_BOOT_TIMEOUT = 240
+BOOT_TICK = 10
+
 MAX_SERVER_SHUTDOWN = 60
 MAX_IMAGE_ACTIVATION = 60
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
-
-WAIT_ECHO_TIMEOUT = 120
-WAIT_ECHO_TICK = 10
 
 
 class OpenstackGuest(NetworkedGuest):
     """
     Implements Openstack Network Guest with snapshots support.
     """
+
+    ALLOW_DEGRADED = ('cloud-config.service',)
+
     @retry(stop_max_attempt_number=10, wait_fixed=1000)
     def _assign_ip(self):
         """
@@ -191,8 +198,12 @@ class OpenstackGuest(NetworkedGuest):
 
         """
 
-        return self.wait_alive(timeout=self._module.option('activation-time'), tick=1, echo_timeout=WAIT_ECHO_TIMEOUT,
-                               echo_tick=WAIT_ECHO_TICK)
+        try:
+            return self.wait_alive(connect_timeout=self._module.option('activation-timeout'), connect_tick=1,
+                                   echo_timeout=self._module.option('echo-timeout'), echo_tick=ECHO_TICK,
+                                   boot_timeout=self._module.option('boot-timeout'), boot_tick=BOOT_TICK)
+        except CIError as exc:
+            raise CIError('Guest failed to become alive: {}'.format(exc.message))
 
     def create_snapshot(self):
         """
@@ -335,94 +346,114 @@ class CIOpenstack(Module):
 
     name = 'openstack'
     description = 'Provides Openstack guests'
-    options = {
-        'api-version': {
-            'help': 'API version (default: 2)',
-            'default': '2'
-        },
-        'activation-time': {
-            'help': "Machines maximum activation time before timeout in \
-seconds (default: {})".format(MAX_SERVER_ACTIVATION),
-            'type': int,
-        },
-        'auth-url': {
-            'help': 'Auth URL'
-        },
-        'cleanup': {
-            'help': 'Cleanup reserved machines which have expired timestamp',
-            'action': 'store_true',
-        },
-        'cleanup-force': {
-            'help': 'Force cleanup reserved machines which have expired timestamp',
-            'action': 'store_true',
-        },
-        'flavor': {
-            'help': 'Default flavor of machines (default: {})'.format(DEFAULT_FLAVOR),
-            'default': DEFAULT_FLAVOR,
-        },
-        'image': {
-            'help': 'Force image name to be used, by default read it from openstack_image shared_function',
-        },
-        'ip-pool-name': {
-            'help': 'Name of the floating ips pool name to use',
-        },
-        'keep': {
-            'help': """Keep instance(s) running, do not destroy. No reservation records are created and it is
-expected from the user to cleanup the instance(s).""",
-            'action': 'store_true',
-        },
-        'key-name': {
-            'help': 'Name of the keypair to inject into instance',
-        },
-        'network': {
-            'help': 'Label of network to attach instance to',
-        },
-        'password': {
-            'help': 'Password'
-        },
-        'project-name': {
-            'help': 'Project/Tenant Name'
-        },
-        'provision': {
-            'help': 'Provision given number of guests',
-            'metavar': 'COUNT',
-            'type': int,
-        },
-        'setup-provisioned': {
-            'help': "Setup guests after provisioning them. See 'guest-setup' module",
-            'action': 'store_true'
-        },
-        'reserve': {
-            'help': 'Creates reservation records and keeps the instance(s) provisioned',
-            'action': 'store_true',
-        },
-        'reserve-directory': {
-            'help': 'Reservation records directory (default: {})'.format(DEFAULT_RESERVE_DIR),
-            'metavar': 'PATH',
-            'default': DEFAULT_RESERVE_DIR,
-        },
-        'reserve-time': {
-            'help': 'Reservation time in hours (default: {})'.format(DEFAULT_RESERVE_TIME),
-            'default': DEFAULT_RESERVE_TIME,
-            'metavar': 'HOURS',
-            'type': int,
-        },
-        'username': {
-            'help': 'Username to used for authentication'
-        },
-        'ssh-key': {
-            'help': 'Path to SSH public key file'
-        },
-        'ssh-user': {
-            'help': 'SSH username'
-        },
-        'user-data': {
-            'help': """
-                    User data to pass to OpenStack when requesting guests. If the value doesn't start
-                    with '#cloud-config', it's considered a path and module will read the actual userdata from it.
-                    """
-        }
-    }
+    options = [
+        ('Common options', {
+            'api-version': {
+                'help': 'API version (default: 2)',
+                'default': '2'
+            },
+            'auth-url': {
+                'help': 'Auth URL'
+            },
+            'cleanup': {
+                'help': 'Cleanup reserved machines which have expired timestamp',
+                'action': 'store_true',
+            },
+            'cleanup-force': {
+                'help': 'Force cleanup reserved machines which have expired timestamp',
+                'action': 'store_true',
+            },
+            'flavor': {
+                'help': 'Default flavor of machines (default: {})'.format(DEFAULT_FLAVOR),
+                'default': DEFAULT_FLAVOR,
+            },
+            'image': {
+                'help': 'Force image name to be used, by default read it from openstack_image shared_function',
+            },
+            'ip-pool-name': {
+                'help': 'Name of the floating ips pool name to use',
+            },
+            'keep': {
+                'help': """Keep instance(s) running, do not destroy. No reservation records are created and it is
+    expected from the user to cleanup the instance(s).""",
+                'action': 'store_true',
+            },
+            'key-name': {
+                'help': 'Name of the keypair to inject into instance',
+            },
+            'network': {
+                'help': 'Label of network to attach instance to',
+            },
+            'password': {
+                'help': 'Password'
+            },
+            'project-name': {
+                'help': 'Project/Tenant Name'
+            },
+            'provision': {
+                'help': 'Provision given number of guests',
+                'metavar': 'COUNT',
+                'type': int,
+            },
+            'setup-provisioned': {
+                'help': "Setup guests after provisioning them. See 'guest-setup' module",
+                'action': 'store_true'
+            },
+            'reserve': {
+                'help': 'Creates reservation records and keeps the instance(s) provisioned',
+                'action': 'store_true',
+            },
+            'reserve-directory': {
+                'help': 'Reservation records directory (default: {})'.format(DEFAULT_RESERVE_DIR),
+                'metavar': 'PATH',
+                'default': DEFAULT_RESERVE_DIR,
+            },
+            'reserve-time': {
+                'help': 'Reservation time in hours (default: {})'.format(DEFAULT_RESERVE_TIME),
+                'default': DEFAULT_RESERVE_TIME,
+                'metavar': 'HOURS',
+                'type': int,
+            },
+            'username': {
+                'help': 'Username to used for authentication'
+            },
+            'ssh-key': {
+                'help': 'Path to SSH public key file'
+            },
+            'ssh-user': {
+                'help': 'SSH username'
+            },
+            'user-data': {
+                'help': """
+                        User data to pass to OpenStack when requesting guests. If the value doesn't start
+                        with '#cloud-config', it's considered a path and module will read the actual userdata from it.
+                        """
+            }
+        }),
+        ('Timeouts', {
+            'activation-timeout': {
+                # pylint: disable=line-too-long
+                'help': 'Wait SECOND for a guest to become reachable over network (default: {})'.format(DEFAULT_ACTIVATION_TIMEOUT),
+                'type': int,
+                'default': DEFAULT_ACTIVATION_TIMEOUT,
+                'metavar': 'SECONDS'
+            },
+            'echo-timeout': {
+                'help': 'Wait SECOND for a guest shell to become available (default: {})'.format(DEFAULT_ECHO_TIMEOUT),
+                'type': int,
+                'default': DEFAULT_ECHO_TIMEOUT,
+                'metavar': 'SECONDS'
+            },
+            'boot-timeout': {
+                # pylint: disable=line-too-long
+                'help': 'Wait SECOND for a guest to finish its booting process (default: {})'.format(DEFAULT_BOOT_TIMEOUT),
+                'type': int,
+                'default': DEFAULT_BOOT_TIMEOUT,
+                'metavar': 'SECONDS'
+            }
+        })
+    ]
+
     required_options = ['auth-url', 'password', 'project-name', 'username', 'ssh-key', 'ip-pool-name']
     shared_functions = ('openstack', 'provision')
 
