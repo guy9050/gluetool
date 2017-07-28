@@ -63,10 +63,10 @@
     builders:
       - shell: |
           if [ "${reserve}" != "true" ]; then
-            wow_opts=""
+            reserve_opts=""
             notify_email_opts=""
           else
-            wow_opts="--reserve --reserve-time ${reservation_time}"
+            reserve_opts="--reserve --reserve-time ${reservation_time}"
             notify_email_opts="--add-reservation"
           fi
 
@@ -74,7 +74,7 @@
           citool -c -i -o citool-debug.txt \
             ${pipeline_prepend} \
             notify-recipients ${notify_recipients_options} \
-            wow --wow-options="${wow_options}" ${wow_opts} \
+            wow --wow-options="${wow_options}" \
             beah-result-parser \
             jenkins \
             testing-results \
@@ -82,7 +82,7 @@
             brew-build-name \
             guess-product ${guess_product_options} \
             guess-beaker-distro ${guess_distro_options} \
-            beaker --jobwatch-options="${jobwatch_options}" \
+            beaker --jobwatch-options="${jobwatch_options}" ${reserve_opts} \
             notify-email --add-frontend-url ${notify_email_options} ${notify_email_opts} \
             ${pipeline_append}
     properties:
