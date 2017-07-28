@@ -27,6 +27,8 @@ ECHO_TICK = 10
 DEFAULT_BOOT_TIMEOUT = 240
 BOOT_TICK = 10
 
+DEFAULT_RESTORE_SNAPSHOT_ATTEMPTS = 3
+
 MAX_SERVER_SHUTDOWN = 60
 MAX_IMAGE_ACTIVATION = 60
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
@@ -208,6 +210,29 @@ class OpenstackGuest(NetworkedGuest):
         except CIError as exc:
             raise CIError('Guest failed to become alive: {}'.format(exc.message))
 
+    def _bring_alive(self, label, actor, attempts=1):
+        """
+        Try to perform an action, and then wait for instance to become alive.
+
+        :param str label: For logging purposes.
+        :param callable actor: Callable that does something with the instance.
+        :param int attempts: Try this many times until :py:meth:`_wait_alive` passes.
+        """
+
+        for i in range(0, attempts):
+            self.debug("Try action '{}', attempt #{} of {}".format(label, i + 1, attempts))
+
+            actor()
+
+            try:
+                return self._wait_alive()
+
+            except CIError as exc:
+                self.error('Failed to bring the guest alive in attempt #{}: {}'.format(i + 1, exc.message))
+                self.warn('instance status: {}'.format(self._instance.status))
+
+        raise CIError('Failed to acquire living instance.')
+
     def create_snapshot(self):
         """
         Creates a snapshot from the current running image of the openstack instance.
@@ -241,9 +266,8 @@ class OpenstackGuest(NetworkedGuest):
         self.info("image snapshot '{}' created".format(name))
 
         # start instance
-        self._instance.start()
-        self._wait_alive()
-        self.debug("server '{}' is up now".format(self.name))
+        self._bring_alive('starting the instance', self._instance.start, attempts=1)
+        self.debug('started and alive')
 
         return name
 
@@ -256,9 +280,13 @@ class OpenstackGuest(NetworkedGuest):
         """
 
         self.info("rebuilding server with snapshot '{}'".format(snapshot))
-        self._instance.rebuild(self._module.get_image_ref(snapshot))
-        self._wait_alive()
-        self.info("instance rebuilt and is up now")
+
+        def _rebuild():
+            self._instance.rebuild(self._module.get_image_ref(snapshot))
+
+        self._bring_alive('rebuilding the instance from a snapshot', _rebuild,
+                          attempts=self._module.option('restore-snapshot-attempts'))
+        self.info('rebuilt and alive')
 
         return self
 
@@ -453,6 +481,14 @@ class CIOpenstack(Module):
                 'type': int,
                 'default': DEFAULT_BOOT_TIMEOUT,
                 'metavar': 'SECONDS'
+            }
+        }),
+        ('Workarounds', {
+            'restore-snapshot-attempts': {
+                # pylint: disable=line-too-long
+                'help': 'When rebuilding guest to restore a snapshot, try this many times before giving up (default: {})'.format(DEFAULT_RESTORE_SNAPSHOT_ATTEMPTS),
+                'type': int,
+                'default': DEFAULT_RESTORE_SNAPSHOT_ATTEMPTS
             }
         })
     ]
