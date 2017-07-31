@@ -31,6 +31,8 @@ _citool()
 
     if [[ ${cur} == -* ]] ; then
         begin %s end
+    elif [[ ${cur} == [.~/]* ]] ; then
+         _filedir
     else
         COMPREPLY=( $(compgen -W "${modules}" -- ${cur}) )
         return 0
