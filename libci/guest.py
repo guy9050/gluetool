@@ -23,45 +23,6 @@ class GuestLoggingAdapter(libci.log.ContextAdapter):
         super(GuestLoggingAdapter, self).__init__(logger, {'ctx_guest_name': (20, guest.name)})
 
 
-class SnapshotContext(object):
-    # pylint: disable=too-few-public-methods
-
-    """
-    Work with a guest, restoring its state using the pre-existing snapshot.
-
-    :param Guest guest: guest we'd like to use.
-    :param snapshot: Snapshot we want to restore. The actual value depends
-      on the guest's implementation, and it's value and type is of no
-      concern to the caller.
-    """
-
-    def __init__(self, guest, snapshot):
-        self._guest = guest
-        self._snapshot = snapshot
-
-    def __enter__(self):
-        """
-        Restore the snapshot.
-
-        :returns: a guest. E.g. in Openstack, "restoring a snapshot" means
-          user get a different server instance, running the requested
-          snapshot image, while the original box is still available to him.
-          This means guest's `restore_snapshot` may return a completely
-          different instance of `Guest`, other than the guest whose method
-          you called. When entering this context, user gets a guest, running
-          requested snapshot, and user should not expect this instance to
-          be identical with the one he passed to the constructor of this context.
-        """
-
-        self._guest.debug("Restoring snapshot '{}'".format(str(self._snapshot)))
-        self._snapshot = self._guest.restore_snapshot(self._snapshot)
-
-        return self._snapshot
-
-    def __exit__(self, *args, **kwargs):
-        self._snapshot.destroy()
-
-
 class Guest(object):
     """
     Base class of "remote system that can run our tests" instances.
