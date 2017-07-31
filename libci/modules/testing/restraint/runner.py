@@ -391,7 +391,9 @@ class RestraintRunner(libci.Module):
 
             recipe_set_results = []
 
-            for task in recipe_set.find_all('task'):
+            for i, task in enumerate(recipe_set.find_all('task'), 1):
+                self.info('running task #{} of {}'.format(i, len(tasks)))
+
                 guest.debug("restoring snapshot '{}' before running next task".format(base_snapshot))
                 actual_guest = guest.restore_snapshot(base_snapshot)
 
