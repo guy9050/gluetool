@@ -6,8 +6,9 @@ import enum
 import bs4
 
 import libci
-from libci.log import log_blob, log_dict
+from libci.log import log_blob, log_dict, ContextAdapter
 from libci.results import TestResult, publish_result
+from libci.utils import Bunch
 
 
 DEFAULT_RESTRAINT_PORT = 8081
@@ -47,6 +48,11 @@ class RestraintTestResult(TestResult):
 
     def __init__(self, overall_result, **kwargs):
         super(RestraintTestResult, self).__init__('restraint', overall_result, **kwargs)
+
+
+class StdStreamAdapter(ContextAdapter):
+    def __init__(self, logger, name):
+        super(StdStreamAdapter, self).__init__(logger, {'ctx_stream': (100, name)})
 
 
 class RestraintRunner(libci.Module):
@@ -262,12 +268,48 @@ class RestraintRunner(libci.Module):
             f.write(job_desc)
             f.flush()
 
+            stdout_logger = StdStreamAdapter(guest.logger, 'stdout')
+            stderr_logger = StdStreamAdapter(guest.logger, 'stderr')
+
+            class StreamHandler(Bunch):
+                # pylint: disable=too-few-public-methods
+
+                def write(self):
+                    # pylint: disable=no-member,attribute-defined-outside-init,access-member-before-definition
+                    self.logger(''.join(self.buff))
+                    self.buff = []
+
+            streams = {
+                '<stdout>': StreamHandler(buff=[], logger=stdout_logger.info),
+                '<stderr>': StreamHandler(buff=[], logger=stderr_logger.warn)
+            }
+
+            def output_streamer(stream, data, flush=False):
+                stream_handler = streams[stream.name]
+
+                if flush and stream_handler.buff:
+                    stream_handler.write()
+                    return
+
+                if data is None:
+                    return
+
+                for c in data:
+                    if c == '\n':
+                        stream_handler.write()
+
+                    elif c == '\r':
+                        continue
+
+                    else:
+                        stream_handler.buff.append(c)
+
             try:
                 output = libci.utils.run_command([
                     'restraint', '-v',
                     '--host', '1={}@{}'.format(guest.username, self._guest_restraint_address(guest)),
                     '--job', f.name
-                ], logger=guest.logger, inspect=True)
+                ], logger=guest.logger, inspect=True, inspect_callback=output_streamer)
 
             except libci.CICommandError as e:
                 output = e.output

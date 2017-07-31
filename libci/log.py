@@ -366,7 +366,7 @@ class LoggingFormatter(logging.Formatter):
             # Sorting them in reverse order of priorities - we're goign to insert
             # their values into `fmt`, so the highest priority context must be
             # inserted as the last one.
-            sorted_ctxs = sorted(ctx_properties, key=lambda x: x[0], reverse=True)
+            sorted_ctxs = sorted(ctx_properties, key=lambda x: getattr(record, x)[0], reverse=True)
 
             for name in sorted_ctxs:
                 _, value = getattr(record, name)

@@ -115,7 +115,7 @@ class WorkerThread(threading.Thread):
 
 
 class StreamReader(object):
-    def __init__(self, stream, block=16):
+    def __init__(self, stream, name=None, block=16):
         """
         Wrap blocking ``stream`` with a reading thread. The threads read from
         the (normal, blocking) `stream` and adds bits and pieces into the `queue`.
@@ -123,6 +123,7 @@ class StreamReader(object):
         """
 
         self._stream = stream
+        self._name = name or stream.name
 
         # List would fine as well, however deque is better optimized for
         # FIFO operations, and it provides the same thread safety.
@@ -151,7 +152,7 @@ class StreamReader(object):
 
     @property
     def name(self):
-        return self._stream.name
+        return self._name
 
     @property
     def content(self):
@@ -209,13 +210,13 @@ def run_command(cmd, logger=None, inspect=False, inspect_callback=None, **kwargs
 
     By default, output of the process is captured for both ``stdout`` and ``stderr``,
     and returned back to the caller. Under some conditions, caller might want to see
-    the output in "real-time". For that purpose, it can pass callable via ``inspect``
+    the output in "real-time". For that purpose, it can pass callable via ``inspect_callback``
     parameter - such callable will be called for every received bit of input on both
     ``stdout`` and ``stderr``. E.g.
 
     .. code-block:: python
 
-       def foo(stream, s):
+       def foo(stream, s, flush=False):
          if s is not None and 'a' in s:
            print s
 
@@ -278,11 +279,11 @@ def run_command(cmd, logger=None, inspect=False, inspect_callback=None, **kwargs
         if inspect is True:
             # let's capture *both* streams - capturing just a single one leads to so many ifs
             # and elses and messy code
-            p_stdout = StreamReader(p.stdout)
-            p_stderr = StreamReader(p.stderr)
+            p_stdout = StreamReader(p.stdout, name='<stdout>')
+            p_stderr = StreamReader(p.stderr, name='<stderr>')
 
             if inspect_callback is None:
-                def stdout_write(stream, data):
+                def stdout_write(stream, data, flush=False):
                     # pylint: disable=unused-argument
 
                     if data is None:
@@ -326,6 +327,8 @@ def run_command(cmd, logger=None, inspect=False, inspect_callback=None, **kwargs
                             break
 
                         inspect_callback(stream, data)
+
+                    inspect_callback(stream, None, flush=True)
 
             stdout, stderr = p_stdout.content, p_stderr.content
 
