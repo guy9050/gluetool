@@ -680,7 +680,11 @@ def wait(label, check, timeout=None, tick=30, logger=None):
     :raises CIError: when ``timeout`` elapses while condition did not pass the check.
     """
 
-    assert isinstance(tick, int) and tick > 0
+    if not isinstance(tick, int):
+        raise CIError('Tick must be an integer')
+
+    if tick < 0:
+        raise CIError('Tick must be a positive integer')
 
     logger = logger or Logging.get_logger()
 
@@ -690,8 +694,8 @@ def wait(label, check, timeout=None, tick=30, logger=None):
     def _timeout():
         return '{} seconds'.format(int(end_time - time.time())) if timeout is not None else 'infinite'
 
-    logger.debug("waiting for condition '{}', timeout {} seconds, check every {} seconds".format(label, _timeout(),
-                                                                                                 tick))
+    logger.debug("waiting for condition '{}', timeout {}, check every {} seconds".format(label, _timeout(),
+                                                                                         tick))
 
     while timeout is None or time.time() < end_time:
         logger.debug('{} left, sleeping for {} seconds'.format(_timeout(), tick))

@@ -55,6 +55,9 @@ class CaplogWrapper(object):
     def records(self):
         return self._caplog.records
 
+    def __repr__(self):
+        return '\n'.join(["<Record: msg='{}'>".format(record.message) for record in self.records])
+
     def clear(self):
         """
         Clear list of captured records.

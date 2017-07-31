@@ -35,6 +35,14 @@ def test_sanity(log, tmpdir):
     assert log.records[0].message == "loaded YAML data from '{}':\n{}".format(filepath, format_dict(data))
 
 
+def test_invalid_path():
+    with pytest.raises(CIError, match=r'File path is not valid: None'):
+        load_yaml(None)
+
+    with pytest.raises(CIError, match=r'File path is not valid: \[\]'):
+        load_yaml([])
+
+
 def test_bad_yaml(tmpdir):
     f = tmpdir.join('test.yml')
     f.write('{')
