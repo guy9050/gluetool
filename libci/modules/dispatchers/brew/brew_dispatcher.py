@@ -5,7 +5,7 @@ import ast
 import _ast
 
 from libci import Module, CIError, SoftCIError
-from libci.log import format_dict
+from libci.log import format_dict, log_dict
 from libci.utils import cached_property, load_yaml
 
 
@@ -423,6 +423,15 @@ class CIBrewDispatcher(Module):
 
         reduced = {}
 
+        def _default_flags():
+            return {
+                'apply-all': None,
+                'recipients': None,
+                'options': None
+            }
+
+        section_flags = _default_flags()
+
         def _add_command_set(name, set_commands):
             self.debug("    adding command set '{}', with commands:\n{}".format(name, format_dict(set_commands)))
 
@@ -440,26 +449,22 @@ class CIBrewDispatcher(Module):
 
                 return
 
-            flags = {
-                'apply-all': True,
-                'recipients': None,
-                'options': None
-            }
+            set_flags = section_flags.copy()
 
             if is_component is True:
                 if isinstance(set_commands[0], dict):
-                    self.debug('      specifies flags:\n{}'.format(format_dict(set_commands[0])))
+                    log_dict(self.debug, 'set flags', set_commands[0])
 
-                    flags.update(set_commands[0])
+                    set_flags.update(set_commands[0])
                     del set_commands[0]
 
-                for flag in [flag for flag in flags.iterkeys() if flag not in CIBrewDispatcher.KNOWN_FLAGS]:
+                for flag in [flag for flag in set_flags.iterkeys() if flag not in CIBrewDispatcher.KNOWN_FLAGS]:
                     self.warn("Flag '{}' is not supported (typo maybe?)".format(flag), sentry=True)
 
-                self.debug('      final flags:\n{}'.format(format_dict(flags)))
+                self.debug('final set flags:\n{}'.format(format_dict(set_flags)))
 
-                if flags['options']:
-                    options = flags['options']
+                if set_flags['options']:
+                    options = set_flags['options']
 
                     self.debug('set-wide options set to:\n{}'.format(format_dict(options)))
 
@@ -472,14 +477,14 @@ class CIBrewDispatcher(Module):
 
                         set_commands[i] = command
 
-                if flags['apply-all'] is True:
+                if set_flags.get('apply-all', True) is True:
                     self.debug("      allows 'all' section to be appended")
                     set_commands = set_commands[:] + all_commands
 
-            if flags['recipients']:
-                self.debug('set-wide recipients set to: {}'.format(flags['recipients']))
+            if set_flags['recipients']:
+                self.debug('set-wide recipients set to: {}'.format(set_flags['recipients']))
 
-                recipients = ','.join([s.strip() for s in flags['recipients'].split(',')])
+                recipients = ','.join([s.strip() for s in set_flags['recipients'].split(',')])
 
                 for i, command in enumerate(set_commands):
                     command = command.strip()
@@ -543,6 +548,15 @@ class CIBrewDispatcher(Module):
             #     - command4
             #   default:
             #     - command5
+
+            if 'flags' in commands:
+                section_flags = commands['flags']
+                del commands['flags']
+
+            else:
+                section_flags = _default_flags()
+
+            log_dict(self.debug, 'section flags', section_flags)
 
             for set_name, set_commands in commands.iteritems():
                 self.debug('  checking command set {}'.format(set_name))
