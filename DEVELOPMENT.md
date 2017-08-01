@@ -21,7 +21,8 @@ Host gitlab
 To begin digging into `citool` sources, there are few requirements:
 
   - `virtualenv` utility
-  - few packages: `libcurl-devel`, `rpm-python`, `krb5-devel`, <libxml devel dependency for lxml>, `yum`
+  - few packages: `libcurl-devel`, `rpm-python`, `krb5-devel`, <libxml devel dependency for lxml>, `yum`, 
+  `compat-openssl10-devel`
   - you'll need RH CA certificates, some pieces of our infrastructure work on HTTPS. If you don't have the certs
     installed already (check your `/etc/ssl`), fetch them (`root` required):
 
@@ -104,7 +105,13 @@ Testsuite is governed by `py.test`, you can override its default arguments using
   python setup.py test -a "--cov=libci --cov-report=html:coverage-report"
 ```
 
-Or, you can use the Tox - which is in fact used when running tests by the CI:
+Or, you can use the Tox. To use Tox, you have to firstly install these packages:
+
+```
+  pip install tox virtualenv
+```
+
+Tox can be easily executed by:
 
 ```
   tox -e py27
@@ -116,11 +123,6 @@ Tox also accepts additional options which are then passed to `py.test`:
   tox -e py27 -- --cov=libci --cov-report=html:coverage-report
 ```
 
-To use Tox, you have to install it:
-
-```
-  pip install tox virtualenv
-```
 
 While `setup.py` uses the current Python interpreter it founds in your `$PATH`, Tox creates (and caches) virtualenv
 for the test run, and uses that for running the tests. It also adds few other tests that were simpler to integrate
