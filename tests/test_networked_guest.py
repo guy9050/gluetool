@@ -1,7 +1,7 @@
 import socket
 import pytest
 
-from mock import MagicMock
+from mock import MagicMock, call
 
 import libci
 import libci.guest
@@ -9,6 +9,19 @@ import libci.log
 import libci.utils
 
 from . import NonLoadingCI, Bunch
+
+
+DEGRADED_REPORT = """
+  UNIT                         LOAD   ACTIVE SUB    DESCRIPTION
+  dummy.service                loaded failed failed some dummy service
+
+LOAD   = Reflects whether the unit definition was properly loaded.
+ACTIVE = The high-level unit activation state, i.e. generalization of SUB.
+SUB    = The low-level unit activation state, values depend on unit type.
+
+3 loaded units listed. Pass --all to see loaded but inactive units, too.
+To show all installed unit files use 'systemctl list-unit-files'.
+"""
 
 
 @pytest.fixture(name='guest')
@@ -220,3 +233,164 @@ def test_copy_from(copy_guest):
 
 def test_copy_from_recursive(copy_guest):
     _test_copy_from(*copy_guest, recursive=True)
+
+
+def test_get_rc_status(guest, monkeypatch):
+    output = Bunch(stdout='  rc status  ')
+
+    monkeypatch.setattr(guest, 'execute', MagicMock(return_value=output))
+
+    # pylint: disable=protected-access
+    assert guest._get_rc_status('dummy rc query command') == 'rc status'
+
+
+def test_get_rc_status_error(guest, monkeypatch):
+    def throw(*args, **kwargs):
+        # pylint: disable=unused-argument
+
+        raise libci.CICommandError(None, Bunch(exit_code=1, stdout='  rc status  '))
+
+    monkeypatch.setattr(guest, 'execute', MagicMock(side_effect=throw))
+
+    # pylint: disable=protected-access
+    assert guest._get_rc_status('dummy rc query command') == 'rc status'
+
+
+def test_check_boot_initctl(guest, monkeypatch):
+    monkeypatch.setattr(guest, '_get_rc_status', MagicMock(return_value='rc stop/waiting'))
+
+    # pylint: disable=protected-access
+    assert guest._check_boot_initctl(ssh_options=['Bar=19']) is True
+    guest._get_rc_status.assert_called_once_with('initctl status rc', ssh_options=['Bar=19'])
+
+
+def test_check_boot_initctl_not_ready(guest, monkeypatch):
+    monkeypatch.setattr(guest, '_get_rc_status', MagicMock(return_value='rc still running'))
+
+    # pylint: disable=protected-access
+    assert guest._check_boot_initctl() is False
+
+
+def test_check_boot_systemctl(guest, monkeypatch):
+    monkeypatch.setattr(guest, '_get_rc_status', MagicMock(return_value='running'))
+
+    # pylint: disable=protected-access
+    assert guest._check_boot_systemctl(ssh_options=['Bar=19']) is True
+    guest._get_rc_status.assert_called_once_with('systemctl is-system-running', ssh_options=['Bar=19'])
+
+
+def test_check_boot_systemctl_not_ready(guest, log, monkeypatch):
+    monkeypatch.setattr(guest, '_get_rc_status', MagicMock(return_value='not running'))
+
+    # pylint: disable=protected-access
+    assert guest._check_boot_systemctl() is False
+    assert log.records[-1].message == "systemctl not reporting ready: 'not running'"
+
+
+def test_check_boot_systemctl_degraded(guest, log, monkeypatch):
+    monkeypatch.setattr(guest, '_get_rc_status', MagicMock(return_value='degraded'))
+    monkeypatch.setattr(guest, 'execute', MagicMock(return_value=Bunch(stdout=DEGRADED_REPORT)))
+
+    guest.ALLOW_DEGRADED = ['dummy.service']
+
+    # pylint: disable=protected-access
+    assert guest._check_boot_systemctl() is True
+    assert log.records[-1].message == 'only ignored services are degraded, report ready'
+
+
+def test_check_boot_systemctl_not_ignored(guest, monkeypatch):
+    monkeypatch.setattr(guest, '_get_rc_status', MagicMock(return_value='degraded'))
+    monkeypatch.setattr(guest, 'execute', MagicMock(return_value=Bunch(stdout=DEGRADED_REPORT)))
+
+    with pytest.raises(libci.CIError, match=r'unexpected services reported as degraded'):
+        # pylint: disable=protected-access
+        guest._check_boot_systemctl()
+
+
+def test_wait_alive_unknown_rc_support(guest, log, monkeypatch):
+    monkeypatch.setattr(guest, 'wait', MagicMock())
+
+    # pylint: disable=protected-access
+    guest._supports_systemctl = False
+    guest._supports_initctl = False
+
+    guest.wait_alive()
+
+    # pylint: disable=line-too-long
+    assert log.records[-1].message == "Don't know how to check boot process status - assume it finished and hope for the best"
+
+
+def test_wait_alive_get_rc_support(guest, monkeypatch):
+    monkeypatch.setattr(guest, 'wait', MagicMock())
+
+    def _discover_rc_support(*args, **kwargs):
+        # pylint: disable=unused-argument,protected-access
+
+        guest._supports_systemctl = False
+        guest._supports_initctl = False
+
+    # pylint: disable=protected-access
+    monkeypatch.setattr(guest, '_discover_rc_support', MagicMock(side_effect=_discover_rc_support))
+
+    guest.wait_alive()
+
+    guest._discover_rc_support.assert_called_once()
+
+
+@pytest.mark.parametrize('rc_support, boot_check', [
+    ((True, False), '_check_boot_systemctl'),
+    ((False, True), '_check_boot_initctl')
+])
+def test_wait_alive_waits(guest, monkeypatch, rc_support, boot_check):
+    monkeypatch.setattr(guest, 'wait', MagicMock())
+
+    # pylint: disable=protected-access
+    guest._supports_systemctl, guest._supports_initctl = rc_support
+
+    guest.wait_alive(connect_timeout=19, connect_tick=13,
+                     echo_timeout=23, echo_tick=57,
+                     boot_timeout=27, boot_tick=17)
+
+    call_args = guest.wait.call_args_list
+
+    assert call_args[0] == call('connectivity', guest._check_connectivity, tick=13, timeout=19)
+
+    # calls #2 and #3 use partial objects because of ssh options, therefore simple list comparison would not work
+    args, kwargs = call_args[1]
+    assert args[0] == 'shell available'
+    assert args[1].func == guest._check_echo
+    assert args[1].args == tuple()
+    assert args[1].keywords == {'ssh_options': ['ConnectTimeout=57']}
+    assert kwargs == {
+        'tick': 57,
+        'timeout': 23
+    }
+
+    args, kwargs = call_args[2]
+    assert args[0] == 'boot finished'
+    assert args[1].func == getattr(guest, boot_check)
+    assert args[1].args == tuple()
+    assert args[1].keywords == {'ssh_options': ['ConnectTimeout=17']}
+    assert kwargs == {
+        'tick': 17,
+        'timeout': 27
+    }
+
+
+def test_setup_missing_support(guest, monkeypatch):
+    # pylint: disable=protected-access
+    monkeypatch.setattr(guest._module, 'has_shared', MagicMock(return_value=False))
+
+    with pytest.raises(libci.CIError, match=r"Module 'guest-setup' is required to actually set the guests up."):
+        guest.setup()
+
+
+def test_setup(guest, monkeypatch):
+    # pylint: disable=protected-access
+    monkeypatch.setattr(guest._module, 'has_shared', MagicMock(return_value=True))
+
+    output = MagicMock()
+    monkeypatch.setattr(guest._module, 'shared', MagicMock(return_value=output))
+
+    assert guest.setup(foo=17) == output
+    guest._module.shared.assert_called_once_with('setup_guest', [guest.hostname], foo=17)
