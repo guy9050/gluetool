@@ -165,3 +165,44 @@ setup/teardown code, unreadable asserts and even more complicated ways to convin
 path, e.g. when it comes to injecting errors into its flow. In such case, consider refactoring the tested code - it's
 possible it could be rewritten to more separate pieces of code (main function & several helpers) which could greatly
 improve the list of options you have, and it may even lead to more readable code.
+
+
+``MagicMock`` is very handy tool
+--------------------------------
+
+Don't be afraid to use ``MagicMock`` - its ``return_value`` and ``side_effect`` parameters can help a lot when it comes
+to mocking mocking functions returning prepared values or raising exceptions. E.g.
+
+.. code-block:: python
+
+   monkeypatch.setattr(library, 'library_function', MagicMock(side_effect=Exception))
+
+when ``library.library_function`` gets called, it will raise an exception. If you need to raise an exception
+with specific arguments, pass a helper function as a side effect:
+
+.. code-block:: python
+
+   def throw(*args, **kwargs):
+       # pylint: disable=unused-argument
+
+       raise Exception('simply bad request')
+
+   monkeypath.setattr(library, 'library_function', MagicMock(side_effect=throw))
+
+Instead of mocking a whole function, use ``MagicMock``'s ``return_value``:
+
+.. code-block:: python
+
+   monkeypatch.setattr(foo, 'bar', MagicMock(return_value=some_known_object))
+
+is way more readable than:
+
+.. code-block:: python
+
+   def foo():
+      return some_known_object
+
+   monkeypach.setattr(foo, 'bar', foo)
+
+Should you need more action when it comes to returned value (computing it on the fly), patching with custom function
+is absolutely acceptable.
