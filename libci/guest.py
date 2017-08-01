@@ -286,22 +286,21 @@ class NetworkedGuest(Guest):
 
         return False
 
+    def _get_rc_status(self, cmd, ssh_options=None):
+        try:
+            output = self.execute(cmd, ssh_options=ssh_options)
+
+        except libci.CICommandError as exc:
+            output = exc.output
+
+        return output.stdout.strip()
+
     def _check_boot_systemctl(self, ssh_options=None):
         """
         Check whether boot process finished using ``systemctl``.
         """
 
-        try:
-            output = self.execute('systemctl is-system-running', ssh_options=ssh_options)
-
-        except libci.CICommandError as exc:
-            output = exc.output
-
-        if output.exit_code not in (0, 1):
-            # systemctl should return a reasonable exit code, anything too high is weird
-            raise libci.CIError('Boot process check failed: {}'.format(str(exc)))
-
-        status = output.stdout.strip()
+        status = self._get_rc_status('systemctl is-system-running', ssh_options=ssh_options)
 
         if status == 'running':
             self.debug('systemctl reports ready')
@@ -332,13 +331,7 @@ class NetworkedGuest(Guest):
         Check whether boot process finished using ``initctl``.
         """
 
-        try:
-            output = self.execute('initctl status rc', ssh_options=ssh_options)
-
-        except libci.CICommandError as exc:
-            output = exc.output
-
-        status = output.stdout.strip()
+        status = self._get_rc_status('initctl status rc', ssh_options=ssh_options)
 
         if status == 'rc stop/waiting':
             self.debug('initctl reports ready')
