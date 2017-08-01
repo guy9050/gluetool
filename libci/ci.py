@@ -166,6 +166,7 @@ class Configurable(object):
             <option name>: {
                 <option properties>
             },
+            ...
         }
 
     where
@@ -180,12 +181,12 @@ class Configurable(object):
       keyword arguments when the option is being added to the parser, therefore any arguments recognized
       by :py:mod:`argparse` can be used.
 
-    It is also possible to use groups:
+    It is also possible to use groups::
 
         options = [
-            ( <group name>,  <group options> ),
+            (<group name>,  <group options>),
             ...
-        }
+        ]
 
     where
 
