@@ -2,7 +2,8 @@
 Gather and provide recipients of notifications.
 """
 
-from libci import Module, utils
+from libci import CIError, Module
+from libci.utils import cached_property, PatternMap
 
 
 def deduplicate(recipients):
@@ -54,6 +55,12 @@ class NotifyRecipients(Module):
             'force-recipients': {
                 'help': 'If set, it will override all recipient settings - all notifications will go to these people',
                 'metavar': 'NAMES'
+            },
+            'mapped-recipients-map': {
+                # pylint: disable=line-too-long
+                'help': "Path to a pattern-map file mapping recipients (usually issuers) to another recipients. Use ';' to split multiple recipients.",
+                'default': None,
+                'metavar': 'PATH'
             }
         })
     ]
@@ -104,7 +111,7 @@ class NotifyRecipients(Module):
 
         return [s.strip() for s in users.split(',')]
 
-    @utils.cached_property
+    @cached_property
     def force_recipients(self):
         """
         List of forced recipients.
@@ -112,7 +119,7 @@ class NotifyRecipients(Module):
 
         return self.option_to_recipients('force-recipients')
 
-    @utils.cached_property
+    @cached_property
     def symbolic_recipients(self):
         """
         Mapping between symbolic recipients and the actual values.
@@ -125,6 +132,13 @@ class NotifyRecipients(Module):
             recipients['ISSUER'] = task.issuer
 
         return recipients
+
+    @cached_property
+    def mapped_recipients(self):
+        if not self.option('mapped-recipients-map'):
+            return None
+
+        return PatternMap(self.option('mapped-recipients-map'), logger=self.logger)
 
     def _recipients_by_result(self, result_type):
         """
@@ -157,6 +171,51 @@ class NotifyRecipients(Module):
 
         return sum([self._recipients_by_result(result_type) for result_type in self.supported_result_types], [])
 
+    def _replace_symbolic_recipients(self, recipients):
+        processed = []
+
+        for recipient in recipients:
+            if recipient[0] != '{' or recipient[-1] != '}':
+                processed.append(recipient)
+                continue
+
+            pattern = recipient[1:-1]
+            actual = self.symbolic_recipients.get(pattern, None)
+
+            if actual is None:
+                self.warn("Cannot replace symbolic recipient '{}'".format(recipient))
+                continue
+
+            self.debug("replacing '{}' with '{}'".format(recipient, actual))
+            processed.append(actual)
+
+        return processed
+
+    def _replace_mapped_recipients(self, recipients):
+        if not self.mapped_recipients:
+            return recipients
+
+        processed = []
+
+        for recipient in recipients:
+            try:
+                new_recipients = self.mapped_recipients.match(recipient)
+                if not new_recipients:
+                    raise CIError()
+
+                new_recipients = [s.strip() for s in new_recipients.split(';')]
+                self.debug("replacing '{}' with '{}'".format(recipient, ', '.join(new_recipients)))
+
+            except CIError:
+                # ignore fails, they are usualy expected
+                new_recipients = [recipient]
+
+                self.debug("Cannot replace mapped recipient '{}'".format(recipient))
+
+            processed += new_recipients
+
+        return processed
+
     def _finalize_recipients(self, recipients):
         """
         The final step before using recipients. Method substitutes all symbolic recipients
@@ -166,24 +225,10 @@ class NotifyRecipients(Module):
         :returns: polished list of recipients.
         """
 
-        substituted_recipients = []
+        symbolic_satisfied = self._replace_symbolic_recipients(recipients)
+        mapped_satisfied = self._replace_mapped_recipients(symbolic_satisfied)
 
-        for recipient in recipients:
-            if recipient[0] != '{' or recipient[-1] != '}':
-                substituted_recipients.append(recipient)
-                continue
-
-            pattern = recipient[1:-1]
-            actual = self.symbolic_recipients.get(pattern, None)
-
-            if actual is None:
-                self.warn("Cannot replace recipient '{}' with the actual value".format(recipient))
-                continue
-
-            self.debug("replacing '{}' with '{}'".format(recipient, actual))
-            substituted_recipients.append(actual)
-
-        return polish(substituted_recipients)
+        return polish(mapped_satisfied)
 
     def notification_recipients(self, result_type=None):
         """
