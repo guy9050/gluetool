@@ -3,55 +3,51 @@
 import logging
 
 import pytest
+from mock import MagicMock
+
 import urlnorm
 
 import libci
 from libci.utils import treat_url
 
 
-def test_sanity():
+@pytest.mark.parametrize('url, expected', [
     # Add more patterns bellow when necessary
-    urls = {
-        'HTTP://FoO.bAr.coM././foo/././../foo/index.html': 'http://foo.bar.com/foo/index.html',
-        # urlnorm cannot handle localhost but treat_url should handle such situation
-        'http://localhost/index.html': 'http://localhost/index.html'
-    }
-
-    for original, expected in urls.iteritems():
-        assert treat_url(original, shorten=False) == expected
+    ('HTTP://FoO.bAr.coM././foo/././../foo/index.html', 'http://foo.bar.com/foo/index.html'),
+    # urlnorm cannot handle localhost but treat_url should handle such situation
+    ('http://localhost/index.html', 'http://localhost/index.html')
+])
+def test_sanity(url, expected):
+    assert treat_url(url, shorten=False) == expected
 
 
-def test_urlnorm_errors(monkeypatch):
-    def norm(url):
-        # pylint: disable=unused-argument
-        assert url == 'dummy url'
+def test_urlnorm_error(monkeypatch):
+    monkeypatch.setattr(urlnorm, 'norm', MagicMock(side_effect=urlnorm.InvalidUrl))
 
-        raise urlnorm.InvalidUrl('dummy exception')
-
-    monkeypatch.setattr(urlnorm, 'norm', norm)
-
-    with pytest.raises(urlnorm.InvalidUrl, match=r'dummy exception'):
+    with pytest.raises(urlnorm.InvalidUrl):
         treat_url('dummy url')
+
+    # pylint: disable=no-member
+    urlnorm.norm.assert_called_once_with('dummy url')
 
 
 def test_shortening(monkeypatch):
-    def fetch_shorten(url, **kwargs):
-        # pylint: disable=unused-argument
-        assert url.endswith('http://foo.bar.com/')
-
-        return None, 'dummy shortened URL from {}'.format(url.split('?')[-1])
-
-    monkeypatch.setattr(libci.utils, 'fetch_url', fetch_shorten)
+    mock_return = (None, 'dummy shortened URL from http://foo.bar.com/')
+    monkeypatch.setattr(libci.utils, 'fetch_url', MagicMock(return_value=mock_return))
 
     assert treat_url('http://foo.bar.com/', shorten=True) == 'dummy shortened URL from http://foo.bar.com/'
+    # pylint: disable=no-member
+    libci.utils.fetch_url.assert_called_once_with('https://url.corp.redhat.com/new?http://foo.bar.com/', logger=None)
 
 
 def test_shortening_errors(log, logger, monkeypatch):
-    def fetch_raise(url, **kwargs):
+    def throw(*args, **kwargs):
         # pylint: disable=unused-argument
+
         raise libci.CIError('simply bad request')
 
-    monkeypatch.setattr(libci.utils, 'fetch_url', fetch_raise)
+    monkeypatch.setattr(libci.utils, 'fetch_url', MagicMock(side_effect=throw))
+
     assert treat_url('http://foo.bar.com/', shorten=True, logger=logger) == 'http://foo.bar.com/'
 
     assert len(log.records) == 1
@@ -60,11 +56,6 @@ def test_shortening_errors(log, logger, monkeypatch):
 
 
 def test_strip(monkeypatch):
-    # check the final strip() call
-    def fetch_whitespace(url, **kwargs):
-        # pylint: disable=unused-argument
-        return None, '   so much whitespace   '
-
-    monkeypatch.setattr(libci.utils, 'fetch_url', fetch_whitespace)
+    monkeypatch.setattr(libci.utils, 'fetch_url', MagicMock(return_value=(None, '   so much whitespace   ')))
 
     assert treat_url('http://foo.bar.com/', shorten=True) == 'so much whitespace'
