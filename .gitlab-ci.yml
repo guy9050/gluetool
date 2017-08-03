@@ -11,15 +11,21 @@ variables:
   DOCS_UPLOAD: "citool-doc@liver3.lab.eng.brq.redhat.com:/home/citool-doc/public_html"
   COVERAGE_UPLOAD: "citool-doc@liver3.lab.eng.brq.redhat.com:/home/citool-doc/public_html/coverage-report"
 
+image: "docker-registry.engineering.redhat.com/baseos-ci/citool-gitlab-ci"
+
 
 #
 # Runs before each and every pipeline job.
 #
 before_script:
-  - yum -y install git make python-setuptools gcc python-devel krb5-devel libxml2-devel postgresql-devel openssl-devel libcurl-devel python-rpm
-  - (curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py && rm -f get-pip.py)
-  - pip install -U setuptools
-  - pip install ansible virtualenv
+  # Following steps are now covered by CI docker image:
+  #
+  #  - yum -y install git make python-setuptools gcc python-devel krb5-devel libxml2-devel postgresql-devel openssl-devel libcurl-devel python-rpm
+  #  - (curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py && rm -f get-pip.py)
+  #  - pip install -U setuptools
+  #  - pip install ansible virtualenv
+
+  # This one is *not* handled by CI image because it depends on repository being cloned in the container
   - chmod u=rw,go= docs/citool-doc.key
 
 
