@@ -8,6 +8,7 @@ class CIPublisherCiBus(Module):
     This module sends notifications of CI results via CI message bus.
     """
 
+    cibus = None
     name = 'publisher-ci-bus'
     description = 'Notification module - CI msg bus'
     options = {
