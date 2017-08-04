@@ -312,8 +312,6 @@ class CIBrewDispatcher(Module):
     description = 'Configurable brew dispatcher'
 
     python_requires = 'PyYAML'
-    build = dict()
-    config = None
 
     options = {
         'config': {
@@ -352,6 +350,15 @@ class CIBrewDispatcher(Module):
     }
 
     required_options = ['config']
+
+    def __init__(self, *args, **kwargs):
+        super(CIBrewDispatcher, self).__init__(*args, **kwargs)
+
+        self.build = {}
+        self.config = None
+
+        self._thread_id = None
+        self._subthread_counter = 0
 
     @cached_property
     def job_result_types(self):
@@ -729,6 +736,10 @@ class CIBrewDispatcher(Module):
         commands = self._construct_command_sets(matching_config, component)
         self.debug('commands:\n{}'.format(format_dict(commands)))
 
+        if self.has_shared('thread_id'):
+            self._thread_id = self.shared('thread_id')
+            self._subthread_counter = 0
+
         def _dispatch_commands(commands):
             """
             Dispatch commands, one by one. This usually leads to starting some
@@ -739,6 +750,11 @@ class CIBrewDispatcher(Module):
             for command in commands:
                 module = shlex.split(command)[0]
                 args = shlex.split(command)[1:]
+
+                if self._subthread_counter is not None:
+                    self._subthread_counter += 1
+
+                    args = ['--thread-id', '{}-{}'.format(self._thread_id, self._subthread_counter)] + args
 
                 self.debug("module='{}', args='{}'".format(module, args))
                 self.run_module(module, args)

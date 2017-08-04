@@ -38,6 +38,7 @@
           citool -c -i -o citool-debug.txt
                  jenkins
                  brew --id $id
+                 testing-thread
                  brew-build-name
                  brew-dispatcher
     properties:

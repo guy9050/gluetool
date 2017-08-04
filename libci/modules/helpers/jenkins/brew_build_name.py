@@ -10,6 +10,15 @@ class CIBrewBuildName(Module):
     name = 'brew-build-name'
     description = 'Set Jenkins build name to details of brew task'
 
+    options = {
+        'testing-thread-length': {
+            'help': 'Testing thread will be shortened to N characters. Use ``-1`` for full length.',
+            'type': int,
+            'metavar': 'N',
+            'default': -1
+        }
+    }
+
     def execute(self):
         task = self.shared('task')
         if task is None:
@@ -24,5 +33,17 @@ class CIBrewBuildName(Module):
             self.warn('$BUILD_URL env var not found, was this job started by Jenkins?', sentry=True)
             return
 
-        self.shared('jenkins').set_build_name(task.short_name)
-        self.info("build name set: '{}'".format(task.short_name))
+        name = task.short_name
+
+        if self.has_shared('thread_id'):
+            thread_id = self.shared('thread_id')
+            if self.option('testing-thread-length') != -1:
+                thread_id = thread_id[0:self.option('testing-thread-length')]
+
+            name = '{}:{}'.format(thread_id, name)
+
+        else:
+            self.warn('Testing thread ID not found')
+
+        self.shared('jenkins').set_build_name(name)
+        self.info("build name set: '{}'".format(name))

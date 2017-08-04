@@ -29,6 +29,9 @@ class DispatchJenkinsJobMixin(object):
     """Name of the Jenkins job this module dispatches."""
 
     options = {
+        'thread-id': {
+            'help': 'Testing thread ID'
+        },
         'id': {
             'help': 'Task ID. If environment variable ``id`` exists, it overrides the command-line option.',
             'type': int
@@ -76,6 +79,7 @@ class DispatchJenkinsJobMixin(object):
             notify_recipients_options = None
 
         return {
+            'thread_id': self.option('thread-id'),
             'id': self.option('id'),
             'pipeline_prepend': self.option('pipeline-prepend'),
             'pipeline_append': self.option('pipeline-append'),
