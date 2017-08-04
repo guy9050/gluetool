@@ -15,7 +15,9 @@ class CIMakeBusMessages(Module):
 
     shared_functions = ['bus_messages']
 
-    messages = {}
+    def __init__(self, *args, **kwargs):
+        super(CIMakeBusMessages, self).__init__(*args, **kwargs)
+        self.messages = {}
 
     def store(self, message_type, new_message):
         if message_type in self.messages.keys():
