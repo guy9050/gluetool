@@ -21,7 +21,7 @@ see documentation for `guess-openstack-image` ([1]).
     """
 
 
-class CIGuessOpenstackImage(Module):
+class GuessOpenstackImage(Module):
     """
     "Guess" openstack image. User can choose from different possible methods of "guessing":
 
@@ -61,7 +61,7 @@ class CIGuessOpenstackImage(Module):
     shared_functions = ['image']
 
     def __init__(self, *args, **kwargs):
-        super(CIGuessOpenstackImage, self).__init__(*args, **kwargs)
+        super(GuessOpenstackImage, self).__init__(*args, **kwargs)
 
         self._image = None
 
@@ -80,6 +80,9 @@ class CIGuessOpenstackImage(Module):
         self._image = image
 
     def _guess_recent(self):
+        if not self.has_shared('openstack'):
+            raise CIError("Module requires OpenStack connection, provided e.g. by the 'openstack' module")
+
         hint = '^{}$'.format(self.option('image'))
         self.debug("using pattern '{}' as a hint".format(hint))
 
@@ -88,9 +91,6 @@ class CIGuessOpenstackImage(Module):
 
         except re.error as exc:
             raise CIError("cannot compile hint pattern '{}': {}".format(hint, str(exc)))
-
-        if not self.has_shared('openstack'):
-            raise CIError("Module requires OpenStack connection, provided e.g. by the 'openstack' module")
 
         possible_image = collections.namedtuple('possible_image', ['key', 'name'])
         possible_images = []
