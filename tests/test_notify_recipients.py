@@ -15,7 +15,7 @@ def fixture_module():
 
 
 @pytest.fixture(name='configured_module')
-def fixture_configured_module(module):
+def fixture_configured_module(module, tmpdir):
     ci, mod = module
 
     # This is a carefully constructed set of recipients, excercising different features
@@ -26,7 +26,7 @@ def fixture_configured_module(module):
     mod._config.update({
         'beaker-notify': ['def', 'ghi'],
         'boc-notify': ['pqr, {FOO}'],
-        'restraint-notify': ['mno'],
+        'restraint-notify': ['mno', 'some-weird/recipient'],
         'rpmdiff-analysis-add-notify': ['jkl, abc', 'abc'],
         'rpmdiff-comparison-add-notify': ['jkl, abc', 'abc'],
         'covscan-default-notify': ['uvw'],
@@ -38,6 +38,13 @@ def fixture_configured_module(module):
     mod.symbolic_recipients = {
         'FOO': 'some foo recipient'
     }
+
+    map_file = tmpdir.join('dummy-map.yml')
+    map_file.write("""---
+- 'some-weird/recipient': 'the real one!; and another real one!'
+""")
+
+    mod._config['mapped-recipients-map'] = str(map_file)
 
     return ci, mod
 
@@ -113,7 +120,29 @@ def test_symbolic_recipients(module):
     # pylint: disable=protected-access
     ci._add_shared('brew_task', None, fake_task)
 
-    assert mod.symbolic_recipients == {'ISSUER': 'foo'}
+    assert mod._replace_symbolic_recipients(['bar', '{ISSUER}']) == ['bar', 'foo']
+
+
+def test_mapped_recipients_map(configured_module):
+    _, mod = configured_module
+
+    assert isinstance(mod.mapped_recipients, libci.utils.PatternMap)
+    assert mod.mapped_recipients.match('some-weird/recipient') == 'the real one!; and another real one!'
+
+
+def test_mapped_recipients_map_unset(module):
+    _, mod = module
+
+    assert mod.mapped_recipients is None
+    # pylint: disable=protected-access
+    assert mod._replace_mapped_recipients(['bar', 'some-weird/recipient']) == ['bar', 'some-weird/recipient']
+
+
+def test_mapped_recipients(configured_module):
+    _, mod = configured_module
+
+    # pylint: disable=protected-access,line-too-long
+    assert mod._replace_mapped_recipients(['bar', 'some-weird/recipient']) == ['bar', 'the real one!', 'and another real one!']
 
 
 def test_recipients(configured_module):
@@ -162,8 +191,8 @@ def test_overall_recipients(configured_module):
     _, mod = configured_module
 
     # pylint: disable=protected-access
-    assert mod._recipients_overall() == ['def', 'ghi', 'pqr', '{FOO}', 'uvw', 'mno', 'jkl', 'abc', 'abc',
-                                         'jkl', 'abc', 'abc']
+    assert mod._recipients_overall() == ['def', 'ghi', 'pqr', '{FOO}', 'uvw', 'mno', 'some-weird/recipient', 'jkl',
+                                         'abc', 'abc', 'jkl', 'abc', 'abc']
 
 
 def test_finalize_recipients(log, configured_module):
@@ -176,19 +205,20 @@ def test_finalize_recipients(log, configured_module):
     # pylint: disable=protected-access
     assert mod._finalize_recipients(['foo', '{BAR}', 'bar', '{FOO}', 'baz']) \
         == ['bar', 'baz', 'foo', 'some foo recipient']
-    assert log.records[0].message == "Cannot replace recipient '{BAR}' with the actual value"
+    assert log.records[0].message == "Cannot replace symbolic recipient '{BAR}'"
     assert log.records[0].levelno == logging.WARN
 
 
 @pytest.mark.parametrize('result_type,expected_recipients', [
     # Without result type, return all recipients
-    (None, ['abc', 'def', 'ghi', 'jkl', 'mno', 'pqr', 'some foo recipient', 'uvw']),
+    # pylint: disable=line-too-long
+    (None, ['abc', 'and another real one!', 'def', 'ghi', 'jkl', 'mno', 'pqr', 'some foo recipient', 'the real one!', 'uvw']),
     # With specific type, return just its recipients
     ('beaker', ['def', 'ghi']),
     ('boc', ['pqr', 'some foo recipient']),
     ('covscan', ['uvw']),
     ('foo', ['xyz']),
-    ('restraint', ['mno']),
+    ('restraint', ['and another real one!', 'mno', 'the real one!']),
     ('rpmdiff-analysis', ['abc', 'jkl']),
     ('rpmdiff-comparison', ['abc', 'jkl'])
 ])
