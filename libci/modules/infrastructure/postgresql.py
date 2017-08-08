@@ -56,15 +56,22 @@ class CIPostgreSQL(libci.Module):
 
         return self._connection
 
-    def postgresql_cursor(self, cursor_factory=NamedTupleCursor):
+    def postgresql_cursor(self, reconnect=False, cursor_factory=NamedTupleCursor):
         """
         Return psycopg2.connection.cursor class instance with cursor_factory
         by default `psycopg2.extras.NamedTupleCursor` is used.
 
+        :param bool reconnect: Recreate connection if True (default: False)
         :param cursor_factory: A cursor factory class from psycopg2.extras, by default `NamedTupleCursor``
         :return: posgtgresql cursor
         :rtype: psycopg2.connection.cursor
+        :raises libci.CIError: if connection object does not exist
         """
+        if reconnect:
+            self.connect()
+
+        if not self._connection:
+            raise libci.CIError("connection object not initialized, did you forget connect to database?")
 
         return self._connection.cursor(cursor_factory=cursor_factory)
 
