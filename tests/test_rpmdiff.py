@@ -674,15 +674,14 @@ def test_run_command_fail(module, monkeypatch):
         module._run_command(["arg0", "arg1", "arg2"])
 
 
-def test_create_command(module):
+@pytest.mark.parametrize("hub_url, expected_cmd", [
+    (None, ["rpmdiff-remote"]),
+    ("url", ["rpmdiff-remote", "--hub-url", "url"]),
+])
+def test_create_command(module, hub_url, expected_cmd):
     _, module = module
-    assert module._rpmdiff_cmd == ["rpmdiff-remote"]
-
-
-def test_create_command_with_huburl(module):
-    _, module = module
-    module.hub_url = "url"
-    assert module._rpmdiff_cmd == ["rpmdiff-remote", "--hub-url", "url"]
+    module.hub_url = hub_url
+    assert module._rpmdiff_cmd == expected_cmd
 
 
 def test_get_runinfo(module, monkeypatch):
