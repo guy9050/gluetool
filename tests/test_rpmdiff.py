@@ -676,13 +676,13 @@ def test_run_command_fail(module, monkeypatch):
 
 def test_create_command(module):
     _, module = module
-    assert module._create_command() == ["rpmdiff-remote"]
+    assert module._rpmdiff_cmd == ["rpmdiff-remote"]
 
 
 def test_create_command_with_huburl(module):
     _, module = module
     module.hub_url = "url"
-    assert module._create_command() == ["rpmdiff-remote", "--hub-url", "url"]
+    assert module._rpmdiff_cmd == ["rpmdiff-remote", "--hub-url", "url"]
 
 
 def test_get_runinfo(module, monkeypatch):
