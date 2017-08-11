@@ -123,7 +123,8 @@ class CIRpmdiff(Module):
     def sanity(self):
         utils.check_for_commands(REQUIRED_CMDS)
 
-    def _create_command(self):
+    @property
+    def _rpmdiff_cmd(self):
         cmd = ["rpmdiff-remote"]
         if self.hub_url:
             cmd += ["--hub-url", self.hub_url]
@@ -138,7 +139,7 @@ class CIRpmdiff(Module):
 
     def _get_runinfo(self, run_id):
         # make sure run_id is a string here, as utils run_command requires it
-        command = self._create_command() + ["runinfo", str(run_id)]
+        command = self._rpmdiff_cmd + ["runinfo", str(run_id)]
 
         blob = json.loads(CIRpmdiff._run_command(command).stdout)
         log_blob(self.debug, 'rpmdiff-remote runinfo returned', utils.format_dict(blob))
@@ -158,9 +159,9 @@ class CIRpmdiff(Module):
 
     def _run_rpmdiff(self, test_type, nvr_baseline=None):
         if self.brew_task.scratch:
-            command = self._create_command() + ["schedule", str(self.brew_task.task_id)]
+            command = self._rpmdiff_cmd + ["schedule", str(self.brew_task.task_id)]
         else:
-            command = self._create_command() + ["schedule", self.brew_task.nvr]
+            command = self._rpmdiff_cmd + ["schedule", self.brew_task.nvr]
 
         if test_type == 'comparison':
             if nvr_baseline is None:
