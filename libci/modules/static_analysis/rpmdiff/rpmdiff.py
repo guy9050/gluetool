@@ -229,11 +229,14 @@ class CIRpmdiff(Module):
             raise CIError('Cannot refresh old results, shared function \'results\' does not exist')
 
         results = self.shared("results")
+        old_result = None
         for result in results:
             if (result.test_type in ["rpmdiff-analysis", "rpmdiff-comparison"] and
                     result.ids['rpmdiff_run_id'] == run_id):
-                results.remove(result)
-                self._publish_results(self._get_runinfo(run_id), result.rpmdiff_test_type)
+                old_result = result
+        if old_result:
+            results.remove(old_result)
+            self._publish_results(self._get_runinfo(run_id), old_result.rpmdiff_test_type)
 
     def execute(self):
         blacklist = self.option('blacklist')
