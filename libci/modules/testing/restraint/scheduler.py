@@ -39,11 +39,10 @@ class RestraintScheduler(libci.Module):
 
     name = 'restraint-scheduler'
     options = {
-        'install-build-not-task': {
-            'help': """Try to install the build instead of the task. This option can help with some non-scratch tasks
-that don't provide RPMs on their web page anymore. You should be fine without this option most of the time, but
-you may need it when dealing some older builds.""",
-            'action': 'store_true'
+        'install-task-not-build': {
+            'help': 'Try to install SUT using brew task ID as a referrence, instead of the brew build ID.',
+            'action': 'store_true',
+            'default': False
         }
     }
 
@@ -99,18 +98,21 @@ you may need it when dealing some older builds.""",
             'BREW_BUILDS': ''
         }
 
-        if self.option('install-build-not-task'):
+        if self.option('install-task-not-build'):
+            self.debug('asked to install by task ID')
+
+            variables['BREW_TASKS'] = str(task.task_id)
+
+        else:
             if task.scratch:
-                # pylint: disable=line-too-long
-                self.warn('Asked to install SUT by the build ID, but the task is a scratch build - falling back to installing by the task ID.')
+                self.debug('task is a scratch build - using task ID for installation')
 
                 variables['BREW_TASKS'] = str(task.task_id)
 
             else:
-                variables['BREW_BUILDS'] = str(task.build_id)
+                self.debug('task is a regular task - using build ID for installation')
 
-        else:
-            variables['BREW_TASKS'] = str(task.task_id)
+                variables['BREW_BUILDS'] = str(task.build_id)
 
         guest.debug('setting the guest up')
         guest.setup(variables=variables)
