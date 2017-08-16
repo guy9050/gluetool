@@ -151,14 +151,16 @@ class RpmDiffWaiver(Module):
             .find("table").find_all("tr")
         error = namedtuple('RpmDiffError', 'error_type subpackage message')
         errors = []
+        # Remove column names
+        rows.pop(0)
         for row in rows:
             columns = row.find_all("td")
             error_type = columns[0].find("b").getText().strip()
             if error_type.lower() in RPMDIFF_RESULTS_TO_WAIVE:
                 errors.append(error(
                     error_type=error_type,
-                    subpackage=columns[2].getText().strip(),
-                    message=columns[4].find("pre").getText()
+                    subpackage=columns[1].getText().strip(),
+                    message=columns[2].find("pre").getText()
                 ))
         return errors
 
