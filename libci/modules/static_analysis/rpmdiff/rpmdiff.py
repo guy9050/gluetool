@@ -77,6 +77,10 @@ class RpmdiffTestResult(TestResult):
                                                 urls=urls,
                                                 **kwargs)
 
+    @property
+    def rpmdiff_test_type(self):
+        return self.test_type.split("-")[1]
+
 
 class CIRpmdiff(Module):
     """
@@ -107,15 +111,24 @@ class CIRpmdiff(Module):
     required_options = ['type']
     shared_functions = ['refresh_rpmdiff_results']
 
-    brew_task = None
-    check_interval = 60
-    max_timeout = 3600 * 4
-    rpmdiff_cmd = None
-
     _result_class = None
+
+    def __init__(self, *args, **kwargs):
+        super(CIRpmdiff, self).__init__(*args, **kwargs)
+        self.brew_task = None
+        self.check_interval = 60
+        self.max_timeout = 3600 * 4
+        self.hub_url = None
 
     def sanity(self):
         utils.check_for_commands(REQUIRED_CMDS)
+
+    @property
+    def _rpmdiff_cmd(self):
+        cmd = ["rpmdiff-remote"]
+        if self.hub_url:
+            cmd += ["--hub-url", self.hub_url]
+        return cmd
 
     @staticmethod
     def _run_command(command):
@@ -126,7 +139,7 @@ class CIRpmdiff(Module):
 
     def _get_runinfo(self, run_id):
         # make sure run_id is a string here, as utils run_command requires it
-        command = self.rpmdiff_cmd + ["runinfo", str(run_id)]
+        command = self._rpmdiff_cmd + ["runinfo", str(run_id)]
 
         blob = json.loads(CIRpmdiff._run_command(command).stdout)
         log_blob(self.debug, 'rpmdiff-remote runinfo returned', utils.format_dict(blob))
@@ -146,11 +159,13 @@ class CIRpmdiff(Module):
 
     def _run_rpmdiff(self, test_type, nvr_baseline=None):
         if self.brew_task.scratch:
-            command = self.rpmdiff_cmd + ["schedule", str(self.brew_task.task_id)]
+            command = self._rpmdiff_cmd + ["schedule", str(self.brew_task.task_id)]
         else:
-            command = self.rpmdiff_cmd + ["schedule", self.brew_task.nvr]
+            command = self._rpmdiff_cmd + ["schedule", self.brew_task.nvr]
 
         if test_type == 'comparison':
+            if nvr_baseline is None:
+                raise CIError("Not provided baseline for comparison")
             command += ["--baseline", nvr_baseline]
 
         blob = json.loads(CIRpmdiff._run_command(command).stdout)
@@ -215,11 +230,15 @@ class CIRpmdiff(Module):
             raise CIError('Cannot refresh old results, shared function \'results\' does not exist')
 
         results = self.shared("results")
+        old_results = []
         for result in results:
             if (result.test_type in ["rpmdiff-analysis", "rpmdiff-comparison"] and
                     result.ids['rpmdiff_run_id'] == run_id):
+                old_results.append(result)
+        if old_results:
+            for result in old_results:
                 results.remove(result)
-        self._publish_results(self._get_runinfo(run_id), self.option('type'))
+            self._publish_results(self._get_runinfo(run_id), old_results[0].rpmdiff_test_type)
 
     def execute(self):
         blacklist = self.option('blacklist')
@@ -227,10 +246,8 @@ class CIRpmdiff(Module):
         test_type = self.option('type')
         url = self.option('url')
 
-        # override url if requested
-        self.rpmdiff_cmd = ['rpmdiff-remote']
         if url:
-            self.rpmdiff_cmd += ['--hub-url', url]
+            self.hub_url = url
 
         # get a brew task instance
         self.brew_task = self.shared('brew_task')
