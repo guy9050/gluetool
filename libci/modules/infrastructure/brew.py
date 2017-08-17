@@ -8,7 +8,7 @@ from libci.utils import cached_property, fetch_url
 BREW_API_TOPURL = "http://download.eng.bos.redhat.com/brewroot"
 BREW_WEB_URL = 'https://brewweb.engineering.redhat.com/brew/'
 AUTOMATION_USER_ID = 2863  # baseos-ci jenkins
-GIT_COMMIT_URL = 'http://pkgs.devel.redhat.com/cgit/rpms/{0}/commit/?id={1}'  # component, hash
+GIT_COMMIT_URL = 'http://pkgs.devel.redhat.com/cgit/rpms/{0}.git/commit/?id={1}'  # component, hash
 
 
 class NotBuildTaskError(SoftCIError):
