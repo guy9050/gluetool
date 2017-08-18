@@ -89,33 +89,65 @@ class RestraintScheduler(libci.Module):
         Run necessary command to prepare guest for following procedures.
         """
 
-        # Variables are passed to Ansible playbook, and that playbook passes them to environment
-        # of executed command - which means, that when the variable does not exist, Ansible will
-        # crash.
-        variables = {
-            'BREW_METHOD': 'install',
-            'BREW_TASKS': '',
-            'BREW_BUILDS': ''
+        guest.info('setting the guest up')
+
+        guest.setup()
+
+        # Install SUT
+        self.info('installing the SUT packages')
+
+        options = {
+            'brew_method': 'install',
+            'brew_tasks': '',
+            'brew_builds': ''
         }
 
         if self.option('install-task-not-build'):
             self.debug('asked to install by task ID')
 
-            variables['BREW_TASKS'] = str(task.task_id)
-
+            options['brew_tasks'] = str(task.task_id)
         else:
             if task.scratch:
                 self.debug('task is a scratch build - using task ID for installation')
 
-                variables['BREW_TASKS'] = str(task.task_id)
-
+                options['brew_tasks'] = str(task.task_id)
             else:
                 self.debug('task is a regular task - using build ID for installation')
 
-                variables['BREW_BUILDS'] = str(task.build_id)
+                options['brew_builds'] = str(task.build_id)
 
-        guest.debug('setting the guest up')
-        guest.setup(variables=variables)
+        job_xml = """
+            <job>
+              <recipeSet priority="Normal">
+                <recipe ks_meta="method=http harness='restraint-rhts beakerlib-redhat'" whiteboard="Server">
+                  <task name="/distribution/install/brew-build" role="None">
+                    <params>
+                      <param name="BASEOS_CI" value="true"/>
+                      <param name="METHOD" value="install"/>
+                      <param name="TASKS" value="{brew_tasks}"/>
+                      <param name="BUILDS" value="{brew_builds}"/>
+                    </params>
+                    <rpm name="test(/distribution/install/brew-build)" path="/mnt/tests/distribution/install/brew-build"/>
+                  </task>
+                  <task name="/distribution/runtime_tests/verify-nvr-installed" role="None">
+                    <params>
+                      <param name="BASEOS_CI" value="true"/>
+                    </params>
+                    <rpm name="test(/distribution/runtime_tests/verify-nvr-installed)" path="/mnt/tests/distribution/runtime_tests/verify-nvr-installed"/>
+                  </task>
+                </recipe>
+              </recipeSet>
+            </job>
+        """.format(**options)
+
+        job = bs4.BeautifulSoup(job_xml, 'xml')
+
+        output = self.shared('restraint', guest, job)
+
+        if output.exit_code != 0:
+            self.debug('restraint exited with invalid exit code {}'.format(output.exit_code))
+
+            raise CIError('Installation of SUT failed, restraint reports errors')
 
     def create_schedule(self, task, job_desc, image):
         """
@@ -184,13 +216,22 @@ class RestraintScheduler(libci.Module):
             libci.log.log_blob(self.debug, str(guest), recipe_set.prettify(encoding='utf-8'))
 
     def execute(self):
+        if not self.has_shared('restraint'):
+            raise CIError('Requires support module that would provide restraint, e.g. `restraint`.')
+
+        if not self.has_shared('task'):
+            raise CIError('Requires support module that would provide Brew task, e.g. `brew`.')
+
+        if not self.has_shared('image'):
+            raise CIError('Requires support module that would OpenStack image name, e.g. `guess-openstack-image`.')
+
         task = self.shared('task')
         if task is None:
-            raise CIError('no brew build found, did you run brew module')
+            raise CIError('No brew build found.')
 
         image = self.shared('image')
         if image is None:
-            raise CIError('No image provided, did you run guess-*-image module?')
+            raise CIError('No image found.')
 
         def _command_options(name):
             opts = self.option(name)

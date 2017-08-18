@@ -230,6 +230,18 @@ def log_blob(writer, intro, blob):
     writer("{}:\n{}\n{}\n{}".format(intro, BLOB_HEADER, blob, BLOB_FOOTER))
 
 
+def log_xml(writer, intro, element):
+    """
+    Log an XML element, e.g. Beaker job description.
+
+    :param callable writer: A function which is used to actually log the text. Usually a one of some logger methods.
+    :param str intro: Label to show what is the meaning of the logged blob.
+    :param element: XML element to log.
+    """
+
+    writer("{}:\n{}".format(intro, element.prettify(encoding='utf-8')))
+
+
 class ContextAdapter(logging.LoggerAdapter):
     """
     Generic logger adapter that collects "contexts", and prepends them
