@@ -8,7 +8,11 @@ from libci.utils import cached_property, fetch_url
 BREW_API_TOPURL = "http://download.eng.bos.redhat.com/brewroot"
 BREW_WEB_URL = 'https://brewweb.engineering.redhat.com/brew/'
 AUTOMATION_USER_ID = 2863  # baseos-ci jenkins
-GIT_COMMIT_URL = 'http://pkgs.devel.redhat.com/cgit/rpms/{0}.git/commit/?id={1}'  # component, hash
+
+GIT_COMMIT_URLS = [
+    'http://pkgs.devel.redhat.com/cgit/rpms/{component}/commit/?id={commit}',
+    'http://pkgs.devel.redhat.com/cgit/rpms/{component}.git/commit/?id={commit}'
+]
 
 
 class NotBuildTaskError(SoftCIError):
@@ -81,9 +85,19 @@ class BrewTask(object):
             component = re.search("/rpms/[^?]*", request).group()[6:]
         except AttributeError:
             return None
+
         # get git commit html
-        url = GIT_COMMIT_URL.format(component, git_hash)
-        return BeautifulSoup(fetch_url(url, logger=self._module.logger)[1], 'html.parser')
+        for url in GIT_COMMIT_URLS:
+            url = url.format(component=component, commit=git_hash)
+
+            try:
+                _, content = fetch_url(url, logger=self._module.logger)
+                return BeautifulSoup(content, 'html.parser')
+
+            except CIError:
+                self._module.warn("Failed to fetch commit info from '{}'".format(url))
+
+        return None
 
     @cached_property
     def branch(self):
