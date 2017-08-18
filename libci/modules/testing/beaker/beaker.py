@@ -9,7 +9,7 @@ import bs4
 
 from libci import CIError, SoftCIError, CICommandError, Module, utils
 from libci.log import BlobLogger
-from libci.utils import run_command, fetch_url
+from libci.utils import Bunch, run_command, fetch_url
 from libci.results import TestResult, publish_result
 
 
@@ -72,6 +72,41 @@ this situation.
 
         variables.update({
             'tasks': '\n'.join(['\t* {}'.format(name) for name in self.tasks])
+        })
+
+        return variables
+
+
+class BeakerJobwatchError(SoftCIError):
+    MODULE = 'beaker'
+    SUBJECT = ('Failed to babysit Beaker jobs till the successfull end for '
+               '{task.nvr}, brew task {task.task_id}, branch {task.branch}')
+    BODY = """
+
+Beaker jobs started by CI failed to finish successfully.
+
+This can often happen because of distro missing from Beaker, installability issues, incompatible
+requirements forced by CI configuration for the component, invalid test metadata, multiple timeouting
+tests, or aborted recipes. See the summary and related logs for more details [1], CI documentation [2],
+current configuration [3] and/or consult with component's QE on how to resolve this situation.
+
+[1] {matrix_url}
+[2] https://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/UserHOWTO#EnableCIforacomponent
+[3] https://gitlab.cee.redhat.com/baseos-qe/citool-config/raw/production/brew-dispatcher.yaml
+    """
+
+    def __init__(self, task, matrix_url):
+        super(BeakerJobwatchError, self).__init__('Beaker job(s) aborted, inform the user nicely')
+
+        self.task = task if task else Bunch(branch='<unknown>', nvr='<unknown>', task_id='<unknown>')
+        self.matrix_url = matrix_url
+
+    def _template_variables(self):
+        variables = super(BeakerJobwatchError, self)._template_variables()
+
+        variables.update({
+            'task': self.task,
+            'matrix_url': self.matrix_url,
         })
 
         return variables
@@ -349,20 +384,23 @@ class Beaker(Module):
             output = run_command(command, inspect=True)
 
         except CICommandError as exc:
+            # if beaker-jobwatch run unsuccessfuly, it exits with retcode 2
+            # this most probably means that the jobs aborted
+            if exc.output.exit_code == 2:
+                matrix_url = self._get_matrix_url(exc.output.stdout)
+                raise BeakerJobwatchError(self.shared('brew_task'), matrix_url)
             raise CIError("Failure during 'jobwatch' execution: {}".format(exc.output.stderr))
 
         return output
 
-    def _process_jobs(self, jobwatch_log):
+    def _get_matrix_url(self, jobwatch_log):
         """
-        Tries to parse beaker-jobwatch output, and looks for list of beaker
-        jobs. It then inspects these jobs, using tcms-results, to gather
-        a summary for other interested parties.
+        Returns beaker matrix url parsed from beaker-jobwatch's output.
 
         :param str jobwatch_log: Output of beaker-jobwatch.
-        :returns: tuple of three items: string result, dict with processed results, beaker matrix URL
+        :returns: matrix url as a string
+        :raises: CIError if output is invalid, matrix url not found or not finished
         """
-
         # beaker-jobwatch output usually looks like this:
         #
         # Broken: 0
@@ -379,18 +417,28 @@ class Beaker(Module):
             raise CIError('jobwatch output is unexpectedly short')
 
         if not jobwatch_log[-3].startswith('https://beaker.engineering.redhat.com/matrix/'):
-            raise CIError('Don\'t know where to find beaker matrix URL in jobwatch output')
+            raise CIError('Could not find beaker matrix URL in jobwatch output')
 
-        matrix_url = jobwatch_log[-3].strip()
+        self.info(jobwatch_log[-1].strip())
+        if jobwatch_log[-1].strip() not in ['finished successfully', 'finished unsuccessfully']:
+            raise CIError('beaker-jobwatch does not report completion')
 
-        if jobwatch_log[-1].strip() != 'finished successfully':
-            # When jobwatch failed, something serious probably happened. Give up
-            # immediately.
-            self.warn('beaker-jobwatch does not report successful completion')
+        self.info('beaker-jobwatch finished')
 
-            return 'ERROR', {}, matrix_url
+        # matrix url is always on the 3rd line from the end
+        return jobwatch_log[-3].strip()
 
-        self.info('beaker-jobwatch finished successfully')
+    def _process_jobs(self, jobwatch_log):
+        """
+        Tries to parse beaker-jobwatch output, and looks for list of beaker
+        jobs. It then inspects these jobs, using tcms-results, to gather
+        a summary for other interested parties.
+
+        :param str jobwatch_log: Output of beaker-jobwatch.
+        :returns: tuple of three items: string result, dict with processed results, beaker matrix URL
+        """
+
+        matrix_url = self._get_matrix_url(jobwatch_log)
 
         parsed_matrix_url = urlparse.urlparse(matrix_url)
         parsed_query = urlparse.parse_qs(parsed_matrix_url.query)
