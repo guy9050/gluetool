@@ -16,10 +16,10 @@ variables:
 # Runs before each and every pipeline job.
 #
 before_script:
-  - yum -y install git make python-setuptools gcc python-devel krb5-devel postgresql-devel openssl-devel libcurl-devel python-rpm
+  - yum -y install git make python-setuptools gcc python-devel krb5-devel libxml2-devel postgresql-devel openssl-devel libcurl-devel python-rpm
   - (curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py && rm -f get-pip.py)
-  - export PYCURL_SSL_LIBRARY=nss
   - pip install -U setuptools
+  - pip install ansible virtualenv
   - chmod u=rw,go= docs/citool-doc.key
 
 
@@ -49,9 +49,10 @@ unit-tests:
 generate-docs:
   stage: test
   script:
-    - pip install -r requirements.txt
+    - virtualenv -p /usr/bin/python2.7 /tmp/virtualenv-citool
+    - source /tmp/virtualenv-citool/bin/activate
+    - /usr/bin/ansible-playbook install.yml
     - sphinx-apidoc -T -e -o docs/source/ libci/
-    - python setup.py develop
     - python docs/generate-module-page.py
     - make -C docs/ html
   artifacts:
