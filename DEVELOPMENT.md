@@ -5,7 +5,7 @@
 
 Before moving on to the actual setup, there are few important notes:
 
-* **The ony supported and (sort of tested) way of instalation and using `citool` is a separate virtual environment!** It may be possible to install `citool` directly somewhere into your system but we don't recommend that, we don't use it that way, and we don't know what kind of hell you might run into. Please, stick with `virtualenv`.
+* **The only supported and (sort of tested) way of instalation and using `citool` is a separate virtual environment!** It may be possible to install `citool` directly somewhere into your system but we don't recommend that, we don't use it that way, and we don't know what kind of hell you might run into. Please, stick with `virtualenv`.
 
 * The tested distributions (as in "we're using these") are either recent Fedora, RHEL or CentOS. Should you try to install `citool` in a different environment - or even development trees of Fedora, for example - please, make notes about differencies, and it'd be awesome if your first merge request could update this file :)
 
@@ -31,16 +31,11 @@ To begin digging into `citool` sources, there are few requirements:
 
   - `virtualenv` utility
 
-  - system packages - it is either impossible or impractical to use their Python counterpart, or they are required to build a Python package required by `citool`:
-    - `krb5-devel`
-    - `libcurl-devel`
-    - `libxml2-devel`
-    - `openssl-devel`
-    - `rpm-python`
-    - `yum`
+  - `ansible-playbook` - you can either use the one provided by your system, or install it into newly created virtualenv. You can use pretty much any reasonable version, `citool` lists `ansible` as one of its requirements, and it will install the correct version in its virtualenv anyway.
 
-  - in some cases, on recent Fedora (26+), it's been shown for some packages their `compat-*` variant might be needed. Please, install these as well:
-    - `compat-openssl10-devel`
+  - system packages - it is either impossible or impractical to use their Python counterpart, or they are required to
+    build a Python package required by `citool`. In some cases, on recent Fedora (26+) for example, it's been shown
+    for some packages their `compat-*` variant might be needed. Please, install them as told during the process.
 
   - you'll need RH CA certificates, some pieces of our infrastructure work on HTTPS. If you don't have the certs
     installed already (check your `/etc/ssl`), fetch them (`root` required):
@@ -51,59 +46,46 @@ To begin digging into `citool` sources, there are few requirements:
       update-ca-trust
     ```
 
+1. Create a virtual environment:
+   ```
+     virtualenv -p /usr/bin/python2.7 <virtualenv-dir>
+     . <virtualenv-dir>/bin/activate
+   ```
 
-```
-  # create virtualenv
-  virtualenv -p /usr/bin/python2.7 <virtualenv-dir>
-  . <virtualenv-dir>/bin/activate
+2. (optional) Install `ansible-playbook`:
+   ```
+     pip install ansible
+   ```
 
-  # update pip
-  pip install --upgrade pip
+3. Clone `citool` repository - your working copy:
+   ```
+     git clone gitlab:<your username>/<your fork name>
+     cd citool
+   ```
 
-  # checkout citool's repo
-  git clone gitlab:<your username>/<your fork name>
-  cd citool
+4. Install `citool`:
+   ```
+     ansible-playbook ./install.yml
+   ```
 
-  # pycurl @ RH (or Fedora) is using nss backend, and that is controlled in its installation time
-  # by environment variable PYCURL_SSL_LIBRARY. You should set it right now:
-  export PYCURL_SSL_LIBRARY=nss
+   **Be warned:** read the messages reported by this step - `install.yml` playbook checks for necessary system packages, and reports any missing pieces. **It does not install them!** We don't want to mess with your system setup, as we try to stay inside our little own virtualenv, but the playbook will try to provide hints on what packages might solve the issue.
 
-  # ... but adding it into your bin/activate script is a good idea as well - tox (we use it to run
-  # citool's test seuite) installs its own virtualenv for the tests, and by having the pycurl variable
-  # exported all the time you work in citool's virtualenv context would make sure the pycurl installed
-  # in tox' own virtualenv will would use the correct backend.
-  echo 'export PYCURL_SSL_LIBRARY=nss' >> $VIRTUAL_ENV/bin/activate
+5. (optional) Activate Bash completion
+   ```
+     python bash_completion.py
+     mv citool $VIRTUAL_ENV/bin/citool-bash-completition
+     echo "source $VIRTUAL_ENV/bin/citool-bash-completition" >> $VIRTUAL_ENV/bin/activate
+   ```
 
-  # There's also a cache used by pip. In case you run into issues while running 'pip install' command bellow,
-  # you might try to add '--no-cache-dir' toption, and try again.
+6. Re-activate virtualenv
 
-  # install citool's requirements
-  pip install -r requirements.txt
+   Since step #1 your `citool` virtualenv is active, but `citool`'s installation made some changes to the `activate`
+   script, therefore it's necessary to re-activate the virtualenv before actually doing stuff with `citool`:
 
-  # install koji - it needs to be downloaded and built
-  ./install-koji.sh
-
-  # rpm package is required by koji, and it seems reasonable to us the one provided by
-  # system rpm. virtualenv is isolated from system libraries, therefore this symlink
-  ln -s /usr/lib64/python2.7/site-packages/rpm $VIRTUAL_ENV/lib64/python2.7/site-packages
-
-  # the same applies to yum (rpmUtils) as well
-  ln -s /usr/lib/python2.7/site-packages/rpmUtils $VIRTUAL_ENV/lib64/python2.7/site-packages
-
-  # we need qe.py as well, for tcms & wow to work correctly
-  ln -s /usr/share/qa-tools/python-modules/qe.py $VIRTUAL_ENV/lib64/python2.7/site-packages
-
-  # tell virtualenv's requests package about RH CA cert
-  echo "export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-bundle.crt" >> $VIRTUAL_ENV/bin/activate
-
-  # and install citool in development mode
-  python setup.py develop
-  
-  # optional: activate bash completion in virtualenv
-  python bash_completion.py
-  mv citool $VIRTUAL_ENV/bin/citool-bash-completition
-  echo "source $VIRTUAL_ENV/bin/citool-bash-completition" >> $VIRTUAL_ENV/bin/activate
-```
+   ```
+   deactivate
+   . <virtualenv-dir>/bin/activate
+   ```
 
 `citool`'s modules may require additional commands as well, e.g. tools like `tcms-results` or `restraint`. You'd have
 to install these tools as well to be able to use the corresponding modules.
