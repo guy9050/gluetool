@@ -229,7 +229,7 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
         if task is None:
             raise CIError("Using 'target-autodetect' method without a brew task does not work")
 
-        target = task.target.target
+        target = task.target
 
         self._distro = self.pattern_map.match(target)
         self.debug("transformed target '{}' to the distro '{}'".format(target, self._distro))

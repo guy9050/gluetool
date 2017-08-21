@@ -118,7 +118,7 @@ class GuessOpenstackImage(Module):
         if task is None:
             raise CIError("Using 'target-autodetect' method without a brew task does not work")
 
-        target = task.target.target
+        target = task.target
 
         self._image = self.pattern_map.match(target)
         self.debug("transformed target '{}' to the image '{}'".format(target, self._image))

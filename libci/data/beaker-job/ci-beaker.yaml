@@ -92,7 +92,7 @@
             wow --wow-options="${wow_options}" \
             beah-result-parser \
             jenkins \
-            brew --id $id \
+            brew --task-id $id \
             brew-build-name \
             guess-product ${guess_product_options} \
             guess-beaker-distro ${guess_distro_options} \

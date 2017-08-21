@@ -29,18 +29,18 @@ See Covscan logs for more details {covscan_result_url}.
 If you have any questions, feel free to ask at Red Hat IRC channel #coverity or coverity-users@redhat.com
     """
 
-    def __init__(self, url, brew_task):
+    def __init__(self, url, task):
         super(CovscanFailedError, self).__init__('Covscan testing failed, task did not pass')
 
         self.url = url
-        self.brew_task = brew_task
+        self.task = task
 
     def _template_variables(self):
         variables = super(CovscanFailedError, self)._template_variables()
 
         variables.update({
             'covscan_result_url': self.url,
-            'nvr': self.brew_task.nvr
+            'nvr': self.task.nvr
         })
 
         return variables
@@ -75,17 +75,17 @@ If you have any questions, feel free to ask at Red Hat IRC channel #coverity or 
 class CovscanTestResult(TestResult):
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, overall_result, covscan_result, brew_task, **kwargs):
+    def __init__(self, overall_result, covscan_result, task, **kwargs):
         urls = {
             'covscan_url': covscan_result.url,
-            'brew_url': brew_task.url
+            'brew_url': task.url
         }
 
         super(CovscanTestResult, self).__init__('covscan', overall_result, urls=urls, **kwargs)
 
         self.fixed = len(covscan_result.fixed)
         self.added = len(covscan_result.added)
-        self.baseline = brew_task.latest
+        self.baseline = task.latest
 
 
 class CovscanResult(object):
@@ -99,7 +99,7 @@ class CovscanResult(object):
         try:
             diff = json.loads(diff_json)
         except ValueError:
-            raise CovscanFailedError(url, self.module.brew_task)
+            raise CovscanFailedError(url, self.module.task)
         log_blob(self.module.debug, 'This is what we got from covscan', diff)
         defects = diff['defects']
         self.module.debug('Defects:\n{}\nfetched from {}'.format(format_dict(defects), url))
@@ -161,7 +161,7 @@ class CICovscan(Module):
         }
     }
 
-    brew_task = None
+    task = None
 
     def sanity(self):
         check_for_commands(REQUIRED_CMDS)
@@ -191,21 +191,21 @@ class CICovscan(Module):
             self.info('Skipping covscan testing, using existing Covscan task id')
             covscan_result = CovscanResult(self, task_id)
         else:
-            baseline = self.brew_task.latest
+            baseline = self.task.latest
 
             if not baseline:
                 raise NoCovscanBaselineFoundError()
 
             self.info('Using (second) latest non-scratch build [%s] in tag [%s] as baseline',
-                      baseline, self.brew_task.target.destination_tag)
+                      baseline, self.task.destination_tag)
 
             self.info('Obtaining source RPM from Brew build')
-            srcrpm = urlgrab(self.brew_task.srcrpm)
+            srcrpm = urlgrab(self.task.srcrpm)
 
             self.info('Issuing Covscan request')
 
-            config = 'rhel-{0}-x86_64'.format(self.brew_task.target.rhel)
-            base_config = 'rhel-{0}-x86_64-basescan'.format(self.brew_task.target.rhel)
+            config = 'rhel-{0}-x86_64'.format(self.task.rhel)
+            base_config = 'rhel-{0}-x86_64-basescan'.format(self.task.rhel)
 
             try:
                 covscan_result = self.version_diff_build(srcrpm, baseline, config, base_config)
@@ -216,7 +216,7 @@ class CICovscan(Module):
         self.info('Covscan task url: {0}'.format(covscan_result.url))
 
         if covscan_result.status_failed():
-            raise CovscanFailedError(covscan_result.url, self.brew_task)
+            raise CovscanFailedError(covscan_result.url, self.task)
 
         covscan_result.download_artifacts()
 
@@ -231,27 +231,27 @@ class CICovscan(Module):
         # Log in format expected by postbuild scripting
         self.info('Result of testing: {}'.format(overall_result))
 
-        publish_result(self, CovscanTestResult, overall_result, covscan_result, self.brew_task)
+        publish_result(self, CovscanTestResult, overall_result, covscan_result, self.task)
 
     def execute(self):
         # get a brew task instance
-        self.brew_task = self.shared('task')
-        if self.brew_task is None:
+        self.task = self.shared('task')
+        if self.task is None:
             raise CIError('no brew build found, did you run brew module?')
 
         blacklist = self.option('blacklist')
         if blacklist is not None:
             self.verbose('blacklisted packages: {}'.format(blacklist))
-            if self.brew_task.component in [splitted.strip() for splitted in blacklist.split(',')]:
-                self.info('Skipping blacklisted package {}'.format(self.brew_task.component))
+            if self.task.component in [splitted.strip() for splitted in blacklist.split(',')]:
+                self.info('Skipping blacklisted package {}'.format(self.task.component))
                 return
 
-        target = self.brew_task.target.target
+        target = self.task.target
         enabled_targets = self.option('target_pattern')
         self.verbose('enabled targets: {}'.format(enabled_targets))
 
         if enabled_targets and any((re.compile(regex.strip()).match(target) for regex in enabled_targets.split(','))):
-            self.info('Running covscan for {} on {}'.format(self.brew_task.component, target))
+            self.info('Running covscan for {} on {}'.format(self.task.component, target))
             self.scan()
         else:
             self.info('Target {} is not enabled, skipping job'.format(target))

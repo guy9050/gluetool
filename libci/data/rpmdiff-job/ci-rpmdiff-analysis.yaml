@@ -46,7 +46,7 @@
                  testing-results
                  testing-thread --id "${testing_thread_id}"
                  jenkins
-                 brew --id $id
+                 brew --task-id $id
                  brew-build-name
                  rpmdiff --type analysis
                  postgresql

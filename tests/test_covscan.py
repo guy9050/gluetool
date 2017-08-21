@@ -82,7 +82,7 @@ def test_not_enabled_target(log, module, monkeypatch):
     component_name = 'ssh'
     target = 'not_allowed'
 
-    mocked_task = MagicMock(target=MagicMock(target=target), component=component_name)
+    mocked_task = MagicMock(target=target, component=component_name)
 
     _, module = module
     module._config['target_pattern'] = enabled_target
@@ -99,8 +99,7 @@ def run(result, log, module, monkeypatch, tmpdir):
     component_name = 'ssh'
     target = 'rhel-7.4-candidate'
 
-    mocked_target = MagicMock(target=target)
-    mocked_task = MagicMock(target=mocked_target, component=component_name, srcrpm='dummy.src.rpm')
+    mocked_task = MagicMock(target=target, component=component_name, srcrpm='dummy.src.rpm')
 
     _, module = module
     module._config['target_pattern'] = enabled_target
@@ -184,7 +183,7 @@ def test_invalid_json(monkeypatch, tmpdir):
 
     monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'urlopen', mocked_urlopen)
 
-    result = CovscanResult(MagicMock(brew_task=111), 000)
+    result = CovscanResult(MagicMock(task=111), 000)
 
     with pytest.raises(CovscanFailedError):
         # pylint: disable=pointless-statement
@@ -194,7 +193,7 @@ def test_invalid_json(monkeypatch, tmpdir):
 def test_no_baseline(module):
     _, module = module
 
-    module.brew_task = MagicMock(latest=None)
+    module.task = MagicMock(latest=None)
 
     with pytest.raises(NoCovscanBaselineFoundError):
         module.scan()
@@ -210,7 +209,7 @@ def test_fetch_added(monkeypatch, tmpdir):
         return outfile
 
     monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'urlopen', mocked_urlopen)
-    result = CovscanResult(MagicMock(brew_task=111), 000)
+    result = CovscanResult(MagicMock(task=111), 000)
 
     assert result.added == ''
 
@@ -224,7 +223,7 @@ def test_fetch_fixed(monkeypatch, tmpdir):
         return outfile
 
     monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'urlopen', mocked_urlopen)
-    result = CovscanResult(MagicMock(brew_task=111), 000)
+    result = CovscanResult(MagicMock(task=111), 000)
 
     assert result.fixed == ''
 
@@ -254,8 +253,7 @@ def test_covscan_fail(module, monkeypatch, tmpdir):
     monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'run_command', mocked_run_command)
     monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'urlopen', mocked_urlopen)
 
-    mocked_target = MagicMock(destination_tag='destination_tag', rhel='rhel')
-    module.brew_task = MagicMock(latest='baseline', target=mocked_target, srpm='srpm')
+    module.task = MagicMock(latest='baseline', destination_tag='destiantion_tag', rhel='rhel', srpm='srpm')
 
     with pytest.raises(CovscanFailedError):
         module.scan()

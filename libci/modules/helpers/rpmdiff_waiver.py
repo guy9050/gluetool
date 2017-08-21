@@ -389,11 +389,11 @@ class RpmDiffWaiver(Module):
         package = self.option("package")
         target = self.option("target")
         if self.has_shared("task"):
-            brew_task = self.shared("task")
+            task = self.shared("task")
             if not package:
-                package = brew_task.component
+                package = task.component
             if not target:
-                target = brew_task.target.destination_tag
+                target = task.destination_tag
         if not run_id:
             run_id = self.rpmdiff_id_from_results()
 

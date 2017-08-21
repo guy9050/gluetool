@@ -99,7 +99,7 @@
              beah-result-parser \
              jenkins \
              openstack ${openstack_opts} \
-             brew --id $id \
+             brew --task-id $id \
              brew-build-name \
              guess-product ${guess_product_options} \
              guess-beaker-distro ${guess_beaker_distro_options} \

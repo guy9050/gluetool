@@ -122,7 +122,7 @@ class CIRpmdiff(Module):
 
     def __init__(self, *args, **kwargs):
         super(CIRpmdiff, self).__init__(*args, **kwargs)
-        self.brew_task = None
+        self.task = None
         self.check_interval = 60
         self.max_timeout = 3600 * 4
         self.hub_url = None
@@ -198,10 +198,10 @@ class CIRpmdiff(Module):
         :rtype dict
         :returns: informations about RPMdiff run
         """
-        if self.brew_task.scratch:
-            command = self._rpmdiff_cmd + ["schedule", str(self.brew_task.task_id)]
+        if self.task.scratch:
+            command = self._rpmdiff_cmd + ["schedule", str(self.task.task_id)]
         else:
-            command = self._rpmdiff_cmd + ["schedule", self.brew_task.nvr]
+            command = self._rpmdiff_cmd + ["schedule", self.task.nvr]
 
         if test_type == 'comparison':
             if nvr_baseline is None:
@@ -222,20 +222,20 @@ class CIRpmdiff(Module):
         """
         if test_type == 'comparison':
             result_type = 'koji_build_pair'
-            item = '{} {}'.format(self.brew_task.nvr, self.brew_task.latest)
+            item = '{} {}'.format(self.task.nvr, self.task.latest)
         else:
             result_type = 'koji_build'
-            item = self.brew_task.nvr
+            item = self.task.nvr
 
         # basic result data and overall result
         tests = [{
             'data': {
                 'item': item,
                 'type': result_type,
-                'newnvr': self.brew_task.nvr,
-                'oldnvr': self.brew_task.latest,
-                'scratch': self.brew_task.scratch,
-                'taskid': self.brew_task.task_id
+                'newnvr': self.task.nvr,
+                'oldnvr': self.task.latest,
+                'scratch': self.task.scratch,
+                'taskid': self.task.task_id
             },
             'ref_url': runinfo['web_url'],
             'testcase': {
@@ -253,10 +253,10 @@ class CIRpmdiff(Module):
                     'data': {
                         'item': item,
                         'type': result_type,
-                        'newnvr': self.brew_task.nvr,
-                        'oldnvr': self.brew_task.latest,
-                        'scratch': self.brew_task.scratch,
-                        'taskid': self.brew_task.task_id
+                        'newnvr': self.task.nvr,
+                        'oldnvr': self.task.latest,
+                        'scratch': self.task.scratch,
+                        'taskid': self.task.task_id
                     },
                     'ref_url': '{}/{}'.format(runinfo['web_url'], result['test']['test_id']),
                     'testcase': {
@@ -303,33 +303,33 @@ class CIRpmdiff(Module):
             self.hub_url = url
 
         # get a brew task instance
-        self.brew_task = self.shared('task')
-        if self.brew_task is None:
+        self.task = self.shared('task')
+        if self.task is None:
             raise CIError('no brew build found, did you run brew module?')
 
         # blacklist packages
         if blacklist is not None:
             self.verbose('blacklisted packages: {}'.format(blacklist))
-            if self.brew_task.component in blacklist.split(','):
-                self.info('skipping blacklisted package {}'.format(self.brew_task.component))
+            if self.task.component in blacklist.split(','):
+                self.info('skipping blacklisted package {}'.format(self.task.component))
                 return
 
         if test_type == 'comparison':
-            if self.brew_task.latest is None:
+            if self.task.latest is None:
                 self.warn('no baseline found, refusing to continue testing')
                 return
-            if self.brew_task.scratch is False and self.brew_task.latest == self.brew_task.nvr:
+            if self.task.scratch is False and self.task.latest == self.task.nvr:
                 self.info('cowardly refusing to compare same packages')
                 return
 
-        msg = ["running {} for task '{}'".format(test_type, self.brew_task.task_id)]
-        msg += ['compared to {}'.format(self.brew_task.latest)] if test_type == 'comparison' else []
+        msg = ["running {} for task '{}'".format(test_type, self.task.task_id)]
+        msg += ['compared to {}'.format(self.task.latest)] if test_type == 'comparison' else []
         self.info(' '.join(msg))
 
         if run_id:
             runinfo = self._get_runinfo(run_id)
         else:
-            runinfo = self._run_rpmdiff(test_type, self.brew_task.latest)
+            runinfo = self._run_rpmdiff(test_type, self.task.latest)
         self.info('result: {}'.format(runinfo['overall_score']['description']))
 
         self._publish_results(runinfo, test_type)

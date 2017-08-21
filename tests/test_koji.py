@@ -192,7 +192,7 @@ VALID_TASKS = {
         'srcrpm': 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/src/bash-4.3.43-4.fc25.src.rpm',
         'target': 'f25-candidate',
         'task_id': 15869828,
-        'url': 'https://koji.fedoraproject.org/kojihub/taskinfo?taskID=15869828',
+        'url': 'https://koji.fedoraproject.org/koji/taskinfo?taskID=15869828',
         'version': '4.3.43',
     },
     20166983: {
@@ -211,7 +211,7 @@ VALID_TASKS = {
         'srcrpm': 'https://kojipkgs.fedoraproject.org/work/tasks/6985/20166985/bash-4.4.12-5.fc27.src.rpm',
         'target': 'rawhide',
         'task_id': 20166983,
-        'url': 'https://koji.fedoraproject.org/kojihub/taskinfo?taskID=20166983',
+        'url': 'https://koji.fedoraproject.org/koji/taskinfo?taskID=20166983',
         'version': '4.4.12',
     }
 }
@@ -269,7 +269,7 @@ class FakeClientSession(object):
 @pytest.fixture(name='module')
 def fixture_module(monkeypatch):
     # pylint: disable=unused-argument
-    ci, mod = create_module(libci.modules.infrastructure.koji_fedora.CIKoji)
+    ci, mod = create_module(libci.modules.infrastructure.koji_fedora.Koji)
 
     # make sure task has required share function
     assert ci.has_shared('task') is True
@@ -278,6 +278,7 @@ def fixture_module(monkeypatch):
     mod._config = {
         'url': 'https://koji.fedoraproject.org/kojihub',
         'pkgs-url': 'https://kojipkgs.fedoraproject.org',
+        'web-url': 'https://koji.fedoraproject.org/koji',
     }
 
     # monkeypatch koji to use FakeClientSession instead of ClientSession
@@ -298,7 +299,7 @@ def test_sanity_task_id(module):
         FakeClientSession.fake_key = task
         module.task(task)
         for prop, val in VALID_TASKS[task].iteritems():
-            assert getattr(module.koji_task_instance, prop) == val
+            assert getattr(module.task_instance, prop) == val
 
 
 def test_sanity_task_id_cmdline(module):
@@ -308,7 +309,7 @@ def test_sanity_task_id_cmdline(module):
     module._config.update({'task-id': 15869828})
     module.execute()
     for prop, val in VALID_TASKS[15869828].iteritems():
-        assert getattr(module.koji_task_instance, prop) == val
+        assert getattr(module.task_instance, prop) == val
 
 
 def test_sanity_nvr(module):
@@ -317,7 +318,7 @@ def test_sanity_nvr(module):
     # pylint: disable=protected-access
     module._config = {'nvr': 'bash-4.3.43-4.fc25'}
     module.execute()
-    assert getattr(module.koji_task_instance, 'task_id') == 15869828
+    assert getattr(module.task_instance, 'task_id') == 15869828
 
 
 def test_sanity_build_id(module):
@@ -326,7 +327,7 @@ def test_sanity_build_id(module):
     # pylint: disable=protected-access
     module._config = {'build-id': 805705}
     module.execute()
-    assert getattr(module.koji_task_instance, 'task_id') == 15869828
+    assert getattr(module.task_instance, 'task_id') == 15869828
 
 
 def test_sanity_name_tag(module):
@@ -338,7 +339,7 @@ def test_sanity_name_tag(module):
         'tag': 'f25'
     }
     module.execute()
-    assert getattr(module.koji_task_instance, 'task_id') == 15869828
+    assert getattr(module.task_instance, 'task_id') == 15869828
 
 
 def test_no_koji_task(module):
@@ -366,7 +367,7 @@ def test_unavailable_artifacts(module):
     # not finished build tasks
     for task in EXPIRED_TASKS:
         FakeClientSession.fake_key = task
-        match = "no artifacts found for koji task '{}', expired scratch build?".format(task)
+        match = "no artifacts found for dummy-module task '{}', expired scratch build?".format(task)
         with pytest.raises(libci.CIError, match=match):
             module.task(task)
 

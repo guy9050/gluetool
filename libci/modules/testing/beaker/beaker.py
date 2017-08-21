@@ -284,7 +284,7 @@ class Beaker(Module):
             options += [
                 '--first-testing-task', '/distribution/runtime_tests/verify-nvr-installed',
                 '--whiteboard',
-                'CI run {} brew task id {} build target {}'.format(task.nvr, task.task_id, task.target.target)
+                'CI run {} brew task id {} build target {}'.format(task.nvr, task.task_id, task.target)
             ]
 
             if self.option('install-task-not-build'):

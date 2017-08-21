@@ -75,7 +75,7 @@ class GuessProduct(Module):
         if task is None:
             raise CIError("Using 'target-autodetect' method without a brew task does not work")
 
-        target = task.target.target
+        target = task.target
 
         self._product = self.pattern_map.match(target)
         self.debug("transformed target '{}' to the product '{}'".format(target, self._product))
