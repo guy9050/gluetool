@@ -16,7 +16,7 @@ variables:
 # Runs before each and every pipeline job.
 #
 before_script:
-  - yum -y install git make python-setuptools gcc python-devel krb5-devel postgresql-devel openssl-devel libcurl-devel
+  - yum -y install git make python-setuptools gcc python-devel krb5-devel postgresql-devel openssl-devel libcurl-devel python-rpm
   - (curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py && rm -f get-pip.py)
   - export PYCURL_SSL_LIBRARY=nss
   - pip install -U setuptools

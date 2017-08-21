@@ -27,6 +27,8 @@ pycurl==7.43.0
 # required by opentack module - novaclient
 python-novaclient==7.1.0
 python-openstackclient==3.9.0
+# required by koji module
+pyOpenSSL==17.0.0
 # required to load configuration
 PyYAML==3.12
 # required by sentry

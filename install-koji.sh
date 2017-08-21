@@ -9,3 +9,6 @@ fi
 
 rm -rf .koji
 git clone https://pagure.io/koji.git ./.koji && pushd ./.koji/koji && make install && popd
+
+# create symlink to rpm if virtualenv detected
+[ -n "$VIRTUAL_ENV" ] && ln -sf /usr/lib64/python2.7/site-packages/rpm $VIRTUAL_ENV/lib64/python2.7/site-packages
