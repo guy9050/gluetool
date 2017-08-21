@@ -91,11 +91,13 @@ class RpmDiffWaiverMatcher(object):
 
 class RpmDiffWaiver(Module):
     """
-    Module waive RPMDiff results according to autowaivers in Errata tool.
-    It is expected to run this module after RpmDiff and PostgreSQL module.
-    To run module manually, take a look at module options.
+    Module waives RPMDiff results according to autowaivers in Errata tool. The product mapping and autowaiver rules
+    are read from Errata Tool's database via TEIID. Connection to TEIID is provided by the :doc:`postgresql` module.
 
-    Below is an example of the yaml mapping file.
+    This module requires :doc:`rpmdiff` and :doc:`postgresql` modules to be run.
+
+    The product mapping can be also specified by a yaml mapping file. Below is an example of such a mapping for
+    two build targets.
 
     .. code-block:: yaml
 
@@ -197,7 +199,7 @@ class RpmDiffWaiver(Module):
             self.warn("errata mapping did not find any product version")
             return None
         if len(product_versions) > 1:
-            self.warn("errata mapping is ambigous, more product versions found")
+            self.warn("errata mapping is ambiguous, more product versions found")
             # if we want continue only if mapping 1:1 exists
             # return None
         self.info("errata mapping was successful, product versions: {}".format(product_versions))
