@@ -3,7 +3,14 @@
 
 ## Environment
 
-Let's say you have already your own `citool` fork, and you've set up gitlab in your `.ssh/config`:
+Before moving on to the actual setup, there are few important notes:
+
+* **The ony supported and (sort of tested) way of instalation and using `citool` is a separate virtual environment!** It may be possible to install `citool` directly somewhere into your system but we don't recommend that, we don't use it that way, and we don't know what kind of hell you might run into. Please, stick with `virtualenv`.
+
+* The tested distributions (as in "we're using these") are either recent Fedora, RHEL or CentOS. Should you try to install `citool` in a different environment - or even development trees of Fedora, for example - please, make notes about differencies, and it'd be awesome if your first merge request could update this file :)
+
+
+Ok, let's say you have already your own `citool` fork, and you've set up gitlab in your `.ssh/config`:
 
 ### Optional - `.ssh/config`
 
@@ -18,11 +25,23 @@ Host gitlab
   IdentitiesOnly yes
 ```
 
+### Requirements
+
 To begin digging into `citool` sources, there are few requirements:
 
   - `virtualenv` utility
-  - few packages: `libcurl-devel`, `rpm-python`, `krb5-devel`, <libxml devel dependency for lxml>, `yum`, 
-  `compat-openssl10-devel`
+
+  - system packages - it is either impossible or impractical to use their Python counterpart, or they are required to build a Python package required by `citool`:
+    - `krb5-devel`
+    - `libcurl-devel`
+    - `libxml2-devel`
+    - `openssl-devel`
+    - `rpm-python`
+    - `yum`
+
+  - in some cases, on recent Fedora (26+), it's been shown for some packages their `compat-*` variant might be needed. Please, install these as well:
+    - `compat-openssl10-devel`
+
   - you'll need RH CA certificates, some pieces of our infrastructure work on HTTPS. If you don't have the certs
     installed already (check your `/etc/ssl`), fetch them (`root` required):
 
@@ -45,14 +64,24 @@ To begin digging into `citool` sources, there are few requirements:
   git clone gitlab:<your username>/<your fork name>
   cd citool
 
+  # pycurl @ RH (or Fedora) is using nss backend, and that is controlled in its installation time
+  # by environment variable PYCURL_SSL_LIBRARY. You should set it right now:
+  export PYCURL_SSL_LIBRARY=nss
+
+  # ... but adding it into your bin/activate script is a good idea as well - tox (we use it to run
+  # citool's test seuite) installs its own virtualenv for the tests, and by having the pycurl variable
+  # exported all the time you work in citool's virtualenv context would make sure the pycurl installed
+  # in tox' own virtualenv will would use the correct backend.
+  echo 'export PYCURL_SSL_LIBRARY=nss' >> $VIRTUAL_ENV/bin/activate
+
+  # There's also a cache used by pip. In case you run into issues while running 'pip install' command bellow,
+  # you might try to add '--no-cache-dir' toption, and try again.
+
   # install citool's requirements
   pip install -r requirements.txt
 
   # install koji - it needs to be downloaded and built
   ./install-koji.sh
-
-  # pycurl's backend must match system's library
-  pip install --global-option="--with-nss" pycurl==7.43.0
 
   # rpm package is required by koji, and it seems reasonable to us the one provided by
   # system rpm. virtualenv is isolated from system libraries, therefore this symlink
