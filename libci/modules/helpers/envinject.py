@@ -37,6 +37,10 @@ class EnvInject(Module):
         return self._variables
 
     def destroy(self, failure=None):
+        if not self.option('file'):
+            self.debug('Do not save exported variables for EnvInject plugin: no file provided')
+            return
+
         self.info('Saving exported variables for EnvInject plugin')
         self.debug('variables:\n{}'.format(format_dict(self._variables)))
 
