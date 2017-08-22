@@ -58,6 +58,12 @@ out an email to 'release-engineering@redhat.com'.
 
 
 class RpmdiffTestResult(TestResult):
+    """
+    RPMdiff test result data container
+
+    :param dict runinfo: informations about RPMdiff run
+    :param str test_type: one of 'analysis', 'comparison'
+    """
     # pylint: disable=too-few-public-methods
 
     def __init__(self, runinfo, test_type, **kwargs):
@@ -88,6 +94,7 @@ class CIRpmdiff(Module):
 
     This module schedules an RPMdiff run, waits until it is finished and reports
     results in results shared function.
+    It is expected to run this module after Brew module.
     """
 
     name = 'rpmdiff'
@@ -132,12 +139,28 @@ class CIRpmdiff(Module):
 
     @staticmethod
     def _run_command(command):
+        """
+        Run external command.
+
+        :param list(str) command: command line arguments as items of list
+        :rtype libci.utils.ProcessOutput instance
+        :returns: :py:class:`libci.utils.ProcessOutput` instance whose attributes contain
+            data returned by the process.
+        :raises libci.CIError: when command was not found or command failed during execution
+        """
         try:
             return utils.run_command(command)
         except CICommandError as exc:
             raise CIError("Failure during 'rpmdiff-remote' execution: {}".format(exc.output.stderr))
 
     def _get_runinfo(self, run_id):
+        """
+        Execute rpmdiff-remote runinfo command to obtain runinfo.
+
+        :param int run_id: ID of RPMdiff run
+        :rtype dict
+        :returns: informations about RPMdiff run
+        """
         # make sure run_id is a string here, as utils run_command requires it
         command = self._rpmdiff_cmd + ["runinfo", str(run_id)]
 
@@ -147,6 +170,14 @@ class CIRpmdiff(Module):
         return blob
 
     def _wait_until_finished(self, run_id):
+        """
+        Helper function to ensure that run already finished.
+
+        :param int run_id: ID of RPMdiff run
+        :rtype dict
+        :returns: informations about RPMdiff run
+        :raises libci.CIError: when run timeout exceed, defined in self.max_timeout
+        """
         start_time = time.time()
         runinfo = self._get_runinfo(run_id)
         self.verbose("RPMdiff run [{}] state: {}".format(run_id, runinfo['overall_score']['description']))
@@ -158,6 +189,15 @@ class CIRpmdiff(Module):
         return runinfo
 
     def _run_rpmdiff(self, test_type, nvr_baseline=None):
+        """
+        Execute RPMdiff analysis or comparison based on test type
+
+        :param str test_type: one of 'analysis', 'comparison'
+        :param str or None nvr_baseline: package NVR against which RPMdiff comparison should be run,
+            valid and required for test_type comparison
+        :rtype dict
+        :returns: informations about RPMdiff run
+        """
         if self.brew_task.scratch:
             command = self._rpmdiff_cmd + ["schedule", str(self.brew_task.task_id)]
         else:
@@ -174,6 +214,12 @@ class CIRpmdiff(Module):
         return self._wait_until_finished(str(blob['run_id']))
 
     def _publish_results(self, runinfo, test_type):
+        """
+        Parse results into known structure and publish to results module.
+
+        :param dict runinfo: informations about RPMdiff run
+        :param str test_type: one of 'analysis', 'comparison'
+        """
         if test_type == 'comparison':
             result_type = 'koji_build_pair'
             item = '{} {}'.format(self.brew_task.nvr, self.brew_task.latest)
@@ -226,6 +272,13 @@ class CIRpmdiff(Module):
         publish_result(self, RpmdiffTestResult, runinfo, test_type, payload=tests)
 
     def refresh_rpmdiff_results(self, run_id):
+        """
+        Shared function
+        Download fresh results from RPMdiff service and updates results stored in results module.
+
+        :param int run_id: ID of RPMdiff run
+        :raises libci.CIError: if shared function does not exist
+        """
         if not self.has_shared("results"):
             raise CIError('Cannot refresh old results, shared function \'results\' does not exist')
 
