@@ -503,6 +503,14 @@ class Beaker(Module):
 
         jobwatch_options = _command_options('jobwatch-options')
 
+        # check for parse_beah_result shared function
+        if not self.has_shared('beaker_job_xml'):
+            raise CIError('No beaker_job_xml shared function found. Did you run wow module?')
+
+        # check for parse_beah_result shared function
+        if not self.has_shared('parse_beah_result'):
+            raise CIError('No parser found. Did you run beah-result-parser module?')
+
         # workflow-tomorrow
         job_ids, job = self._run_wow()
 
