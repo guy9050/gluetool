@@ -20,6 +20,7 @@ TESTS_REQUIRE = [
     'pytest-flake8',
     'pytest-cov',
     'pytest-catchlog',
+    'pytest-mock',
     'pytest'
 ]
 

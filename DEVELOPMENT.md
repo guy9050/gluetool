@@ -31,7 +31,7 @@ To begin digging into `citool` sources, there are few requirements:
 
   - `virtualenv` utility
 
-  - `ansible-playbook` - you can either use the one provided by your system, or install it into newly created virtualenv. You can use pretty much any reasonable version, `citool` lists `ansible` as one of its requirements, and it will install the correct version in its virtualenv anyway.
+  - `ansible-playbook`
 
   - system packages - it is either impossible or impractical to use their Python counterpart, or they are required to
     build a Python package required by `citool`. In some cases, on recent Fedora (26+) for example, it's been shown
@@ -52,32 +52,27 @@ To begin digging into `citool` sources, there are few requirements:
      . <virtualenv-dir>/bin/activate
    ```
 
-2. (optional) Install `ansible-playbook`:
-   ```
-     pip install ansible
-   ```
-
-3. Clone `citool` repository - your working copy:
+2. Clone `citool` repository - your working copy:
    ```
      git clone gitlab:<your username>/<your fork name>
      cd citool
    ```
 
-4. Install `citool`:
+3. Install `citool`:
    ```
-     ansible-playbook ./install.yml
+     /usr/bin/ansible-playbook ./install.yml
    ```
 
    **Be warned:** read the messages reported by this step - `install.yml` playbook checks for necessary system packages, and reports any missing pieces. **It does not install them!** We don't want to mess with your system setup, as we try to stay inside our little own virtualenv, but the playbook will try to provide hints on what packages might solve the issue.
 
-5. (optional) Activate Bash completion
+4. (optional) Activate Bash completion
    ```
      python bash_completion.py
      mv citool $VIRTUAL_ENV/bin/citool-bash-completition
      echo "source $VIRTUAL_ENV/bin/citool-bash-completition" >> $VIRTUAL_ENV/bin/activate
    ```
 
-6. Re-activate virtualenv
+5. Re-activate virtualenv
 
    Since step #1 your `citool` virtualenv is active, but `citool`'s installation made some changes to the `activate`
    script, therefore it's necessary to re-activate the virtualenv before actually doing stuff with `citool`:
@@ -86,6 +81,21 @@ To begin digging into `citool` sources, there are few requirements:
    deactivate
    . <virtualenv-dir>/bin/activate
    ```
+
+6. Fetch configuration
+
+   `citool` looks for its configuration in `~/.citool.d`. Easy way to start out is to simply get a clone of `development` branch of upstream configuration:
+
+   ```
+   git clone gitlab:baseos-ci/citool-config
+   cd citool-config
+   git checkout development
+   ```
+
+   And symlink it to `~/.citool.d`.
+
+   You can use other branches as well, e.g. `staging`, or modify your local configuration heavily, if you know what you're doing.
+
 
 `citool`'s modules may require additional commands as well, e.g. tools like `tcms-results` or `restraint`. You'd have
 to install these tools as well to be able to use the corresponding modules.
