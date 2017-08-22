@@ -27,6 +27,7 @@ ECHO_TICK = 10
 DEFAULT_BOOT_TIMEOUT = 240
 BOOT_TICK = 10
 
+DEFAULT_START_AFTER_SNAPSHOT_ATTEMPTS = 3
 DEFAULT_RESTORE_SNAPSHOT_ATTEMPTS = 3
 
 MAX_SERVER_SHUTDOWN = 60
@@ -266,7 +267,8 @@ class OpenstackGuest(NetworkedGuest):
         self.info("image snapshot '{}' created".format(name))
 
         # start instance
-        self._bring_alive('starting the instance', self._instance.start, attempts=1)
+        self._bring_alive('starting the instance', self._instance.start,
+                          attempts=self._module.option('start-after-snapshot-attempts'))
         self.debug('started and alive')
 
         return name
@@ -484,6 +486,12 @@ class CIOpenstack(Module):
             }
         }),
         ('Workarounds', {
+            'start-after-snapshot-attempts': {
+                # pylint: disable=line-too-long
+                'help': 'When starting guest after taking its snapshot, try this many times before giving up (default: {})'.format(DEFAULT_START_AFTER_SNAPSHOT_ATTEMPTS),
+                'type': int,
+                'default': DEFAULT_START_AFTER_SNAPSHOT_ATTEMPTS
+            },
             'restore-snapshot-attempts': {
                 # pylint: disable=line-too-long
                 'help': 'When rebuilding guest to restore a snapshot, try this many times before giving up (default: {})'.format(DEFAULT_RESTORE_SNAPSHOT_ATTEMPTS),
