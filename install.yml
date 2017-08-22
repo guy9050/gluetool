@@ -147,8 +147,8 @@
     #
     # Install koji module
     #
-    - name: "Check whether koji module is installed"
-      command: "python -c 'import koji'"
+    - name: "Check whether koji modules are installed"
+      command: "python -c 'import koji; import koji_cli'"
       ignore_errors: yes
       register: koji_present
 
@@ -173,11 +173,8 @@
         DESTDIR: "/"
       when: koji_present.rc == 1
 
-    - name: "Check whether koji module is installed"
-      command: "python -c 'import koji'"
-
-    - name: "Check whether koji_cli module is installed"
-      command: "python -c 'import koji_cli'"
+    - name: "Check whether koji modules are installed"
+      command: "python -c 'import koji; import koji_cli'"
 
     #
     # Install citool
