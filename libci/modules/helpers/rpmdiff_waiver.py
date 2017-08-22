@@ -81,6 +81,8 @@ class RpmDiffWaiverMatcher(object):
         :returns: True if error is matched by some of waivers, False otherwise
         """
         for waiver in self.waivers:
+            if not waiver.content_pattern:
+                continue
             if error.subpackage != waiver.subpackage:
                 continue
             if re.search(waiver.content_pattern, error.message):
