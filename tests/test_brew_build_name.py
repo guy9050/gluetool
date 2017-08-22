@@ -59,7 +59,7 @@ def test_run(log, module, monkeypatch):
 
     def mocked_shared(key):
         return {
-            'brew_task': MagicMock(short_name=short_name),
+            'task': MagicMock(short_name=short_name),
             'jenkins': MagicMock(set_build_name=mocked_set_build_name)
         }[key]
 

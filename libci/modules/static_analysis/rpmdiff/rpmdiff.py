@@ -303,7 +303,7 @@ class CIRpmdiff(Module):
             self.hub_url = url
 
         # get a brew task instance
-        self.brew_task = self.shared('brew_task')
+        self.brew_task = self.shared('task')
         if self.brew_task is None:
             raise CIError('no brew build found, did you run brew module?')
 

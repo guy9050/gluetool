@@ -115,7 +115,7 @@ class WorkflowTomorrow(libci.Module):
             'BEAKERLIB_RPM_DOWNLOAD_METHODS': 'yum\\ direct'
         }
 
-        task = self.shared('brew_task')
+        task = self.shared('task')
         if task is None:
             self.warn('No brew task available, cannot add BASEOS_CI_COMPONENT task param')
 

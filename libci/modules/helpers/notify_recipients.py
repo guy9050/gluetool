@@ -127,7 +127,7 @@ class NotifyRecipients(Module):
 
         recipients = {}
 
-        task = self.shared('brew_task')
+        task = self.shared('task')
         if task is not None:
             recipients['ISSUER'] = task.issuer
 

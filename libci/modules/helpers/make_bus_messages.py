@@ -54,7 +54,7 @@ class CIMakeBusMessages(Module):
         self.process_rpmdiff_analysis(result)
 
     def process_covscan(self, result):
-        task = self.shared('brew_task')
+        task = self.shared('task')
         if task is None:
             raise CIError('no brew task found in shared functions')
         item = '{} {}'.format(task.nvr, result.baseline)
@@ -99,7 +99,7 @@ class CIMakeBusMessages(Module):
         in favor of 'resultsdb' format. Currently it should be considered as a legacy format
         of CI messages used to report results from old BaseOS CI.
         """
-        task = self.shared('brew_task')
+        task = self.shared('task')
         if task is None:
             raise CIError('no brew task found in shared functions')
         distro = self.shared('distro')

@@ -184,7 +184,7 @@ class RestraintScheduler(libci.Module):
             libci.log.log_blob(self.debug, str(guest), recipe_set.prettify(encoding='utf-8'))
 
     def execute(self):
-        task = self.shared('brew_task')
+        task = self.shared('task')
         if task is None:
             raise CIError('no brew build found, did you run brew module')
 

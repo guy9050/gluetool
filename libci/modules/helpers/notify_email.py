@@ -553,7 +553,7 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
     @utils.cached_property
     def task(self):
-        task = self.shared('brew_task')
+        task = self.shared('task')
 
         if task:
             return task

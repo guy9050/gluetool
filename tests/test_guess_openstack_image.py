@@ -137,7 +137,7 @@ def test_autodetection(module, log, monkeypatch):
         # pylint: disable=unused-argument
 
         return {
-            'brew_task': MagicMock(target=MagicMock(target=target))
+            'task': MagicMock(target=MagicMock(target=target))
         }[name]
 
     monkeypatch.setattr(module, 'shared', mock_shared)

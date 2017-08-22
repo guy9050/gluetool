@@ -11,7 +11,7 @@ class CIBrewBuildName(Module):
     description = 'Set Jenkins build name to details of brew task'
 
     def execute(self):
-        task = self.shared('brew_task')
+        task = self.shared('task')
         if task is None:
             raise CIError('no brew task found, did you run brew module?')
 
