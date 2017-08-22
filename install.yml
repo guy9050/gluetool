@@ -165,8 +165,19 @@
         chdir: "{{ tmpdir.stdout }}/koji/koji"
       when: koji_present.rc == 1
 
+    - name: "Install koji_cli module"
+      command: "make install"
+      args:
+        chdir: "{{ tmpdir.stdout }}/koji/cli/koji_cli"
+      environment:
+        DESTDIR: "/"
+      when: koji_present.rc == 1
+
     - name: "Check whether koji module is installed"
       command: "python -c 'import koji'"
+
+    - name: "Check whether koji_cli module is installed"
+      command: "python -c 'import koji_cli'"
 
     #
     # Install citool
