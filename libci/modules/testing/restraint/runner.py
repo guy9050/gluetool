@@ -1,19 +1,12 @@
 import copy
 import os
-import tempfile
 from collections import defaultdict
 import enum
 import bs4
 
 import libci
-from libci.log import log_blob, log_dict, ContextAdapter
+from libci.log import log_blob, log_dict
 from libci.results import TestResult, publish_result
-from libci.utils import Bunch
-
-
-DEFAULT_RESTRAINT_PORT = 8081
-
-REQUIRED_COMMANDS = ['restraint']
 
 
 # The exit status values come from restraint sources: https://github.com/p3ck/restraint/blob/master/src/errors.h
@@ -48,11 +41,6 @@ class RestraintTestResult(TestResult):
 
     def __init__(self, overall_result, **kwargs):
         super(RestraintTestResult, self).__init__('restraint', overall_result, **kwargs)
-
-
-class StdStreamAdapter(ContextAdapter):
-    def __init__(self, logger, name):
-        super(StdStreamAdapter, self).__init__(logger, {'ctx_stream': (100, name)})
 
 
 class RestraintRunner(libci.Module):
@@ -106,10 +94,6 @@ class RestraintRunner(libci.Module):
     @libci.utils.cached_property
     def parallelize_task_sets(self):
         return self._bool_option('parallelize-task-sets')
-
-    def _guest_restraint_address(self, guest):
-        # pylint: disable=no-self-use
-        return '{}:{}/{}'.format(guest.hostname, DEFAULT_RESTRAINT_PORT, guest.port)
 
     def _merge_task_results(self, tasks_results):
         # pylint: disable=no-self-use
@@ -263,67 +247,19 @@ class RestraintRunner(libci.Module):
 
         self.debug('Job:\n{}'.format(job_desc))
 
-        # Write out our job description, and tell restraint to run it
-        with tempfile.NamedTemporaryFile() as f:
-            f.write(job_desc)
-            f.flush()
+        output = self.shared('restraint', guest, job)
 
-            stdout_logger = StdStreamAdapter(guest.logger, 'stdout')
-            stderr_logger = StdStreamAdapter(guest.logger, 'stderr')
+        if output.exit_code != 0:
+            self.debug('restraint exited with invalid exit code {}'.format(output.exit_code))
 
-            class StreamHandler(Bunch):
-                # pylint: disable=too-few-public-methods
+            if output.exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_RESULT_ERROR:
+                # "One or more tasks failed" error - this is a good, well behaving error.
+                # We can safely move on and process results stored in restraint's directory.
+                self.info('restraint reports: One or more tasks failed')
 
-                def write(self):
-                    # pylint: disable=no-member,attribute-defined-outside-init,access-member-before-definition
-                    self.logger(''.join(self.buff))
-                    self.buff = []
-
-            streams = {
-                '<stdout>': StreamHandler(buff=[], logger=stdout_logger.info),
-                '<stderr>': StreamHandler(buff=[], logger=stderr_logger.warn)
-            }
-
-            def output_streamer(stream, data, flush=False):
-                stream_handler = streams[stream.name]
-
-                if flush and stream_handler.buff:
-                    stream_handler.write()
-                    return
-
-                if data is None:
-                    return
-
-                for c in data:
-                    if c == '\n':
-                        stream_handler.write()
-
-                    elif c == '\r':
-                        continue
-
-                    else:
-                        stream_handler.buff.append(c)
-
-            try:
-                output = libci.utils.run_command([
-                    'restraint', '-v',
-                    '--host', '1={}@{}'.format(guest.username, self._guest_restraint_address(guest)),
-                    '--job', f.name
-                ], logger=guest.logger, inspect=True, inspect_callback=output_streamer)
-
-            except libci.CICommandError as e:
-                output = e.output
-
-                self.debug('restraint exited with invalid exit code {}'.format(output.exit_code))
-
-                if output.exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_RESULT_ERROR:
-                    # "One or more tasks failed" error - this is a good, well behaving error.
-                    # We can safely move on and process results stored in restraint's directory.
-                    self.info('restraint reports: One or more tasks failed')
-
-                else:
-                    raise libci.CIError('restraint command exited with return code {}: {}'.format(
-                        output.exit_code, output.stderr))
+            else:
+                raise libci.CIError('restraint command exited with return code {}: {}'.format(
+                    output.exit_code, output.stderr))
 
         log_blob(self.info, 'Task set output', output.stdout)
 
@@ -462,8 +398,6 @@ class RestraintRunner(libci.Module):
         return 'PASS'
 
     def sanity(self):
-        libci.utils.check_for_commands(REQUIRED_COMMANDS)
-
         if self.parallelize_recipe_sets:
             self.info('Will run recipe sets in parallel')
 
@@ -482,6 +416,9 @@ class RestraintRunner(libci.Module):
             self.info('Will run recipe set tasks serially, without snapshots')
 
     def execute(self):
+        if not self.has_shared('restraint'):
+            raise libci.CIError('Requires support module that would provide restraint, e.g. `restraint`.')
+
         schedule = self.shared('schedule') or []
 
         if self.parallelize_recipe_sets:

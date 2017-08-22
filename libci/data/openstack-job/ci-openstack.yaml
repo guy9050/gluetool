@@ -87,6 +87,7 @@
              ${pipeline_prepend} \
              notify-recipients ${notify_recipients_options} \
              ansible \
+             restraint \
              guest-setup --playbooks=${CITOOL_CONFIG}/guest-setup/openstack-restraint.yaml \
              wow --wow-options="${wow_options}" \
              beah-result-parser \
