@@ -36,7 +36,8 @@ def get_version():
     """
 
     try:
-        version_git = subprocess.check_output(['git', 'describe', '--tags']).strip()
+        command = ['git', 'describe', '--tags', '--match', '[0-9]*']
+        version_git = subprocess.check_output(command).strip()
 
         match = re.match(r'([0-9\.]*)-?([0-9]+)?.*', version_git)
         if match is not None:
