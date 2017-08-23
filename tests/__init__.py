@@ -65,6 +65,12 @@ class CaplogWrapper(object):
 
         self._caplog.handler.records = []
 
+    def match(self, matcher=any, **kwargs):
+        def _cmp(record):
+            return all(getattr(record, field) == value for field, value in kwargs.iteritems())
+
+        return matcher(_cmp(record) for record in self.records)
+
 
 def create_module(module_class, ci_class=NonLoadingCI, name='dummy-module'):
     ci = ci_class()

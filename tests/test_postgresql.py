@@ -95,8 +95,7 @@ def test_execute(configured_module, monkeypatch, log):
     connection_mock = MagicMock(cursor=MagicMock(return_value=cursor_mock))
     monkeypatch.setattr(psycopg2, "connect", MagicMock(return_value=connection_mock))
     module.execute()
-    message = "connected to postgresql 'host1' version 'TEEID 1.2'"
-    assert any(record.message == message for record in log.records)
+    assert log.match(message="connected to postgresql 'host1' version 'TEEID 1.2'")
 
 
 def test_execute_fail_server_version(configured_module, monkeypatch):

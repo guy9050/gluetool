@@ -287,5 +287,4 @@ def test_setted_taskid(log, module, monkeypatch, tmpdir):
 
     module.scan()
 
-    message = 'Skipping covscan testing, using existing Covscan task id'
-    assert any(record.message == message for record in log.records)
+    assert log.match(message='Skipping covscan testing, using existing Covscan task id')

@@ -1,4 +1,5 @@
 # pylint: disable=protected-access
+import logging
 import pytest
 
 from mock import MagicMock, PropertyMock
@@ -836,8 +837,7 @@ def test_execute_blacklisted(module_for_execute, log):
     _, module = module_for_execute
     module._config["blacklist"] = "dummy,which"
     module.execute()
-    message = "skipping blacklisted package which"
-    assert any(record.message == message for record in log.records)
+    assert log.match(levelno=logging.INFO, message="skipping blacklisted package which")
     assert not module._publish_results.called
 
 
@@ -850,7 +850,7 @@ def test_execute_comparison_silent_fail(module_for_execute, baseline, expected_l
     type(module.shared("task")).latest = PropertyMock(return_value=baseline)
     module._config["type"] = "comparison"
     module.execute()
-    assert any(record.message == expected_log_msg for record in log.records)
+    assert log.match(message=expected_log_msg)
     assert not module._run_rpmdiff.called
     assert not module._get_runinfo.called
     assert not module._publish_results.called
