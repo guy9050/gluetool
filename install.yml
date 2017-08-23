@@ -180,7 +180,7 @@
     # Install citool
     #
     - name: "Install citool"
-      command: "python setup.py {{ citool_installation_method }}"
+      command: "python setup.py clean --all {{ citool_installation_method }}"
       args:
         chdir: "{{ playbook_dir }}"
       when: install_citool == 'yes'
