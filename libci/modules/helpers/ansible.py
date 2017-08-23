@@ -14,6 +14,8 @@ class Ansible(libci.Module):
 
     shared_functions = ('run_playbook',)
 
+    supported_dryrun_level = libci.ci.DryRunLevels.DRY
+
     def run_playbook(self, playbook_path, hosts, variables=None):
         """
         Run Ansible playbook.
@@ -39,6 +41,11 @@ class Ansible(libci.Module):
                 '--extra-vars',
                 ' '.join(['{}="{}"'.format(k, v) for k, v in variables.iteritems()])
             ]
+
+        if not self.dryrun_allows('Running a playbook in non-check mode'):
+            self.debug("dry run enabled, telling ansible to use 'check' mode")
+
+            cmd += ['-C']
 
         cmd += [playbook_path]
 

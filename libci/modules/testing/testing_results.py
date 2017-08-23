@@ -23,11 +23,9 @@ class TestingResults(libci.Module):
 
     name = 'testing-results'
 
+    supported_dryrun_level = libci.ci.DryRunLevels.DRY
+
     options = {
-        'dry-run': {
-            'help': 'Dry run, do not create results file',
-            'action': 'store_true',
-        },
         'results-file': {
             'help': 'path to a file to store results into (default: {})'.format(DEFAULT_RESULTS_FILE),
             'default': DEFAULT_RESULTS_FILE
@@ -75,9 +73,7 @@ class TestingResults(libci.Module):
             raise libci.CIError(e)
 
     def destroy(self, failure=None):
-        # dry-run, do not create results-file
-        if self.option('dry-run'):
-            self.info('running in dry-run mode, skipping export to results file')
+        if not self.dryrun_allows('Exporting results into a file'):
             return
 
         # the results-file option can be empty if parsing of arguments failed

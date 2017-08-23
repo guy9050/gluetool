@@ -8,6 +8,7 @@ import os
 import sys
 import ast
 
+import enum
 from functools import partial
 
 from .help import LineWrapRawTextHelpFormatter, option_help, docstring_to_help
@@ -20,6 +21,20 @@ DEFAULT_MODULE_CONFIG_PATHS = [
 ]
 DEFAULT_MODULE_PATH = '{}/modules'.format(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_DATA_PATH = '{}/data'.format(os.path.dirname(os.path.abspath(__file__)))
+
+
+class DryRunLevels(enum.IntEnum):
+    """
+    Dry-run levels.
+
+    :cvar int DEFAULT: Default level - everything is allowed.
+    :cvar int DRY: Well-known "dry-run" - no changes to the outside world are allowed.
+    :cvar int ISOLATED: No interaction with the outside world is allowed (networks connections, reading files, etc.)
+    """
+
+    DEFAULT = 0
+    DRY = 1
+    ISOLATED = 2
 
 
 class CIError(Exception):
@@ -203,6 +218,15 @@ class Configurable(object):
 
     required_options = []
     """Iterable of names of required options."""
+
+    supported_dryrun_level = DryRunLevels.DEFAULT
+    """Highest supported level of dry-run."""
+
+    unique_name = None
+    """
+    Unque name of this instance. Used by modules, has no meaning elsewhere, but since dry-run
+    checks are done on this level, it must be declared here to make pylint happy :/
+    """
 
     @staticmethod
     def _for_each_option(callback, options):
@@ -465,6 +489,72 @@ class Configurable(object):
         except KeyError:
             return None
 
+    @property
+    def dryrun_level(self):
+        """
+        Return current dry-run level. This must be implemented by class descendants
+        because each one finds the necessary information in different places.
+        """
+
+        raise NotImplementedError()
+
+    @property
+    def dryrun_enabled(self):
+        """
+        ``True`` if dry-run level is enabled, on any level.
+        """
+
+        return self.dryrun_level != DryRunLevels.DEFAULT
+
+    def _dryrun_allows(self, threshold, msg):
+        """
+        Check whether current dry-run level allows an action. If the current dry-run level
+        is equal of higher than ``threshold``, then the action is not allowed.
+
+        E.g. when action's ``threshold`` is :py:attr:`DryRunLevels.ISOLATED`, and the current
+        level is :py:attr:`DryRunLevels.DRY`, the action is allowed.
+
+        :param DryRunLevels threshold: Dry-run level the action is not allowed.
+        :param str msg: Message logged (as a warning) when the action is deemed not allowed.
+        :returns: ``True`` when action is allowed, ``False`` otherwise.
+        """
+
+        if self.dryrun_level >= threshold:
+            self.warn('{} is not allowed by current dry-run level'.format(msg))
+            return False
+
+        return True
+
+    def dryrun_allows(self, msg):
+        """
+        Checks whether current dry-run level allows an action which is disallowed on
+        :py:attr:`DryRunLevels.DRY` level.
+
+        See :py:meth:`Configurable._dryrun_allows` for detailed description.
+        """
+
+        return self._dryrun_allows(DryRunLevels.DRY, msg)
+
+    def isolatedrun_allows(self, msg):
+        """
+        Checks whether current dry-run level allows an action which is disallowed on
+        :py:attr:`DryRunLevels.ISOLATED` level.
+        """
+
+        return self._dryrun_allows(DryRunLevels.ISOLATED, msg)
+
+    def check_dryrun(self):
+        """
+        Checks whether this object supports current dry-run level.
+        """
+
+        if not self.dryrun_enabled:
+            return
+
+        if self.dryrun_level > self.supported_dryrun_level:
+            raise CIError("Module '{}' does not support current dry-run level of '{}'".format(self.unique_name,
+                                                                                              self.dryrun_level.name))
+
 
 class Module(Configurable):
     """
@@ -523,6 +613,10 @@ class Module(Configurable):
 
         else:
             self.debug('no data file found')
+
+    @property
+    def dryrun_level(self):
+        return self.ci.dryrun_level
 
     def parse_config(self):
         self._parse_config(self._paths_with_module(self.ci.module_config_paths))
@@ -687,6 +781,18 @@ class CI(Configurable):
                 'metavar': 'DIR',
                 'action': 'append',
                 'default': []
+            }
+        }),
+        ('Dry run options', {
+            'dry-run': {
+                'help': 'Modules that support this option will make no changes to the outside world.',
+                'action': 'store_true',
+                'default': False
+            },
+            'isolated-run': {
+                'help': 'Modules that support this option will not interact with the outside world.',
+                'action': 'store_true',
+                'default': False
             }
         }),
         {
@@ -1017,6 +1123,8 @@ class CI(Configurable):
 
         super(CI, self).__init__()
 
+        self._dryrun_level = DryRunLevels.DEFAULT
+
         # module types dictionary
         self.modules = {}
 
@@ -1070,6 +1178,16 @@ class CI(Configurable):
         self.logger = ContextAdapter(logger)
         self.logger.connect(self)
 
+        if self.option('isolated-run'):
+            self._dryrun_level = DryRunLevels.ISOLATED
+
+        elif self.option('dry-run'):
+            self._dryrun_level = DryRunLevels.DRY
+
+    @property
+    def dryrun_level(self):
+        return self._dryrun_level
+
     def destroy_modules(self, failure=None):
         if not self._module_instances:
             return
@@ -1119,6 +1237,7 @@ class CI(Configurable):
 
             module.parse_config()
             module.parse_args(module_argv)
+            module.check_dryrun()
             module.sanity()
             module.check_required_options()
 
