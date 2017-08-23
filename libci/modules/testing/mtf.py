@@ -42,8 +42,8 @@ class CIMTF(Module):
         guest = guests[0]
 
         setupcmds = [
-            'dnf copr enable phracek/meta-test-family-devel',
-            'dnf install -y meta-test-family'
+            'dnf -y copr enable phracek/meta-test-family-devel',
+            'dnf -y install  meta-test-family'
         ]
 
         map(guest.execute, setupcmds)
