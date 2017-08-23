@@ -27,7 +27,9 @@ class EnvInject(Module):
 
     shared_functions = ['env']
 
-    _variables = {}
+    def __init__(self, *args, **kwargs):
+        super(EnvInject, self).__init__(*args, **kwargs)
+        self._variables = {}
 
     def env(self):
         """
