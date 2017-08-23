@@ -45,5 +45,5 @@ class EnvInject(Module):
         self.debug('variables:\n{}'.format(format_dict(self._variables)))
 
         with open(self.option('file'), 'w') as f:
-            for key, value in self._variables.iteritems():
+            for key, value in sorted(self._variables.iteritems()):
                 f.write('{}="{}"\n'.format(key, value))
