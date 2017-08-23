@@ -42,8 +42,8 @@ class CIMTF(Module):
         guest = guests[0]
 
         setupcmds = [
-            'dnf copr -y enable jscotka/modularity-testing-framework',
-            'dnf install -y modularity-testing-framework'
+            'dnf -y copr enable phracek/meta-test-family-devel',
+            'dnf -y install  meta-test-family'
         ]
 
         map(guest.execute, setupcmds)
