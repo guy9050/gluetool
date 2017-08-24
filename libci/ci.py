@@ -259,7 +259,7 @@ class Configurable(object):
         parser.read(paths)
 
         def _inject_values(options):
-            for name in options.iterkeys():
+            for name, params in options.iteritems():
                 if isinstance(name, tuple):
                     name = name[1]
 
@@ -268,6 +268,14 @@ class Configurable(object):
 
                 except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
                     continue
+
+                if 'type' in params:
+                    try:
+                        value = params['type'](value)
+
+                    except ValueError as exc:
+                        raise CIError("Value of option '{}' expected to be '{}' but cannot be parsed: '{}'".format(
+                            name, params['type'].__name__, exc.message))
 
                 self._config[name] = value
                 self.debug("Option '{}' set to '{}' by config file".format(name, value))
