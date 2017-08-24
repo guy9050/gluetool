@@ -32,6 +32,7 @@ def create_build_params(mod, **kwargs):
     """
 
     params = {
+        'thread_id': 'deadbeef',
         'id': 17,
         'pipeline_prepend': 'some prepended options',
         'pipeline_append': 'some appended options',

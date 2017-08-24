@@ -12,6 +12,10 @@
           default: ''
           description: 'Brew task ID.'
       - string:
+          name: testing_thread_id
+          default: ''
+          description: 'Testing thread ID.'
+      - string:
           name: pipeline_prepend
           default: ''
           description: 'citool options that will be added at the beginning of citool pipeline'
@@ -36,8 +40,9 @@
           citool -c -i -o citool-debug.txt
                  ${pipeline_prepend}
                  notify-recipients ${notify_recipients_options}
-                 jenkins
                  testing-results
+                 testing-thread --id "${testing_thread_id}"
+                 jenkins
                  brew --id $id
                  brew-build-name
                  covscan

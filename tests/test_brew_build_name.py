@@ -53,6 +53,8 @@ def test_no_build_url(log, module, monkeypatch):
 
 def test_run(log, module, monkeypatch):
     short_name = 'dummy_short_name'
+    thread_id = 'dummy-thread-id'
+
     _, module = module
 
     mocked_set_build_name = MagicMock()
@@ -60,7 +62,8 @@ def test_run(log, module, monkeypatch):
     def mocked_shared(key):
         return {
             'task': MagicMock(short_name=short_name),
-            'jenkins': MagicMock(set_build_name=mocked_set_build_name)
+            'jenkins': MagicMock(set_build_name=mocked_set_build_name),
+            'thread_id': thread_id
         }[key]
 
     monkeypatch.setattr(module, 'shared', mocked_shared)
@@ -69,5 +72,5 @@ def test_run(log, module, monkeypatch):
     monkeypatch.setenv('BUILD_URL', 'dummy_jenkins_url')
 
     module.execute()
-    assert log.records[-1].message == "build name set: '{}'".format(short_name)
-    mocked_set_build_name.assert_called_with(short_name)
+    assert log.records[-1].message == "build name set: '{}:{}'".format(thread_id, short_name)
+    mocked_set_build_name.assert_called_with('{}:{}'.format(thread_id, short_name))
