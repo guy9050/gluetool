@@ -1,3 +1,4 @@
+import re
 import shlex
 
 import libci
@@ -118,7 +119,7 @@ class SclRun(libci.Module):
             'BEAKERLIB_RPM_DOWNLOAD_METHODS': 'yum\\ direct'
         }
 
-        task = self.shared('brew_task')
+        task = self.shared('task')
         if task is None:
             self.warn('No brew task available, cannot add BASEOS_CI_COMPONENT task param')
 
@@ -132,9 +133,8 @@ class SclRun(libci.Module):
             options += ['--taskparam', '{}={}'.format(name, value)]
 
         # detect collection name and rhel version from brew target
-        target = task.target
-        scl = target.collection
-        distro = target.rhel
+        scl = re.sub("rhscl-[^-]*-(.*)-rhel.*", "\\1", task.target)
+        distro = task.rhel
 
         # add '"' to strings containing spaces to prevent bad expansion in sclrun
         options = [('"{}"'.format(option) if ' ' in option and not option.startswith('"') else option)

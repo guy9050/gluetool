@@ -67,7 +67,7 @@ class CIBrewTagBuild(Module):
             raise CIError("unknown tag group '{}'".format(group))
 
         try:
-            tag = tag_map[task.target.target]
+            tag = tag_map[task.target]
         except KeyError:
             self.info("no tags to apply for build target '{}'".format(task.target))
             return

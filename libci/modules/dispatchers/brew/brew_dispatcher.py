@@ -394,7 +394,7 @@ class CIBrewDispatcher(Module):
         variables = {
             # constants
             'BREW_TASK_ID': task.task_id,
-            'BREW_TASK_TARGET': task.target.target,
+            'BREW_TASK_TARGET': task.target,
             'BREW_TASK_ISSUER': task.issuer,
             'NVR': task.nvr,
             'SCRATCH': task.scratch is True,

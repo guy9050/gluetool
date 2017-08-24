@@ -556,8 +556,8 @@ def fixture_module():
     return create_module(libci.modules.static_analysis.rpmdiff.rpmdiff.CIRpmdiff)
 
 
-@pytest.fixture(name="brew_task")
-def fixture_brew_task():
+@pytest.fixture(name="task")
+def fixture_task():
     mocked_task = MagicMock()
     mocked_scratch = PropertyMock(return_value=False)
     mocked_nvr = PropertyMock(return_value="1.3")
@@ -577,16 +577,16 @@ def fixture_brew_task():
     return mocked_task
 
 
-@pytest.fixture(name="scratch_brew_task")
-def fixture_scratch_brew_task(brew_task):
-    type(brew_task).scratch = PropertyMock(return_value=True)
-    return brew_task
+@pytest.fixture(name="scratch_task")
+def fixture_scratch_task(task):
+    type(task).scratch = PropertyMock(return_value=True)
+    return task
 
 
 @pytest.fixture(name="module_with_task")
-def fixture_module_with_task(module, brew_task):
+def fixture_module_with_task(module, task):
     ci, module = module
-    module.brew_task = brew_task
+    module.task = task
     return ci, module
 
 
@@ -611,7 +611,7 @@ def fixture_configured_module(module):
 
 
 @pytest.fixture(name="module_for_execute")
-def fixture_module_execute(configured_module, monkeypatch, brew_task):
+def fixture_module_execute(configured_module, monkeypatch, task):
     ci, module = configured_module
     run_rpmdiff_mock = MagicMock()
     runinfo_mock = MagicMock()
@@ -622,7 +622,7 @@ def fixture_module_execute(configured_module, monkeypatch, brew_task):
 
     def shared_mock(key):
         return {
-            'task': brew_task,
+            'task': task,
             'results': ci.shared(key)
         }[key]
     monkeypatch.setattr(module, "shared", shared_mock)
@@ -723,7 +723,7 @@ def test_wait_until_finished_timeout_exceed(module, monkeypatch):
 ])
 def test_run_rpmdiff(module_with_task, monkeypatch, scratch, rpmdiff_test_type, expected_schedule_cmd):
     _, module = module_with_task
-    type(module.brew_task).scratch = PropertyMock(return_value=scratch)
+    type(module.task).scratch = PropertyMock(return_value=scratch)
     run_mock = MagicMock(return_value=MagicMock(exit_code=0, stdout=SUCCESS_STDOUT, stderr=""))
     monkeypatch.setattr(libci.utils, "run_command", run_mock)
     blob = module._run_rpmdiff(rpmdiff_test_type, "0.9")
@@ -827,7 +827,7 @@ def test_execute_set_huburl(configured_module, url):
     assert module.hub_url == url
 
 
-def test_execute_no_brew_task(module):
+def test_execute_no_task(module):
     _, module = module
     with pytest.raises(libci.CIError, match=r"^no brew build found"):
         module.execute()

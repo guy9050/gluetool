@@ -37,7 +37,7 @@
       - shell:
           citool -c -i -o citool-debug.txt
                  jenkins
-                 brew --id $id
+                 brew --task-id $id
                  testing-thread
                  brew-build-name
                  brew-dispatcher

@@ -31,7 +31,7 @@ def test_no_brew(module):
 def test_no_jenkins(log, module, monkeypatch):
     _, module = module
 
-    monkeypatch.setattr(module, 'shared', MagicMock(return_value='dummy_brew_task'))
+    monkeypatch.setattr(module, 'shared', MagicMock(return_value='dummy_task'))
 
     module.execute()
     assert log.records[-1].message == 'Jenkins API is necessary, please provide Jenkins module'
@@ -40,7 +40,7 @@ def test_no_jenkins(log, module, monkeypatch):
 def test_no_build_url(log, module, monkeypatch):
     _, module = module
 
-    monkeypatch.setattr(module, 'shared', MagicMock(return_value='dummy_brew_task'))
+    monkeypatch.setattr(module, 'shared', MagicMock(return_value='dummy_task'))
     monkeypatch.setattr(module, 'has_shared', MagicMock(return_value=True))
     try:
         monkeypatch.delenv('BUILD_URL')
