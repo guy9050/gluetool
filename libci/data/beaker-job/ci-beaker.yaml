@@ -88,7 +88,7 @@
             ${pipeline_prepend} \
             notify-recipients ${notify_recipients_options} \
             testing-results \
-            testing-thread --id ${testing_thread_id} \
+            testing-thread --id "${testing_thread_id}" \
             wow --wow-options="${wow_options}" \
             beah-result-parser \
             jenkins \
