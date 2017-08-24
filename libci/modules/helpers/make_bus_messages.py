@@ -106,10 +106,6 @@ class CIMakeBusMessages(Module):
         task = self.shared('primary_task')
         distro = self.shared('distro')
 
-        if task.scratch:
-            self.warn('ignoring ci_metricsdata export of scratch build')
-            return
-
         recipients = self.shared('notification_recipients', result_type=result_type)
         if recipients is None:
             recipients = 'unknown'

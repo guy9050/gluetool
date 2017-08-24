@@ -269,19 +269,3 @@ def test_ci_metricsdata_no_distro(module, monkeypatch):
 
     assert_shared('distro', module.process_ci_metricsdata, 'dummy_result', 'dummy_result_type')
     module.store.assert_not_called()
-
-
-def test_ci_metricsdata_scratch(log, module, monkeypatch):
-    _, module = module
-
-    patch_shared(monkeypatch, module, {
-        'primary_task': MagicMock(scratch=True),
-        'distro': True
-    })
-
-    monkeypatch.setattr(module, 'store', MagicMock())
-
-    module.process_ci_metricsdata('dummy_result', 'dummy_result_type')
-
-    assert log.records[-1].message == 'ignoring ci_metricsdata export of scratch build'
-    module.store.assert_not_called()
