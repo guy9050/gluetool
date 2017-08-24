@@ -1,4 +1,3 @@
-import os
 import re
 import shlex
 import ast
@@ -226,9 +225,9 @@ class Rules(object):
         return eval(self._code, our_globals, our_locals)
 
 
-class CIBrewDispatcher(Module):
+class KojiTaskDispatcher(Module):
     """
-    A configurable dispatcher for Brew builds.
+    A configurable dispatcher for Brew/Koji builds.
 
     Possible config file formats are::
 
@@ -254,7 +253,7 @@ class CIBrewDispatcher(Module):
             default:
                 - command5
 
-    This allows more fine-grained filtering of commands. This way, when brew build's target
+    This allows more fine-grained filtering of commands. This way, when brew/koji build's target
     is `'rhel-7.4-candidate'`, `command1` and `command2` will be dispatched, `command3` and
     `command4` will be dispatched when target is `'rhel-6.5-z-candidate'`, and for every
     other build, `command5` will run.
@@ -308,7 +307,7 @@ class CIBrewDispatcher(Module):
     # Supported flags - keep them alphabetically sorted
     KNOWN_FLAGS = ('apply-all', 'recipients', 'options')
 
-    name = 'brew-dispatcher'
+    name = ['brew-dispatcher', 'koji-dispatcher']
     description = 'Configurable brew dispatcher'
 
     python_requires = 'PyYAML'
@@ -317,42 +316,17 @@ class CIBrewDispatcher(Module):
         'config': {
             'help': 'BaseOS dispatcher configuration'
         },
-        'id': {
-            'help': 'Brew task id',
-        },
-        'name': {
-            'help': 'Package name',
-        },
-        # 'list': {
-        #    'help': 'List dispatcher configuration',
-        # },
         'job-result-type': {
             'help': 'List of comma-separated pairs <job>:<result type>',
             'action': 'append',
             'default': []
         },
-        'release': {
-            'help': 'Package release',
-        },
-        'scratch': {
-            'help': 'Scratch build (default: false)',
-            'default': False,
-        },
-        'target': {
-            'help': 'Package brew target',
-        },
-        'version': {
-            'help': 'Package version',
-        },
-        # 'verify': {
-        #    'help': 'Verify dispatcher configuration',
-        # },
     }
 
     required_options = ['config']
 
     def __init__(self, *args, **kwargs):
-        super(CIBrewDispatcher, self).__init__(*args, **kwargs)
+        super(KojiTaskDispatcher, self).__init__(*args, **kwargs)
 
         self.build = {}
         self.config = None
@@ -465,7 +439,7 @@ class CIBrewDispatcher(Module):
                     set_flags.update(set_commands[0])
                     del set_commands[0]
 
-                for flag in [flag for flag in set_flags.iterkeys() if flag not in CIBrewDispatcher.KNOWN_FLAGS]:
+                for flag in [flag for flag in set_flags.iterkeys() if flag not in KojiTaskDispatcher.KNOWN_FLAGS]:
                     self.warn("Flag '{}' is not supported (typo maybe?)".format(flag), sentry=True)
 
                 self.debug('final set flags:\n{}'.format(format_dict(set_flags)))
@@ -686,16 +660,6 @@ class CIBrewDispatcher(Module):
             self.warn('Empty dispatcher configuration')
             self.config = {}
 
-        # set options from command line or environment
-        for option in ['name', 'version', 'release', 'target', 'id']:
-            try:
-                self.build[option] = os.environ[option]
-            except KeyError:
-                # for cmdline options replace '_' with '-'
-                if not self.option(option):
-                    raise CIError("Required option '{}' not found in the environment or command line".format(option))
-                self.build[option] = self.option(option)
-
     def _dispatch_tests(self):
         """
         Dispatch tests for a component. That means we have to get command sets for the component,
@@ -703,11 +667,9 @@ class CIBrewDispatcher(Module):
         the commands we have left.
         """
 
-        component = self.build['name']
-
         task = self.shared('task')
         if task is None:
-            raise CIError('Need a brew task to continue')
+            raise CIError('Need a brew/koji task to continue')
 
         self.debug('find out which config section we should use')
 
@@ -733,7 +695,7 @@ class CIBrewDispatcher(Module):
             return
 
         # Find command sets for the component
-        commands = self._construct_command_sets(matching_config, component)
+        commands = self._construct_command_sets(matching_config, task.component)
         self.debug('commands:\n{}'.format(format_dict(commands)))
 
         if self.has_shared('thread_id'):
@@ -768,5 +730,7 @@ class CIBrewDispatcher(Module):
             _dispatch_commands(set_commands)
 
     def execute(self):
+        if self.shared('task') is None:
+            raise CIError('no task found, did you run brew or koji module?')
+
         self._dispatch_tests()
-        # self.info("package '{}' not enabled for target '{}'".format(self.build['name'], self.build['target']))
