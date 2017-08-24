@@ -366,12 +366,13 @@ class BrewTask(KojiTask):
         :returns: issuer of brew task and in case of build from automation, returns issuer of git commit
         """
         owner_id = self.task_info["owner"]
-        if owner_id in self.automation_user_ids:
+        if owner_id not in self.automation_user_ids:
             return self.owner
 
         self.info("Automation user detected, need to get git commit issuer")
         if self._parsed_commit_html is None:
-            raise CIError('could not find git commit issuer')
+            self.warn('could not find git commit issuer', sentry=True)
+            return self.owner
 
         issuer = self._parsed_commit_html.find(class_='commit-info').find('td')
         issuer = re.sub(".*lt;(.*)@.*", "\\1", str(issuer))
@@ -447,7 +448,6 @@ class Koji(Module):
 
     def _init_task(self, task_id, wait_timeout=None, details=None, task_class=None):
         task_class = task_class or KojiTask
-        self.info('task-class: {}'.format(task_class))
 
         full_details = dict_update({
             'session': self.instance,
@@ -562,8 +562,8 @@ class Brew(Koji, Module):
 
     def _init_task(self, task_id, wait_timeout=None, details=None, task_class=None):
         details = dict_update({}, {
-            'automation_user_ids': self.option('automation-user-ids').split(','),
-            'dist_git_commit_urls': self.option('dist-git-commit-urls').split(',')
+            'automation_user_ids': [int(user.strip()) for user in self.option('automation-user-ids').split(',')],
+            'dist_git_commit_urls': [url.strip() for url in self.option('dist-git-commit-urls').split(',')]
         }, details or {})
 
         super(Brew, self)._init_task(task_id, wait_timeout=wait_timeout, details=details, task_class=BrewTask)
