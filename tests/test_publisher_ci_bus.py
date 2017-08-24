@@ -17,10 +17,6 @@ MESSAGES = {'covscan': [Message(headers=HEADERS, body=BODY)],
             'rpmdiff': [Message(headers=HEADERS, body=BODY), Message(headers=HEADERS, body=BODY)]}
 
 
-def was_called(log, message):
-    return any(record.message == message for record in log.records)
-
-
 @pytest.fixture(name='module')
 def fixture_module():
     return create_module(CIPublisherCiBus)
@@ -64,7 +60,7 @@ def test_dry_run(log, module, monkeypatch):
 
     module.execute()
 
-    assert was_called(log, 'running in dry-run mode, no messages will be sent out')
+    assert log.match(message='running in dry-run mode, no messages will be sent out')
     mocked_send.assert_not_called()
 
 
@@ -81,16 +77,16 @@ def test_run(log, module, monkeypatch):
     module.execute()
 
     mocked_send.assert_called()
-    assert was_called(log, '1 covscan message published to CI message bus')
-    assert was_called(log, '2 rpmdiff messages published to CI message bus')
+    assert log.match(message='1 covscan message published to CI message bus')
+    assert log.match(message='2 rpmdiff messages published to CI message bus')
 
     monkeypatch.setattr(stomp, '__version__', MagicMock(__version__=[3]))
 
     module.execute()
 
     mocked_send.assert_called()
-    assert was_called(log, '1 covscan message published to CI message bus')
-    assert was_called(log, '2 rpmdiff messages published to CI message bus')
+    assert log.match(message='1 covscan message published to CI message bus')
+    assert log.match(message='2 rpmdiff messages published to CI message bus')
 
 
 def test_sanity_dry_run(module, monkeypatch):
