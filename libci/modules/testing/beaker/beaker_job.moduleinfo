@@ -1,0 +1,6 @@
+---
+- name: beaker-job
+  description: Jenkins beaker job
+  dependencies:
+    pip:
+      - jenkins-job-builder==1.6.2

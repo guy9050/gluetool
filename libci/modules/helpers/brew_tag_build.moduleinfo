@@ -1,0 +1,11 @@
+---
+- name: brew-tag-build
+  description: brew-tag-build
+  dependencies:
+    repo:
+      - name: 'rel-eng'
+        description: RCMTOOLS repository
+        baseurl: http://download-ipv4.eng.brq.redhat.com/rel-eng/RCMTOOLS/latest-RCMTOOLS-2-RHEL-7/compose/Server/$basearch/os
+        exclude: kobo kobo-rpmlib kobo-client
+    yum:
+      - brewkoji

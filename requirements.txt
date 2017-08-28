@@ -30,7 +30,8 @@ python-openstackclient==3.9.0
 # required by koji module
 pyOpenSSL==17.0.0
 # required to load configuration
-PyYAML==3.12
+ruamel.ordereddict==0.4.13
+ruamel.yaml==0.15.34
 # required by sentry
 raven==6.0.0
 # required by many packages - we must list it explicitly to force version

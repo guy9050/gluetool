@@ -1,7 +1,9 @@
 # pylint: disable=blacklisted-name
 
 import bs4
-import yaml
+
+# pylint: disable=relative-import
+import ruamel.yaml
 
 import pytest
 
@@ -120,7 +122,11 @@ def create_module(module_class, ci_class=NonLoadingCI, name='dummy-module', add_
 
 def create_yaml(tmpdir, name, data):
     f = tmpdir.join(name)
-    f.write(yaml.dump(data))
+
+    with open(str(f), 'w') as stream:
+        ruamel.yaml.YAML().dump(data, stream)
+        stream.flush()
+
     return f
 
 

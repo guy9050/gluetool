@@ -1,0 +1,6 @@
+---
+- name: covscan-job
+  description: Jenkins covscan job
+  dependencies:
+    pip:
+      - jenkins-job-builder==1.6.2
