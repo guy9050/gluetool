@@ -716,7 +716,7 @@ class KojiTaskDispatcher(Module):
                 if self._subthread_counter is not None:
                     self._subthread_counter += 1
 
-                    args = ['--thread-id', '{}-{}'.format(self._thread_id, self._subthread_counter)] + args
+                    args = ['--testing-thread-id', '{}-{}'.format(self._thread_id, self._subthread_counter)] + args
 
                 self.debug("module='{}', args='{}'".format(module, args))
                 self.run_module(module, args)
