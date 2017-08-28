@@ -227,7 +227,7 @@ class RpmDiffWaiver(Module):
             error_type = columns[0].find("b").getText().strip()
             if error_type.lower() in RPMDIFF_RESULTS_TO_WAIVE:
                 errors.append(
-                    RpmDiffError(error_type, columns[2].getText().strip(), columns[4].find("pre").getText())
+                    RpmDiffError(error_type, columns[1].getText().strip(), columns[2].find("pre").getText())
                 )
         return errors
 
