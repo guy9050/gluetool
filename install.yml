@@ -90,7 +90,6 @@
         name: pip
         state: latest
         virtualenv: "{{ virtualenv_path }}"
-        extra_args: "--no-cache-dir"
 
     #
     # Modify `activate` script to set additional variables
