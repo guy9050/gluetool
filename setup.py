@@ -8,21 +8,10 @@ Run `setup.py` to perfor various actions:
 import os
 import re
 import subprocess
-import sys
 
 from setuptools import setup
-from setuptools.command.test import test as TestCommand
 
 DESCRIPTION = 'CI Tool - Continuous Integration Swiss Army Knife'
-
-TESTS_REQUIRE = [
-    'pytest-pylint',
-    'pytest-flake8',
-    'pytest-cov',
-    'pytest-catchlog',
-    'pytest-mock',
-    'pytest'
-]
 
 VERSION_FILE = os.path.join(os.path.dirname(__file__), 'libci/version.py')
 
@@ -78,42 +67,6 @@ def update_version(version, release):
             f.write('{0}\n__version__ = \'{1}\'\n'.format(version_msg, version))
 
 
-class PyTest(TestCommand):
-    default_pytest_args = ['-v', '-ra', '--pylint', '--flake8']
-
-    user_options = [
-        ('pytest-args=', 'a', 'Arguments to pass to pytest')
-    ]
-
-    def initialize_options(self):
-        TestCommand.initialize_options(self)
-
-        # pylint: disable=attribute-defined-outside-init
-        self.pytest_args = None
-
-    def run_tests(self):
-        passed_pytest_args = []
-
-        if self.pytest_args is not None:
-            import shlex
-            passed_pytest_args = shlex.split(self.pytest_args)
-
-        pytest_args = passed_pytest_args if passed_pytest_args else self.default_pytest_args
-
-        # Clear importer cache - with any luck, this will get rid of (by now not existing
-        # anymore) /tmp/easy_install-* paths that, for reasons unknown to mere mortals, were
-        # given priority over the correct locations in .eggs/.
-        # This behavior affected mostly jenkinsapi module, and pylint reported misleading
-        # "Unable to import" error.
-        sys.path_importer_cache.clear()
-
-        print 'pytest options: %s' % pytest_args
-
-        import pytest
-        errno = pytest.main(pytest_args)
-        sys.exit(errno)
-
-
 VERSION, RELEASE = get_version()
 
 if __name__ == '__main__':
@@ -122,10 +75,6 @@ if __name__ == '__main__':
     setup(name='citool',
           # we write only the version here, release should be specified only for rpm
           version='{0}'.format(VERSION),
-          tests_require=TESTS_REQUIRE,
-          cmdclass={
-              'test': PyTest
-          },
           packages=['libci'],
           include_package_data=True,
           entry_points={

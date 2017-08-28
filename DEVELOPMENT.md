@@ -114,19 +114,7 @@ Now every time you activate your new virtualenv, you should be able to run `cito
 
 ## Test suites
 
-To run the tests:
-
-```
-  python setup.py test
-```
-
-Testsuite is governed by `py.test`, you can override its default arguments using `-a` option:
-
-```
-  python setup.py test -a "--cov=libci --cov-report=html:coverage-report"
-```
-
-Or, you can use the Tox. To use Tox, you have to firstly install these packages:
+The test suite is governed by `tox` and `py.test`. Before running the test suite, you have to install `tox`:
 
 ```
   pip install tox virtualenv
@@ -135,19 +123,18 @@ Or, you can use the Tox. To use Tox, you have to firstly install these packages:
 Tox can be easily executed by:
 
 ```
-  tox -e py27
+  tox
 ```
 
 Tox also accepts additional options which are then passed to `py.test`:
 
 ```
-  tox -e py27 -- --cov=libci --cov-report=html:coverage-report
+  tox -- --cov=libci --cov-report=html:coverage-report
 ```
 
 
-While `setup.py` uses the current Python interpreter it founds in your `$PATH`, Tox creates (and caches) virtualenv
-for the test run, and uses that for running the tests. It also adds few other tests that were simpler to integrate
-here, e.g. YAML linter.
+Tox creates (and caches) virtualenv for its test runs, and uses them for running the tests. It integrates multiple
+different types of test (you can see them by running `tox -l`).
 
 
 ## Documentation

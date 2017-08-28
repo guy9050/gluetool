@@ -58,8 +58,15 @@ def gather_module_data():
 
     cwd = os.getcwd() + '/'
     modules = []
+    classes = {}
 
     for name, properties in ci.modules.iteritems():
+        klass = properties['class'].__name__
+        if klass in classes:
+            continue
+
+        classes[klass] = True
+
         # get file where class is stored
         filepath = inspect.getfile(properties['class'])
 
@@ -71,7 +78,7 @@ def gather_module_data():
         modules.append({
             'name': name,
             'description': description,
-            'klass': properties['class'].__name__,
+            'klass': klass,
             'filepath': filepath,
             'modclass': properties['class'],
             'modpath': os.path.splitext(filepath)[0].replace('/', '.'),
