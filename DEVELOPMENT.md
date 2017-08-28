@@ -35,7 +35,8 @@ To begin digging into `citool` sources, there are few requirements:
 
   - system packages - it is either impossible or impractical to use their Python counterpart, or they are required to
     build a Python package required by `citool`. In some cases, on recent Fedora (26+) for example, it's been shown
-    for some packages their `compat-*` variant might be needed. Please, install them as told during the process.
+    for some packages their `compat-*` variant might be needed. See the optional ``Bootstrap system environment`` step
+    bellow.
 
   - you'll need RH CA certificates, some pieces of our infrastructure work on HTTPS. If you don't have the certs
     installed already (check your `/etc/ssl`), fetch them (`root` required):
@@ -45,6 +46,27 @@ To begin digging into `citool` sources, there are few requirements:
       curl -o /etc/pki/ca-trust/source/anchors/Eng-CA.crt https://engineering.redhat.com/Eng-CA.crt
       update-ca-trust
     ```
+
+0. (optional) Bootstrap system environment:
+
+   Following steps are necessary to install requirements when installing ``citool`` on different distributions:
+
+   **RHEL 7.4**
+
+   ```
+     yum install -y libcurl-devel libxml2-devel openssl-devel python-devel
+     curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py && rm -f get-pip.py
+     pip install -U setuptools
+     pip install ansible virtualenv
+   ```
+
+   **Fedora 26**
+
+   ```
+   dnf install -y ansible libselinux-python python2-virtualenv /usr/lib/rpm/redhat/redhat-hardened-cc1
+   dnf install -y --allowerasing compat-openssl10-devel
+   pip install -U setuptools
+   ```
 
 1. Create a virtual environment:
    ```
