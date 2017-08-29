@@ -458,7 +458,7 @@ class KojiTaskDispatcher(Module):
 
                         set_commands[i] = command
 
-                if set_flags.get('apply-all', True) is True:
+                if set_flags.get('apply-all', True) is not False:
                     self.debug("      allows 'all' section to be appended")
                     set_commands = set_commands[:] + all_commands
 
