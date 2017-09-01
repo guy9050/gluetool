@@ -560,10 +560,11 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
     @utils.cached_property
     def task(self):
-        task = self.shared('task')
+        try:
+            return self.shared('primary_task')
 
-        if task:
-            return task
+        except libci.CIError:
+            pass
 
         self.warn('Unable to get brew task')
 
@@ -616,8 +617,7 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
         exc = failure.exc_info[1]
 
-        if not self.has_shared('notification_recipients'):
-            self.warn('Cannot get a list of recipients, please add e.g. notify-recipients module', sentry=True)
+        if not self.require_shared('notification_recipients', warn_only=True):
             return
 
         recipients = ['{}@redhat.com'.format(user) for user in self.shared('notification_recipients')]

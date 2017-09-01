@@ -219,6 +219,9 @@ class Configurable(object):
     required_options = []
     """Iterable of names of required options."""
 
+    options_note = None
+    """If set, it will be printed after all options as a help's epilog."""
+
     supported_dryrun_level = DryRunLevels.DEFAULT
     """Highest supported level of dry-run."""
 
@@ -644,10 +647,13 @@ class Module(Configurable):
         return SHARED_FUNCTIONS_HELP_TEMPLATE.format(functions='\n'.join(functions))
 
     def parse_args(self, args):
+        epilog = '{}\n{}'.format('' if self.options_note is None else docstring_to_help(self.options_note),
+                                 self._generate_shared_functions_help())
+
         self._parse_args(args,
                          usage='{} [options]'.format(self.unique_name),
                          description=docstring_to_help(self.__doc__),
-                         epilog=self._generate_shared_functions_help(),
+                         epilog=epilog,
                          formatter_class=LineWrapRawTextHelpFormatter)
 
     def destroy(self, failure=None):
@@ -677,6 +683,9 @@ class Module(Configurable):
 
     def has_shared(self, funcname):
         return self.ci.has_shared(funcname)
+
+    def require_shared(self, *names, **kwargs):
+        return self.ci.require_shared(*names, **kwargs)
 
     def execute(self):
         # pylint: disable-msg=no-self-use
@@ -714,14 +723,21 @@ class Module(Configurable):
 
 
 class CI(Configurable):
+    # pylint: disable=too-many-public-methods
+
     options = [
         ('Global options', {
-            ('l', 'list'): {
+            ('l', 'list-modules'): {
                 'help': 'List all available modules. If a GROUP is set, limits list to the given module group.',
                 'action': 'append',
                 'nargs': '?',
                 'metavar': 'GROUP',
                 'const': True
+            },
+            ('L', 'list-shared'): {
+                'help': 'List all available shared functions.',
+                'action': 'store_true',
+                'default': False
             },
             ('r', 'retries'): {
                 'help': 'Number of retries',
@@ -904,6 +920,23 @@ class CI(Configurable):
 
     def has_shared(self, funcname):
         return funcname in self.shared_functions
+
+    def require_shared(self, *names, **kwargs):
+        warn_only = kwargs.get('warn_only', False)
+
+        def _check(name):
+            if self.has_shared(name):
+                return True
+
+            msg = "Shared function '{}' is required. See `citool -L` to find out which module provides it.".format(name)
+
+            if warn_only is True:
+                self.sentry_submit_warning(msg)
+                return False
+
+            raise CIError(msg)
+
+        return all([_check(name) for name in names])
 
     # call a shared function
     def shared(self, funcname, *args, **kwargs):

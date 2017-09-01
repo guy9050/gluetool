@@ -138,13 +138,29 @@ def main():
         log_dict(CI.debug, 'pipeline description', pipeline_description)
 
         # list modules
-        groups = CI.option('list')
+        groups = CI.option('list-modules')
         if groups == [True]:
             sys.stdout.write('%s\n' % CI.module_list_usage([]))
             sys.exit(0)
 
         elif groups:
             sys.stdout.write('%s\n' % CI.module_list_usage(groups))
+            sys.exit(0)
+
+        if CI.option('list-shared'):
+            import tabulate
+
+            functions = []
+
+            for mod_name in CI.module_list():
+                functions += [[func_name, mod_name] for func_name in CI.modules[mod_name]['class'].shared_functions]
+
+            functions = sorted(functions, key=lambda row: row[0])
+
+            sys.stdout.write("""Available shared functions
+
+{}
+""".format(tabulate.tabulate(functions, ['Shared function', 'Module name'], tablefmt='simple')))
             sys.exit(0)
 
         # no modules

@@ -4,7 +4,9 @@ import pytest
 import libci
 import libci.modules.helpers.notify_recipients
 
-from . import Bunch, create_module
+from mock import MagicMock
+
+from . import create_module, patch_shared
 
 
 @pytest.fixture(name='module')
@@ -111,15 +113,14 @@ def test_symbolic_recipients_no_task(module):
     assert mod.symbolic_recipients == {}
 
 
-def test_symbolic_recipients(module):
-    ci, mod = module
+def test_symbolic_recipients(monkeypatch, module):
+    _, mod = module
 
-    def fake_task():
-        return Bunch(issuer='foo')
+    patch_shared(monkeypatch, mod, {
+        'primary_task': MagicMock(issuer='foo')
+    })
 
     # pylint: disable=protected-access
-    ci._add_shared('task', None, fake_task)
-
     assert mod._replace_symbolic_recipients(['bar', '{ISSUER}']) == ['bar', 'foo']
 
 

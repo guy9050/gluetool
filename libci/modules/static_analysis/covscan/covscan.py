@@ -196,8 +196,7 @@ class CICovscan(Module):
             if not baseline:
                 raise NoCovscanBaselineFoundError()
 
-            self.info('Using (second) latest non-scratch build [%s] in tag [%s] as baseline',
-                      baseline, self.task.destination_tag)
+            self.info("Using latest non-scratch build '{}' as baseline".format(baseline))
 
             self.info('Obtaining source RPM from Brew build')
             srcrpm = urlgrab(self.task.srcrpm)
@@ -234,10 +233,10 @@ class CICovscan(Module):
         publish_result(self, CovscanTestResult, overall_result, covscan_result, self.task)
 
     def execute(self):
+        self.require_shared('primary_task')
+
         # get a brew task instance
-        self.task = self.shared('task')
-        if self.task is None:
-            raise CIError('no brew build found, did you run brew module?')
+        self.task = self.shared('primary_task')
 
         blacklist = self.option('blacklist')
         if blacklist is not None:

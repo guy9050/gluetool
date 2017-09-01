@@ -82,7 +82,7 @@ class RestraintScheduler(libci.Module):
 
         return self.shared('beaker_job_xml', options=options)
 
-    def _setup_guest(self, task, guest):
+    def _setup_guest(self, tasks, guest):
         # pylint: disable=no-self-use
 
         """
@@ -105,16 +105,18 @@ class RestraintScheduler(libci.Module):
         if self.option('install-task-not-build'):
             self.debug('asked to install by task ID')
 
-            options['brew_tasks'] = str(task.task_id)
+            options['brew_tasks'] = ' '.join([str(task.task_id) for task in tasks])
+
         else:
-            if task.scratch:
-                self.debug('task is a scratch build - using task ID for installation')
+            if any([task.scratch for task in tasks]):
+                self.debug('at least one task is a scratch build - using task ID for installation')
 
-                options['brew_tasks'] = str(task.task_id)
+                options['brew_tasks'] = ' '.join([str(task.task_id) for task in tasks])
+
             else:
-                self.debug('task is a regular task - using build ID for installation')
+                self.debug('all tasks are regular tasks - using build ID for installation')
 
-                options['brew_builds'] = str(task.build_id)
+                options['brew_builds'] = ' '.join([str(task.build_id) for task in tasks])
 
         job_xml = """
             <job>
@@ -149,7 +151,7 @@ class RestraintScheduler(libci.Module):
 
             raise CIError('Installation of SUT failed, restraint reports errors')
 
-    def create_schedule(self, task, job_desc, image):
+    def create_schedule(self, tasks, job_desc, image):
         """
         Main workhorse - given the job XML, get some guests, and create pairs
         (guest, tasks) for runner to process.
@@ -194,7 +196,7 @@ class RestraintScheduler(libci.Module):
             # setup guest
             thread_name = 'setup-guest-{}'.format(guest.name)
             thread = utils.WorkerThread(guest.logger,
-                                        self._setup_guest, fn_args=(task, guest,),
+                                        self._setup_guest, fn_args=(tasks, guest,),
                                         name=thread_name)
             setup_threads.append(thread)
 
@@ -216,18 +218,9 @@ class RestraintScheduler(libci.Module):
             libci.log.log_blob(self.debug, str(guest), recipe_set.prettify(encoding='utf-8'))
 
     def execute(self):
-        if not self.has_shared('restraint'):
-            raise CIError('Requires support module that would provide restraint, e.g. `restraint`.')
+        self.require_shared('restraint', 'tasks', 'image')
 
-        if not self.has_shared('task'):
-            raise CIError('Requires support module that would provide Brew task, e.g. `brew`.')
-
-        if not self.has_shared('image'):
-            raise CIError('Requires support module that would OpenStack image name, e.g. `guess-openstack-image`.')
-
-        task = self.shared('task')
-        if task is None:
-            raise CIError('No brew build found.')
+        tasks = self.shared('tasks')
 
         image = self.shared('image')
         if image is None:
@@ -246,7 +239,7 @@ class RestraintScheduler(libci.Module):
         job = bs4.BeautifulSoup(wow_output.stdout, 'xml')
         self.debug('job as planned by wow:\n{}'.format(job.prettify(encoding='utf-8')))
 
-        self.create_schedule(task, job, image)
+        self.create_schedule(tasks, job, image)
 
     def destroy(self, failure=None):
         pass

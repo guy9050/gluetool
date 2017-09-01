@@ -7,7 +7,7 @@ import libci
 import libci.utils
 import libci.modules.static_analysis.rpmdiff.rpmdiff
 import libci.modules.testing.testing_results
-from . import Bunch, create_module
+from . import Bunch, create_module, patch_shared
 
 
 SUCCESS_STDOUT = """{
@@ -622,7 +622,7 @@ def fixture_module_execute(configured_module, monkeypatch, task):
 
     def shared_mock(key):
         return {
-            'task': task,
+            'primary_task': task,
             'results': ci.shared(key)
         }[key]
     monkeypatch.setattr(module, "shared", shared_mock)
@@ -771,7 +771,7 @@ def test_publish_results(module_with_ciresults, monkeypatch, rpmdiff_test_type, 
 
 def test_refresh_results_fail(module):
     _, module = module
-    with pytest.raises(libci.CIError, match=r"^Cannot refresh old results, shared function \'results\' does not exist"):
+    with pytest.raises(libci.CIError, match=r"^Shared function 'results' is required."):
         module.refresh_rpmdiff_results(118618)
 
 
@@ -822,20 +822,25 @@ def test_refresh_results(module_with_ciresults, monkeypatch):
 def test_execute_set_huburl(configured_module, url):
     _, module = configured_module
     module._config["url"] = url
-    with pytest.raises(libci.CIError, match=r"^no brew build found"):
+    # pylint: disable=line-too-long
+    with pytest.raises(libci.CIError, match=r"^Shared function 'primary_task' is required."):
         module.execute()
     assert module.hub_url == url
 
 
 def test_execute_no_task(module):
     _, module = module
-    with pytest.raises(libci.CIError, match=r"^no brew build found"):
+
+    with pytest.raises(libci.CIError, match=r"Shared function 'primary_task' is required."):
         module.execute()
 
 
-def test_execute_blacklisted(module_for_execute, log):
+def test_execute_blacklisted(monkeypatch, module_for_execute, log):
     _, module = module_for_execute
     module._config["blacklist"] = "dummy,which"
+    patch_shared(monkeypatch, module, {
+        'primary_task': MagicMock(component='which')
+    })
     module.execute()
     assert log.match(levelno=logging.INFO, message="skipping blacklisted package which")
     assert not module._publish_results.called
@@ -845,10 +850,13 @@ def test_execute_blacklisted(module_for_execute, log):
     (None, "no baseline found, refusing to continue testing"),
     ("1.3", "cowardly refusing to compare same packages"),
 ])
-def test_execute_comparison_silent_fail(module_for_execute, baseline, expected_log_msg, log):
+def test_execute_comparison_silent_fail(monkeypatch, module_for_execute, baseline, expected_log_msg, log):
     _, module = module_for_execute
-    type(module.shared("task")).latest = PropertyMock(return_value=baseline)
+    type(module.shared("primary_task")).latest = PropertyMock(return_value=baseline)
     module._config["type"] = "comparison"
+    patch_shared(monkeypatch, module, {
+        'primary_task': MagicMock(component='which')
+    })
     module.execute()
     assert log.match(message=expected_log_msg)
     assert not module._run_rpmdiff.called
@@ -856,9 +864,12 @@ def test_execute_comparison_silent_fail(module_for_execute, baseline, expected_l
     assert not module._publish_results.called
 
 
-def test_execute_with_runid(module_for_execute):
+def test_execute_with_runid(monkeypatch, module_for_execute):
     _, module = module_for_execute
     module._config["run-id"] = 118618
+    patch_shared(monkeypatch, module, {
+        'primary_task': MagicMock(component='which')
+    })
     module.execute()
     assert not module._run_rpmdiff.called
     module._get_runinfo.assert_called_with(118618)
@@ -869,9 +880,12 @@ def test_execute_with_runid(module_for_execute):
     ("comparison", "0.9"),
     ("analysis", "0.9"),
 ])
-def test_execute(module_for_execute, rpmdiff_test_type, expected_baseline):
+def test_execute(monkeypatch, module_for_execute, rpmdiff_test_type, expected_baseline):
     _, module = module_for_execute
     module._config["type"] = rpmdiff_test_type
+    patch_shared(monkeypatch, module, {
+        'primary_task': None
+    })
     module.execute()
     module._run_rpmdiff.assert_called_once_with(rpmdiff_test_type, expected_baseline)
     run_rpmdiff_result = module._run_rpmdiff(rpmdiff_test_type, expected_baseline)

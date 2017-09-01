@@ -71,6 +71,8 @@ class WorkflowTomorrow(libci.Module):
 
         self.info('running workflow-tomorrow to get job description')
 
+        self.require_shared('primary_task')
+
         options = options or []
         environment = environment or {}
         task_params = task_params or {}
@@ -112,15 +114,9 @@ class WorkflowTomorrow(libci.Module):
         # add global task parameters
         _task_params = {
             'BASEOS_CI': 'true',
-            'BEAKERLIB_RPM_DOWNLOAD_METHODS': 'yum\\ direct'
+            'BEAKERLIB_RPM_DOWNLOAD_METHODS': 'yum\\ direct',
+            'BASEOS_CI_COMPONENT': str(self.shared('primary_task').component)
         }
-
-        task = self.shared('task')
-        if task is None:
-            self.warn('No brew task available, cannot add BASEOS_CI_COMPONENT task param')
-
-        else:
-            _task_params['BASEOS_CI_COMPONENT'] = str(task.component)
 
         # incorporate changes demanded by user
         _task_params.update(task_params)

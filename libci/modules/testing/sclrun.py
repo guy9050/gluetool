@@ -77,6 +77,10 @@ class SclRun(libci.Module):
         environment = environment or {}
         task_params = task_params or {}
 
+        self.require_shared('primary_task')
+
+        primary_task = self.shared('primary_task')
+
         #
         # setup phases
         if setup_phases is None:
@@ -116,15 +120,9 @@ class SclRun(libci.Module):
         # add global task parameters
         _task_params = {
             'BASEOS_CI': 'true',
-            'BEAKERLIB_RPM_DOWNLOAD_METHODS': 'yum\\ direct'
+            'BEAKERLIB_RPM_DOWNLOAD_METHODS': 'yum\\ direct',
+            'BASEOS_CI_COMPONENT': str(primary_task.component)
         }
-
-        task = self.shared('task')
-        if task is None:
-            self.warn('No brew task available, cannot add BASEOS_CI_COMPONENT task param')
-
-        else:
-            _task_params['BASEOS_CI_COMPONENT'] = str(task.component)
 
         # incorporate changes demanded by user
         _task_params.update(task_params)
@@ -133,8 +131,8 @@ class SclRun(libci.Module):
             options += ['--taskparam', '{}={}'.format(name, value)]
 
         # detect collection name and rhel version from brew target
-        scl = re.sub("rhscl-[^-]*-(.*)-rhel.*", "\\1", task.target)
-        distro = task.rhel
+        scl = re.sub("rhscl-[^-]*-(.*)-rhel.*", "\\1", primary_task.target)
+        distro = primary_task.rhel
 
         # add '"' to strings containing spaces to prevent bad expansion in sclrun
         options = [('"{}"'.format(option) if ' ' in option and not option.startswith('"') else option)

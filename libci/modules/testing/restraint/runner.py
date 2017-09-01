@@ -416,8 +416,7 @@ class RestraintRunner(libci.Module):
             self.info('Will run recipe set tasks serially, without snapshots')
 
     def execute(self):
-        if not self.has_shared('restraint'):
-            raise libci.CIError('Requires support module that would provide restraint, e.g. `restraint`.')
+        self.require_shared('restraint')
 
         schedule = self.shared('schedule') or []
 

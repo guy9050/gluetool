@@ -8,7 +8,7 @@ import libci
 import libci.utils
 from libci.modules.static_analysis.covscan.covscan import CICovscan, CovscanResult, \
     CovscanFailedError, NoCovscanBaselineFoundError
-from . import create_module
+from . import create_module, patch_shared, assert_shared
 
 ADDED_PASS = """
 {
@@ -55,13 +55,10 @@ def test_loadable(module):
     assert hasattr(python_mod, 'CICovscan')
 
 
-def test_no_brew(module, monkeypatch):
+def test_no_brew(module):
     _, module = module
 
-    monkeypatch.setattr(module, 'shared', MagicMock(return_value=None))
-
-    with pytest.raises(libci.CIError, match=r'^no brew build found, did you run brew module?'):
-        module.execute()
+    assert_shared('primary_task', module.execute)
 
 
 def test_blacklisted_component(log, module, monkeypatch):
@@ -70,7 +67,9 @@ def test_blacklisted_component(log, module, monkeypatch):
     _, module = module
     module._config['blacklist'] = '{},libreoffice'.format(component_name)
 
-    monkeypatch.setattr(module, 'shared', MagicMock(return_value=MagicMock(component=component_name)))
+    monkeypatch.setattr(module.ci, 'shared_functions', {
+        'primary_task': (None, MagicMock(return_value=MagicMock(component=component_name)))
+    })
 
     module.execute()
 
@@ -82,12 +81,12 @@ def test_not_enabled_target(log, module, monkeypatch):
     component_name = 'ssh'
     target = 'not_allowed'
 
-    mocked_task = MagicMock(target=target, component=component_name)
-
     _, module = module
     module._config['target_pattern'] = enabled_target
 
-    monkeypatch.setattr(module, 'shared', MagicMock(return_value=mocked_task))
+    monkeypatch.setattr(module.ci, 'shared_functions', {
+        'primary_task': (None, MagicMock(return_value=MagicMock(target=target, component=component_name)))
+    })
 
     module.execute()
 
@@ -136,19 +135,17 @@ def run(result, log, module, monkeypatch, tmpdir):
         else:
             pass
 
-    def mocked_shared(key):
-        return {
-            'task': mocked_task
-        }[key]
+    patch_shared(monkeypatch, module, {
+        'primary_task': mocked_task
+    })
 
-    monkeypatch.setattr(module, 'shared', mocked_shared)
     monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'urlgrab', mocked_grabber)
     monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'run_command', mocked_run_command)
     monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'urlopen', mocked_urlopen)
 
     module.execute()
 
-    assert log.records[-2].message == 'Result of testing: {}'.format(result)
+    assert log.records[-1].message == 'Result of testing: {}'.format(result)
 
 
 def test_pass_run(log, module, monkeypatch, tmpdir):

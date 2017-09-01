@@ -279,8 +279,7 @@ class CIRpmdiff(Module):
         :param int run_id: ID of RPMdiff run
         :raises libci.CIError: if shared function does not exist
         """
-        if not self.has_shared("results"):
-            raise CIError('Cannot refresh old results, shared function \'results\' does not exist')
+        self.require_shared('results')
 
         results = self.shared("results")
         old_results = []
@@ -302,10 +301,10 @@ class CIRpmdiff(Module):
         if url:
             self.hub_url = url
 
+        self.require_shared('primary_task')
+
         # get a brew task instance
-        self.task = self.shared('task')
-        if self.task is None:
-            raise CIError('no brew build found, did you run brew module?')
+        self.task = self.shared('primary_task')
 
         # blacklist packages
         if blacklist is not None:

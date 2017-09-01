@@ -24,15 +24,11 @@ class CIMTF(Module):
 
         self.shared('jenkins').set_build_name(module)
 
-        if not self.has_shared('image'):
-            raise CIError('No image provided, did you run guess-*-image module?')
+        self.require_shared('image', 'provision')
 
         image = self.shared('image')
         if image is None:
             raise CIError('No image provided')
-
-        if not self.has_shared('provision'):
-            raise CIError('No guest provider found, did you run a guests provider module, e.g. openstack?')
 
         guests = self.shared('provision', image=image)
 

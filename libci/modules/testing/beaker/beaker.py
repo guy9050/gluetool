@@ -276,32 +276,34 @@ class Beaker(Module):
         if self.option('job'):
             return self._reuse_job(self.option('job'))
 
-        task = self.shared('task')
+        tasks = self.shared('tasks')
+        primary_task = self.shared('primary_task')
 
-        options = []
+        options = [
+            '--whiteboard',
+            'CI run {} brew task id {} build target {}'.format(primary_task.nvr, primary_task.task_id,
+                                                               primary_task.target),
+            '--first-testing-task', '/distribution/runtime_tests/verify-nvr-installed'
+        ]
 
-        if task is not None:
-            options += [
-                '--first-testing-task', '/distribution/runtime_tests/verify-nvr-installed',
-                '--whiteboard',
-                'CI run {} brew task id {} build target {}'.format(task.nvr, task.task_id, task.target)
-            ]
+        def _add_brew_install(option, attr):
+            return sum([[option, str(getattr(task, attr))] for task in tasks], [])
 
-            if self.option('install-task-not-build'):
-                self.debug('asked to install by task ID')
+        if self.option('install-task-not-build'):
+            self.debug('asked to install by task ID')
 
-                options += ['--brew-task', str(task.task_id)]
+            options += _add_brew_install('--brew-task', 'task_id')
+
+        else:
+            if any([task.scratch for task in tasks]):
+                self.debug('at least one task is a scratch build - using task ID for installation')
+
+                options += _add_brew_install('--brew-task', 'task_id')
 
             else:
-                if task.scratch:
-                    self.debug('task is a scratch build - using task ID for installation')
+                self.debug('all tasks are regular tasks - using build ID for installation')
 
-                    options += ['--brew-task', str(task.task_id)]
-
-                else:
-                    self.debug('task is a regular task - using build ID for installation')
-
-                    options += ['--brew-build', str(task.build_id)]
+                options += _add_brew_install('--brew-build', 'build_id')
 
         # we could use --reserve but we must be sure the reservesys is *the last* taskin the recipe
         # users may require their own "last" tasks and --last-task is mightier than mere --reserve.
@@ -494,6 +496,8 @@ class Beaker(Module):
         return 'PASS', self._processed_results, matrix_url
 
     def execute(self):
+        self.require_shared('tasks', 'primary_tasks', 'beaker_job_xml', 'parse_beah_result')
+
         def _command_options(name):
             opts = self.option(name)
             if opts is None or not opts:
@@ -502,14 +506,6 @@ class Beaker(Module):
             return shlex.split(opts)
 
         jobwatch_options = _command_options('jobwatch-options')
-
-        # check for parse_beah_result shared function
-        if not self.has_shared('beaker_job_xml'):
-            raise CIError('No beaker_job_xml shared function found. Did you run wow module?')
-
-        # check for parse_beah_result shared function
-        if not self.has_shared('parse_beah_result'):
-            raise CIError('No parser found. Did you run beah-result-parser module?')
 
         # workflow-tomorrow
         job_ids, job = self._run_wow()

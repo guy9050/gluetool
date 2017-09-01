@@ -2,7 +2,7 @@ import re
 import koji
 from bs4 import BeautifulSoup
 from libci import CIError, SoftCIError, Module
-from libci.log import Logging
+from libci.log import Logging, log_dict
 from libci.utils import cached_property, dict_update, fetch_url, format_dict, wait
 
 
@@ -182,7 +182,10 @@ class KojiTask(object):
         """
         :returns: latest released package with the same destination tag or None if not found
         """
-        builds = self.session.listTagged(self.destination_tag, None, True, latest=2, package=self.component)
+        if self.destination_tag:
+            builds = self.session.listTagged(self.destination_tag, None, True, latest=2, package=self.component)
+        else:
+            builds = self.session.listTagged(self.target, None, True, latest=2, package=self.component)
         if self.scratch:
             return builds[0]["nvr"] if builds else None
         return builds[1]["nvr"] if builds and len(builds) > 1 else None
@@ -266,7 +269,7 @@ class KojiTask(object):
         if self.scratch:
             msg.append("scratch")
         msg.append("build '{}'".format(self.nvr))
-        msg.append("destination tag '{}'".format(self.destination_tag))
+        msg.append("target '{}'".format(self.target))
         return ' '.join(msg)
 
     @cached_property
@@ -281,7 +284,10 @@ class KojiTask(object):
         """
         :returns: build destination tag
         """
-        return self.session.getBuildTarget(self.target)["dest_tag_name"]
+        try:
+            return self.session.getBuildTarget(self.target)["dest_tag_name"]
+        except TypeError:
+            return None
 
 
 class BrewTask(KojiTask):
@@ -415,21 +421,29 @@ class Koji(Module):
             'help': 'Koji instance web ui URL',
         },
         'task-id': {
-            'help': 'Initialize from task ID',
-            'type': int,
+            'help': 'Initialize from task ID.',
+            'action': 'append',
+            'default': [],
+            'type': int
         },
         'build-id': {
-            'help': 'Initialize from build ID',
-            'type': int,
+            'help': 'Initialize from build ID.',
+            'action': 'append',
+            'default': [],
+            'type': int
         },
         'name': {
-            'help': 'Choose latest tagged build of the given package name (requires --tag)',
+            'help': 'Initialize from package name, by choosing latest tagged build (requires ``--tag``).',
+            'action': 'append',
+            'default': []
         },
         'nvr': {
-            'help': 'Initialize from given NVR',
+            'help': 'Initialize from package NVR.',
+            'action': 'append',
+            'default': []
         },
         'tag': {
-            'help': 'Use give build tag',
+            'help': 'Use given build tag.',
         },
         'wait': {
             'help': 'Wait for given number of seconds for a not finished task',
@@ -437,83 +451,146 @@ class Koji(Module):
         },
     }
 
+    options_note = """
+    Options ``--task-id``, ``--build-id``, ``--name`` and ``--nvr`` can be used multiple times, and even mixed
+    together, to specify tasks for a single pipeline in many different ways.
+    """
+
     required_options = ['url', 'pkgs-url', 'web-url']
-    shared_functions = ['task']
+    shared_functions = ('tasks', 'primary_task')
 
     def __init__(self, *args, **kwargs):
         super(Koji, self).__init__(*args, **kwargs)
 
-        self.instance = None
-        self.task_instance = None
+        self._session = None
+        self._tasks = []
 
-    def _init_task(self, task_id, wait_timeout=None, details=None, task_class=None):
+    def _task_factory(self, task_id, wait_timeout=None, details=None, task_class=None):
         task_class = task_class or KojiTask
 
-        full_details = dict_update({
-            'session': self.instance,
+        details = dict_update({
+            'session': self._session,
             'url': self.option('url'),
             'pkgs_url': self.option('pkgs-url'),
             'web_url': self.option('web-url'),
         }, details or {})
 
-        self.task_instance = task_class(full_details, task_id, self.unique_name, logger=self.logger,
-                                        wait_timeout=wait_timeout)
+        task = task_class(details, task_id, self.unique_name, logger=self.logger, wait_timeout=wait_timeout)
+        self.debug('initialized {}'.format(task.full_name))
 
-        self.info(self.task_instance.full_name)
+        return task
 
-    def _find_task_id(self):
+    def _objects_to_builds(self, name, object_ids, finder):
+        if not object_ids:
+            return []
+
+        log_dict(self.debug, 'finding builds for {} ids'.format(name), object_ids)
+
+        builds = []
+
+        for object_id in object_ids:
+            build = finder(object_id)
+
+            log_dict(self.debug, "for '{}' found".format(object_id), build)
+
+            if None in build:
+                self.warn('Looking for {} {}, remote server returned None - skipping this ID'.format(name, object_id))
+                continue
+
+            builds += build
+
+        log_dict(self.debug, 'found builds', builds)
+
+        return builds
+
+    def _find_task_ids(self):
         """
-        Tries to find task ID from all supported sources.
+        Tries to find task ID from all supported options.
 
         :return: task ID
         :rtype: int or None if no sources specified
         """
-        build_id = self.option('build-id')
-        name = self.option('name')
-        nvr = self.option('nvr')
-        tag = self.option('tag')
-        task_id = self.option('task-id')
 
-        if task_id:
-            return task_id
+        task_ids = []
+        builds = []
 
-        if build_id:
-            builds = [self.instance.getBuild(build_id)]
-        elif nvr:
-            builds = [self.instance.getBuild(nvr)]
-        elif name:
-            builds = self.instance.listTagged(tag, package=name)
-        else:
-            # no task to find, just continue without initialization
-            # it will be expected that user inits task via the shared function
-            return None
+        if self.option('task-id'):
+            task_ids += self.option('task-id')
 
-        if builds[0] and 'task_id' in builds[0] and builds[0]['task_id']:
-            return builds[0]['task_id']
+        if self.option('build-id'):
+            builds += self._objects_to_builds('build', self.option('build-id'),
+                                              lambda build_id: [self._session.getBuild(build_id)])
 
-        raise CIError('could not find a valid build according to given details')
+        if self.option('nvr'):
+            builds += self._objects_to_builds('nvr', self.option('nvr'),
+                                              lambda nvr: [self._session.getBuild(nvr)])
 
-    def task(self, task_id=None):
+        if self.option('name'):
+            builds += self._objects_to_builds('name', self.option('name'),
+                                              lambda name: self._session.listTagged(self.option('tag'), package=name))
+
+        if builds:
+            for_removal = []
+
+            for build in builds:
+                if 'task_id' in build and build['task_id']:
+                    continue
+
+                log_dict(self.debug, 'Build does not provide build ID', build)
+                for_removal.append(build)
+
+            for build in for_removal:
+                builds.remove(build)
+
+            task_ids += [build['task_id'] for build in builds]
+
+        return task_ids
+
+    def tasks(self, task_ids=None, **kwargs):
         """
-        Return a KojiTask or a BrewTask instance. If task_id passed, initialize KojiTask/BrewTask instance
-        from it first.
+        Returns a list of current tasks. If ``task_ids`` is set, new set of tasks is created using
+        the IDs, and becomes new set of current tasks, which is then returned.
 
-        :param int task_id: ID of the task to process
-        :returns: :py:class:`KojiTask` or `BrewTask` instance
+        Method either returns non-empty list of tasks, or raises an exception
+
+        :param list(int) task_ids: IDs of the tasks.
+        :param dict kwargs: Additional arguments passed to :py:meth:`_task_factory`.
+        :returns: List of task instances.
+        :rtype: list(:py:class:`KojiTask`)
+        :raises libci.ci.CIError: When there are no tasks.
         """
-        if task_id:
-            self._init_task(task_id)
 
-        if self.task_instance:
-            return self.task_instance
+        task_ids = task_ids or []
 
-        raise CIError('no {} task ID specified'.format(self.unique_name))
+        self.debug('get tasks for IDs: {}'.format(format_dict(task_ids)))
+
+        if task_ids:
+            self._tasks = [self._task_factory(task_id, **kwargs) for task_id in task_ids]
+
+        if self._tasks:
+            return self._tasks
+
+        raise CIError('No tasks specified')
+
+    def primary_task(self):
+        """
+        Returns a `primary` task, the first task in the list of current tasks.
+
+        Method either returns a task, or raises an exception.
+
+        :rtype: :py:class:`KojiTask`
+        :raises libci.ci.CIError: When there are no tasks, therefore not even a primary one.
+        """
+
+        self.debug('primary task - current tasks: {}'.format(format_dict(self._tasks)))
+
+        if not self._tasks:
+            raise CIError('No tasks specified, cannot return the primary one')
+
+        return self._tasks[0]
 
     def sanity(self):
         # make sure that no conflicting options are specified
-        optnum = sum([1 for opt in ['task-id', 'build-id', 'name', 'nvr'] if self.option(opt) is not None])
-        if optnum > 1:
-            raise CIError("Only one of the options 'task-id', 'build-id', 'name' and 'nvr' can be specified.")
 
         # name option requires tag
         if self.option('name') and not self.option('tag'):
@@ -527,13 +604,16 @@ class Koji(Module):
         url = self.option('url')
         wait_timeout = self.option('wait')
 
-        self.instance = koji.ClientSession(url)
-        version = self.instance.getAPIVersion()
+        self._session = koji.ClientSession(url)
+        version = self._session.getAPIVersion()
         self.info('connected to {} instance \'{}\' API version {}'.format(self.unique_name, url, version))
 
-        task_id = self._find_task_id()
-        if task_id:
-            self._init_task(task_id, wait_timeout=wait_timeout)
+        task_ids = self._find_task_ids()
+        if task_ids:
+            self.tasks(task_ids, wait_timeout=wait_timeout)
+
+        for task in self._tasks:
+            self.info('initialized {}'.format(task.full_name))
 
 
 class Brew(Koji, Module):
@@ -560,10 +640,11 @@ class Brew(Koji, Module):
 
     required_options = Koji.required_options + ['automation-user-ids', 'dist-git-commit-urls']
 
-    def _init_task(self, task_id, wait_timeout=None, details=None, task_class=None):
+    def _task_factory(self, task_id, wait_timeout=None, details=None, task_class=None):
         details = dict_update({}, {
             'automation_user_ids': [int(user.strip()) for user in self.option('automation-user-ids').split(',')],
             'dist_git_commit_urls': [url.strip() for url in self.option('dist-git-commit-urls').split(',')]
         }, details or {})
 
-        super(Brew, self)._init_task(task_id, wait_timeout=wait_timeout, details=details, task_class=BrewTask)
+        return super(Brew, self)._task_factory(task_id, details=details, task_class=BrewTask,
+                                               wait_timeout=wait_timeout)

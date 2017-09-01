@@ -225,11 +225,9 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
         self._distro = distro
 
     def _guess_target_autodetection(self):
-        task = self.shared('task')
-        if task is None:
-            raise CIError("Using 'target-autodetect' method without a brew task does not work")
+        self.require_shared('primary_task')
 
-        target = task.target
+        target = self.shared('primary_task').target
 
         self._distro = self.pattern_map.match(target)
         self.debug("transformed target '{}' to the distro '{}'".format(target, self._distro))

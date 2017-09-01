@@ -1,5 +1,5 @@
 import os
-from libci import CIError, Module
+from libci import Module
 
 
 class CIBrewBuildName(Module):
@@ -20,13 +20,12 @@ class CIBrewBuildName(Module):
     }
 
     def execute(self):
-        task = self.shared('task')
-        if task is None:
-            raise CIError('no brew task found, did you run brew module?')
+        self.require_shared('primary_task')
 
-        if not self.has_shared('jenkins'):
-            self.warn('Jenkins API is necessary, please provide Jenkins module', sentry=True)
+        if not self.require_shared('jenkins'):
             return
+
+        task = self.shared('primary_task')
 
         build_url = os.getenv('BUILD_URL', None)
         if build_url is None:

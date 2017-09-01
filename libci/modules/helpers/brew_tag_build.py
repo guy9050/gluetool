@@ -38,9 +38,9 @@ class CIBrewTagBuild(Module):
         check_for_commands(REQUIRED_CMDS)
 
     def execute(self):
-        task = self.shared('task')
-        if not task:
-            raise CIError('no brew task found')
+        self.require_shared('primary_task')
+
+        task = self.shared('primary_task')
 
         if task.scratch:
             self.info('cowardly refusing to tag scratch build')

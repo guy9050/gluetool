@@ -3,7 +3,11 @@
 import bs4
 import yaml
 
+import pytest
+
 import libci
+
+from mock import MagicMock
 
 
 class Bunch(object):
@@ -70,6 +74,38 @@ class CaplogWrapper(object):
             return all(getattr(record, field) == value for field, value in kwargs.iteritems())
 
         return matcher(_cmp(record) for record in self.records)
+
+
+def assert_shared(name, func, *args, **kwargs):
+    """
+    Syntax sugar for ``pytest.raises`` when testing whether called code checks for shared function.
+
+    :param str name: name of shared function the test expect to be missing.
+    :param callable func: Callable piece that should raise an exception.
+    :param args: Arguments for ``func``.
+    :param kwargs: Keyword arguments for ``func``.
+    """
+
+    pattern = r"^Shared function '{}' is required. See `citool -L` to find out which module provides it.$".format(name)
+
+    with pytest.raises(libci.CIError, match=pattern):
+        func(*args, **kwargs)
+
+
+def patch_shared(monkeypatch, module, shared_functions):
+    """
+    Monkeypatch registry of shared functions. This helper is intended for simple and common use cases
+    where test needs to inject its own list of functions that return values. If you need anything
+    more complicated, you're on your own.
+
+    :param monkeypatch: Monkeypatch fixture, usually passed to the original test function.
+    :param module: Module instance that serves as an access point to CI internals.
+    :param dict(str, obj) shared_functions: Maping between names and return values.
+    """
+
+    monkeypatch.setattr(module.ci, 'shared_functions', {
+        name: (None, MagicMock(return_value=value)) for name, value in shared_functions.iteritems()
+    })
 
 
 def create_module(module_class, ci_class=NonLoadingCI, name='dummy-module'):

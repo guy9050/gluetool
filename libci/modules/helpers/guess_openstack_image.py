@@ -80,8 +80,7 @@ class GuessOpenstackImage(Module):
         self._image = image
 
     def _guess_recent(self):
-        if not self.has_shared('openstack'):
-            raise CIError("Module requires OpenStack connection, provided e.g. by the 'openstack' module")
+        self.require_shared('openstack')
 
         hint = '^{}$'.format(self.option('image'))
         self.debug("using pattern '{}' as a hint".format(hint))
@@ -114,11 +113,9 @@ class GuessOpenstackImage(Module):
         self._image = sorted(possible_images, key=lambda x: x.key)[-1].name
 
     def _guess_target_autodetection(self):
-        task = self.shared('task')
-        if task is None:
-            raise CIError("Using 'target-autodetect' method without a brew task does not work")
+        self.require_shared('primary_task')
 
-        target = task.target
+        target = self.shared('primary_task').target
 
         self._image = self.pattern_map.match(target)
         self.debug("transformed target '{}' to the image '{}'".format(target, self._image))
