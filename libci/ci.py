@@ -8,15 +8,18 @@ import os
 import sys
 import ast
 
+from functools import partial
+
 from .help import LineWrapRawTextHelpFormatter, option_help, docstring_to_help
 from .log import Logging, ContextAdapter, ModuleAdapter, log_dict
 
 
-CONFIGS = ['/etc/citool.d/citool', os.path.expanduser('~/.citool.d/citool')]
-MODULE_CONFIG_PATHS = ['/etc/citool.d/config',
-                       os.path.expanduser('~/.citool.d/config')]
-MODULE_PATH = [os.path.dirname(os.path.abspath(__file__)) + '/modules']
-DATA_PATH = os.path.dirname(os.path.abspath(__file__)) + '/data'
+DEFAULT_MODULE_CONFIG_PATHS = [
+    '/etc/citool.d/config',
+    os.path.expanduser('~/.citool.d/config')
+]
+DEFAULT_MODULE_PATH = '{}/modules'.format(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_DATA_PATH = '{}/data'.format(os.path.dirname(os.path.abspath(__file__)))
 
 
 class CIError(Exception):
@@ -201,6 +204,51 @@ class Configurable(object):
     required_options = []
     """Iterable of names of required options."""
 
+    @staticmethod
+    def _for_each_option(callback, options):
+        """
+        Given dictionary defining options, call a callback for each of them.
+
+        :param dict options: Dictionary of options, in a form ``option-name: option-params``.
+        :param callable callback: Must accept at least 3 parameters: option name (``str``),
+            all option names (short and long ones) (``tuple(str, str)``), and option params
+            (``dict``).
+        """
+
+        # Sort options by their names - no code has a strong option on their order, so force
+        # one to all users of this helper.
+        option_names = sorted(options.keys(), key=lambda x: x[1] if isinstance(x, tuple) else x)
+
+        for names in option_names:
+            params = options[names]
+
+            name = names[1] if isinstance(names, tuple) else names
+
+            callback(name, names, params)
+
+    @staticmethod
+    def _for_each_option_group(callback, options):
+        """
+        Given set of options, call a callback for each option group.
+
+        :param options: List of option groups, or a dict listing options directly.
+        :param callable callback: Must accept at least 2 parameters: ``options`` (``dict``), listing options
+            in the group, and keyword parameter ``group_name`` (``str``), which is set to group name when
+            the ``options`` defines an option group.
+        """
+
+        if isinstance(options, dict):
+            callback(options)
+
+        elif isinstance(options, (list, tuple)):
+            for group in options:
+                if isinstance(group, dict):
+                    callback(group)
+
+                else:
+                    group_name, group_options = group
+                    callback(group_options, group_name=group_name)
+
     def __init__(self):
         super(Configurable, self).__init__()
 
@@ -211,39 +259,35 @@ class Configurable(object):
         def _fail_name(name):
             raise CIError("Option name must be either a string or (<letter>, <string>), '{}' found".format(name))
 
-        def _verify_options_dict(options):
-            for name, params in options.iteritems():
-                if isinstance(name, str):
-                    if not isinstance(name, str):
-                        _fail_name(name)
+        def _verify_option(name, names, params):
+            if isinstance(names, str):
+                self._config[name] = None
 
-                    self._config[name] = None
-
-                elif isinstance(name, tuple):
-                    if not isinstance(name[0], str) or len(name[0]) != 1:
-                        _fail_name(name)
-
-                    if not isinstance(name[1], str) or len(name[1]) < 2:
-                        _fail_name(name)
-
-                    self._config[name[1]] = None
-
-                else:
+            elif isinstance(names, tuple):
+                if not isinstance(names[0], str) or len(names[0]) != 1:
                     _fail_name(name)
 
-                if 'help' not in params:
-                    continue
+                if not isinstance(names[1], str) or len(names[1]) < 2:
+                    _fail_name(name)
 
-                # Long help texts can be written using triple quotes and docstring-like
-                # formatting. Convert every help string to a single line string.
-                params['help'] = option_help(params['help'])
+                self._config[name] = None
 
-        if isinstance(self.options, dict):
-            _verify_options_dict(self.options)
+            else:
+                _fail_name(name)
 
-        elif isinstance(self.options, (list, tuple)):
-            for _, options in self.options:
-                _verify_options_dict(options)
+            if 'help' not in params:
+                return
+
+            # Long help texts can be written using triple quotes and docstring-like
+            # formatting. Convert every help string to a single line string.
+            params['help'] = option_help(params['help'])
+
+        def _verify_options(options, **kwargs):
+            # pylint: disable=unused-argument
+
+            Configurable._for_each_option(_verify_option, options)
+
+        Configurable._for_each_option_group(_verify_options, self.options)
 
     def _parse_config(self, paths):
         """
@@ -258,34 +302,32 @@ class Configurable(object):
         parser = ConfigParser.ConfigParser()
         parser.read(paths)
 
-        def _inject_values(options):
-            for name, params in options.iteritems():
-                if isinstance(name, tuple):
-                    name = name[1]
+        def _inject_value(name, names, params):
+            # pylint: disable=unused-argument
 
+            try:
+                value = parser.get('default', name)
+
+            except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
+                return
+
+            if 'type' in params:
                 try:
-                    value = parser.get('default', name)
+                    value = params['type'](value)
 
-                except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
-                    continue
+                except ValueError as exc:
+                    raise CIError("Value of option '{}' expected to be '{}' but cannot be parsed: '{}'".format(
+                        name, params['type'].__name__, exc.message))
 
-                if 'type' in params:
-                    try:
-                        value = params['type'](value)
+            self._config[name] = value
+            self.debug("Option '{}' set to '{}' by config file".format(name, value))
 
-                    except ValueError as exc:
-                        raise CIError("Value of option '{}' expected to be '{}' but cannot be parsed: '{}'".format(
-                            name, params['type'].__name__, exc.message))
+        def _inject_values(options, **kwargs):
+            # pylint: disable=unused-argument
 
-                self._config[name] = value
-                self.debug("Option '{}' set to '{}' by config file".format(name, value))
+            Configurable._for_each_option(_inject_value, options)
 
-        if isinstance(self.options, dict):
-            _inject_values(self.options)
-
-        elif isinstance(self.options, (list, tuple)):
-            for _, options in self.options:
-                _inject_values(options)
+        Configurable._for_each_option_group(_inject_values, self.options)
 
     @classmethod
     def _create_args_parser(cls, **kwargs):
@@ -296,26 +338,34 @@ class Configurable(object):
         :param dict kwargs: Additional arguments passed to :py:class:`argparse.ArgumentParser`.
         """
 
-        parser = argparse.ArgumentParser(**kwargs)
+        root_parser = argparse.ArgumentParser(**kwargs)
 
-        def _add_options(group_parser, options):
-            for name in sorted(options.iterkeys()):
-                if isinstance(name, str):
-                    names = ('--{}'.format(name),)
+        def _add_option(parser, name, names, params):
+            if params.get('raw', False) is True:
+                final_names = (name,)
+                del params['raw']
+
+            else:
+                if isinstance(names, str):
+                    final_names = ('--{}'.format(name),)
 
                 else:
-                    names = ('-{}'.format(name[0]), '--{}'.format(name[1]))
+                    final_names = ('-{}'.format(names[0]), '--{}'.format(names[1]))
 
-                group_parser.add_argument(*names, **options[name])
+            parser.add_argument(*final_names, **params)
 
-        if isinstance(cls.options, dict):
-            _add_options(parser, cls.options)
+        def _add_options(group_options, group_name=None):
+            if group_name is None:
+                group_parser = root_parser
 
-        elif isinstance(cls.options, (list, tuple)):
-            for group_name, options in cls.options:
-                _add_options(parser.add_argument_group(group_name), options)
+            else:
+                group_parser = root_parser.add_argument_group(group_name)
 
-        return parser
+            Configurable._for_each_option(partial(_add_option, group_parser), group_options)
+
+        Configurable._for_each_option_group(_add_options, cls.options)
+
+        return root_parser
 
     def _parse_args(self, args, **kwargs):
         """
@@ -326,6 +376,8 @@ class Configurable(object):
           program level.
         """
 
+        self.debug('Loading configuration from command-line arguments')
+
         # construct the parser
         parser = self._create_args_parser(**kwargs)
 
@@ -333,42 +385,40 @@ class Configurable(object):
         args = parser.parse_args(args)
 
         # add the parsed args to options
-        def _inject_values(options):
-            for name, params in options.iteritems():
-                if isinstance(name, tuple):
-                    name = name[1]
+        def _inject_value(name, names, params):
+            # pylint: disable=unused-argument
 
-                dest = params.get('dest', name.replace('-', '_'))
+            dest = params.get('dest', name.replace('-', '_'))
 
-                value = getattr(args, dest)
+            value = getattr(args, dest)
 
-                # if the option was not specified, skip it
-                if value is None and name in self._config:
-                    continue
+            # if the option was not specified, skip it
+            if value is None and name in self._config:
+                return
 
-                # do not replace config options with default command line values
-                if name in self._config and self._config[name] is not None:
-                    # if default parameter used
-                    if 'default' in params and value == params['default']:
-                        continue
+            # do not replace config options with default command line values
+            if name in self._config and self._config[name] is not None:
+                # if default parameter used
+                if 'default' in params and value == params['default']:
+                    return
 
-                    # with action store_true, the default is False
-                    if params.get('action', '') == 'store_true' and value is False:
-                        continue
+                # with action store_true, the default is False
+                if params.get('action', '') == 'store_true' and value is False:
+                    return
 
-                    # with action store_false, the default is True
-                    if params.get('action', '') == 'store_false' and value is True:
-                        continue
+                # with action store_false, the default is True
+                if params.get('action', '') == 'store_false' and value is True:
+                    return
 
-                self._config[name] = value
-                self.debug("Option '{}' set to '{}' by command-line".format(name, value))
+            self._config[name] = value
+            self.debug("Option '{}' set to '{}' by command-line".format(name, value))
 
-        if isinstance(self.options, dict):
-            _inject_values(self.options)
+        def _inject_values(options, **kwargs):
+            # pylint: disable=unused-argument
 
-        elif isinstance(self.options, (list, tuple)):
-            for _, options in self.options:
-                _inject_values(options)
+            Configurable._for_each_option(_inject_value, options)
+
+        Configurable._for_each_option_group(_inject_values, self.options)
 
     def parse_config(self):
         """
@@ -438,6 +488,15 @@ class Module(Configurable):
     shared_functions = []
     """Iterable of names of shared functions exported by the module."""
 
+    def _paths_with_module(self, roots):
+        """
+        Return paths cretaed by joining roots with module's unique name.
+
+        :param list(str) roots: List of root directories.
+        """
+
+        return [os.path.join(root, self.unique_name) for root in roots]
+
     def __init__(self, ci, name):
         super(Module, self).__init__()
 
@@ -452,11 +511,21 @@ class Module(Configurable):
         self.logger.connect(self)
 
         # initialize data path if exists, else it will be None
-        dpath = os.path.join(self.ci.option('data_path') or DATA_PATH, self.unique_name)
-        self.data_path = dpath if os.path.exists(dpath) else None
+        self.data_path = None
+
+        for path in self._paths_with_module(self.ci.module_data_paths):
+            if not os.path.exists(path):
+                continue
+
+            self.data_path = path
+            self.debug('data file is {}'.format(path))
+            break
+
+        else:
+            self.debug('no data file found')
 
     def parse_config(self):
-        self._parse_config([os.path.join(c, self.unique_name) for c in MODULE_CONFIG_PATHS])
+        self._parse_config(self._paths_with_module(self.ci.module_config_paths))
 
     def _generate_shared_functions_help(self):
         """
@@ -554,9 +623,10 @@ class CI(Configurable):
     options = [
         ('Global options', {
             ('l', 'list'): {
-                'help': 'List all available modules',
+                'help': 'List all available modules. If a GROUP is set, limits list to the given module group.',
                 'action': 'append',
                 'nargs': '?',
+                'metavar': 'GROUP',
                 'const': True
             },
             ('r', 'retries'): {
@@ -587,8 +657,7 @@ class CI(Configurable):
             },
             ('p', 'pid'): {
                 'help': 'Log PID of citool process',
-                'nargs': '?',
-                'const': True
+                'action': 'store_true'
             },
             ('q', 'quiet'): {
                 'help': 'Silence info messages',
@@ -600,16 +669,58 @@ class CI(Configurable):
             }
         }),
         ('Directories', {
-            'data-path': {
-                'help': 'Specify data path'
-            },
             'module-path': {
-                'help': 'Specify one or more directories with modules (IMPORTANT: works only with configuration file)',
+                'help': 'Specify directory with modules (default: {}).'.format(DEFAULT_MODULE_PATH),
                 'metavar': 'DIR',
-                'action': 'append'
+                'action': 'append',
+                'default': []
+            },
+            'module-data-path': {
+                'help': 'Specify directory with module data files (default: ``{}``).'.format(DEFAULT_DATA_PATH),
+                'metavar': 'DIR',
+                'action': 'append',
+                'default': []
+            },
+            'module-config-path': {
+                'help': 'Specify directory with module configuration files (default: {}).'.format(
+                    ', '.join(DEFAULT_MODULE_CONFIG_PATHS)),
+                'metavar': 'DIR',
+                'action': 'append',
+                'default': []
             }
-        })
+        }),
+        {
+            'pipeline': {
+                'raw': True,
+                'help': 'List of modules and their options, passed after citool options.',
+                'nargs': argparse.REMAINDER
+            }
+        }
     ]
+
+    @property
+    def module_paths(self):
+        """
+        List of paths in which modules reside.
+        """
+
+        return self.option('module-path') or [DEFAULT_MODULE_PATH]
+
+    @property
+    def module_data_paths(self):
+        """
+        List of paths in which module data files reside.
+        """
+
+        return self.option('module-data-path') or [DEFAULT_DATA_PATH]
+
+    @property
+    def module_config_paths(self):
+        """
+        List of paths in which module config files reside.
+        """
+
+        return self.option('module-config-path') or DEFAULT_MODULE_CONFIG_PATHS
 
     def sentry_submit_exception(self, exc_info, **kwargs):
         """
@@ -795,7 +906,7 @@ class CI(Configurable):
                 return
 
         except CIError as e:
-            self.info("ignoring file '{}': {}".format(module_name, e.message))
+            self.warn("ignoring file '{}': {}".format(module_name, e.message))
             return
 
         # Try to import file as a Python module
@@ -805,7 +916,7 @@ class CI(Configurable):
             module = self._import_module(import_name, filepath)
 
         except CIError as e:
-            self.info("ignoring module '{}': {}".format(module_name, e.message))
+            self.warn("ignoring module '{}': {}".format(module_name, e.message))
             return
 
         return module
@@ -884,16 +995,15 @@ class CI(Configurable):
 
                 self._load_citool_modules(group, module_name, module_file)
 
-    def _load_modules(self):
+    def load_modules(self):
         """
         Load all available `citool` modules.
         """
 
-        ppaths = self.option('module_path') or MODULE_PATH
-        self.debug('loading modules from these paths: {}'.format(ppaths))
+        log_dict(self.debug, 'loading modules from these paths', self.module_paths)
 
-        for ppath in ppaths:
-            self._load_module_path(ppath)
+        for path in self.module_paths:
+            self._load_module_path(path)
 
     def __init__(self, sentry=None):
         # Initialize logging methods before doing anything else.
@@ -909,7 +1019,9 @@ class CI(Configurable):
 
         # module types dictionary
         self.modules = {}
-        self.module_instances = []
+
+        # Materialized pipeline - used by `destroy_modules`
+        self._module_instances = []
 
         #: Shared function registry.
         #: funcname: (module, fn)
@@ -917,17 +1029,27 @@ class CI(Configurable):
 
         self._sentry = sentry
 
-        # load config and create module list
-        self.parse_config()
-        self._load_modules()
-
-    def parse_config(self):
-        self._parse_config(CONFIGS)
+    # pylint: disable=arguments-differ
+    def parse_config(self, paths):
+        self._parse_config(paths)
 
     def parse_args(self, args):
+        epilog = docstring_to_help("""
+            Default paths
+
+                * modules are searched under:
+                    {}
+
+                * module data files are searched under:
+                    {}
+
+                * module configuration files are searched under:
+                    {}
+            """.format(DEFAULT_MODULE_PATH, DEFAULT_DATA_PATH, ', '.join(DEFAULT_MODULE_CONFIG_PATHS)))
+
         self._parse_args(args,
-                         usage='%(prog)s [opts] module1 [opts] [args] module2 ...',
-                         epilog=self.module_group_list_usage(),
+                         usage='%(prog)s [options] [module1 [module1 options] module2 [module2 options] ...]',
+                         epilog=epilog,
                          formatter_class=LineWrapRawTextHelpFormatter)
 
         # re-create logger - now we have all necessary configuration
@@ -949,13 +1071,13 @@ class CI(Configurable):
         self.logger.connect(self)
 
     def destroy_modules(self, failure=None):
-        if not self.module_instances:
+        if not self._module_instances:
             return
 
         # we will destroy modules in reverse order, which makes more sense
         self.verbose('destroying all modules in reverse order')
 
-        for module in reversed(self.module_instances):
+        for module in reversed(self._module_instances):
             try:
                 module.debug('destroying myself')
                 module.destroy(failure=failure)
@@ -967,26 +1089,52 @@ class CI(Configurable):
                 self.exception('error in destroy function: {}'.format(str(exception)))
                 self.sentry_submit_exception(exc_info)
 
-        self.module_instances = []
-
-    def add_module_instance(self, module):
-        self.module_instances.append(module)
-        return module
+        self._module_instances = []
 
     def init_module(self, module):
         return self.modules[module]['class'](self, module)
 
-    def run_module(self, module_name, args):
-        module = self.init_module(module_name)
+    def run_modules(self, pipeline_description, register_with_ci=False):
+        """
+        Run a pipeline, consisting of multiple modules.
 
-        # Process options from all sources
-        module.parse_config()
-        module.parse_args(args)
-        module.sanity()
-        module.check_required_options()
+        :param list(tuple) pipeline_description: List of tuples (<module name>, <module arguments>).
+            ``<module arguments>`` is a list of strings, just like the one you can find in
+            :py:attr:`sys.argv`.
+        :param bool register_with_ci: If ``True``, module instance is added to a list of instances
+            in this ``CI`` instance, and it will be collected when :py:meth:`destroy_modules` gets
+            called.
+        """
 
-        module.execute()
-        module.add_shared()
+        log_dict(self.debug, 'running a pipeline', pipeline_description)
+
+        modules = []
+
+        for module_name, module_argv in pipeline_description:
+            module = self.init_module(module_name)
+            modules.append(module)
+
+            if register_with_ci is True:
+                self._module_instances.append(module)
+
+            module.parse_config()
+            module.parse_args(module_argv)
+            module.sanity()
+            module.check_required_options()
+
+        for module in modules:
+            module.execute()
+            module.add_shared()
+
+    def run_module(self, module_name, module_argv):
+        """
+        Syntax sugar for :py:meth:`run_modules`, in the case you want to run just a one-shot module.
+
+        :param str module_name: Name of the module.
+        :param list(str) module_argv: Arguments of the module.
+        """
+
+        return self.run_modules([(module_name, module_argv)])
 
     def module_list(self):
         return sorted(self.modules)
@@ -1035,29 +1183,3 @@ class CI(Configurable):
                     module: self.modules[module]['description']
                 }
         return module_groups
-
-    def module_group_list_usage(self):
-        """ Returns a string with all available groups """
-        ret = 'Available module groups: '
-
-        # get module list
-        glist = self.module_group_list()
-        return ret + ', '.join(glist)
-
-    def print_cmdline(self, ci_args, modules_args):
-        """
-        Logs command-line that would recreate current process.
-        """
-
-        from .utils import format_command_line
-
-        cmdline = [
-            [sys.argv[0]] + ci_args
-        ]
-
-        for module in modules_args:
-            module_name = module.keys()[0]
-
-            cmdline.append([module_name] + module[module_name])
-
-        self.info('command-line info:\n{}'.format(format_command_line(cmdline)))

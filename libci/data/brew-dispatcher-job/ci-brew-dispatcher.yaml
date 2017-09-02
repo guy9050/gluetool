@@ -35,7 +35,7 @@
       - workspace-cleanup
     builders:
       - shell:
-          citool -c -i -o citool-debug.txt
+          citool -c -i -o citool-debug.txt --
                  jenkins
                  brew --task-id $id
                  testing-thread
