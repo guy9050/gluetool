@@ -96,16 +96,16 @@
              notify-recipients ${notify_recipients_options} \
              testing-results \
              testing-thread --id "${testing_thread_id}" \
+             brew --task-id $id \
+             jenkins \
+             brew-build-name \
+             build-dependencies ${build_dependencies_options} \
              ansible \
              restraint \
              guest-setup --playbooks=${CITOOL_CONFIG}/guest-setup/openstack-restraint.yaml \
              wow --wow-options="${wow_options}" \
              beah-result-parser \
-             jenkins \
              openstack ${openstack_opts} \
-             brew --task-id $id \
-             brew-build-name \
-             build-dependencies ${build_dependencies_options} \
              guess-product ${guess_product_options} \
              guess-beaker-distro ${guess_beaker_distro_options} \
              guess-openstack-image ${guess_openstack_image_options} \

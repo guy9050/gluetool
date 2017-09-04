@@ -69,15 +69,6 @@
           colormap: xterm
       - workspace-cleanup
     builders:
-      #
-      # order is important:
-      #     - `notify-recipients` must be placed as soon as possible, to provide recipients to notification
-      #           module in case of pipeline crash.
-      #     - `testing-results` must stand before `testing-thread`: testing-thread wants to add thread ID
-      #           into `ids` field of every result, before storing them into a file, which is done in their
-      #           `destroy` methods.
-      #
-
       - shell: |
           if [ "${reserve}" != "true" ]; then
             reserve_opts=""
@@ -93,12 +84,12 @@
             notify-recipients ${notify_recipients_options} \
             testing-results \
             testing-thread --id "${testing_thread_id}" \
-            wow --wow-options="${wow_options}" \
-            beah-result-parser \
-            jenkins \
             brew --task-id $id \
+            jenkins \
             brew-build-name \
             build-dependencies ${build_dependencies_options} \
+            wow --wow-options="${wow_options}" \
+            beah-result-parser \
             guess-product ${guess_product_options} \
             guess-beaker-distro ${guess_distro_options} \
             beaker --jobwatch-options="${jobwatch_options}" ${reserve_opts} \

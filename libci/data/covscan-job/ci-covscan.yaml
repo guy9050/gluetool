@@ -42,8 +42,8 @@
                  notify-recipients ${notify_recipients_options}
                  testing-results
                  testing-thread --id "${testing_thread_id}"
-                 jenkins
                  brew --task-id $id
+                 jenkins
                  brew-build-name
                  covscan
                  make-bus-messages
