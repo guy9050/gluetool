@@ -95,9 +95,8 @@ class RpmDiffWaiverMatcher(object):
 class RpmDiffWaiver(Module):
     """
     Module waives RPMDiff results according to autowaivers in Errata tool. The product mapping and autowaiver rules
-    are read from Errata Tool's database via TEIID. Connection to TEIID is provided by the :doc:`postgresql` module.
-
-    This module requires :doc:`rpmdiff` and :doc:`postgresql` modules to be run.
+    are read from Errata Tool's database via TEIID. Connection to TEIID is provided by postgresql module. This module
+    also requires rpmdiff module.
 
     The product mapping can be also specified by a yaml mapping file. Below is an example of such a mapping for
     two build targets.

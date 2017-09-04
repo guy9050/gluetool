@@ -58,7 +58,7 @@ class TestingResults(libci.Module):
         """
         Converts different forms on format:file specifications into a ``list``. These:
 
-        * from a config file: ``format1:file1.ext, format2  :  file2.ext  ``
+        * from a config file: ``format1:file1.ext, format2:file2.ext``
         * from an option (specified possibly multiple times): ``['format1:file1.ext', '  format2  : file2.ext  ']``
 
         will result into ``[('foo', 'bar'), ('bar', 'baz')]``.

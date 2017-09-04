@@ -110,7 +110,7 @@ class Guest(object):
             the condition is assumed to pass the test and waiting ends.
         :param int timeout: fail after this many seconds. ``None`` means test forever.
         :param int tick: test condition every ``tick`` seconds.
-        :raises CIError: when ``timeout`` elapses while condition did not pass the check.
+        :raises libci.CIError: when ``timeout`` elapses while condition did not pass the check.
         """
 
         return libci.utils.wait(label, check, timeout=timeout, tick=tick, logger=self.logger)
