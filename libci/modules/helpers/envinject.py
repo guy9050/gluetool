@@ -27,7 +27,9 @@ class EnvInject(Module):
 
     shared_functions = ['env']
 
-    _variables = {}
+    def __init__(self, *args, **kwargs):
+        super(EnvInject, self).__init__(*args, **kwargs)
+        self._variables = {}
 
     def env(self):
         """
@@ -45,5 +47,5 @@ class EnvInject(Module):
         self.debug('variables:\n{}'.format(format_dict(self._variables)))
 
         with open(self.option('file'), 'w') as f:
-            for key, value in self._variables.iteritems():
+            for key, value in sorted(self._variables.iteritems()):
                 f.write('{}="{}"\n'.format(key, value))
