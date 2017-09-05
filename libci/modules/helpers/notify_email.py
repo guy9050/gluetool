@@ -40,6 +40,7 @@ BODY_FOOTER = """
 --
 Troubleshooting Tips: http://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/Troubleshoot
 CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation
+IRC: #baseosci
 """
 
 HARD_ERROR_MSG = """
@@ -88,6 +89,7 @@ RPMDIFF_FOOTER = """
 --
 RPMdiff CI Test Plan: http://url.corp.redhat.com/rpmdiff-in-ci
 CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation
+IRC: #baseosci
 """
 
 COVSCAN_BODY = """
@@ -111,6 +113,7 @@ Covscan CI Test Plan: https://url.corp.redhat.com/covscan-in-ci
 COVSCAN_FOOTER = """
 ---
 CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation
+IRC: #baseosci
 """
 
 RESERVED_BODY = Template("""
