@@ -8,7 +8,7 @@ from urllib2 import urlopen
 from urlgrabber.grabber import urlgrab
 from libci import Module, CIError, SoftCIError
 from libci.log import log_blob, format_dict
-from libci.utils import cached_property, run_command, check_for_commands, CICommandError
+from libci.utils import cached_property, run_command, check_for_commands, CICommandError, dict_update
 from libci.results import TestResult, publish_result
 
 REQUIRED_CMDS = ['covscan']
@@ -86,6 +86,10 @@ class CovscanTestResult(TestResult):
         self.fixed = len(covscan_result.fixed)
         self.added = len(covscan_result.added)
         self.baseline = task.latest
+
+    def serialize(self):
+        serialized = super(CovscanTestResult, self).serialize()
+        return dict_update(serialized, {'baseline': self.baseline})
 
 
 class CovscanResult(object):
