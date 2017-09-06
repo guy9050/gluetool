@@ -191,8 +191,15 @@ class RestraintRunner(libci.Module):
         # results accumulates results (<task name>: <task runs>) we want to return upwards
         results = defaultdict(list)
 
-        build_url = os.getenv('BUILD_URL', '<Jenkins job URL not available>')
-        artifact_root = build_url + '/artifact'
+        if 'BUILD_URL' in os.environ:
+            def artifact_path(s):
+                return '{}/artifact/{}/{}'.format(os.getenv('BUILD_URL'), job_dir, s)
+
+        else:
+            def artifact_path(s):
+                path = os.path.abspath('{}/{}'.format(job_dir, s))
+
+                return 'file://localhost/{}'.format(path)
 
         for task_results in job_results.recipeSet.recipe.find_all('task'):
             # find journal if there's one available for the task
@@ -213,8 +220,7 @@ class RestraintRunner(libci.Module):
 
             results[task_results['name']].append(
                 self.shared('parse_beah_result', task_results, journal=journal, recipe=job_results.job.recipeSet,
-                            artifact_path=lambda s: '{}/{}/{}'.format(artifact_root, job_dir, s),
-                            connectable_hostname=connectable_hostname)
+                            artifact_path=artifact_path, connectable_hostname=connectable_hostname)
             )
 
         return dict(results)
