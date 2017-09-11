@@ -40,7 +40,7 @@
       - workspace-cleanup
     builders:
       - shell:
-          citool -c -i -o citool-debug.txt
+          citool -c -i -o citool-debug.txt --
                  ${pipeline_prepend}
                  notify-recipients ${notify_recipients_options}
                  testing-results
