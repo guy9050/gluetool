@@ -27,7 +27,7 @@ _citool()
     done
 
     modules="%s"
-    %s
+%s
 
     if [[ ${cur} == -* ]] ; then
         begin %s end
@@ -71,12 +71,12 @@ def main():
         module_variable = '{}_opts'.format(re.sub('-', '_', module_name))
         variable_names += '{} '.format(module_variable)
 
-        help_command = 'citool {} -h'.format(module_name)
+        help_command = 'citool {} -h'.format(module_name).replace('citool citool', 'citool')
         process = subprocess.Popen(help_command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         help_output, _ = process.communicate()
 
         module_params = re.findall(r' (--\S+|-\w)', help_output)
-        modules_opts += '{}="{}"\n'.format(module_variable, ' '.join(module_params))
+        modules_opts += '    {}="{}"\n'.format(module_variable, ' '.join(module_params))
 
         conditions += CONDITION_FRAME % (module_name, module_variable)
 
