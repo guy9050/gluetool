@@ -178,6 +178,9 @@ class Message(object):
         self._module.debug("Subject: '{}'".format(self.subject))
         log_blob(self._module.debug, 'Content', content)
 
+        if not self._module.dryrun_allows('Sending the notification'):
+            return
+
         try:
             smtp = smtplib.SMTP(self._module.option('smtp-server'))
 
@@ -197,6 +200,7 @@ class Notify(Module):
 
     name = 'notify-email'
     description = 'Notification module - e-mail'
+    supported_dryrun_level = libci.ci.DryRunLevels.DRY
 
     options = {
         'smtp-server': {
