@@ -6,6 +6,7 @@ import pytest
 from mock import MagicMock
 import libci
 import libci.utils
+from libci.ci import DryRunLevels
 from libci.modules.static_analysis.covscan.covscan import CICovscan, CovscanResult, \
     CovscanFailedError, NoCovscanBaselineFoundError
 from . import create_module
@@ -259,9 +260,7 @@ def test_covscan_fail(module, monkeypatch, tmpdir):
         module.scan()
 
 
-def test_setted_taskid(log, module, monkeypatch, tmpdir):
-    _, module = module
-    module._config['task-id'] = '1234'
+def general_dry_run(log, module, monkeypatch, tmpdir):
 
     def mocked_urlopen(url):
         if 'added' in url or 'fixed' in url:
@@ -285,4 +284,27 @@ def test_setted_taskid(log, module, monkeypatch, tmpdir):
 
     module.scan()
 
-    assert log.match(message='Skipping covscan testing, using existing Covscan task id')
+    assert log.match(message='Skipping covscan testing, using existing Covscan task id 1234')
+
+
+def test_only_task_id(log, module, monkeypatch, tmpdir):
+    _, module = module
+    module._config['task-id'] = '1234'
+
+    general_dry_run(log, module, monkeypatch, tmpdir)
+
+
+def test_dry_run_with_task_id(log, module, monkeypatch, tmpdir):
+    ci, module = module
+    ci._dryrun_level = DryRunLevels.DRY
+    module._config['task-id'] = '1234'
+
+    general_dry_run(log, module, monkeypatch, tmpdir)
+
+
+def test_dry_run_without_taskid(module):
+    ci, module = module
+    ci._dryrun_level = DryRunLevels.DRY
+
+    with pytest.raises(libci.CIError, match=r"^Can not run covscan dryrun without task-id parameter"):
+        module.scan()
