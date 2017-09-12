@@ -76,8 +76,7 @@ class RestraintScheduler(libci.Module):
             '--hardware-skip',  # ignore tasks with specific hardware requirements
             '--arch', 'x86_64',  # limit to x86_64, we're dealing with openstack - I know :(
             '--restraint',
-            '--suppress-install-task',
-            '--first-testing-task', '/distribution/runtime_tests/verify-nvr-installed'
+            '--suppress-install-task'
         ]
 
         return self.shared('beaker_job_xml', options=options)
