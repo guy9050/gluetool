@@ -20,7 +20,7 @@
       - ci-trigger:
           jms-selector:
             CI_TYPE = 'fedmsg'
-            AND topic = 'org.fedoraproject.prod.mbs.module.state.change'
+            AND original_topic = 'org.fedoraproject.prod.mbs.module.state.change'
             AND state_name = 'done'
     wrappers:
       - ansicolor:
