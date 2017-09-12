@@ -33,7 +33,7 @@ RPMDIFF_SCORE = {
 REQUIRED_CMDS = ['rpmdiff-remote']
 
 
-# not used currently, keeping here for future usage
+# NOT USED CURRENTLY, keeping here for future usage
 class NoBaselineFoundError(SoftCIError):
     STATUS = 'SKIP'
     SUBJECT = 'Could not find baseline for RPMDiff'
@@ -86,6 +86,20 @@ class RpmdiffTestResult(TestResult):
     @property
     def rpmdiff_test_type(self):
         return self.test_type.split("-")[1]
+
+
+class RpmdiffSkippedTestResult(TestResult):
+    """
+    RPMdiff test result data container for a skipped test result
+    """
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, **kwargs):
+        super(RpmdiffSkippedTestResult, self).__init__('rpmdiff-comparison', 'INFO', **kwargs)
+
+    @property
+    def rpmdiff_test_type(self):
+        return 'comparison'
 
 
 class CIRpmdiff(Module):
@@ -213,6 +227,27 @@ class CIRpmdiff(Module):
         self.info("web url: {}".format(blob['web_url']))
         return self._wait_until_finished(str(blob['run_id']))
 
+    def _publish_skipped_result(self):
+        """
+        Publish a skipped test result.
+        """
+        result = [{
+            'data': {
+                'item': self.task.nvr,
+                'type': 'koji_build',
+                'scratch': self.task.scratch,
+                'taskid': self.task.task_id
+            },
+            'testcase': {
+                'name': 'dist.rpmdiff.comparison',
+                'ref_url': 'https://url.corp.redhat.com/rpmdiff-in-ci',
+            },
+            'outcome': 'INFO',
+            'note': 'No baseline found for the build. Testing skipped'
+        }]
+
+        publish_result(self, RpmdiffSkippedTestResult, payload=result)
+
     def _publish_results(self, runinfo, test_type):
         """
         Parse results into known structure and publish to results module.
@@ -317,6 +352,7 @@ class CIRpmdiff(Module):
         if test_type == 'comparison':
             if self.task.latest is None:
                 self.warn('no baseline found, refusing to continue testing')
+                self._publish_skipped_result()
                 return
             if self.task.scratch is False and self.task.latest == self.task.nvr:
                 self.info('cowardly refusing to compare same packages')
