@@ -24,7 +24,7 @@
     builders:
       - shell:
           # ${username} is set in the environment by the Red Hat CI plugin
-          citool -c -i -o citool-debug.txt --
+          citool -c -i -o citool-debug.txt
                  notify-recipients --boc-add-notify ${username}
                  jenkins
                  build-on-commit --component ${repo} --branch ${branch}

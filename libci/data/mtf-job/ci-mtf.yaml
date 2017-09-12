@@ -33,7 +33,7 @@
           echo $CI_MESSAGE
           MODULENAME=`echo "$CI_MESSAGE" | egrep -o '"name".*'|sed 's/.*: "\(.*\)".*/\1/'`
           echo "$CI_MESSAGE" > exported-fedmsg.yaml
-          citool -c -i -o citool-debug.txt -- \
+          citool -c -i -o citool-debug.txt \
                  ${pipeline_prepend} \
                  jenkins \
                  openstack --user-data=$CITOOL_CONFIG/default-user-data.yaml \
