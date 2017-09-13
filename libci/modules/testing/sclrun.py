@@ -54,7 +54,8 @@ class SclRun(libci.Module):
         default, ``beaker_job_xml`` adds following variables:
 
         * ``BASEOS_CI=true``
-        * ``BASEOS_CI_COMPONENT=<component name>`` - available only when Brew task is available.
+        * ``BASEOS_CI_TASKS=<comma-separated list of Brew/Koji tasks installed on the box>``
+        * ``BASEOS_CI_COMPONENT=<component name>``
         * ``BEAKERLIB_RPM_DOWNLOAD_METHODS='yum direct'``
 
         To override any of these variables, simply pass your own value in ``task_params`` parameter.
@@ -77,7 +78,7 @@ class SclRun(libci.Module):
         environment = environment or {}
         task_params = task_params or {}
 
-        self.require_shared('primary_task')
+        self.require_shared('tasks', 'primary_task')
 
         primary_task = self.shared('primary_task')
 
@@ -121,6 +122,7 @@ class SclRun(libci.Module):
         _task_params = {
             'BASEOS_CI': 'true',
             'BEAKERLIB_RPM_DOWNLOAD_METHODS': 'yum\\ direct',
+            'BASEOS_CI_TASKS': ','.join([str(task.task_id) for task in self.shared('tasks')]),
             'BASEOS_CI_COMPONENT': str(primary_task.component)
         }
 
