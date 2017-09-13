@@ -84,6 +84,9 @@ class KojiTask(object):
         if not self._valid_task():
             raise NotBuildTaskError(self.task_id, module_name)
 
+    def __repr__(self):
+        return '{}({})'.format(self.__class__.__name__, self.task_id)
+
     def _valid_task(self):
         """
         Verify that the task is a sucessfully finished build task
@@ -562,7 +565,7 @@ class Koji(Module):
 
         task_ids = task_ids or []
 
-        self.debug('get tasks for IDs: {}'.format(format_dict(task_ids)))
+        log_dict(self.debug, 'tasks - for IDs', task_ids)
 
         if task_ids:
             self._tasks = [self._task_factory(task_id, **kwargs) for task_id in task_ids]
