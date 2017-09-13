@@ -1,14 +1,13 @@
 import pytest
 
 from mock import MagicMock
-import libci
 from libci.modules.helpers.make_bus_messages import CIMakeBusMessages
 from libci.results import TestResult
 from libci.modules.static_analysis.covscan.covscan import CovscanTestResult
 from libci.modules.static_analysis.rpmdiff.rpmdiff import RpmdiffTestResult
 from libci.modules.testing.beaker.beaker import BeakerTestResult
 from libci.modules.testing.restraint.runner import RestraintTestResult
-from . import create_module
+from . import create_module, patch_shared, assert_shared
 
 
 @pytest.fixture(name='module')
@@ -41,17 +40,13 @@ def test_covscan_nobrew(module, monkeypatch):
     _, module = module
     result_type = 'covscan'
 
-    def mocked_shared(key):
-        return {
-            'task': None,
-            'results': [TestResult(result_type, 'overall_results')]
-        }[key]
+    patch_shared(monkeypatch, module, {
+        'results': [TestResult(result_type, 'overall_results')]
+    })
 
-    monkeypatch.setattr(module, 'shared', mocked_shared)
     monkeypatch.setattr(module, 'store', MagicMock())
 
-    with pytest.raises(libci.CIError, match=r'^no brew task found in shared functions'):
-        module.execute()
+    assert_shared('primary_task', module.execute)
     module.store.assert_not_called()
 
 
@@ -69,13 +64,10 @@ def test_covscan(module, monkeypatch):
     mocked_covscan_result = MagicMock(url=covscan_url, add=[], fixed=[])
     mocked_result = CovscanTestResult(overall_results, mocked_covscan_result, mocked_task)
 
-    def mocked_shared(key):
-        return {
-            'task': mocked_task,
-            'results': [mocked_result, mocked_result]
-        }[key]
-
-    monkeypatch.setattr(module, 'shared', mocked_shared)
+    patch_shared(monkeypatch, module, {
+        'primary_task': mocked_task,
+        'results': [mocked_result, mocked_result]
+    })
 
     module.execute()
 
@@ -198,16 +190,12 @@ def functional_testing(test_result, module, monkeypatch):
     mocked_task = MagicMock(nvr=nvr, scratch=scratch, task_id=task_id, url='dummy_brew_url',
                             latest='dummy_baseline', component=component, target=target)
 
-    def mocked_shared(key, **kwargs):
-        # pylint: disable=unused-argument
-        return {
-            'task': mocked_task,
-            'results': [test_result, test_result],
-            'distro': distro,
-            'notification_recipients': None
-        }[key]
-
-    monkeypatch.setattr(module, 'shared', mocked_shared)
+    patch_shared(monkeypatch, module, {
+        'primary_task': mocked_task,
+        'results': [test_result, test_result],
+        'distro': distro,
+        'notification_recipients': None
+    })
 
     build_type = 'dummy_build_type'
     job_url = 'dummy_job_url'
@@ -264,41 +252,33 @@ def test_restraint(module, monkeypatch):
 def test_ci_metricsdata_no_brew(module, monkeypatch):
     _, module = module
 
-    monkeypatch.setattr(module, 'shared', MagicMock(return_value=None))
     monkeypatch.setattr(module, 'store', MagicMock())
 
-    with pytest.raises(libci.CIError, match=r'^no brew task found in shared functions'):
-        module.process_ci_metricsdata('dummy_result', 'dummy_result_type')
+    assert_shared('primary_task', module.process_ci_metricsdata, 'dummy_result', 'dummy_result_type')
     module.store.assert_not_called()
 
 
 def test_ci_metricsdata_no_distro(module, monkeypatch):
     _, module = module
 
-    def mocked_shared(key):
-        return {
-            'task': True,
-            'distro': None
-        }[key]
+    patch_shared(monkeypatch, module, {
+        'primary_task': None,
+    })
 
-    monkeypatch.setattr(module, 'shared', mocked_shared)
     monkeypatch.setattr(module, 'store', MagicMock())
 
-    with pytest.raises(libci.CIError, match=r'^no distro found in shared functions'):
-        module.process_ci_metricsdata('dummy_result', 'dummy_result_type')
+    assert_shared('distro', module.process_ci_metricsdata, 'dummy_result', 'dummy_result_type')
     module.store.assert_not_called()
 
 
 def test_ci_metricsdata_scratch(log, module, monkeypatch):
     _, module = module
 
-    def mocked_shared(key):
-        return {
-            'task': MagicMock(scratch=True),
-            'distro': True
-        }[key]
+    patch_shared(monkeypatch, module, {
+        'primary_task': MagicMock(scratch=True),
+        'distro': True
+    })
 
-    monkeypatch.setattr(module, 'shared', mocked_shared)
     monkeypatch.setattr(module, 'store', MagicMock())
 
     module.process_ci_metricsdata('dummy_result', 'dummy_result_type')

@@ -1,6 +1,6 @@
 import os
 import collections
-from libci import CIError, Module
+from libci import Module
 
 Message = collections.namedtuple('Message', 'headers body')
 
@@ -54,9 +54,9 @@ class CIMakeBusMessages(Module):
         self.process_rpmdiff_analysis(result)
 
     def process_covscan(self, result):
-        task = self.shared('task')
-        if task is None:
-            raise CIError('no brew task found in shared functions')
+        self.require_shared('primary_task')
+
+        task = self.shared('primary_task')
         item = '{} {}'.format(task.nvr, result.baseline)
 
         headers = {
@@ -99,12 +99,12 @@ class CIMakeBusMessages(Module):
         in favor of 'resultsdb' format. Currently it should be considered as a legacy format
         of CI messages used to report results from old BaseOS CI.
         """
-        task = self.shared('task')
-        if task is None:
-            raise CIError('no brew task found in shared functions')
+
+        self.require_shared('primary_task')
+        self.require_shared('distro')
+
+        task = self.shared('primary_task')
         distro = self.shared('distro')
-        if distro is None:
-            raise CIError('no distro found in shared functions')
 
         if task.scratch:
             self.warn('ignoring ci_metricsdata export of scratch build')

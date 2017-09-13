@@ -99,8 +99,7 @@ class CIBuildOnCommit(Module):
         """
         Use Jenkins REST API to change build name.
         """
-        if not self.has_shared('jenkins'):
-            self.warn('Jenkins API is necessary, please provide Jenkins module', sentry=True)
+        if not self.require_shared('jenkins', warn_only=True):
             return
 
         build_url = os.getenv('BUILD_URL', None)

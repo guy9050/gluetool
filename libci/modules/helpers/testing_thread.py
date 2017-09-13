@@ -67,9 +67,9 @@ class TestingThread(libci.Module):
             'stamp': int(time.time())
         }
 
-        if self.has_shared('brew_task'):
+        if self.has_shared('primary_task'):
             fmt.append('brew-build')
-            variables['brew-build'] = self.shared('brew_task').build_id
+            variables['brew-build'] = self.shared('primary_task').build_id
 
         self._thread_id = self._create_thread_id('-'.join(['{' + s + '}' for s in fmt]), **variables)
         self.info('testing thread ID set to {}'.format(self._thread_id))

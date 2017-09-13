@@ -360,7 +360,7 @@ class KojiTaskDispatcher(Module):
 
     @cached_property
     def _rules_locals(self):
-        task = self.shared('task')
+        task = self.shared('primary_task')
 
         def match(pattern, value):
             return re.match(pattern, value) is not None
@@ -667,9 +667,7 @@ class KojiTaskDispatcher(Module):
         the commands we have left.
         """
 
-        task = self.shared('task')
-        if task is None:
-            raise CIError('Need a brew/koji task to continue')
+        task = self.shared('primary_task')
 
         self.debug('find out which config section we should use')
 
@@ -730,7 +728,6 @@ class KojiTaskDispatcher(Module):
             _dispatch_commands(set_commands)
 
     def execute(self):
-        if self.shared('task') is None:
-            raise CIError('no task found, did you run brew or koji module?')
+        self.require_shared('primary_task')
 
         self._dispatch_tests()

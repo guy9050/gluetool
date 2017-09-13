@@ -6,7 +6,7 @@ from mock import MagicMock
 import libci
 import libci.utils
 from libci.modules.testing.wow import WorkflowTomorrow, NoTestAvailableError
-from . import create_module
+from . import create_module, patch_shared, assert_shared
 
 
 COMMON_SEQUENCIES = [
@@ -15,7 +15,7 @@ COMMON_SEQUENCIES = [
     ['--taskparam', 'BEAKERLIB_RPM_DOWNLOAD_METHODS=yum\\ direct']
 ]
 SHARED_DISTRO = ['distro', 'distro1']
-SHARED_TASK = ['task', MagicMock(component='c1')]
+SHARED_TASK = ['primary_task', MagicMock(component='c1')]
 SHARED_PRODUCT = ['product', 'product1']
 
 
@@ -25,28 +25,37 @@ def fixture_module(monkeypatch):
     return create_module(WorkflowTomorrow)
 
 
-@pytest.fixture(name='module_with_shared', params=[
-    None,
-    [SHARED_DISTRO],
-    [SHARED_TASK],
-    [SHARED_PRODUCT],
-    [SHARED_DISTRO, SHARED_TASK],
-    [SHARED_DISTRO, SHARED_PRODUCT],
-    [SHARED_TASK, SHARED_PRODUCT],
-    [SHARED_DISTRO, SHARED_TASK, SHARED_PRODUCT]
-])
-def fixture_module_with_shared(module, request):
+@pytest.fixture(name='module_with_task')
+def fixture_module_with_task(module, monkeypatch):
     ci, module = module
-    what = request.param
-    if what:
-        for shared in what:
-            ci.add_shared(shared[0], MagicMock(**{shared[0]: MagicMock(return_value=shared[1])}))
+
+    patch_shared(monkeypatch, module, {
+        'primary_task': MagicMock()
+    })
+
+    return ci, module
+
+
+@pytest.fixture(name='module_with_shared', params=[
+    [SHARED_TASK],
+    [SHARED_TASK, SHARED_DISTRO],
+    [SHARED_TASK, SHARED_PRODUCT],
+    [SHARED_TASK, SHARED_DISTRO, SHARED_PRODUCT]
+])
+def fixture_module_with_shared(module, request, monkeypatch):
+    ci, module = module
+
+    if request.param:
+        patch_shared(monkeypatch, module, {
+            name: value for name, value in request.param
+        })
+
     return ci, module
 
 
 @pytest.fixture(name='configured_module')
-def fixture_configured_module(module):
-    ci, module = module
+def fixture_configured_module(module_with_task):
+    ci, module = module_with_task
     module._config['wow-options'] = '--dummy-option dummy-value'
     return ci, module
 
@@ -92,8 +101,8 @@ def test_sanity(configured_module):
     'No relevant tasks found in test plan',
     'No recipe generated (no relevant tasks?)'
 ])
-def test_common_command_failures(module, monkeypatch, stderr):
-    _, module = module
+def test_common_command_failures(module_with_task, monkeypatch, stderr):
+    _, module = module_with_task
 
     def faulty_run_command(cmd, **kwargs):
         # pylint: disable=unused-argument
@@ -104,8 +113,8 @@ def test_common_command_failures(module, monkeypatch, stderr):
         module.beaker_job_xml()
 
 
-def test_unrecognized_command_failure(module, monkeypatch):
-    _, module = module
+def test_unrecognized_command_failure(module_with_task, monkeypatch):
+    _, module = module_with_task
     monkeypatch.setattr(libci.utils, 'run_command', MagicMock(
         side_effect=libci.CICommandError([], MagicMock(exit_code=1, stderr='dummy error'))
     ))
@@ -113,8 +122,8 @@ def test_unrecognized_command_failure(module, monkeypatch):
         module.beaker_job_xml()
 
 
-def test_setup_phases_empty(module):
-    _, module = module
+def test_setup_phases_empty(module_with_task):
+    _, module = module_with_task
     module.beaker_job_xml(setup_phases=[])
     assert not sublist_exists(['--setup'])
 
@@ -125,10 +134,10 @@ def test_include_module_wow_options(configured_module):
     assert sublist_exists(['--dummy-option', 'dummy-value'])
 
 
-def test_without_brew_task(module, log):
+def test_without_brew_task(module):
     _, module = module
-    module.beaker_job_xml()
-    assert log.match(message="No brew task available, cannot add BASEOS_CI_COMPONENT task param")
+
+    assert_shared('primary_task', module.beaker_job_xml)
 
 
 @pytest.mark.parametrize('options,environment,task_params,setup_phases,expected_sequencies', [
@@ -174,10 +183,9 @@ def test_with_basic_params(module_with_shared, options, environment, task_params
     args, _ = libci.utils.run_command.call_args
     cmd = args[0]
 
+    expected_sequencies = expected_sequencies + [['--taskparam', 'BASEOS_CI_COMPONENT=c1']]
     if ci.has_shared('distro'):
         expected_sequencies = expected_sequencies + [['--distro', 'distro1']]
-    if ci.has_shared('task'):
-        expected_sequencies = expected_sequencies + [['--taskparam', 'BASEOS_CI_COMPONENT=c1']]
     if ci.has_shared('product'):
         env_data = cmd[cmd.index('--environment') + 1]
         assert re.match(r'.*product=product1.*', env_data)

@@ -316,8 +316,8 @@ class RpmDiffWaiver(Module):
         if not run_id:
             self.info('looks like rpmdiff was not run, cowardly refusing to run')
             return
-        if not self.has_shared('postgresql'):
-            raise CIError("Module requires PostgreSQL support, did you include 'postgresql' module?")
+
+        self.require_shared('postgresql')
 
         if self.option('mapping'):
             self.mapping = load_yaml(self.option('mapping'), logger=self.logger)
@@ -388,12 +388,12 @@ class RpmDiffWaiver(Module):
         run_id = self.option("run-id")
         package = self.option("package")
         target = self.option("target")
-        if self.has_shared("task"):
-            task = self.shared("task")
+        if self.has_shared("primary_task"):
+            task = self.shared("primary_task")
             if not package:
                 package = task.component
             if not target:
-                target = task.destination_tag
+                target = task.destination_tag or task.target
         if not run_id:
             run_id = self.rpmdiff_id_from_results()
 

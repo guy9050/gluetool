@@ -72,8 +72,7 @@ def publish_result(module, result_class, *args, **kwargs):
     :param dict kwargs: keyword arguments passed to result class constructor.
     """
 
-    if not module.has_shared('results'):
-        module.warn("Cannot publish results, no 'results' shared function found", sentry=True)
+    if not module.require_shared('results', warn_only=True):
         return
 
     result = result_class(*args, **kwargs)

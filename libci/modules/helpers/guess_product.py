@@ -71,11 +71,9 @@ class GuessProduct(Module):
         self.debug("forcing '{}' as the product".format(self._product))
 
     def _guess_target_autodetection(self):
-        task = self.shared('task')
-        if task is None:
-            raise CIError("Using 'target-autodetect' method without a brew task does not work")
+        self.require_shared('primary_task')
 
-        target = task.target
+        target = self.shared('primary_task').target
 
         self._product = self.pattern_map.match(target)
         self.debug("transformed target '{}' to the product '{}'".format(target, self._product))

@@ -85,9 +85,9 @@ class SimpleWowExport(libci.Module):
             raise libci.CIError("Template contains unknown key '{}'".format(exc.args[0]))
 
     def execute(self):
-        task = self.shared('task')
-        if not task:
-            raise libci.CIError('Unable to get brew task')
+        self.require_shared('primary_task')
+
+        task = self.shared('primary_task')
 
         results = self.shared('results') or []
         records = []
@@ -108,9 +108,7 @@ class SimpleWowExport(libci.Module):
         if failure is None:
             return
 
-        task = self.shared('task')
-        if task is None:
-            raise libci.CIError('Cannot log result without having Brew task')
+        task = self.shared('primary_task')
 
         self.info('Logging wow results into a log file {}'.format(self.option('log')))
 

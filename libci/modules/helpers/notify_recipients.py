@@ -125,13 +125,12 @@ class NotifyRecipients(Module):
         Mapping between symbolic recipients and the actual values.
         """
 
-        recipients = {}
+        if not self.has_shared('primary_task'):
+            return {}
 
-        task = self.shared('task')
-        if task is not None:
-            recipients['ISSUER'] = task.issuer
-
-        return recipients
+        return {
+            'ISSUER': self.shared('primary_task').issuer
+        }
 
     @cached_property
     def mapped_recipients(self):

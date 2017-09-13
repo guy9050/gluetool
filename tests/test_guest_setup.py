@@ -3,7 +3,7 @@ import pytest
 import libci
 import libci.modules.helpers.guest_setup
 
-from . import create_module
+from . import create_module, assert_shared
 
 
 @pytest.fixture(name='module')
@@ -20,10 +20,9 @@ def test_sanity(module):
 
 
 def test_missing_ansible_support(module):
-    ci, _ = module
+    _, module = module
 
-    with pytest.raises(libci.CIError, match=r"Module requires Ansible support, did you include 'ansible' module\?"):
-        ci.shared('setup_guest', [])
+    assert_shared('run_playbook', module.setup_guest, [])
 
 
 def test_setup(log, module):

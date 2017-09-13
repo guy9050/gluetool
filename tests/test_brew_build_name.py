@@ -1,10 +1,8 @@
 import pytest
 
 from mock import MagicMock
-import libci
-import libci.utils
 from libci.modules.helpers.jenkins.brew_build_name import CIBrewBuildName
-from . import create_module
+from . import create_module, patch_shared, assert_shared
 
 
 @pytest.fixture(name='module')
@@ -24,24 +22,27 @@ def test_loadable(module):
 def test_no_brew(module):
     _, module = module
 
-    with pytest.raises(libci.CIError, match=r'^no brew task found, did you run brew module?'):
-        module.execute()
+    assert_shared('primary_task', module.execute)
 
 
-def test_no_jenkins(log, module, monkeypatch):
+def test_no_jenkins(module, monkeypatch):
     _, module = module
 
-    monkeypatch.setattr(module, 'shared', MagicMock(return_value='dummy_task'))
+    patch_shared(monkeypatch, module, {
+        'primary_task': 'dummy_task'
+    })
 
-    module.execute()
-    assert log.records[-1].message == 'Jenkins API is necessary, please provide Jenkins module'
+    assert_shared('jenkins', module.execute)
 
 
 def test_no_build_url(log, module, monkeypatch):
     _, module = module
 
-    monkeypatch.setattr(module, 'shared', MagicMock(return_value='dummy_task'))
-    monkeypatch.setattr(module, 'has_shared', MagicMock(return_value=True))
+    patch_shared(monkeypatch, module, {
+        'jenkins': MagicMock(),
+        'primary_task': 'dummy_task'
+    })
+
     try:
         monkeypatch.delenv('BUILD_URL')
     except KeyError:
@@ -59,15 +60,11 @@ def test_run(log, module, monkeypatch):
 
     mocked_set_build_name = MagicMock()
 
-    def mocked_shared(key):
-        return {
-            'task': MagicMock(short_name=short_name),
-            'jenkins': MagicMock(set_build_name=mocked_set_build_name),
-            'thread_id': thread_id
-        }[key]
-
-    monkeypatch.setattr(module, 'shared', mocked_shared)
-    monkeypatch.setattr(module, 'has_shared', MagicMock(return_value=True))
+    patch_shared(monkeypatch, module, {
+        'primary_task': MagicMock(short_name=short_name),
+        'jenkins': MagicMock(set_build_name=mocked_set_build_name),
+        'thread_id': thread_id
+    })
 
     monkeypatch.setenv('BUILD_URL', 'dummy_jenkins_url')
 

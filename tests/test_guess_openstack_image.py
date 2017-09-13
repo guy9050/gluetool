@@ -5,7 +5,7 @@ from mock import MagicMock
 import libci
 import libci.modules.helpers.guess_openstack_image
 
-from . import create_module
+from . import create_module, patch_shared, assert_shared
 
 
 @pytest.fixture(name='module')
@@ -31,15 +31,9 @@ def fixture_module_for_recent(module, monkeypatch):
         _image('image-20160103')
     ]
 
-    def mock_shared(name, *args, **kwargs):
-        # pylint: disable=unused-argument
-
-        return {
-            'openstack': MagicMock(images=MagicMock(list=MagicMock(return_value=images)))
-        }[name]
-
-    monkeypatch.setattr(module, 'has_shared', MagicMock(return_value=True))
-    monkeypatch.setattr(module, 'shared', mock_shared)
+    patch_shared(monkeypatch, module, {
+        'openstack': MagicMock(images=MagicMock(list=MagicMock(return_value=images)))
+    })
 
     # pylint: disable=protected-access
     module._config['method'] = 'recent'
@@ -133,14 +127,10 @@ def test_autodetection(module, log, monkeypatch):
     target = 'dummy-target'
     image = 'dummy-image'
 
-    def mock_shared(name, *args, **kwargs):
-        # pylint: disable=unused-argument
+    monkeypatch.setattr(module.ci, 'shared_functions', {
+        'primary_task': (None, MagicMock(return_value=MagicMock(target=target)))
+    })
 
-        return {
-            'task': MagicMock(target=target)
-        }[name]
-
-    monkeypatch.setattr(module, 'shared', mock_shared)
     # monkeypatching of @cached_property does not work, the property's __get__() gets called...
     module.pattern_map = MagicMock(match=MagicMock(return_value=image))
 
@@ -152,23 +142,24 @@ def test_autodetection(module, log, monkeypatch):
 
 
 def test_autodetection_no_brew(module):
-    with pytest.raises(libci.CIError, match=r"Using 'target-autodetect' method without a brew task does not work"):
-        # pylint: disable=protected-access
-        module._guess_target_autodetection()
+    # pylint: disable=protected-access
+    assert_shared('primary_task', module._guess_target_autodetection)
 
 
 def test_recent_no_openstack(module):
-    # pylint: disable=line-too-long
-    with pytest.raises(libci.CIError, match=r"Module requires OpenStack connection, provided e.g. by the 'openstack' module"):
-        # pylint: disable=protected-access
-        module._guess_recent()
+    # pylint: disable=protected-access
+    assert_shared('openstack', module._guess_recent)
 
 
-def test_recent_broken_regexp(module):
+def test_recent_broken_regexp(monkeypatch, module):
     module.has_shared = MagicMock(return_value=True)
 
     # pylint: disable=protected-access
     module._config['image'] = '[foo'
+
+    patch_shared(monkeypatch, module, {
+        'openstack': None
+    })
 
     # pylint: disable=line-too-long
     with pytest.raises(libci.CIError, match=r"cannot compile hint pattern '\^\[foo\$': unexpected end of regular expression"):

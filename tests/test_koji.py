@@ -1,3 +1,4 @@
+import logging
 import pytest
 import koji
 
@@ -180,7 +181,7 @@ VALID_TASKS = {
         'build_id': 805705,
         'component': 'bash',
         'destination_tag': 'f25-updates-candidate',
-        'full_name': "task '15869828' build 'bash-4.3.43-4.fc25' destination tag 'f25-updates-candidate'",
+        'full_name': "task '15869828' build 'bash-4.3.43-4.fc25' target 'f25-candidate'",
         'issuer': 'svashisht',
         'owner': 'svashisht',
         'latest': 'bash-4.3.43-3.fc25',
@@ -199,7 +200,7 @@ VALID_TASKS = {
         'build_id': None,
         'component': 'bash',
         'destination_tag': 'f27-pending',
-        'full_name': "task '20166983' scratch build 'bash-4.4.12-5.fc27' destination tag 'f27-pending'",
+        'full_name': "task '20166983' scratch build 'bash-4.4.12-5.fc27' target 'rawhide'",
         'issuer': 'mvadkert',
         'owner': 'mvadkert',
         'latest': 'bash-4.4.12-5.fc27',
@@ -272,7 +273,8 @@ def fixture_module(monkeypatch):
     ci, mod = create_module(libci.modules.infrastructure.koji_fedora.Koji)
 
     # make sure task has required share function
-    assert ci.has_shared('task') is True
+    assert ci.has_shared('tasks')
+    assert ci.has_shared('primary_task')
 
     # pylint: disable=protected-access
     mod._config = {
@@ -297,37 +299,38 @@ def test_sanity_task_id(module):
     # sanity tests for various types of valid tasks specified by task_id
     for task in VALID_TASKS.iterkeys():
         FakeClientSession.fake_key = task
-        module.task(task)
+        module.tasks([task])
         for prop, val in VALID_TASKS[task].iteritems():
-            assert getattr(module.task_instance, prop) == val
+            # pylint: disable=protected-access
+            assert getattr(module._tasks[0], prop) == val
 
 
 def test_sanity_task_id_cmdline(module):
     # valid task specified by nvr
     FakeClientSession.fake_key = 15869828
     # pylint: disable=protected-access
-    module._config.update({'task-id': 15869828})
+    module._config.update({'task-id': [15869828]})
     module.execute()
     for prop, val in VALID_TASKS[15869828].iteritems():
-        assert getattr(module.task_instance, prop) == val
+        assert getattr(module._tasks[0], prop) == val
 
 
 def test_sanity_nvr(module):
     # valid task specified by nvr
     FakeClientSession.fake_key = 'bash-4.3.43-4.fc25'
     # pylint: disable=protected-access
-    module._config = {'nvr': 'bash-4.3.43-4.fc25'}
+    module._config = {'nvr': ['bash-4.3.43-4.fc25']}
     module.execute()
-    assert getattr(module.task_instance, 'task_id') == 15869828
+    assert module._tasks[0].task_id == 15869828
 
 
 def test_sanity_build_id(module):
     # valid task specified by build ID
     FakeClientSession.fake_key = '805705'
     # pylint: disable=protected-access
-    module._config = {'build-id': 805705}
+    module._config = {'build-id': [805705]}
     module.execute()
-    assert getattr(module.task_instance, 'task_id') == 15869828
+    assert module._tasks[0].task_id == 15869828
 
 
 def test_sanity_name_tag(module):
@@ -339,19 +342,19 @@ def test_sanity_name_tag(module):
         'tag': 'f25'
     }
     module.execute()
-    assert getattr(module.task_instance, 'task_id') == 15869828
+    assert module._tasks[0].task_id == 15869828
 
 
 def test_no_koji_task(module):
     # no koji task specified
     with pytest.raises(libci.CIError, message='no koji task ID specified'):
-        module.task()
+        module.tasks()
 
 
 def test_invalid_task_id_type(module):
     # task_id not convertable to a number
     with pytest.raises(ValueError):
-        module.task('invalid id')
+        module.tasks(['invalid id'])
 
 
 def test_not_valid_build_tasks(module):
@@ -360,7 +363,7 @@ def test_not_valid_build_tasks(module):
         FakeClientSession.fake_key = task
         match = "task '{}' is not a valid finished build task".format(task)
         with pytest.raises(libci.CIError, match=match):
-            module.task(task)
+            module.tasks([task])
 
 
 def test_unavailable_artifacts(module):
@@ -369,19 +372,7 @@ def test_unavailable_artifacts(module):
         FakeClientSession.fake_key = task
         match = "no artifacts found for dummy-module task '{}', expired scratch build?".format(task)
         with pytest.raises(libci.CIError, match=match):
-            module.task(task)
-
-
-def test_conflicting_options_source(module):
-    # pylint: disable=protected-access
-    module._config = {
-        'build-id': 805705,
-        'nvr': 'bash-4.3.43-4.fc25'
-    }
-
-    match = "Only one of the options 'task-id', 'build-id', 'name' and 'nvr' can be specified."
-    with pytest.raises(libci.CIError, match=match):
-        module.sanity()
+            module.tasks([task])
 
 
 def test_missing_name(module):
@@ -398,7 +389,7 @@ def test_missing_name(module):
 def test_missing_tag(module):
     # pylint: disable=protected-access
     module._config = {
-        'name': 'bash',
+        'name': ['bash'],
     }
 
     match = "You need to specify 'tag' with package name"
@@ -406,13 +397,14 @@ def test_missing_tag(module):
         module.sanity()
 
 
-def test_invalid_build(module):
+def test_invalid_build(log, module):
     # pylint: disable=protected-access
     FakeClientSession.fake_key = 705705
     module._config = {
-        'build-id': 705705
+        'build-id': [705705]
     }
 
-    match = 'could not find a valid build according to given details'
-    with pytest.raises(libci.CIError, match=match):
-        module.execute()
+    module.execute()
+
+    log.match(levelno=logging.WARN, message='Looking for build 705705, remote server returned None - skipping this ID')
+    assert module._tasks == []

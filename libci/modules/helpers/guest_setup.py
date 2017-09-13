@@ -29,8 +29,7 @@ class GuestSetup(libci.Module):
           module.
         """
 
-        if not self.has_shared('run_playbook'):
-            raise libci.CIError("Module requires Ansible support, did you include 'ansible' module?")
+        self.require_shared('run_playbook')
 
         for playbook in [playbook.strip() for playbook in self.option('playbooks').split(',')]:
             self.info("setting the guests '{}' up with '{}'".format(', '.join(hosts), playbook))
