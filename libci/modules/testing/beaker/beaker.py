@@ -496,7 +496,7 @@ class Beaker(Module):
         return 'PASS', self._processed_results, matrix_url
 
     def execute(self):
-        self.require_shared('tasks', 'primary_tasks', 'beaker_job_xml', 'parse_beah_result')
+        self.require_shared('tasks', 'primary_task', 'beaker_job_xml', 'parse_beah_result')
 
         def _command_options(name):
             opts = self.option(name)
