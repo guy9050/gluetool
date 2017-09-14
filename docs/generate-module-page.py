@@ -16,7 +16,7 @@ MOD_TEMPLATE = """
 ``{name}``
 {title_underline}
 
-**{description}.**
+**{description}**
 
 .. automoddesc:: {modpath}.{klass}
    :noindex:
