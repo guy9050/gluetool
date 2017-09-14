@@ -16,7 +16,7 @@ import yaml
 import urlnorm
 import mako
 
-from libci import CIError, CICommandError
+from libci import CIError, SoftCIError, CICommandError
 from libci.log import Logging, ContextAdapter, log_blob, BlobLogger, format_dict
 
 
@@ -53,6 +53,27 @@ def dict_update(dst, *args):
         dst.update(other)
 
     return dst
+
+
+class IncompatibleOptionsError(SoftCIError):
+    SUBJECT = 'Incompatible options detected'
+    BODY = """
+    Configuration of your component uses incompatible options for `{module.unique_name}` module:
+
+        {message}
+
+    Please, review the configuration of your component - the default settings are usually sane
+    and should not lead to this error. For valid options, their values and possible combinations
+    see documentation for `{module.unique_name}` module.
+    """
+
+    def __init__(self, module, message):
+        super(IncompatibleOptionsError, self).__init__(message)
+
+        self.module = module
+
+    def _template_variables(self):
+        return dict_update(super(IncompatibleOptionsError, self)._template_variables(), {'module': self.module})
 
 
 class Bunch(object):

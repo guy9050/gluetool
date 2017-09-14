@@ -33,6 +33,10 @@
           default: ''
           description: 'citool options that will be added at the end of citool pipeline'
       - string:
+          name: build_dependencies_options
+          default: ''
+          description: 'Additional options for build-dependencies module.'
+      - string:
           name: guess_product_options
           default: ''
           description: 'Additional options for guess-product module.'
@@ -101,6 +105,7 @@
              openstack ${openstack_opts} \
              brew --task-id $id \
              brew-build-name \
+             build-dependencies ${build_dependencies_options} \
              guess-product ${guess_product_options} \
              guess-beaker-distro ${guess_beaker_distro_options} \
              guess-openstack-image ${guess_openstack_image_options} \
