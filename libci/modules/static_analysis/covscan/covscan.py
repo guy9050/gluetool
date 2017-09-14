@@ -2,8 +2,6 @@ import os
 import re
 import tempfile
 import json
-import StringIO
-import gzip
 from urllib2 import urlopen
 from urlgrabber.grabber import urlgrab
 from libci import Module, CIError, SoftCIError
@@ -118,19 +116,14 @@ class CovscanResult(object):
         return fixed_defects
 
     def status_failed(self):
-        url = self.url + 'log/stdout.log?format=raw'
-        response = urlopen(url)
+        command = ['covscan', 'task-info', self.task_id]
+        process_output = run_command(command)
+        match = re.search('state_label = (.*)\n', process_output.stdout)
 
-        # response is gz archiv, it has to be decompressed
-        compressed_file = StringIO.StringIO()
-        compressed_file.write(response.read())
-        compressed_file.seek(0)
+        if match is None:
+            return True
 
-        decompressed_file = gzip.GzipFile(fileobj=compressed_file, mode='rb')
-        output = decompressed_file.read()
-
-        log_blob(self.module.debug, 'fetched from {}'.format(url), output)
-        return output == "Failing because of at least one subtask hasn't closed properly.\n"
+        return match.group(1) == 'FAILED'
 
     # download added.html and fixed.html to keep them as build artifacts
     def download_artifacts(self):

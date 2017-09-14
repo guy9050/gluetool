@@ -1,6 +1,5 @@
 # pylint: disable=protected-access
 import os
-import gzip
 import pytest
 
 from mock import MagicMock
@@ -38,6 +37,42 @@ FIXED = """
         "mock-config": "rhel-7-x86_64-basescan"
     }
 }
+"""
+
+TASK_INFO_PASS = """
+exclusive = False
+resubmitted_by = None
+weight = 1
+state_label = CLOSED
+awaited = False
+result =
+owner = jenkins/baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com
+id = 55188
+state = 3
+label = netpbm-10.79.00-1.el7.src.rpm
+priority = 10
+waiting = False
+method = VersionDiffBuild
+channel = 1
+parent = None
+"""
+
+TASK_INFO_FAIL = """
+exclusive = False
+resubmitted_by = None
+weight = 1
+state_label = FAILED
+awaited = False
+result =
+owner = jenkins/baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com
+id = 55122
+state = 5
+label = qt5-qtimageformats-5.9.1-1.el7.src.rpm
+priority = 10
+waiting = False
+method = VersionDiffBuild
+channel = 1
+parent = None
 """
 
 
@@ -113,19 +148,15 @@ def run(result, log, module, monkeypatch, tmpdir):
             elif result == 'FAILED':
                 outfile.write(ADDED_FAIL)
             return outfile
-
-        elif 'stdout' in url:
-            outfile = tmpdir.join('dummy_file.log.gz')
-            with gzip.open(str(outfile), 'wb') as f:
-                f.write(b'Lots of content here')
-            return outfile
-
         else:
             return ''
 
     def mocked_run_command(cmd):
-        with open(cmd[-1], 'w') as outfile:
-            outfile.write('1234')
+        if cmd[1] == 'version-diff-build':
+            with open(cmd[-1], 'w') as outfile:
+                outfile.write('1234')
+        elif cmd[1] == 'task-info':
+            return MagicMock(stdout=TASK_INFO_PASS)
 
     def mocked_grabber(url):
         if 'rpm' in url:
@@ -225,7 +256,7 @@ def test_fetch_fixed(monkeypatch, tmpdir):
     assert result.fixed == ''
 
 
-def test_covscan_fail(module, monkeypatch, tmpdir):
+def test_covscan_fail(module, monkeypatch):
     _, module = module
 
     def mocked_grabber(cmd):
@@ -236,19 +267,14 @@ def test_covscan_fail(module, monkeypatch, tmpdir):
         return os.path.abspath(file_name)
 
     def mocked_run_command(cmd):
-        with open(cmd[-1], 'w') as outfile:
-            outfile.write('1234')
-
-    def mocked_urlopen(url):
-        # pylint: disable=unused-argument
-        outfile = tmpdir.join('dummy_file.log.gz')
-        with gzip.open(str(outfile), 'wb') as f:
-            f.write(b"Failing because of at least one subtask hasn't closed properly.\n")
-        return outfile
+        if cmd[1] == 'version-diff-build':
+            with open(cmd[-1], 'w') as outfile:
+                outfile.write('1234')
+        elif cmd[1] == 'task-info':
+            return MagicMock(stdout=TASK_INFO_FAIL)
 
     monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'urlgrab', mocked_grabber)
     monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'run_command', mocked_run_command)
-    monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'urlopen', mocked_urlopen)
 
     module.task = MagicMock(latest='baseline', destination_tag='destiantion_tag', rhel='rhel', srpm='srpm')
 
@@ -261,24 +287,26 @@ def test_setted_taskid(log, module, monkeypatch, tmpdir):
     module._config['task-id'] = '1234'
 
     def mocked_urlopen(url):
-        if 'added' in url or 'fixed' in url:
-            file_name = 'dummy_file.html'
-            outfile = tmpdir.join(file_name)
-            outfile.write(ADDED_PASS)
-            return outfile
-
-        elif 'stdout' in url:
-            outfile = tmpdir.join('dummy_file.log.gz')
-            with gzip.open(str(outfile), 'wb') as f:
-                f.write(b'Lots of content here')
-            return outfile
+        # pylint: disable=unused-argument
+        file_name = 'dummy_file.html'
+        outfile = tmpdir.join(file_name)
+        outfile.write(ADDED_PASS)
+        return outfile
 
     def mocked_grabber(cmd):
         # pylint: disable=unused-argument
         pass
 
+    def mocked_run_command(cmd):
+        if cmd[1] == 'version-diff-build':
+            with open(cmd[-1], 'w') as outfile:
+                outfile.write('1234')
+        elif cmd[1] == 'task-info':
+            return MagicMock(stdout=TASK_INFO_PASS)
+
     monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'urlopen', mocked_urlopen)
     monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'urlgrab', mocked_grabber)
+    monkeypatch.setattr(libci.modules.static_analysis.covscan.covscan, 'run_command', mocked_run_command)
 
     module.scan()
 
