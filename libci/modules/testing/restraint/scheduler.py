@@ -1,3 +1,5 @@
+import os
+import re
 import shlex
 import bs4
 
@@ -27,6 +29,31 @@ this situation.
 
     def __init__(self):
         super(NoTestAvailableError, self).__init__('No tests provided for the component')
+
+
+class SUTInstallationFailedError(SoftCIError):
+    SUBJECT = 'SUT installation failed'
+    BODY = """
+
+CI wasn't able to install the packages under the test. This can have many different causes, e.g.:
+
+    * packages have dependencies that could not be solved in CI environment
+    * there's already a package with newer NVR installed or available.
+
+Installation logs: {installation_logs}
+
+Please, get in touch with component's QE and/or CI stuff to find out how to resolve this situation.
+    """
+
+    def __init__(self, installation_logs):
+        super(SUTInstallationFailedError, self).__init__('SUT installation failed')
+
+        self.installation_logs = installation_logs
+
+    def _template_variables(self):
+        variables = super(SUTInstallationFailedError, self)._template_variables()
+
+        return utils.dict_update(variables, {'installation_logs': self.installation_logs})
 
 
 class RestraintScheduler(libci.Module):
@@ -145,10 +172,22 @@ class RestraintScheduler(libci.Module):
 
         output = self.shared('restraint', guest, job)
 
+        sut_install_logs = None
+
+        match = re.search(r'Using (\./tmp[a-zA-Z0-9\.]+?) for job run', output.stdout)
+        if match is not None:
+            sut_install_logs = '{}/index.html'.format(match.group(1))
+
+            if 'BUILD_URL' in os.environ:
+                sut_install_logs = utils.treat_url('{}/artifact/{}'.format(os.getenv('BUILD_URL'), sut_install_logs),
+                                                   logger=self.logger)
+
+            self.info('SUT installation logs are in {}'.format(sut_install_logs))
+
         if output.exit_code != 0:
             self.debug('restraint exited with invalid exit code {}'.format(output.exit_code))
 
-            raise CIError('Installation of SUT failed, restraint reports errors')
+            raise SUTInstallationFailedError('<Not available>' if sut_install_logs is None else sut_install_logs)
 
     def create_schedule(self, tasks, job_desc, image):
         """
@@ -210,6 +249,30 @@ class RestraintScheduler(libci.Module):
             self.error('At least one guest setup failed')
             self.error('Note: see detailed exception in debug log for more information')
 
+            # This is strange - we can have N threads, M of them failed with an exception, but we can
+            # kill pipeline only with a single one. They are all logged, though, so there should not
+            # be any loss of information. Not having a better idea, let's kill pipeline with the
+            # first custom exception we find.
+
+            def _raise_first(check):
+                # how to find the first item in the list: create a generator returning only those items
+                # that match a condition (by calling check()), and calling next() on it will return
+                # its first item (or None, in this case).
+                error = next((thread.result for thread in setup_threads if check(thread.result)), None)
+
+                if error is None:
+                    return
+
+                raise error
+
+            # Soft errors have precedence - the let user know something bad happened, which is better
+            # than just "infrastructure error".
+            _raise_first(lambda result: isinstance(result, SoftCIError))
+
+            # Then common CI errors
+            _raise_first(lambda result: isinstance(result, CIError))
+
+            # Ok, no custom exception, maybe just some Python ones - kill the pipeline.
             raise CIError('At least one guest setup failed')
 
         self.debug('Schedule:')
