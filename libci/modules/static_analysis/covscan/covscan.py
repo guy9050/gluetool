@@ -235,7 +235,7 @@ class CICovscan(Module):
         if blacklist is not None:
             self.verbose('blacklisted packages: {}'.format(blacklist))
             if self.task.component in [splitted.strip() for splitted in blacklist.split(',')]:
-                self.info('Skipping blacklisted package {}'.format(self.task.component))
+                self.info('Package {} is blacklisted, skipping job'.format(self.task.component))
                 return
 
         target = self.task.target

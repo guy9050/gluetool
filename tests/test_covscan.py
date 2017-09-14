@@ -108,7 +108,7 @@ def test_blacklisted_component(log, module, monkeypatch):
 
     module.execute()
 
-    assert log.records[-1].message == 'Skipping blacklisted package {}'.format(component_name)
+    assert log.records[-1].message == 'Package {} is blacklisted, skipping job'.format(component_name)
 
 
 def test_not_enabled_target(log, module, monkeypatch):

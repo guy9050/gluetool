@@ -72,12 +72,6 @@
                       manager.createSummary("red.gif").appendText("<h1>Tests failed</h1>",
                                                                   false, false, false, "red");
 
-                  } else if (manager.logContains(".* Result of testing: ERROR.*")) {
-                      manager.listener.logger.println("[groovy-postbuild]: Tests failed because of errors");
-                      manager.addBadge("delete.gif", "Tests FAILED");
-                      manager.createSummary("red.gif").appendText("<h1>Tests failed because of errors</h1>",
-                                                                  false, false, false, "red");
-
                   } else if (manager.logContains(".* Result of testing: PASS.*")) {
                       manager.listener.logger.println("[groovy-postbuild]: Tests passed");
                       manager.addBadge("success.gif", "Tests PASSED");
