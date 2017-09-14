@@ -55,6 +55,7 @@ def gather_module_data():
     LOGGER.info('gathering data on all available modules')
 
     ci = libci.CI()
+    ci.load_modules()
 
     cwd = os.getcwd() + '/'
     modules = []
