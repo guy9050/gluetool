@@ -464,6 +464,10 @@ def treat_url(url, shorten=False, logger=None):
     :returns: Treated URL.
     """
 
+    logger = logger or Logging.get_logger()
+
+    logger.debug("treating a URL '{}'".format(url))
+
     try:
         url = str(urlnorm.norm(url))
 
