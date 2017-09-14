@@ -157,8 +157,11 @@ class OpenstackGuest(NetworkedGuest):
 
             console = self._instance.get_console_output()
 
-            # Some servers may return empty console output. Observed with rhel-7.1-server-x86_64-released image
-            if not console:
+            if console:
+                console = console.encode('utf-8', 'replace')
+
+            else:
+                # Some servers may return empty console output. Observed with rhel-7.1-server-x86_64-released image
                 self.warn('empty console output')
 
                 console = '<Server returned empty console output>'
