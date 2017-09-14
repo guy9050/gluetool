@@ -5,6 +5,7 @@ import json
 from urllib2 import urlopen
 from urlgrabber.grabber import urlgrab
 from libci import Module, CIError, SoftCIError
+from libci.ci import DryRunLevels
 from libci.log import log_blob, format_dict
 from libci.utils import cached_property, run_command, check_for_commands, CICommandError, dict_update
 from libci.results import TestResult, publish_result
@@ -145,6 +146,8 @@ class CICovscan(Module):
 
     name = 'covscan'
     description = 'Run covscan'
+    supported_dryrun_level = DryRunLevels.DRY
+    task = None
 
     options = {
         'blacklist': {
@@ -157,8 +160,6 @@ class CICovscan(Module):
             'help': 'A comma separated list of regexes, which define enabled targets'
         }
     }
-
-    task = None
 
     def sanity(self):
         check_for_commands(REQUIRED_CMDS)
@@ -183,11 +184,17 @@ class CICovscan(Module):
         return CovscanResult(self, covscan_task_id)
 
     def scan(self):
+        covscan_result = None
+
         task_id = self.option('task-id')
         if task_id:
-            self.info('Skipping covscan testing, using existing Covscan task id')
+            self.info('Skipping covscan testing, using existing Covscan task id {}'.format(task_id))
             covscan_result = CovscanResult(self, task_id)
-        else:
+
+        if not covscan_result and not self.dryrun_allows('Run covscan testing'):
+            raise CIError('Can not run covscan dryrun without task-id parameter')
+
+        if not covscan_result:
             baseline = self.task.latest
 
             if not baseline:
