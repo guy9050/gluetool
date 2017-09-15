@@ -43,11 +43,12 @@ class OpenstackGuest(NetworkedGuest):
 
     ALLOW_DEGRADED = ('cloud-config.service',)
 
-    @retry(stop_max_attempt_number=10, wait_fixed=1000)
+    @retry(stop_max_attempt_number=10, wait_fixed=60000)
     def _assign_ip(self):
         """
-        The assignment of IP can fail if done too early. So retry it 10 times
-        to be sure that there is some other issue.
+        The assignment of IP can fail if done too early. So retry for 10 minutes
+        to be sure that we do not hit this. Also retrying should improve a bit
+        situation with shorter outages happening regularly on Openstack.
         """
         self._instance.add_floating_ip(self._ip)
 
