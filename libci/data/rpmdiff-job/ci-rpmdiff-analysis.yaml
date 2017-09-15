@@ -53,11 +53,11 @@
                  jenkins
                  brew-build-name
                  pipeline-state-reporter --category=rpmdiff ${pipeline_state_reporter_options}
+                 publisher-ci-bus
                  rpmdiff --type analysis
                  postgresql
                  rpmdiff-waiver
-                 make-bus-messages
-                 publisher-ci-bus
+                 exporter-resultsdb
                  notify-email ${notify_email_options}
                  ${pipeline_append}
     properties:

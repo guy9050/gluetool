@@ -53,6 +53,8 @@
                  covscan
                  make-bus-messages
                  publisher-ci-bus
+                 covscan
+                 exporter-resultsdb
                  notify-email ${notify_email_options}
                  ${pipeline_append}
     properties:

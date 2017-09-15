@@ -1,87 +1,99 @@
 import stomp
+
+import libci
 from libci import CIError, Module
-from libci.log import log_blob, format_dict
+from libci.ci import DryRunLevels
+from libci.log import format_dict
 
 
-class CIPublisherCiBus(Module):
+class CIBusPublisher(Module):
     """
-    This module sends notifications of CI results via CI message bus.
+    This module sends messages via CI message bus.
     """
 
-    cibus = None
     name = 'publisher-ci-bus'
-    description = 'Notification module - CI msg bus'
+    # pylint: disable=line-too-long
+    description = 'This module provides shared function to send messages via a messaging server (such as Apollo or RabbitMQ) using the STOMP protocol.'
+
     options = {
         'destination': {
-            'help': 'Message bus topic/subscription',
-        },
-        'dry-run': {
-            'help': 'Do not send notifications.',
-            'action': 'store_true',
+            'help': 'Message bus topic/subscription.',
         },
         'host': {
-            'help': 'Message bus host'
+            'help': 'Message bus host.'
         },
         'password': {
             'help': 'Password used for authentication',
         },
         'port': {
-            'help': 'Message bus port',
+            'help': 'Message bus port.',
         },
         'user': {
-            'help': 'User used for authentication',
-        },
+            'help': 'User used for authentication.',
+        }
     }
-    required_options = ['user', 'password', 'destination', 'host', 'port']
 
-    def publish(self, message):
-        # body needs to be a string
-        body = format_dict(message.body)
+    required_options = ('user', 'password', 'destination', 'host', 'port')
+    shared_functions = ('publish_bus_messages',)
 
-        log_blob(self.debug,
-                 'sent following message to CI message bus',
-                 'header:\n{}\nbody:\n{}'.format(format_dict(message.headers), body))
+    supported_dryrun_level = DryRunLevels.ISOLATED
 
-        if self.option('dry-run'):
-            return
+    @libci.utils.cached_property
+    def _session(self):
+        # skip connecting if in isolated mode
+        if not self.isolatedrun_allows('Connecting to the message bus'):
+            return None
 
-        if stomp.__version__[0] < 4:
-            # pylint: disable=no-value-for-parameter
-            self.cibus.send(message=body, headers=message.headers, destination=self.option('destination'))
-        else:
-            self.cibus.send(body=body, headers=message.headers, destination=self.option('destination'))
+        session = stomp.Connection([(self.option('host'), self.option('port'))])
+        session.start()
 
-    def sanity(self):
-        # skip connecting if in dry mode
-        if self.option('dry-run'):
-            return
-
-        # connect to message bus
-        self.cibus = stomp.Connection([(self.option('host'), self.option('port'))])
-        self.cibus.start()
         try:
-            self.cibus.connect(login=self.option('user'), passcode=self.option('password'), wait=True)
+            session.connect(login=self.option('user'), passcode=self.option('password'), wait=True)
+
         except stomp.exception.ConnectFailedException:
             raise CIError('could not connect to CI message bus')
-        if self.cibus.is_connected() is not True:
+
+        if session.is_connected() is not True:
             raise CIError('could not connect to CI message bus')
 
-    def execute(self):
-        messages = self.shared('bus_messages') or {}
+        return session
 
-        if not messages:
-            self.warn('No messages to send, did you call make-bus-messages module before this one?')
+    def publish_bus_messages(self, messages, **kwargs):
+        """
+        Publish one or more message to the message bus.
 
-        if self.option('dry-run'):
-            self.info('running in dry-run mode, no messages will be sent out')
+        A message is an object with two properties:
 
-        for message_type in messages.keys():
-            messages_of_one_type = messages[message_type]
+            * ``headers`` - a ``dict`` representing `headers` of the message,
+            * ``body`` - an object representing the actual data being send over the bus. Its actual
+              type depends entirely on the message, it can be ``dict`` or``list`` or any other primitive
+              type.
 
-            for message in messages_of_one_type:
-                self.publish(message)
+        :param list messages: Either ``list`` or a single `message`.
+        :param str topic: If set, overrides the bus topic set by the configuration.
+        :raises libci.ci.CIError: When there are messages that module failed to send.
+        """
 
-            count = len(messages_of_one_type)
-            plural = "message" if count == 1 else "messages"
+        # preserve original arguments for later call of publish_bus_messages
+        original_args = (messages,)
+        original_kwargs = kwargs.copy()
 
-            self.info('{0} {1} {2} published to CI message bus'.format(count, message_type, plural))
+        if not isinstance(messages, list):
+            messages = [messages]
+
+        message_buffer = messages[:]
+
+        for message in message_buffer:
+            # body needs to be a string
+            body = format_dict(message.body)
+
+            self.debug('sending the message')
+            libci.log.log_dict(self.debug, 'header', message.headers)
+            libci.log.log_dict(self.debug, 'body', message.body)
+
+            if not self.dryrun_allows('Sending messages to message bus'):
+                continue
+
+            self._session.send(body=body, headers=message.headers, destination=self.option('destination'))
+
+        self.shared('publish_bus_messages', *original_args, **original_kwargs)
