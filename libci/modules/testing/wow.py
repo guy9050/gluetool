@@ -40,6 +40,8 @@ class WorkflowTomorrow(libci.Module):
 
     shared_functions = ['beaker_job_xml']
 
+    supported_dryrun_level = libci.ci.DryRunLevels.DRY
+
     def beaker_job_xml(self, options=None, environment=None, task_params=None, setup_phases=None):
         """
         Run workflow-tomorrow to create beaker job XML.
