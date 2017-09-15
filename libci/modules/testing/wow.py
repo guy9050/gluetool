@@ -52,7 +52,8 @@ class WorkflowTomorrow(libci.Module):
         default, ``beaker_job_xml`` adds following variables:
 
         * ``BASEOS_CI=true``
-        * ``BASEOS_CI_COMPONENT=<component name>`` - available only when Brew task is available.
+        * ``BASEOS_CI_COMPONENT=<component name>``
+        * ``BASEOS_CI_TASKS=<comma-separated list of Brew/Koji tasks installed on the box>``
         * ``BEAKERLIB_RPM_DOWNLOAD_METHODS='yum direct'``
 
         To override any of these variables, simply pass your own value in ``task_params`` parameter.
@@ -71,7 +72,7 @@ class WorkflowTomorrow(libci.Module):
 
         self.info('running workflow-tomorrow to get job description')
 
-        self.require_shared('primary_task')
+        self.require_shared('tasks', 'primary_task')
 
         options = options or []
         environment = environment or {}
@@ -115,6 +116,7 @@ class WorkflowTomorrow(libci.Module):
         _task_params = {
             'BASEOS_CI': 'true',
             'BEAKERLIB_RPM_DOWNLOAD_METHODS': 'yum\\ direct',
+            'BASEOS_CI_TASKS': ','.join([str(task.task_id) for task in self.shared('tasks')]),
             'BASEOS_CI_COMPONENT': str(self.shared('primary_task').component)
         }
 

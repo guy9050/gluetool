@@ -15,6 +15,7 @@ COMMON_SEQUENCIES = [
     ['--taskparam', 'BEAKERLIB_RPM_DOWNLOAD_METHODS=yum\\ direct']
 ]
 SHARED_DISTRO = ['distro', 'distro1']
+SHARED_TASKS = ['tasks', MagicMock()]
 SHARED_TASK = ['primary_task', MagicMock(component='c1')]
 SHARED_PRODUCT = ['product', 'product1']
 
@@ -30,6 +31,7 @@ def fixture_module_with_task(module, monkeypatch):
     ci, module = module
 
     patch_shared(monkeypatch, module, {
+        'tasks': MagicMock(),
         'primary_task': MagicMock()
     })
 
@@ -37,10 +39,10 @@ def fixture_module_with_task(module, monkeypatch):
 
 
 @pytest.fixture(name='module_with_shared', params=[
-    [SHARED_TASK],
-    [SHARED_TASK, SHARED_DISTRO],
-    [SHARED_TASK, SHARED_PRODUCT],
-    [SHARED_TASK, SHARED_DISTRO, SHARED_PRODUCT]
+    [SHARED_TASKS, SHARED_TASK],
+    [SHARED_TASKS, SHARED_TASK, SHARED_DISTRO],
+    [SHARED_TASKS, SHARED_TASK, SHARED_PRODUCT],
+    [SHARED_TASKS, SHARED_TASK, SHARED_DISTRO, SHARED_PRODUCT]
 ])
 def fixture_module_with_shared(module, request, monkeypatch):
     ci, module = module
@@ -134,8 +136,18 @@ def test_include_module_wow_options(configured_module):
     assert sublist_exists(['--dummy-option', 'dummy-value'])
 
 
-def test_without_brew_task(module):
+def test_without_tasks(module):
     _, module = module
+
+    assert_shared('tasks', module.beaker_job_xml)
+
+
+def test_without_primary_task(module, monkeypatch):
+    _, module = module
+
+    patch_shared(monkeypatch, module, {
+        'tasks': MagicMock()
+    })
 
     assert_shared('primary_task', module.beaker_job_xml)
 
