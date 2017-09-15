@@ -460,7 +460,7 @@ class Koji(Module):
     """
 
     required_options = ['url', 'pkgs-url', 'web-url']
-    shared_functions = ('tasks', 'primary_task')
+    shared_functions = ('tasks', 'primary_task', 'koji_session')
 
     def __init__(self, *args, **kwargs):
         super(Koji, self).__init__(*args, **kwargs)
@@ -548,6 +548,9 @@ class Koji(Module):
             task_ids += [build['task_id'] for build in builds]
 
         return task_ids
+
+    def koji_session(self):
+        return self._session
 
     def tasks(self, task_ids=None, **kwargs):
         """

@@ -33,6 +33,10 @@
           default: ''
           description: 'citool options that will be added at the end of citool pipeline'
       - string:
+          name: build_dependencies_options
+          default: ''
+          description: 'Additional options for build-dependencies module.'
+      - string:
           name: guess_product_options
           default: ''
           description: 'Additional options for guess-product module'
@@ -94,6 +98,7 @@
             jenkins \
             brew --task-id $id \
             brew-build-name \
+            build-dependencies ${build_dependencies_options} \
             guess-product ${guess_product_options} \
             guess-beaker-distro ${guess_distro_options} \
             beaker --jobwatch-options="${jobwatch_options}" ${reserve_opts} \
