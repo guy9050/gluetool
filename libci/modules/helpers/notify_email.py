@@ -629,7 +629,7 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
         self.info('Sending failure-state notifications to: {}'.format(', '.join(recipients)))
 
-        result = libci.results.TestResult('dummy', 'ERROR')
+        result = libci.results.TestResult(self.ci, 'dummy', 'ERROR')
         summary_url = self._get_summary_url(result)
 
         # default body header and footer

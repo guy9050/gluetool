@@ -4,6 +4,7 @@ Various helpers.
 
 import collections
 import errno
+import json
 import os
 import re
 import subprocess
@@ -13,6 +14,7 @@ import time
 import urllib2
 import yaml
 
+import bs4
 import urlnorm
 import mako
 
@@ -463,6 +465,7 @@ def fetch_url(url, logger=None, success_codes=(200,)):
         code, content = response.getcode(), response.read()
 
     except urllib2.HTTPError as exc:
+        logger.exception(exc)
         raise CIError("Failed to fetch URL '{}': {}".format(url, exc.message))
 
     log_blob(logger.debug, '{}: {}'.format(url, code), content)
@@ -567,6 +570,31 @@ def load_yaml(filepath, logger=None):
 
     except yaml.YAMLError as e:
         raise CIError("Unable to load YAML file '{}': {}".format(filepath, str(e)))
+
+
+def _json_byteify(data, ignore_dicts=False):
+    # if this is a unicode string, return its string representation
+    if isinstance(data, unicode):
+        return data.encode('utf-8')
+
+    # if this is a list of values, return list of byteified values
+    if isinstance(data, list):
+        return [_json_byteify(item, ignore_dicts=True) for item in data]
+
+    # if this is a dictionary, return dictionary of byteified keys and values
+    # but only if we haven't already byteified it
+    if isinstance(data, dict) and not ignore_dicts:
+        return {
+            _json_byteify(key, ignore_dicts=True): _json_byteify(value, ignore_dicts=True)
+            for key, value in data.iteritems()
+        }
+
+    # if it's anything else, return it in its original form
+    return data
+
+
+def load_json(stream):
+    return _json_byteify(json.load(stream, object_hook=_json_byteify), ignore_dicts=True)
 
 
 class PatternMap(object):
@@ -737,3 +765,24 @@ def wait(label, check, timeout=None, tick=30, logger=None):
         logger.debug('check failed, assuming failure')
 
     raise CIError("Condition '{}' failed to pass within given time".format(label))
+
+
+def new_xml_element(tag_name, _parent=None, **attrs):
+    """
+    Create new XML element.
+
+    :param str tag_name: Name of the element.
+    :param element _parent: If set, the newly created element will be appended to this element.
+    :param dict attrs: Attributes to set on the newly created element.
+    :returns: Newly created XML element.
+    """
+
+    element = bs4.BeautifulSoup('', 'xml').new_tag(tag_name)
+
+    for name, value in attrs.iteritems():
+        element[name] = value
+
+    if _parent is not None:
+        _parent.append(element)
+
+    return element

@@ -28,7 +28,9 @@ def test_unknown_type(log, module, monkeypatch):
     _, module = module
     result_type = 'unsupported_type'
 
-    monkeypatch.setattr(module, 'shared', MagicMock(return_value=[TestResult(result_type, 'overall_results')]))
+    patch_shared(monkeypatch, module, {
+        'results': [TestResult(module.ci, result_type, 'overall_results')]
+    })
     monkeypatch.setattr(module, 'store', MagicMock())
 
     module.execute()
@@ -41,7 +43,7 @@ def test_covscan_nobrew(module, monkeypatch):
     result_type = 'covscan'
 
     patch_shared(monkeypatch, module, {
-        'results': [TestResult(result_type, 'overall_results')]
+        'results': [TestResult(module.ci, result_type, 'overall_results')]
     })
 
     monkeypatch.setattr(module, 'store', MagicMock())
@@ -62,7 +64,7 @@ def test_covscan(module, monkeypatch):
 
     mocked_task = MagicMock(nvr=nvr, scratch=True, task_id=task_id, url=brew_url, latest=latest)
     mocked_covscan_result = MagicMock(url=covscan_url, add=[], fixed=[])
-    mocked_result = CovscanTestResult(overall_results, mocked_covscan_result, mocked_task)
+    mocked_result = CovscanTestResult(module.ci, overall_results, mocked_covscan_result, mocked_task)
 
     patch_shared(monkeypatch, module, {
         'primary_task': mocked_task,
@@ -116,7 +118,7 @@ def rpmdiff(result_type, module, monkeypatch):
     subresult['data']['taskid'] = task_id
     subresult['data']['item'] = item
 
-    mocked_result = RpmdiffTestResult(run_info, result_type, payload=[subresult, subresult, subresult])
+    mocked_result = RpmdiffTestResult(module.ci, run_info, result_type, payload=[subresult, subresult, subresult])
 
     def mocked_shared(key):
         return {
@@ -240,12 +242,16 @@ def functional_testing(test_result, module, monkeypatch):
 
 
 def test_beaker(module, monkeypatch):
-    test_result = BeakerTestResult('PASS', 'some_matrix', payload=DUMMY_PAYLOAD)
+    ci, _ = module
+
+    test_result = BeakerTestResult(ci, 'PASS', 'some_matrix', payload=DUMMY_PAYLOAD)
     functional_testing(test_result, module, monkeypatch)
 
 
 def test_restraint(module, monkeypatch):
-    test_result = RestraintTestResult('PASS', payload=DUMMY_PAYLOAD)
+    ci, _ = module
+
+    test_result = RestraintTestResult(ci, 'PASS', payload=DUMMY_PAYLOAD)
     functional_testing(test_result, module, monkeypatch)
 
 

@@ -115,12 +115,12 @@ current configuration [3] and/or consult with component's QE on how to resolve t
 class BeakerTestResult(TestResult):
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, overall_result, matrix_url, **kwargs):
+    def __init__(self, ci, overall_result, matrix_url, **kwargs):
         urls = {
             'beaker_matrix': matrix_url
         }
 
-        super(BeakerTestResult, self).__init__('beaker', overall_result, urls=urls, **kwargs)
+        super(BeakerTestResult, self).__init__(ci, 'beaker', overall_result, urls=urls, **kwargs)
 
 
 class Beaker(Module):

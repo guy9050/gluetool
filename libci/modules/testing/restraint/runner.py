@@ -7,6 +7,7 @@ import bs4
 import libci
 from libci.log import log_blob, log_dict
 from libci.results import TestResult, publish_result
+from libci.utils import new_xml_element
 
 
 # The exit status values come from restraint sources: https://github.com/p3ck/restraint/blob/master/src/errors.h
@@ -39,8 +40,25 @@ see documentation for `restraint-runner` ([1]).
 class RestraintTestResult(TestResult):
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, overall_result, **kwargs):
-        super(RestraintTestResult, self).__init__('restraint', overall_result, **kwargs)
+    def __init__(self, ci, overall_result, **kwargs):
+        super(RestraintTestResult, self).__init__(ci, 'restraint', overall_result, **kwargs)
+
+    def _serialize_to_xunit(self):
+        test_suite = super(RestraintTestResult, self)._serialize_to_xunit()
+
+        if self.ci.has_shared('beah_xunit_serialize'):
+            self.ci.shared('beah_xunit_serialize', test_suite, self)
+
+        else:
+            self.ci.warn("To serialize result to xUnit format, 'beah_xunit_serialize' shared function is required",
+                         sentry=True)
+
+        return test_suite
+
+    @classmethod
+    def _unserialize_from_json(cls, ci, input_data):
+        return RestraintTestResult(ci, input_data['overall_result'], ids=input_data['ids'], urls=input_data['urls'],
+                                   payload=input_data['payload'])
 
 
 class RestraintRunner(libci.Module):
@@ -235,15 +253,13 @@ class RestraintRunner(libci.Module):
         :param dict recipe_set_attrs: additional attributes to set on <recipe_set/> element.
         """
 
-        soup = bs4.BeautifulSoup('', 'xml')
-
         # Log our task set
         guest.debug('Task set:\n{}'.format('\n'.join([task.prettify(encoding='utf-8') for task in task_set])))
 
         # Wrap task set in <job><recipeSet><recipe>... envelope
-        job = soup.new_tag('job')
-        job.append(soup.new_tag('recipeSet', **recipe_set_attrs))
-        job.recipeSet.append(soup.new_tag('recipe', **recipe_attrs))
+        job = new_xml_element('job')
+        new_xml_element('recipeSet', _parent=job, **recipe_set_attrs)
+        new_xml_element('recipe', _parent=job.recipeSet, **recipe_attrs)
 
         for task in task_set:
             job.recipeSet.recipe.append(copy.copy(task))

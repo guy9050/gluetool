@@ -11,14 +11,14 @@ from . import create_module
 def fixture_module():
     # pylint: disable=unused-argument
 
-    return create_module(libci.modules.testing.testing_results.TestingResults)
+    return create_module(libci.modules.testing.testing_results.TestingResults)[1]
 
 
 @pytest.fixture(name='result')
-def fixture_result():
+def fixture_result(module):
     # pylint: disable=unused-argument
 
-    return libci.results.TestResult('dummy', 'PASS')
+    return libci.results.TestResult(module.ci, 'dummy', 'PASS')
 
 
 def assert_results(results, length=0, model=None):
@@ -29,44 +29,82 @@ def assert_results(results, length=0, model=None):
         assert results is model
 
 
-def test_sanity(module, result):
+def test_shared(module):
+    assert module.has_shared('results')
+
+    # pylint: disable=protected-access
+    assert module.results() is module._results
+
+
+def test_updatable(module, result):
     """
     Basic sanity test - excercise shared function and add a result.
     """
 
-    ci, _ = module
-
-    assert ci.has_shared('results') is True
-
-    results1 = ci.shared('results')
-    assert_results(results1)
-
+    results1 = module.results()
     results1.append(result)
 
-    results2 = ci.shared('results')
-    assert_results(results2, length=1, model=results1)
+    results2 = module.results()
 
+    assert_results(results2, length=1, model=results1)
     assert result in results2
 
 
-def test_store_not_set(log, module, result):
+@pytest.mark.parametrize('input_data, expected', [
+    ('  foo :  bar', [('foo', 'bar')]),
+    ('  foo :  bar  , baz  : mark  ', [('foo', 'bar'), ('baz', 'mark')]),
+    (['  foo :  bar  ', '  baz : mark '], [('foo', 'bar'), ('baz', 'mark')])
+])
+def test_parse_formats(module, input_data, expected):
+    # pylint: disable=protected-access
+    module._config['foo'] = input_data
+
+    assert module._parse_formats('foo') == expected
+
+
+def test_serialize_json(tmpdir, module, result):
+    output_file = tmpdir.join('out.json')
+
+    # pylint: disable=protected-access
+    module._results.append(result)
+
+    with open(str(output_file), 'w') as f:
+        module._serialize_to_json(f)
+        f.flush()
+
+    with open(str(output_file), 'r') as f:
+        assert result.serialize('json') == libci.utils.load_json(f)[0]
+
+
+def test_unknown_serializer(module):
+    # pylint: disable=protected-access
+    module._config['results-file'] = ['foo:bar']
+
+    with pytest.raises(libci.CIError, match=r"Output format 'foo' is not supported"):
+        module.destroy()
+
+
+def test_store_not_set(log, module):
     """
     Module should not save anything when --results-file is not set.
     """
 
-    ci, mod = module
-
-    ci.shared('results').append(result)
-
     # pylint: disable=protected-access
-    assert mod._config['results-file'] is None
+    module._config['results-file'] = []
 
-    # clear caplog because ci.shared might have produced something
-    log.clear()
-    mod.destroy()
+    module.destroy()
 
-    # when results are saved, module reports that to user
-    assert not log.records
+    assert log.records[-1].message == 'No results file set.'
+
+
+def test_store_dryrun(log, module):
+    # pylint: disable=protected-access
+    module._config['results-file'] = ['foo:bar']
+    module.ci._dryrun_level = libci.ci.DryRunLevels.DRY
+
+    module.destroy()
+
+    assert log.records[-1].message == 'Exporting results into a file is not allowed by current dry-run level'
 
 
 def test_store(log, module, result, tmpdir):
@@ -74,28 +112,25 @@ def test_store(log, module, result, tmpdir):
     Store test result into a file.
     """
 
-    ci, mod = module
+    json_file = tmpdir.join('out.json')
+    xunit_file = tmpdir.join('out.xml')
 
-    ci.shared('results').append(result)
-
-    results_file = tmpdir.join('dummy-results.json')
     # pylint: disable=protected-access
-    mod._config['results-file'] = str(results_file)
+    module._results.append(result)
 
-    # clear caplog because ci.shared might have produced something
-    log.clear()
-    mod.destroy()
+    module._config['results-file'] = ['json:{}'.format(str(json_file)), 'xunit:{}'.format(str(xunit_file))]
 
-    assert len(log.records) == 1
-    assert log.records[0].message == "Results saved into '{}'".format(str(results_file))
+    module.destroy()
 
-    with open(str(results_file), 'r') as f:
-        written_results = json.load(f)
+    assert log.match(message="Results in format 'json' saved into '{}'".format(str(json_file)))
+    assert log.match(message="Results in format 'xunit' saved into '{}'".format(str(xunit_file)))
+
+    with open(str(json_file), 'r') as f:
+        written_results = libci.utils.load_json(f)
 
     assert isinstance(written_results, list)
     assert len(written_results) == 1
-
-    assert written_results[0] == result.serialize()
+    assert written_results[0] == result.serialize('json')
 
 
 def test_init_file_not_set(module):
@@ -103,16 +138,14 @@ def test_init_file_not_set(module):
     Module should not do anything when --init-file is not set.
     """
 
-    ci, mod = module
-
-    results1 = ci.shared('results')
+    results1 = module.results()
     assert_results(results1)
 
     # pylint: disable=protected-access
-    assert mod._config['init-file'] is None
-    mod.execute()
+    assert module._config['init-file'] is None
+    module.execute()
 
-    assert_results(ci.shared('results'), model=results1)
+    assert_results(module.results(), model=results1)
 
 
 def test_init_file(module, result, tmpdir):
@@ -120,20 +153,18 @@ def test_init_file(module, result, tmpdir):
     Try to load perfectly fine test result using --init-file.
     """
 
-    ci, mod = module
-
     init_file = tmpdir.join('fake-results.json')
-    init_file.write(json.dumps([result.serialize()]))
+    init_file.write(json.dumps([result.serialize('json')]))
 
     # pylint: disable=protected-access
-    mod._config['init-file'] = str(init_file)
+    module._config['init-file'] = 'json:{}'.format(str(init_file))
 
-    mod.execute()
+    module.execute()
 
-    results = ci.shared('results')
+    results = module.results()
 
     assert_results(results, length=1)
-    assert results[0].serialize() == result.serialize()
+    assert results[0].serialize('json') == result.serialize('json')
 
 
 def test_init_file_broken(module, result, tmpdir):
@@ -141,21 +172,19 @@ def test_init_file_broken(module, result, tmpdir):
     Try to load broken test result (missing a key).
     """
 
-    ci, mod = module
-
-    serialized_result = result.serialize()
+    serialized_result = result.serialize('json')
     del serialized_result['test_type']
 
     init_file = tmpdir.join('bad-result.json')
     init_file.write(json.dumps([serialized_result]))
 
     # pylint: disable=protected-access
-    mod._config['init-file'] = str(init_file)
+    module._config['init-file'] = 'json:{}'.format(str(init_file))
 
     with pytest.raises(libci.CIError, match=r"^init file is invalid, key 'test_type' not found$"):
-        mod.execute()
+        module.execute()
 
-    assert_results(ci.shared('results'))
+    assert_results(module.results())
 
 
 def test_init_file_ioerror(module, monkeypatch, result, tmpdir):
@@ -163,13 +192,11 @@ def test_init_file_ioerror(module, monkeypatch, result, tmpdir):
     Try to deal with IOError raised during --init-file loading.
     """
 
-    ci, mod = module
-
     init_file = tmpdir.join('bad-result.json')
-    init_file.write(json.dumps([result.serialize()]))
+    init_file.write(json.dumps([result.serialize('json')]))
 
     # pylint: disable=protected-access
-    mod._config['init-file'] = str(init_file)
+    module._config['init-file'] = 'json:{}'.format(str(init_file))
 
     def buggy_load(stream):
         # pylint: disable=unused-argument
@@ -179,8 +206,8 @@ def test_init_file_ioerror(module, monkeypatch, result, tmpdir):
     monkeypatch.setattr(json, 'load', buggy_load)
 
     with pytest.raises(libci.CIError, match=r"^this is a fake IOError$"):
-        mod.execute()
+        module.execute()
 
     monkeypatch.undo()
 
-    assert_results(ci.shared('results'))
+    assert_results(module.results())
