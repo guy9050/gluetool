@@ -10,7 +10,7 @@ class CIMTF(Module):
         'fedmsgfile': {
             'help': 'file containing received fedmsg'
         },
-        'module': {
+        'test-module': {
             'help': 'which module to test',
             'default': 'testing-module'
         }
@@ -20,7 +20,7 @@ class CIMTF(Module):
 
     def execute(self):
         fedmsgf = os.path.abspath(self.option('fedmsgfile'))
-        module = self.option('module')
+        module = self.option('test-module')
 
         self.shared('jenkins').set_build_name(module)
 
