@@ -42,8 +42,6 @@ class CIError(Exception):
     Generic ``libci`` exception.
     """
 
-    pass
-
 
 class SoftCIError(CIError):
     """
@@ -98,7 +96,6 @@ class SoftCIError(CIError):
 
 class CIRetryError(CIError):
     """ Retry libci exception """
-    pass
 
 
 class CICommandError(CIError):
@@ -698,8 +695,6 @@ class Module(Configurable):
         By default, this method does nothing. Reimplement as needed.
         """
 
-        pass
-
     def sanity(self):
         # pylint: disable-msg=no-self-use
         """
@@ -712,8 +707,6 @@ class Module(Configurable):
 
         By default, this method does nothing. Reimplement as needed.
         """
-
-        pass
 
     def shared(self, *args, **kwargs):
         return self.ci.shared(*args, **kwargs)

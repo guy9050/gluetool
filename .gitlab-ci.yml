@@ -40,11 +40,26 @@ unit-tests:
   stage: test
   script:
     - pip install tox
-    - tox -e py27 -- --cov=libci --cov-report=html:coverage-report
+    - tox -e py27-unit-tests -- --cov=libci --cov-report=html:coverage-report
   artifacts:
     paths:
       - coverage-report
 
+# Static analysis - pylint, flake8
+static-analysis:
+  stage: test
+  script:
+    - pip install tox
+    - tox -e py27-static-analysis
+
+# Static analysis - coala
+#
+# Note: coala integration is better done directly via gitlab's docker support
+static-analysis-coala:
+  stage: test
+  image: coala/base
+  script:
+    - /usr/bin/coala --non-interactive --config .coafile
 
 # Generate documentation from the sources
 #
