@@ -6,11 +6,15 @@ from libci.log import format_dict
 
 class Ansible(libci.Module):
     """
-    Helper module - give it a playbook, a host, maybe few additional variables,
+    Helper module - give it a playbook, a guest, maybe few additional variables,
     and let Ansible perform it.
+
+    Usually, guests are provided by other provisioning modules, e.g. ``openstack``
+    or ``docker-provisioner``, playbooks are up to you.
     """
 
     name = 'ansible'
+    description = 'Run an Ansible playbook on a given guest.'
 
     shared_functions = ('run_playbook',)
 
@@ -21,7 +25,7 @@ class Ansible(libci.Module):
         Run Ansible playbook.
 
         :param str playbook_path: Path to the playbook.
-        :param [str, ...] hosts: Specifications of hosts, forming Ansible inventory.
+        :param list(str) hosts: Specifications of hosts, forming Ansible inventory.
         :param dict variables: If set, represents additional variables that will
           be passed to ``ansible-playbook`` using ``--extra-vars`` option.
         :returns: :py:class:`libci.utils.ProcessOutput` instance.
