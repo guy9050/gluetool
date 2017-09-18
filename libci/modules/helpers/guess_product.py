@@ -1,3 +1,4 @@
+import libci
 from libci import CIError, SoftCIError, Module
 from libci.utils import cached_property, PatternMap
 
@@ -46,6 +47,8 @@ class GuessProduct(Module):
     }
 
     shared_functions = ['product']
+
+    supported_dryrun_level = libci.ci.DryRunLevels.DRY
 
     def __init__(self, *args, **kwargs):
         super(GuessProduct, self).__init__(*args, **kwargs)

@@ -1,6 +1,7 @@
 import collections
 import re
 
+import libci
 from libci import CIError, SoftCIError, Module
 from libci.log import format_dict
 from libci.utils import cached_property, PatternMap
@@ -59,6 +60,8 @@ class GuessOpenstackImage(Module):
     }
 
     shared_functions = ['image']
+
+    supported_dryrun_level = libci.ci.DryRunLevels.DRY
 
     def __init__(self, *args, **kwargs):
         super(GuessOpenstackImage, self).__init__(*args, **kwargs)

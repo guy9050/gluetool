@@ -1,5 +1,6 @@
 import bs4
 
+import libci
 from libci import CIError, SoftCIError, Module
 from libci.log import format_dict
 from libci.utils import fetch_url, cached_property, PatternMap
@@ -70,6 +71,8 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
     }
 
     shared_functions = ['distro']
+
+    supported_dryrun_level = libci.ci.DryRunLevels.DRY
 
     _distro = None
 
