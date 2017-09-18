@@ -25,6 +25,13 @@
         msg: "Running inside virtualenv '{{ virtualenv_path }}'"
 
     #
+    # Check whether installation uses non-virtualenv ansible
+    #
+    - fail:
+        msg: "This playbook must be run using system Ansible (/usr/bin/ansible-playbook or similar)!"
+      when: ansible_python_interpreter != "/usr/bin/python"
+
+    #
     # Check necessary system packages
     #
     - name: "Check whether cURL development pieces are available"
@@ -71,6 +78,15 @@
     - fail:
         msg: "Install package providing Python bindings for Yum (usually provided by yum or dnf)"
       when: rpmutils_present.stat.isdir is not defined or not rpmutils_present.stat.isdir
+
+    - name: "Check whether krb5.h is available"
+      stat:
+        path: "/usr/include/krb5.h"
+      register: krb5_present
+
+    - fail:
+        msg: "Install package providing krb5.h (usually provided by krb5-devel)"
+      when: krb5_present.stat.isreg is not defined or not krb5_present.stat.isreg
 
       #- name: "Check whether qe.py is available"
       #stat:
