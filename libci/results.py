@@ -1,6 +1,7 @@
 import os
 
 import libci
+from libci.utils import new_xml_element
 
 
 class TestResult(object):
@@ -10,6 +11,8 @@ class TestResult(object):
     Meaning of most of the fields depends on the result type, there are only
     few "points of contact" between two different result types.
 
+    :param libci.ci.CI ci: CI instance the results belongs to - the results was either created
+        by this instance, or loaded by it.
     :param str test_type: Type of testing. Makes sense to producers and consumers,
       ``Result`` class does not care of its actual value.
     :param str overall_result: Overall result of the test, e.g. ``PASS``, ``FAIL`` or ``ERROR``.
@@ -31,8 +34,11 @@ class TestResult(object):
 
     # pylint: disable=too-many-arguments,too-few-public-methods
 
-    def __init__(self, test_type, overall_result, ids=None, urls=None, payload=None):
+    def __init__(self, ci, test_type, overall_result, ids=None, urls=None, payload=None):
+        self.ci = ci
+
         self.test_type = test_type
+        self.result_class = '{}.{}'.format(self.__module__, self.__class__.__name__)
         self.overall_result = overall_result
         self.ids = ids or {}
         self.urls = urls or {}
@@ -41,21 +47,107 @@ class TestResult(object):
         if 'jenkins_build' not in self.urls and 'BUILD_URL' in os.environ:
             self.urls['jenkins_build'] = os.environ['BUILD_URL']
 
-    def serialize(self):
+    def __repr__(self):
+        return libci.utils.format_dict(self._serialize_to_json())
+
+    def _serialize_to_json(self):
         """
         Return JSON representation of the result.
         """
 
         return {
             'test_type': self.test_type,
+            'result_class': self.result_class,
             'overall_result': self.overall_result,
             'ids': self.ids,
             'urls': self.urls,
             'payload': self.payload
         }
 
-    def __repr__(self):
-        return libci.utils.format_dict(self.serialize())
+    @classmethod
+    def _unserialize_from_json(cls, ci, input_data):
+        return cls(ci, input_data['test_type'], input_data['overall_result'],
+                   ids=input_data['ids'], urls=input_data['urls'], payload=input_data['payload'])
+
+    def _serialize_to_xunit(self):
+        test_suite = new_xml_element('testsuite', name=self.test_type)
+        test_suite_properties = new_xml_element('properties', _parent=test_suite)
+
+        def _add_property(name, value):
+            new_xml_element('property', _parent=test_suite_properties, name='baseosci.{}'.format(name), value=value)
+
+        _add_property('test-type', self.test_type)
+        _add_property('result-class', self.result_class)
+        _add_property('overall-result', self.overall_result)
+
+        ids = self.ids.copy()
+
+        if 'testing-thread-id' in ids:
+            _add_property('ids.testing-thread-id', ids['testing-thread-id'])
+            del ids['testing-thread-id']
+
+        if ids:
+            self.ci.warn('Unconsumed IDs:\n{}'.format(libci.log.format_dict(ids)), sentry=True)
+
+        urls = self.urls
+
+        if 'jenkins_build' in urls:
+            _add_property('urls.jenkins-build', urls['jenkins_build'])
+            del urls['jenkins_build']
+
+        if urls:
+            self.ci.warn('Unconsumed URLs:\n{}'.format(libci.log.format_dict(urls)), sentry=True)
+
+        return test_suite
+
+    def can_serialize(self, output_format):
+        """
+        Returns ``True`` if the class supports serialization into a given format.
+        """
+
+        return hasattr(self, '_serialize_to_{}'.format(output_format))
+
+    @classmethod
+    def can_unserialize(cls, input_format):
+        """
+        Returns ``True`` if the class supports unserialization from a given format.
+        """
+
+        return hasattr(cls, '_unserialize_from_{}'.format(input_format))
+
+    def serialize(self, output_format):
+        """
+        Return representation of the result in given format.
+
+        :param str output_format: Output data format.
+        :raises libci.ci.CIError: when result class does not support the output format.
+        """
+
+        serializer = getattr(self, '_serialize_to_{}'.format(output_format), None)
+
+        if not serializer:
+            raise libci.CIError("Cannot serialize into output format '{}'".format(output_format))
+
+        # pylint: disable=not-callable
+        return serializer()
+
+    @classmethod
+    def unserialize(cls, ci, input_format, input_data):
+        """
+        Return instance of the result class, containing information provided in ``input_data``.
+
+        :param str input_format: Input data format name.
+        :param input_data: Input data in given format.
+        :raises libci.ci.CIError: when result class does not support the input format.
+        """
+
+        unserializer = getattr(cls, '_unserialize_from_{}'.format(input_format), None)
+
+        if not unserializer:
+            raise libci.CIError("Cannot unserialize from input format '{}'".format(input_format))
+
+        # pylint: disable=not-callable
+        return unserializer(ci, input_data)
 
 
 def publish_result(module, result_class, *args, **kwargs):
@@ -75,7 +167,7 @@ def publish_result(module, result_class, *args, **kwargs):
     if not module.require_shared('results', warn_only=True):
         return
 
-    result = result_class(*args, **kwargs)
-    module.debug('result:\n{}'.format(libci.utils.format_dict(result.serialize())))
+    result = result_class(module.ci, *args, **kwargs)
+    libci.log.log_dict(module.debug, 'result', result.serialize('json'))
 
     module.shared('results').append(result)

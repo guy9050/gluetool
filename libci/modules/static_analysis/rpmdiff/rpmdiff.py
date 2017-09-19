@@ -66,7 +66,7 @@ class RpmdiffTestResult(TestResult):
     """
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, runinfo, test_type, **kwargs):
+    def __init__(self, ci, runinfo, test_type, **kwargs):
         overall_result = RPMDIFF_OVERALL_SCORE[runinfo['overall_score']['description']]
 
         ids = {
@@ -77,11 +77,8 @@ class RpmdiffTestResult(TestResult):
             'rpmdiff_url': runinfo['web_url']
         }
 
-        super(RpmdiffTestResult, self).__init__('rpmdiff-{}'.format(test_type),
-                                                overall_result,
-                                                ids=ids,
-                                                urls=urls,
-                                                **kwargs)
+        super(RpmdiffTestResult, self).__init__(ci, 'rpmdiff-{}'.format(test_type), overall_result,
+                                                ids=ids, urls=urls, **kwargs)
 
     @property
     def rpmdiff_test_type(self):

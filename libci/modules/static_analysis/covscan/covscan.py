@@ -74,20 +74,20 @@ If you have any questions, feel free to ask at Red Hat IRC channel #coverity or 
 class CovscanTestResult(TestResult):
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, overall_result, covscan_result, task, **kwargs):
+    def __init__(self, ci, overall_result, covscan_result, task, **kwargs):
         urls = {
             'covscan_url': covscan_result.url,
             'brew_url': task.url
         }
 
-        super(CovscanTestResult, self).__init__('covscan', overall_result, urls=urls, **kwargs)
+        super(CovscanTestResult, self).__init__(ci, 'covscan', overall_result, urls=urls, **kwargs)
 
         self.fixed = len(covscan_result.fixed)
         self.added = len(covscan_result.added)
         self.baseline = task.latest
 
-    def serialize(self):
-        serialized = super(CovscanTestResult, self).serialize()
+    def _serialize_to_json(self):
+        serialized = super(CovscanTestResult, self)._serialize_to_json()
         return dict_update(serialized, {'baseline': self.baseline})
 
 
