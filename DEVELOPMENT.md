@@ -54,7 +54,7 @@ To begin digging into `citool` sources, there are few requirements:
    **RHEL 7.4**
 
    ```
-     yum install -y libcurl-devel libxml2-devel openssl-devel python-devel
+     yum install -y krb5-devel libcurl-devel libxml2-devel openssl-devel python-devel
      curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py && rm -f get-pip.py
      pip install -U setuptools
      pip install ansible virtualenv
@@ -63,7 +63,7 @@ To begin digging into `citool` sources, there are few requirements:
    **Fedora 26**
 
    ```
-   dnf install -y ansible libselinux-python python2-virtualenv /usr/lib/rpm/redhat/redhat-hardened-cc1
+   dnf install -y ansible krb5-devel libselinux-python python2-virtualenv /usr/lib/rpm/redhat/redhat-hardened-cc1
    dnf install -y --allowerasing compat-openssl10-devel
    pip install -U setuptools
    ```
