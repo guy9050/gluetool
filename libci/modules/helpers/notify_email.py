@@ -65,7 +65,8 @@ Beaker matrix:  {beaker_matrix_url}
 
 RPMDIFF_BODY = """
 Result:         {result.overall_result}
-RPMdiff run:    {rpmdiff_url}
+
+Jenkins build:  {jenkins_build_url}
 
 See RPMdiff run link ^^ for more details. Note that waiving of results is not required until
 the build is added to Erratum.
@@ -501,9 +502,9 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
     def format_result_rpmdiff_analysis(self, result, msg):
         # pylint: disable=no-self-use
-        rpmdiff_url = self._format_result_url(result, 'rpmdiff_url', '<RPMdiff URL not available>')
+        jenkins_build_url = self._format_result_url(result, 'jenkins_build_url', '<Jenkins build URL not available>')
 
-        msg.body = RPMDIFF_BODY.format(result=result, rpmdiff_url=rpmdiff_url)
+        msg.body = RPMDIFF_BODY.format(result=result, jenkins_build_url=jenkins_build_url)
         msg.footer = RPMDIFF_FOOTER
 
     # pylint: disable=invalid-name
@@ -532,6 +533,10 @@ to this option, and process environmental variables (default: {})""".format(DEFA
 
         if 'baseosci_frontend' in result.urls:
             frontend_url = result.urls['baseosci_frontend']
+
+        # for rpmdiff set summary url to rpmdiff's web ui
+        if 'rpmdiff_url' in result.urls:
+            return self._shorten_url(result.urls['rpmdiff_url'])
 
         else:
             frontend_url_template = self.option('frontend-url')
