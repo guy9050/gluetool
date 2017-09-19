@@ -216,6 +216,12 @@ class ProcessOutput(object):
         else:
             log_blob(logger, stream, content)
 
+    def log(self, logger):
+        logger('command exited with code {}'.format(self.exit_code))
+
+        self.log_stream('stdout', logger)
+        self.log_stream('stderr', logger)
+
 
 def run_command(cmd, logger=None, inspect=False, inspect_callback=None, **kwargs):
     """
@@ -366,9 +372,7 @@ def run_command(cmd, logger=None, inspect=False, inspect_callback=None, **kwargs
 
     output = ProcessOutput(cmd, exit_code, stdout, stderr, kwargs)
 
-    logger.debug('command exited with code {}'.format(output.exit_code))
-    output.log_stream('stdout', logger.debug)
-    output.log_stream('stderr', logger.debug)
+    output.log(logger.debug)
 
     if exit_code != 0:
         raise CICommandError(cmd, output)
