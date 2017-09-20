@@ -94,6 +94,7 @@
            citool -c -i -o citool-debug.txt \
              ${pipeline_prepend} \
              notify-recipients ${notify_recipients_options} \
+             beah-xunit \
              testing-results \
              testing-thread --id "${testing_thread_id}" \
              brew --task-id $id \

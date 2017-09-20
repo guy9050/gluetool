@@ -69,6 +69,28 @@ class TestResult(object):
         return cls(ci, input_data['test_type'], input_data['overall_result'],
                    ids=input_data['ids'], urls=input_data['urls'], payload=input_data['payload'])
 
+    def _serialize_to_xunit_property_dict(self, parent, properties, names):
+        """
+        Serialize ``key: value`` properties. Method serializes only known properties,
+        and raises a warning when there are unknown properties left when it's done.
+
+        :param element parent: Parent <properties/> element.
+        :param dict properties: Properties to serialize.
+        :param dict names: Mapping between known properties and their xUnit names. E.g. ``testing-thread-id``
+            maps to ``baseosci.ids.testing-thread-id``.
+        """
+
+        for property_name, xunit_name in names.iteritems():
+            if property_name not in properties:
+                continue
+
+            value = properties.pop(property_name)
+
+            new_xml_element('property', _parent=parent, name=xunit_name, value=value)
+
+        if properties:
+            self.ci.warn('Unconsumed properties:\n{}'.format(libci.log.format_dict(properties)), sentry=True)
+
     def _serialize_to_xunit(self):
         test_suite = new_xml_element('testsuite', name=self.test_type)
         test_suite_properties = new_xml_element('properties', _parent=test_suite)
@@ -80,23 +102,15 @@ class TestResult(object):
         _add_property('result-class', self.result_class)
         _add_property('overall-result', self.overall_result)
 
-        ids = self.ids.copy()
+        # serialize result's IDs into properties
+        self._serialize_to_xunit_property_dict(test_suite_properties, self.ids.copy(), {
+            'testing-thread-id': 'baseosci.ids.testing-thread-id'
+        })
 
-        if 'testing-thread-id' in ids:
-            _add_property('ids.testing-thread-id', ids['testing-thread-id'])
-            del ids['testing-thread-id']
-
-        if ids:
-            self.ci.warn('Unconsumed IDs:\n{}'.format(libci.log.format_dict(ids)), sentry=True)
-
-        urls = self.urls
-
-        if 'jenkins_build' in urls:
-            _add_property('urls.jenkins-build', urls['jenkins_build'])
-            del urls['jenkins_build']
-
-        if urls:
-            self.ci.warn('Unconsumed URLs:\n{}'.format(libci.log.format_dict(urls)), sentry=True)
+        # serialize result's URLs into properties
+        self._serialize_to_xunit_property_dict(test_suite_properties, self.urls.copy(), {
+            'jenkins_build': 'baseosci.urls.jenkins-build'
+        })
 
         return test_suite
 
