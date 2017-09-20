@@ -7,6 +7,7 @@ import imp
 
 import bs4
 
+import libci
 from libci import CIError, SoftCIError, CICommandError, Module, utils
 from libci.log import BlobLogger
 from libci.utils import Bunch, run_command, fetch_url
@@ -116,11 +117,22 @@ class BeakerTestResult(TestResult):
     # pylint: disable=too-few-public-methods
 
     def __init__(self, ci, overall_result, matrix_url, **kwargs):
-        urls = {
-            'beaker_matrix': matrix_url
-        }
+        urls = kwargs.pop('urls', {})
+        urls['beaker_matrix'] = matrix_url
 
         super(BeakerTestResult, self).__init__(ci, 'beaker', overall_result, urls=urls, **kwargs)
+
+    @classmethod
+    def _unserialize_from_json(cls, ci, input_data):
+        return BeakerTestResult(ci, input_data['overall_result'], input_data['urls']['beaker_matrix'],
+                                ids=input_data['ids'], urls=input_data['urls'], payload=input_data['payload'])
+
+    def _serialize_to_xunit_property_dict(self, parent, properties, names):
+        if 'beaker_matrix' in properties:
+            libci.utils.new_xml_element('property', parent, name='baseosci.urls.beaker-matrix',
+                                        value=properties.pop('beaker_matrix'))
+
+        super(BeakerTestResult, self)._serialize_to_xunit_property_dict(parent, properties, names)
 
 
 class Beaker(Module):
