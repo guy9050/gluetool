@@ -156,9 +156,10 @@ class CIBuildOnCommit(Module):
         msg += ["'{}' on branch '{}' with build target '{}'".format(component, branch, target)]
         self.info(' '.join(msg))
         command = [
-            "rhpkg", "build", "--scratch", "--skip-nvr-check", "--arches", "x86_64",
-            "--target", target, "--nowait",
-            "--path", component]
+            "rhpkg", "--path", component, "build", "--scratch", "--skip-nvr-check", "--arches", "x86_64",
+            "--target", target, "--nowait"
+        ]
+
         output = self._run_command(command)
 
         # detect brew task id
