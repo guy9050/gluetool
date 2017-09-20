@@ -227,7 +227,7 @@ def functional_testing(test_result, module, monkeypatch):
     assert result[result_type][1].body['tests'][0]['failed'] == FAILED
 
     assert result[result_type][1].body['base_distro'] == distro
-    assert result[result_type][1].body['task_id'] == task_id
+    assert result[result_type][1].body['brew_task_id'] == task_id
     job_name = 'ci-{}-brew-{}-2-runtest'.format(component, target)
     assert result[result_type][1].body['job_name'] == job_name
 

@@ -141,7 +141,7 @@ class CIMakeBusMessages(Module):
             'trigger': 'brew build',
             'tests': results,
             'base_distro': distro,
-            'task_id': task.task_id,
+            'brew_task_id': task.task_id,
             # fake job name for legacy reasons
             'job_name': 'ci-{}-brew-{}-2-runtest'.format(task.component, task.target),
             'build_type': os.environ.get('BUILD_TYPE', 'unknown'),
