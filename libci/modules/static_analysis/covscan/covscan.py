@@ -121,7 +121,8 @@ class CovscanResult(object):
         return fixed_defects
 
     def status_failed(self):
-        command = ['covscan', 'task-info', self.task_id]
+        # convert task id to string because of run_command
+        command = ['covscan', 'task-info', str(self.task_id)]
         process_output = run_command(command)
         match = re.search('state_label = (.*)\n', process_output.stdout)
 
