@@ -13,6 +13,9 @@
       - string:
           name: branch
           description: 'Git branch'
+      - string:
+          name: username
+          description: 'Name of the user to notify'
     triggers:
       - ci-trigger:
           jms-selector: >
