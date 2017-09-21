@@ -129,7 +129,7 @@ class BeakerTestResult(TestResult):
 
     def _serialize_to_xunit_property_dict(self, parent, properties, names):
         if 'beaker_matrix' in properties:
-            libci.utils.new_xml_element('property', parent, name='baseosci.urls.beaker-matrix',
+            libci.utils.new_xml_element('property', parent, name='baseosci.url.beaker-matrix',
                                         value=properties.pop('beaker_matrix'))
 
         super(BeakerTestResult, self)._serialize_to_xunit_property_dict(parent, properties, names)

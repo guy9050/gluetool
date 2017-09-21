@@ -77,7 +77,7 @@ class TestResult(object):
         :param element parent: Parent <properties/> element.
         :param dict properties: Properties to serialize.
         :param dict names: Mapping between known properties and their xUnit names. E.g. ``testing-thread-id``
-            maps to ``baseosci.ids.testing-thread-id``.
+            maps to ``baseosci.id.testing-thread``.
         """
 
         for property_name, xunit_name in names.iteritems():
@@ -104,12 +104,12 @@ class TestResult(object):
 
         # serialize result's IDs into properties
         self._serialize_to_xunit_property_dict(test_suite_properties, self.ids.copy(), {
-            'testing-thread-id': 'baseosci.ids.testing-thread-id'
+            'testing-thread-id': 'baseosci.id.testing-thread'
         })
 
         # serialize result's URLs into properties
         self._serialize_to_xunit_property_dict(test_suite_properties, self.urls.copy(), {
-            'jenkins_build': 'baseosci.urls.jenkins-build'
+            'jenkins_build': 'baseosci.url.jenkins-build'
         })
 
         return test_suite
