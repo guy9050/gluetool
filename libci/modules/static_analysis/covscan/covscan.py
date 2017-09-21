@@ -4,6 +4,7 @@ import tempfile
 import json
 from urllib2 import urlopen
 from urlgrabber.grabber import urlgrab
+import libci
 from libci import Module, CIError, SoftCIError
 from libci.ci import DryRunLevels
 from libci.log import log_blob, format_dict
@@ -89,6 +90,17 @@ class CovscanTestResult(TestResult):
     def _serialize_to_json(self):
         serialized = super(CovscanTestResult, self)._serialize_to_json()
         return dict_update(serialized, {'baseline': self.baseline})
+
+    def _serialize_to_xunit_property_dict(self, parent, properties, names):
+        if 'covscan_url' in properties:
+            libci.utils.new_xml_element('property', parent, name='baseosci.url.covscan-run',
+                                        value=properties.pop('covscan_url'))
+
+        if 'brew_url' in properties:
+            # just drop this one - it can be reconstructed from task ID anyway
+            properties.pop('brew_url')
+
+        super(CovscanTestResult, self)._serialize_to_xunit_property_dict(parent, properties, names)
 
 
 class CovscanResult(object):

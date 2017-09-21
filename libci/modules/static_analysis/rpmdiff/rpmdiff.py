@@ -1,6 +1,7 @@
 import json
 import re
 import time
+import libci
 from libci import Module
 from libci import CIError, SoftCIError, CICommandError
 from libci import utils
@@ -83,6 +84,17 @@ class RpmdiffTestResult(TestResult):
     @property
     def rpmdiff_test_type(self):
         return self.test_type.split("-")[1]
+
+    def _serialize_to_xunit_property_dict(self, parent, properties, names):
+        if 'rpmdiff_run_id' in properties:
+            libci.utils.new_xml_element('property', parent, name='baseosci.id.rpmdiff-run',
+                                        value=properties.pop('rpmdiff_run_id'))
+
+        if 'rpmdiff_url' in properties:
+            libci.utils.new_xml_element('property', parent, name='baseosci.url.rpmdiff-run',
+                                        value=properties.pop('rpmdiff_url'))
+
+        super(RpmdiffTestResult, self)._serialize_to_xunit_property_dict(parent, properties, names)
 
 
 class RpmdiffSkippedTestResult(TestResult):
