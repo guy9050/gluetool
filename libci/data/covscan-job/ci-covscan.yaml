@@ -55,7 +55,7 @@
           num-to-keep: 500
     publishers:
       - archive:
-          artifacts: '*.txt, *.html, *.json'
+          artifacts: '*.txt, *.html, *.json, results.xml'
           allow-empty: 'true'
       - groovy-postbuild:
           on-failure: "failed"
