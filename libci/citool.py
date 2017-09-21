@@ -81,7 +81,6 @@ def main():
 
     # pylint: disable=invalid-name
     CI = None
-    module = None
 
     # If not None, exception happened and we want to let modules know
     # during their "destroy" time.
@@ -187,21 +186,22 @@ def main():
                 CI.run_modules(pipeline_description, register_with_ci=True)
 
             except CIRetryError as e:
-                module.error('error: {}'.format(e))
+                CI.error(e)
                 continue
+
             break
 
     except (SystemExit, KeyboardInterrupt) as e:
-        failure = Failure(module=module, exc_info=sys.exc_info())
+        failure = Failure(module=CI.current_module, exc_info=sys.exc_info())
         raise e
 
     except Exception as e:
         exit_status = -1
 
-        failure = Failure(module=module, exc_info=sys.exc_info())
+        failure = Failure(module=CI.current_module, exc_info=sys.exc_info())
 
-        if module:
-            msg = "Exception raised in module '{}': {}".format(module.unique_name, e.message)
+        if CI.current_module:
+            msg = "Exception raised in module '{}': {}".format(CI.current_module.unique_name, e.message)
         else:
             msg = "Exception raised: {}".format(e.message)
 

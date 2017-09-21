@@ -2,6 +2,7 @@
 Gather and provide recipients of notifications.
 """
 
+import libci
 from libci import CIError, Module
 from libci.utils import cached_property, PatternMap
 
@@ -46,6 +47,8 @@ class NotifyRecipients(Module):
 
     name = 'notify-recipients'
     description = 'Notification module - recipient management'
+
+    supported_dryrun_level = libci.ci.DryRunLevels.DRY
 
     supported_result_types = ('beaker', 'boc', 'covscan', 'restraint', 'rpmdiff-analysis', 'rpmdiff-comparison')
     result_type_names = ('Beaker', 'Build-on-commit', 'Covscan', 'Restraint', 'RPMdiff analysis', 'RPMdiff comparison')

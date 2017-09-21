@@ -7,6 +7,15 @@ import libci
 from . import CaplogWrapper
 
 
+def pytest_addoption(parser):
+    parser.addoption('--integration-config', action='store', default=str, help='Path to the real configuration')
+
+
+@pytest.fixture(name='integration_config')
+def fixture_integration_config(request):
+    return request.config.getoption('--integration-config')
+
+
 @pytest.fixture(name='logger', scope='session', autouse=True)
 def fixture_enable_logger():
     """

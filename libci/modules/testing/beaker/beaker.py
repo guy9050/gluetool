@@ -10,7 +10,7 @@ import bs4
 import libci
 from libci import CIError, SoftCIError, CICommandError, Module, utils
 from libci.log import BlobLogger
-from libci.utils import Bunch, run_command, fetch_url
+from libci.utils import run_command, fetch_url
 from libci.results import TestResult, publish_result
 
 
@@ -22,95 +22,22 @@ DEFAULT_RESERVE_TIME = 24
 
 
 class NoTestAvailableError(SoftCIError):
-    MODULE = 'beaker'
-    SUBJECT = 'No tests found for the component'
-    BODY = """
-
-CI could not find any suitable tests for the component. This can have many different causes, e.g.:
-
-    * component's configuration is incomplete, it does not provide correct test plan with tests
-      for the component, or
-    * the test plan is provided but it's empty, or
-    * the test plan is not empty but there are filters applied in the configuration, and the result
-      is an empty set of tests.
-
-Please, see the documentation on CI configuration and what is required to correctly enable CI for
-a component [1], current configuration [2], and/or consult with component's QE how to resolve
-this situation.
-
-[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/UserHOWTO#EnableCIforacomponent
-[2] https://gitlab.cee.redhat.com/baseos-qe/citool-config/raw/production/brew-dispatcher.yaml
-    """
-
     def __init__(self):
         super(NoTestAvailableError, self).__init__('No tests provided for the component')
 
 
 class InvalidTasksError(SoftCIError):
-    MODULE = 'beaker'
-    SUBJECT = 'Invalid tasks provided'
-    BODY = """
-
-One or more tasks provided to CI could not be found:
-
-{tasks}
-
-Please, see the documentation on CI configuration and what is required to correctly enable CI for
-a component [1], current configuration [2], and/or consult with component's QE how to resolve
-this situation.
-
-[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/UserHOWTO#EnableCIforacomponent
-[2] https://gitlab.cee.redhat.com/baseos-qe/citool-config/raw/production/brew-dispatcher.yaml
-    """
-
     def __init__(self, tasks):
         super(InvalidTasksError, self).__init__('Invalid task names provided')
 
         self.tasks = tasks
 
-    def _template_variables(self):
-        variables = super(InvalidTasksError, self)._template_variables()
-
-        variables.update({
-            'tasks': '\n'.join(['\t* {}'.format(name) for name in self.tasks])
-        })
-
-        return variables
-
 
 class BeakerJobwatchError(SoftCIError):
-    MODULE = 'beaker'
-    SUBJECT = ('Failed to babysit Beaker jobs till the successfull end for '
-               '{task.nvr}, brew task {task.task_id}, branch {task.branch}')
-    BODY = """
-
-Beaker jobs started by CI failed to finish successfully.
-
-This can often happen because of distro missing from Beaker, installability issues, incompatible
-requirements forced by CI configuration for the component, invalid test metadata, multiple timeouting
-tests, or aborted recipes. See the summary and related logs for more details [1], CI documentation [2],
-current configuration [3] and/or consult with component's QE on how to resolve this situation.
-
-[1] {matrix_url}
-[2] https://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/UserHOWTO#EnableCIforacomponent
-[3] https://gitlab.cee.redhat.com/baseos-qe/citool-config/raw/production/brew-dispatcher.yaml
-    """
-
-    def __init__(self, task, matrix_url):
+    def __init__(self, matrix_url):
         super(BeakerJobwatchError, self).__init__('Beaker job(s) aborted, inform the user nicely')
 
-        self.task = task if task else Bunch(branch='<unknown>', nvr='<unknown>', task_id='<unknown>')
         self.matrix_url = matrix_url
-
-    def _template_variables(self):
-        variables = super(BeakerJobwatchError, self)._template_variables()
-
-        variables.update({
-            'task': self.task,
-            'matrix_url': self.matrix_url,
-        })
-
-        return variables
 
 
 class BeakerTestResult(TestResult):
@@ -422,7 +349,8 @@ class Beaker(Module):
             # this most probably means that the jobs aborted
             if exc.output.exit_code == 2:
                 matrix_url = self._get_matrix_url(exc.output.stdout)
-                raise BeakerJobwatchError(self.shared('primary_task'), matrix_url)
+                raise BeakerJobwatchError(matrix_url)
+
             raise CIError("Failure during 'jobwatch' execution: {}".format(exc.output.stderr))
 
         return output

@@ -70,46 +70,9 @@ class SoftCIError(CIError):
 
     However, we still must provide notification to user(s), and since we expect them to fix the issues
     that led to raising the soft error, we must provide them with as much information as possible.
-    Therefore soft errors contain a template that can be used to format the error into a descriptive
-    text, usable e.g. in e-mail.
+    Therefore modules dealing with notifications are expected to give these exceptions a chance
+    to influence the outgoing messages, e.g. by letting them provide an e-mail body template.
     """
-
-    BODY = None
-    BODY_HEADER = None
-    BODY_FOOTER = None
-    MODULE_NAME = None
-    STATUS = 'ABORT'
-    SUBJECT = None
-
-    def __init__(self, *args, **kwargs):
-        assert self.STATUS is not None
-        assert self.SUBJECT is not None
-        assert self.BODY is not None
-
-        super(SoftCIError, self).__init__(*args, **kwargs)
-
-    def _template_variables(self):
-        """
-        Override this method to provide more variables for rendering exception template.
-        """
-
-        return {
-            'message': self.message
-        }
-
-    def render(self):
-        """
-        Render template with variables provided by the exception instance.
-        """
-
-        from .utils import render_template
-
-        variables = self._template_variables()
-
-        return {
-            'subject': render_template(self.SUBJECT, **variables),
-            'body': render_template(self.BODY, **variables)
-        }
 
 
 class CIRetryError(CIError):
@@ -146,6 +109,7 @@ class Failure(object):
     :param tuple exc_info: Exception information as returned by :py:func:`sys.exc_info`.
 
     :ivar libci.ci.Module module: module in which the error happened, or ``None``.
+    :ivar Exception exception: Shortcut to ``exc_info[1]``, if available, or ``None``.
     :ivar tuple exc_info: Exception information as returned by :py:func:`sys.exc_info`.
     """
 
@@ -154,11 +118,11 @@ class Failure(object):
         self.exc_info = exc_info
 
         if exc_info:
-            exc = exc_info[1]
-
-            self.soft = isinstance(exc, SoftCIError)
+            self.exception = exc_info[1]
+            self.soft = isinstance(self.exception, SoftCIError)
 
         else:
+            self.exception = None
             self.soft = False
 
 
@@ -905,6 +869,8 @@ class CI(Configurable):
         :param callable func: Shared function.
         """
 
+        self.debug("registering shared function '{}' of module '{}'".format(funcname, module.unique_name))
+
         self.shared_functions[funcname] = (module, func)
 
     def add_shared(self, funcname, module):
@@ -941,7 +907,7 @@ class CI(Configurable):
             msg = "Shared function '{}' is required. See `citool -L` to find out which module provides it.".format(name)
 
             if warn_only is True:
-                self.sentry_submit_warning(msg)
+                self.warn(msg, sentry=True)
                 return False
 
             raise CIError(msg)
@@ -1168,6 +1134,8 @@ class CI(Configurable):
 
         self._dryrun_level = DryRunLevels.DEFAULT
 
+        self.current_module = None
+
         # module types dictionary
         self.modules = {}
 
@@ -1231,6 +1199,12 @@ class CI(Configurable):
     def dryrun_level(self):
         return self._dryrun_level
 
+    def _for_each_module(self, modules, callback, *args, **kwargs):
+        for module in modules:
+            self.current_module = module
+
+            callback(module, *args, **kwargs)
+
     def destroy_modules(self, failure=None):
         if not self._module_instances:
             return
@@ -1238,7 +1212,7 @@ class CI(Configurable):
         # we will destroy modules in reverse order, which makes more sense
         self.verbose('destroying all modules in reverse order')
 
-        for module in reversed(self._module_instances):
+        def _destroy(module):
             try:
                 module.debug('destroying myself')
                 module.destroy(failure=failure)
@@ -1250,6 +1224,9 @@ class CI(Configurable):
                 self.exception('error in destroy function: {}'.format(str(exception)))
                 self.sentry_submit_exception(exc_info)
 
+        self._for_each_module(reversed(self._module_instances), _destroy)
+
+        self.current_module = None
         self._module_instances = []
 
     def init_module(self, module):
@@ -1281,12 +1258,20 @@ class CI(Configurable):
             module.parse_config()
             module.parse_args(module_argv)
             module.check_dryrun()
+
+        def _sanity(module):
             module.sanity()
             module.check_required_options()
 
-        for module in modules:
+        self._for_each_module(modules, _sanity)
+
+        def _execute(module):
             module.execute()
             module.add_shared()
+
+        self._for_each_module(modules, _execute)
+
+        self.current_module = None
 
     def run_module(self, module_name, module_argv):
         """

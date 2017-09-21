@@ -38,19 +38,19 @@ def test_build_params(module):
     assert mod.build_params == expected_params
 
 
-def test_dispatch_analysis(module):
+def test_dispatch_analysis(module, monkeypatch):
     _, mod = module
 
     # pylint: disable=protected-access
     mod._config['type'] = 'analysis'
 
-    basic_test_dispatch(module, job_name='ci-rpmdiff-analysis')
+    basic_test_dispatch(module, monkeypatch, job_name='ci-rpmdiff-analysis')
 
 
-def test_dispatch_comparison(module):
+def test_dispatch_comparison(module, monkeypatch):
     _, mod = module
 
     # pylint: disable=protected-access
     mod._config['type'] = 'comparison'
 
-    basic_test_dispatch(module, job_name='ci-rpmdiff-comparison')
+    basic_test_dispatch(module, monkeypatch, job_name='ci-rpmdiff-comparison')

@@ -27,6 +27,7 @@ Welcome to citool's documentation!
    libci.help
    libci.guest
    libci.log
+   libci.modules
    libci.proxy
    libci.results
    libci.utils

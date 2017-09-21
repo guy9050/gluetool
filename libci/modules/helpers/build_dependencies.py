@@ -144,7 +144,7 @@ class BuildDependencies(libci.Module):
     def sanity(self):
         if self.option('method') == 'companions-from-koji' and not self.option('companions'):
             # pylint: disable=line-too-long
-            raise libci.utils.IncompatibleOptionsError(self, "--companions option is required with method 'companions-from-koji'")  # Ignore PEP8Bear
+            raise libci.utils.IncompatibleOptionsError("--companions option is required with method 'companions-from-koji'")  # Ignore PEP8Bear
 
     def execute(self):
         self.require_shared('tasks')
@@ -157,7 +157,7 @@ class BuildDependencies(libci.Module):
 
         if method is None:
             # pylint: disable=line-too-long
-            raise libci.utils.IncompatibleOptionsError(self, "Unknown 'guessing' method '{}'".format(self.option('method')))  # Ignore PEP8Bear
+            raise libci.utils.IncompatibleOptionsError("Unknown 'guessing' method '{}'".format(self.option('method')))  # Ignore PEP8Bear
 
         additional_task_ids = method(self)
 

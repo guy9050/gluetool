@@ -1,0 +1,32 @@
+subject: "[CI] [covscan] [PASSED] dummy-package-1.2.3-79.el7, task 123456, branch fixing-bz17"
+body: |-
+  Tested build:   https://brewweb.engineering.redhat.com/brew/taskinfo?taskID=14091309
+
+  Fixed defects:  19
+  Added defects:  17
+
+  Final result:   PASSED
+
+  See Covscan url for more details. Result is based on diff to previous known build.
+  The testing fails if your build added new defects from the previous one.
+
+  If you have any questions, feel free to ask at Red Hat IRC channel #coverity or coverity-users@redhat.com
+
+  Covscan url:          http://cov01.lab.eng.brq.redhat.com/covscanhub/task/56254/
+  Covscan wiki:         https://engineering.redhat.com/trac/CoverityScan/wiki/covscan
+  Covscan CI Test Plan: https://url.corp.redhat.com/covscan-in-ci
+header: |-
+  Brew task:      123456
+  Build target:   release-candidate
+  Tested package: dummy-package-1.2.3-79.el7
+  Build issuer:   bar@redhat.com
+  Summary:        https://baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/job/ci-covscan/36817/
+footer: |-
+  --
+  CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation
+  IRC: #baseosci
+recipients:
+  - dummy-recipient@redhat.com
+cc:
+  - platform-ci-notification@redhat.com
+sender: "qe-baseos-automation@redhat.com"

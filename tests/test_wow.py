@@ -35,6 +35,8 @@ def fixture_module_with_task(module, monkeypatch):
         'primary_task': MagicMock()
     })
 
+    module._config['wow-options'] = 'dummy wow options'
+
     return ci, module
 
 
@@ -51,6 +53,8 @@ def fixture_module_with_shared(module, request, monkeypatch):
         patch_shared(monkeypatch, module, {
             name: value for name, value in request.param
         })
+
+    module._config['wow-options'] = 'dummy wow options'
 
     return ci, module
 
@@ -91,7 +95,7 @@ def test_sanity_fail(module, opts):
     _, module = module
     module._config['wow-options'] = opts
     with pytest.raises(NoTestAvailableError, match=r'No tests provided for the component'):
-        module.sanity()
+        module.beaker_job_xml()
 
 
 def test_sanity(configured_module):
@@ -117,9 +121,11 @@ def test_common_command_failures(module_with_task, monkeypatch, stderr):
 
 def test_unrecognized_command_failure(module_with_task, monkeypatch):
     _, module = module_with_task
+
     monkeypatch.setattr(libci.utils, 'run_command', MagicMock(
         side_effect=libci.CICommandError([], MagicMock(exit_code=1, stderr='dummy error'))
     ))
+
     with pytest.raises(libci.CIError, match=r"Failure during 'wow' execution:"):
         module.beaker_job_xml()
 
@@ -139,6 +145,7 @@ def test_include_module_wow_options(configured_module):
 def test_without_tasks(module):
     _, module = module
 
+    module._config['wow-options'] = 'dummy wow options'
     assert_shared('tasks', module.beaker_job_xml)
 
 
@@ -148,6 +155,8 @@ def test_without_primary_task(module, monkeypatch):
     patch_shared(monkeypatch, module, {
         'tasks': MagicMock()
     })
+
+    module._config['wow-options'] = 'dummy wow options'
 
     assert_shared('primary_task', module.beaker_job_xml)
 

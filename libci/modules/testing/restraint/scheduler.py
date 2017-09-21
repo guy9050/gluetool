@@ -8,52 +8,15 @@ from libci import utils, CIError, SoftCIError
 
 
 class NoTestAvailableError(SoftCIError):
-    SUBJECT = 'No tests found for component'
-    BODY = """
-
-CI could not find any suitable tests for the component. This can have many different causes, e.g.:
-
-    * component's configuration is incomplete, it does not provide correct test plan with tests
-      for the component, or
-    * the test plan is provided but it's empty, or
-    * the test plan is not empty but there are filters applied in the configuration, and the result
-      is an empty set of tests.
-
-Please, see the documentation on CI configuration and what is required to correctly enable CI for
-a component ([1]), current configuration ([2]), and/or consult with component's QE how to resolve
-this situation.
-
-[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/UserHOWTO#EnableCIforacomponent
-[2] https://gitlab.cee.redhat.com/baseos-qe/citool-config/raw/production/brew-dispatcher.yaml
-    """
-
     def __init__(self):
         super(NoTestAvailableError, self).__init__('No tests provided for the component')
 
 
 class SUTInstallationFailedError(SoftCIError):
-    SUBJECT = 'SUT installation failed'
-    BODY = """
-
-CI wasn't able to install the packages under the test. This can have many different causes, e.g.:
-
-    * packages have dependencies that could not be solved in CI environment
-    * there's already a package with newer NVR installed or available.
-
-Installation logs: {installation_logs}
-
-Please, get in touch with component's QE and/or CI stuff to find out how to resolve this situation.
-    """
-
     def __init__(self, installation_logs):
         super(SUTInstallationFailedError, self).__init__('SUT installation failed')
 
         self.installation_logs = installation_logs
-
-    def _template_variables(self):
-        variables = super(SUTInstallationFailedError, self)._template_variables()
-
-        return utils.dict_update(variables, {'installation_logs': self.installation_logs})
 
 
 class RestraintScheduler(libci.Module):

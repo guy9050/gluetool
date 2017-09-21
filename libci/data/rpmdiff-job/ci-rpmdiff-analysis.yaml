@@ -54,6 +54,7 @@
                  brew-build-name
                  publisher-umb-bus
                  pipeline-state-reporter --category=rpmdiff.analysis ${pipeline_state_reporter_options}
+                 notify-email-rpmdiff-formatter
                  rpmdiff --type analysis
                  postgresql
                  rpmdiff-waiver

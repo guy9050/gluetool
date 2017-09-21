@@ -20,8 +20,6 @@ enum34==1.1.6
 jenkinsapi==0.3.3
 # required by jenkins-jobs
 jenkins-job-builder==1.6.2
-# required by notify-email module
-mako==1.0.6
 # required by urlgrabber/covscan
 pycurl==7.43.0
 # required by opentack module - novaclient

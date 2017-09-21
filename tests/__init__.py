@@ -108,8 +108,8 @@ def patch_shared(monkeypatch, module, shared_functions):
     })
 
 
-def create_module(module_class, ci_class=NonLoadingCI, name='dummy-module', add_shared=True):
-    ci = ci_class()
+def create_module(module_class, ci=None, ci_class=NonLoadingCI, name='dummy-module', add_shared=True):
+    ci = ci or ci_class()
     mod = module_class(ci, name)
 
     if add_shared is True:

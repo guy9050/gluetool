@@ -19,37 +19,12 @@ class RulesError(SoftCIError):
     :param str error: specific error message.
     """
 
-    SUBJECT = 'Unable to parse filtering rules'
-    BODY = """
-{intro}:
-
-    {rules}
-
-    {error}
-
-Please, review the configuration of your component, for complete information on filtering rules
-and supported operators and functions see documentation of `brew-dispatcher` module ([1]).
-
-[1] https://url.corp.redhat.com/dafcf63
-    """
-
     def __init__(self, message, rules, intro, error):
         super(RulesError, self).__init__(message)
 
         self.rules = rules
         self.intro = intro
         self.error = error
-
-    def _template_variables(self):
-        variables = super(RulesError, self)._template_variables()
-
-        variables.update({
-            'rules': str(self.rules),
-            'intro': self.intro,
-            'error': self.error
-        })
-
-        return variables
 
 
 class CommandsError(SoftCIError):
@@ -61,31 +36,10 @@ class CommandsError(SoftCIError):
       the template.
     """
 
-    SUBJECT = 'Invalid component configuration'
-    BODY = """
-{message}:
-
-{commands}
-
-Please, review the configuration of your component, for documentation on how to
-enable CI for a component and how to configure it see our How To page ([1]).
-
-[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/UserHOWTO#EnableCIforacomponent
-    """
-
     def __init__(self, message, commands):
         super(CommandsError, self).__init__(message)
 
         self.commands = commands
-
-    def _template_variables(self):
-        variables = super(CommandsError, self)._template_variables()
-
-        variables.update({
-            'commands': format_dict(self.commands)
-        })
-
-        return variables
 
 
 class InvalidASTNodeError(RulesError):

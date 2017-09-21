@@ -1,28 +1,13 @@
 import bs4
 
 import libci
-from libci import CIError, SoftCIError, Module
+from libci import CIError, Module
 from libci.log import format_dict
-from libci.utils import fetch_url, cached_property, PatternMap
+from libci.utils import fetch_url, cached_property, PatternMap, IncompatibleOptionsError
 
 
 DEFAULT_NIGHTLY_LISTING = 'http://download.eng.brq.redhat.com/nightly/'
 DEFAULT_BU_LISTING = 'http://download-node-02.eng.bos.redhat.com/rel-eng/updates/'
-
-
-class IncompatibleOptionsError(SoftCIError):
-    SUBJECT = 'Incompatible options detected'
-    BODY = """
-Configuration of your component uses incompatible options for `guess-beaker-distro` module:
-
-    {message}
-
-Please, review the configuration of your component - the default settings are usually sane
-and should not lead to this error. For valid options, their values and possible combinations
-see documentation for `guess-beaker-distro` ([1]).
-
-[1] https://url.corp.redhat.com/dbb9190
-    """
 
 
 class CIGuessBeakerDistro(Module):
