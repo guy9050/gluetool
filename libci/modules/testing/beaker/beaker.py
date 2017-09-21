@@ -134,6 +134,18 @@ class BeakerTestResult(TestResult):
 
         super(BeakerTestResult, self)._serialize_to_xunit_property_dict(parent, properties, names)
 
+    def _serialize_to_xunit(self):
+        test_suite = super(BeakerTestResult, self)._serialize_to_xunit()
+
+        if self.ci.has_shared('beah_xunit_serialize'):
+            self.ci.shared('beah_xunit_serialize', test_suite, self)
+
+        else:
+            self.ci.warn("To serialize result to xUnit format, 'beah_xunit_serialize' shared function is required",
+                         sentry=True)
+
+        return test_suite
+
 
 class Beaker(Module):
     """
