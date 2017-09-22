@@ -103,8 +103,8 @@ class RpmdiffSkippedTestResult(TestResult):
     """
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, **kwargs):
-        super(RpmdiffSkippedTestResult, self).__init__('rpmdiff-comparison', 'INFO', **kwargs)
+    def __init__(self, ci, **kwargs):
+        super(RpmdiffSkippedTestResult, self).__init__(ci, 'rpmdiff-comparison', 'INFO', **kwargs)
 
     @property
     def rpmdiff_test_type(self):
