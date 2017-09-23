@@ -45,6 +45,9 @@ class DispatchJenkinsJobMixin(object):
         'pipeline-append': {
             'help': '``citool`` options that will be added at the end of the pipeline.'
         },
+        'pipeline-state-reporter-options': {
+            'help': 'Additional options for ``pipeline-state-reporter`` module.'
+        },
         'notify-recipients-options': {
             'help': 'Additional options for ``notify-recipients`` module.',
             'action': 'append',
@@ -83,6 +86,7 @@ class DispatchJenkinsJobMixin(object):
             'id': self.option('id'),
             'pipeline_prepend': self.option('pipeline-prepend'),
             'pipeline_append': self.option('pipeline-append'),
+            'pipeline_state_reporter_options': self.option('pipeline-state-reporter-options'),
             'notify_recipients_options': notify_recipients_options,
             'notify_email_options': self.option('notify-email-options')
         }
