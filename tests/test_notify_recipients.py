@@ -143,7 +143,7 @@ def test_mapped_recipients(configured_module):
     _, mod = configured_module
 
     # pylint: disable=protected-access,line-too-long
-    assert mod._replace_mapped_recipients(['bar', 'some-weird/recipient']) == ['bar', 'the real one!', 'and another real one!']
+    assert mod._replace_mapped_recipients(['bar', 'some-weird/recipient']) == ['bar', 'the real one!', 'and another real one!']  # Ignore PEP8Bear
 
 
 def test_recipients(configured_module):
@@ -213,7 +213,7 @@ def test_finalize_recipients(log, configured_module):
 @pytest.mark.parametrize('result_type,expected_recipients', [
     # Without result type, return all recipients
     # pylint: disable=line-too-long
-    (None, ['abc', 'and another real one!', 'def', 'ghi', 'jkl', 'mno', 'pqr', 'some foo recipient', 'the real one!', 'uvw']),
+    (None, ['abc', 'and another real one!', 'def', 'ghi', 'jkl', 'mno', 'pqr', 'some foo recipient', 'the real one!', 'uvw']),  # Ignore PEP8Bear
     # With specific type, return just its recipients
     ('beaker', ['def', 'ghi']),
     ('boc', ['pqr', 'some foo recipient']),

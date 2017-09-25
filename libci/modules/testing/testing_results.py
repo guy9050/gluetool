@@ -54,7 +54,6 @@ class TestingResults(libci.Module):
 
     def _parse_formats(self, option):
         # pylint: disable=no-self-use
-
         """
         Converts different forms on format:file specifications into a ``list``. These:
 

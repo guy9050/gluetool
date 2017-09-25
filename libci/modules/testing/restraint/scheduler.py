@@ -110,7 +110,6 @@ class RestraintScheduler(libci.Module):
 
     def _setup_guest(self, tasks, guest):
         # pylint: disable=no-self-use
-
         """
         Run necessary command to prepare guest for following procedures.
         """

@@ -16,7 +16,7 @@ def test_sanity(log):
 
     # todo: check decreasing remaining time
     # pylint: disable=line-too-long
-    assert re.match(r"waiting for condition 'dummy check', timeout \d seconds, check every 2 seconds", log.records[0].message) is not None
+    assert re.match(r"waiting for condition 'dummy check', timeout \d seconds, check every 2 seconds", log.records[0].message) is not None  # Ignore PEP8Bear
     assert re.match(r'\d seconds left, sleeping for 2 seconds$', log.records[1].message) is not None
     assert log.records[2].message == 'check failed, assuming failure'
     assert re.match(r'\d seconds left, sleeping for 2 seconds$', log.records[3].message) is not None

@@ -655,7 +655,6 @@ class Module(Configurable):
 
     def destroy(self, failure=None):
         # pylint: disable-msg=no-self-use,unused-argument
-
         """
         Here should go any code that needs to be run on exit, like job cleanup etc.
 
@@ -686,7 +685,6 @@ class Module(Configurable):
 
     def execute(self):
         # pylint: disable-msg=no-self-use
-
         """
         In this method, modules can perform any work they deemed necessary for
         completing their purpose. E.g. if the module promises to run some tests,

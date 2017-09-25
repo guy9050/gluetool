@@ -136,9 +136,9 @@ def test_std_streams_mix(popen, log):
 
 @pytest.mark.parametrize('actual_comm, stdout, stderr', [
     # pylint: disable=line-too-long
-    ((None, 'This goes to stderr\n'), (libci.utils.DEVNULL, 'DEVNULL', None), (subprocess.PIPE, 'PIPE', 'This goes to stderr\n')),
-    (('This goes to stdout\n', None), (subprocess.PIPE, 'PIPE', 'This goes to stdout\n'), (libci.utils.DEVNULL, 'DEVNULL', None)),
-    (('This goes to stdout\nThis goes to stderr\n', None), (subprocess.PIPE, 'PIPE', 'This goes to stdout\nThis goes to stderr\n'), (subprocess.STDOUT, 'STDOUT', None))
+    ((None, 'This goes to stderr\n'), (libci.utils.DEVNULL, 'DEVNULL', None), (subprocess.PIPE, 'PIPE', 'This goes to stderr\n')),  # Ignore PEP8Bear
+    (('This goes to stdout\n', None), (subprocess.PIPE, 'PIPE', 'This goes to stdout\n'), (libci.utils.DEVNULL, 'DEVNULL', None)),  # Ignore PEP8Bear
+    (('This goes to stdout\nThis goes to stderr\n', None), (subprocess.PIPE, 'PIPE', 'This goes to stdout\nThis goes to stderr\n'), (subprocess.STDOUT, 'STDOUT', None))  # Ignore PEP8Bear
 ])
 def test_forwarding(popen, log, actual_comm, stdout, stderr):
     popen.return_value.communicate.return_value = actual_comm
@@ -152,8 +152,8 @@ def test_forwarding(popen, log, actual_comm, stdout, stderr):
     popen.assert_called_once_with(['/bin/foo'], stdout=stdout[0], stderr=stderr[0])
 
     # pylint: disable=line-too-long
-    expected_stdout = '  command produced no output' if stdout[2] is None else '---v---v---v---v---v---\n{}\n---^---^---^---^---^---'.format(stdout[2])
-    expected_stderr = '  command produced no output' if stderr[2] is None else '---v---v---v---v---v---\n{}\n---^---^---^---^---^---'.format(stderr[2])
+    expected_stdout = '  command produced no output' if stdout[2] is None else '---v---v---v---v---v---\n{}\n---^---^---^---^---^---'.format(stdout[2])  # Ignore PEP8Bear
+    expected_stderr = '  command produced no output' if stderr[2] is None else '---v---v---v---v---v---\n{}\n---^---^---^---^---^---'.format(stderr[2])  # Ignore PEP8Bear
 
     _assert_logging(log, 4, "cmd='['/bin/foo']', kwargs={'stderr': '%s', 'stdout': '%s'}" % (stderr[1], stdout[1]),
                     stdout='stdout:\n{}'.format(expected_stdout),

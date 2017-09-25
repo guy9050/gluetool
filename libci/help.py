@@ -68,7 +68,6 @@ class LineWrapRawTextHelpFormatter(argparse.RawDescriptionHelpFormatter):
 
 def py_default_role(role, rawtext, text, lineno, inliner, options=None, content=None):
     # pylint: disable=unused-argument,too-many-arguments
-
     """
     Default handler we use for ``py:...`` roles, translates text to literal node.
     """

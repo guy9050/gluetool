@@ -15,7 +15,6 @@ class BeahXUnit(libci.Module):
 
     def beah_xunit_serialize(self, test_suite, result):
         # pylint: disable=no-self-use
-
         """
         Given ``testsuite`` XML element, it will fill it with data corresponding to given result.
 

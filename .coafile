@@ -7,7 +7,7 @@ use_spaces = True
 # Uncommented ones are proven and work without reporting issues against the current code base.
 # bears = PEP8Bear,CPDBear,PinRequirementsBear,PyCommentedCodeBear,PyDocStyleBear,PyImportSortBear,PyLintBear,BaditBear
 
-bears = PyUnusedCodeBear
+bears = PyUnusedCodeBear,PEP8Bear
 
 [all.libci]
 files = libci/**/*.py
