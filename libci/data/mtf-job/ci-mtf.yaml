@@ -37,7 +37,7 @@
                  ${pipeline_prepend} \
                  jenkins \
                  openstack --user-data=$CITOOL_CONFIG/default-user-data.yaml \
-                 guess-openstack-image --method force --image 'Fedora-Cloud-Base-25-compose-latest' \
+                 guess-openstack-image --method force --image 'Fedora-Cloud-Base-26-compose-latest' \
                  mtf --fedmsgfile=exported-fedmsg.yaml --test-module=$MODULENAME \
                  ${pipeline_append}
     properties:
