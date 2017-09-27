@@ -200,7 +200,7 @@ class NotifyRecipients(Module):
             try:
                 new_recipients = self.mapped_recipients.match(recipient)
                 if not new_recipients:
-                    raise CIError()
+                    raise CIError("No mapping for '{}'".format(recipient))
 
                 new_recipients = [s.strip() for s in new_recipients.split(';')]
                 self.debug("replacing '{}' with '{}'".format(recipient, ', '.join(new_recipients)))
