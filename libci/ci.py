@@ -40,7 +40,25 @@ class DryRunLevels(enum.IntEnum):
 class CIError(Exception):
     """
     Generic ``libci`` exception.
+
+    :param str message: Exception message, describing what happened.
+    :param tuple caused_by: If set, contains tuple as returned by :py:func:`sys.exc_info`, describing
+        the exception that caused this one to be born. If not set, constructor will try to auto-detect
+        this information, and if there's no such information, instance property ``caused_by`` will be
+        set to ``None``.
+
+    :ivar str message: Exception message, describing what happened.
+    :ivar tuple caused_by: If set, contains tuple as returned by :py:func:`sys.exc_info`, describing
+        the exception that caused this one to be born. ``None`` otherwise.
     """
+
+    def __init__(self, message, caused_by=None, **kwargs):
+        super(CIError, self).__init__(message, **kwargs)
+
+        if caused_by is None:
+            caused_by = sys.exc_info()
+            if caused_by != (None, None, None):
+                self.caused_by = caused_by
 
 
 class SoftCIError(CIError):
@@ -109,8 +127,9 @@ class CICommandError(CIError):
     :ivar libci.utils.ProcessOutput output: Process output data.
     """
 
-    def __init__(self, cmd, output):
-        super(CICommandError, self).__init__("Command '{}' failed with exit code {}".format(cmd, output.exit_code))
+    def __init__(self, cmd, output, **kwargs):
+        super(CICommandError, self).__init__("Command '{}' failed with exit code {}".format(cmd, output.exit_code),
+                                             **kwargs)
 
         self.cmd = cmd
         self.output = output

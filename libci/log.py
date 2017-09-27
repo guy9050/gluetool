@@ -42,6 +42,8 @@ import json
 import logging
 import traceback
 
+import jinja2
+
 try:
     import colorama
 
@@ -100,6 +102,17 @@ logging.LoggerAdapter.warn = warn_sentry
 
 logging.Logger.verbose = verbose_logger
 logging.LoggerAdapter.verbose = verbose_adapter
+
+
+_TRACEBACK_TEMPLATE = """
+{%- set label = '{}:'.format(label) %}
+---v---v---v---v---v--- {{ label | center(10) }} ---v---v---v---v---v---
+
+{{ exception.__class__.__module__ }}.{{ exception.__class__.__name__ }}: {{ exception.message }}
+
+{{ traceback }}
+---^---^---^---^---^---^----------^---^---^---^---^---^---
+"""
 
 
 class BlobLogger(object):
@@ -348,6 +361,26 @@ class LoggingFormatter(logging.Formatter):
         self.log_tracebacks = log_tracebacks
         self.colors = colors
 
+    @staticmethod
+    def _format_exception_chain(exc_info):
+        tmpl = jinja2.Template(_TRACEBACK_TEMPLATE)
+
+        output = ['']
+
+        def _add_block(label, exc, trace):
+            output.append(tmpl.render(label=label, exception=exc, traceback=''.join(traceback.format_tb(trace))))
+
+        # don't unpack traceback - it might lead to a circular reference, leaving this frame
+        # uncollectable
+        _add_block('Exception', exc_info[1], exc_info[2])
+
+        while getattr(exc_info[1], 'caused_by', None) is not None:
+            exc_info = exc_info[1].caused_by
+
+            _add_block('Caused by', exc_info[1], exc_info[2])
+
+        return '\n'.join(output)
+
     def format(self, record):
         """
         Format a logging record. It puts together pieces like time stamp,
@@ -369,7 +402,7 @@ class LoggingFormatter(logging.Formatter):
         if record.exc_info \
                 and (self.log_tracebacks is True or Logging.stderr_handler.level in (logging.DEBUG, logging.VERBOSE)):
             fmt.append('{exc_text}')
-            values['exc_text'] = '\n\nTraceback:\n' + ''.join(traceback.format_tb(record.exc_info[2]))
+            values['exc_text'] = LoggingFormatter._format_exception_chain(record.exc_info)
 
         # List all context properties of record
         ctx_properties = [prop for prop in dir(record) if prop.startswith('ctx_')]
