@@ -44,6 +44,7 @@ class RpmDiffError(object):
     :param str subpackage: subpackage where the error was found
     :param str message: message of error against which waiver's regexp is executed
     """
+
     def __init__(self, error_type, subpackage, message):
         self.error_type = error_type
         self.subpackage = subpackage

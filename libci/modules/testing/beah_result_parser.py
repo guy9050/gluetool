@@ -214,7 +214,6 @@ class BeahResultParser(libci.Module):
 
     def parse_beah_result(self, task, journal=None, recipe=None, artifact_path=None, connectable_hostname=None):
         # pylint: disable=line-too-long
-
         """
         Processes XML description of task result, complemented by the recipe XML and journal, if available,
         and returns dictionary with "standardized" keys, describing the result.

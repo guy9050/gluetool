@@ -391,7 +391,6 @@ class KojiTaskDispatcher(Module):
 
     def _reduce_section(self, commands, is_component=True, default_commands=None, all_commands=None):
         # pylint: disable=too-many-statements
-
         """
         Reduce commands to a minimal set - apply filtering rules, apply global sections,
         and return set of command sets.

@@ -115,7 +115,6 @@ class RestraintRunner(libci.Module):
 
     def _merge_task_results(self, tasks_results):
         # pylint: disable=no-self-use
-
         """
         ``task_results`` is quite common structure - ``list`` of dictionaries, with ``task`` name
         being the key, with ``task runs`` - list of dictionaries, one for each task run - as values.

@@ -90,7 +90,7 @@ class BuildDependencies(libci.Module):
 
         task_ids = [
             # pylint: disable=line-too-long
-            self._find_task_for_target_and_component(session, primary_task.target, companion) for companion in companions
+            self._find_task_for_target_and_component(session, primary_task.target, companion) for companion in companions  # Ignore PEP8Bear
         ]
 
         # Filter out only the real task IDs, ignore "not found" represented by None
@@ -107,7 +107,7 @@ class BuildDependencies(libci.Module):
     def sanity(self):
         if self.option('method') == 'companions-from-koji' and not self.option('companions'):
             # pylint: disable=line-too-long
-            raise libci.utils.IncompatibleOptionsError(self, "--companions option is required with method 'companions-from-koji'")
+            raise libci.utils.IncompatibleOptionsError(self, "--companions option is required with method 'companions-from-koji'")  # Ignore PEP8Bear
 
     def execute(self):
         self.require_shared('tasks')
@@ -120,7 +120,7 @@ class BuildDependencies(libci.Module):
 
         if method is None:
             # pylint: disable=line-too-long
-            raise libci.utils.IncompatibleOptionsError(self, "Unknown 'guessing' method '{}'".format(self.option('method')))
+            raise libci.utils.IncompatibleOptionsError(self, "Unknown 'guessing' method '{}'".format(self.option('method')))  # Ignore PEP8Bear
 
         additional_task_ids = method(self)
 
