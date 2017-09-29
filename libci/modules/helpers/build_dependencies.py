@@ -33,8 +33,20 @@ class BuildDependencies(libci.Module):
             'action': 'append',
             'default': [],
             'metavar': 'COMPONENT1,...'
+        },
+        'companion-target-fallback-map': {
+            'help': 'When there is not build for given build target, try another target as well.',
+            'metavar': 'FILE',
+            'default': None
         }
     }
+
+    @libci.utils.cached_property
+    def companion_target_fallback_map(self):
+        if not self.option('companion-target-fallback-map'):
+            return None
+
+        return libci.utils.PatternMap(self.option('companion-target-fallback-map'), logger=self.logger)
 
     def _find_task_for_target_and_component(self, session, target, component):
         """
@@ -53,7 +65,32 @@ class BuildDependencies(libci.Module):
 
         self.debug("looking for builds of component '{}' with target '{}'".format(component, target))
 
-        builds = session.getLatestBuilds(target, package=component)
+        import koji
+
+        try:
+            builds = session.getLatestBuilds(target, package=component)
+
+        except koji.GenericError as exc:
+            # Some targets exist in multiple versions, mixing lower- and upper case. Deal with it.
+            # We're giving our users chance to use another target and try again.
+            if exc.message == 'No such entry in table tag: {}'.format(target):
+                if self.companion_target_fallback_map is None:
+                    self.warn("No companion target map set, cannot fall back from '{}'".format(target), sentry=True)
+                    self.warn("No builds found for component '{}' and target '{}'".format(component, target))
+                    return None
+
+                try:
+                    alternative_target = self.companion_target_fallback_map.match(target)
+
+                except libci.CIError as exc:
+                    self.warn("Cannot fall back from a target '{}'".format(target), sentry=True)
+                    self.warn("No builds found for component '{}' and target '{}'".format(component, target))
+                    return None
+
+                return self._find_task_for_target_and_component(session, alternative_target, component)
+
+            raise exc
+
         log_dict(self.debug, 'found builds', builds)
 
         if not builds:
