@@ -70,7 +70,7 @@
           description: 'Kill the build when it is still running after this period of time.'
     properties:
       - build-discarder:
-          num-to-keep: 500
+          num-to-keep: 5000
       - inject:
           properties-content: |
             # Tell Ansible to store its *.retry file locally, to avoid possible race conditions.
