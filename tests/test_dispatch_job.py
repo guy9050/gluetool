@@ -36,6 +36,7 @@ def create_build_params(mod, **kwargs):
         'id': 17,
         'pipeline_prepend': 'some prepended options',
         'pipeline_append': 'some appended options',
+        'pipeline_state_reporter_options': 'some pipeline-report options',
         'notify_recipients_options': ['more', 'and', 'more', 'recipients'],
         'notify_email_options': 'email options'
     }

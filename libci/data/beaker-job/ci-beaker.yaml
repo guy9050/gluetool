@@ -33,6 +33,10 @@
           default: ''
           description: 'citool options that will be added at the end of citool pipeline'
       - string:
+          name: pipeline_state_reporter_options
+          default: ''
+          description: 'Additional options for pipeline-state-reporter module.'
+      - string:
           name: build_dependencies_options
           default: ''
           description: 'Additional options for build-dependencies module.'
@@ -88,6 +92,7 @@
             brew --task-id $id \
             jenkins \
             brew-build-name \
+            pipeline-state-reporter --category=beaker ${pipeline_state_reporter_options} \
             build-dependencies ${build_dependencies_options} \
             wow --wow-options="${wow_options}" \
             beah-result-parser \

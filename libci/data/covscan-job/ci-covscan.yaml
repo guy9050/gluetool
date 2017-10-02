@@ -24,6 +24,10 @@
           default: ''
           description: 'citool options that will be added at the end of citool pipeline'
       - string:
+          name: pipeline_state_reporter_options
+          default: ''
+          description: 'Additional options for pipeline-state-reporter module.'
+      - string:
           name: notify_recipients_options
           default: ''
           description: 'Additional options for notify-recipients module.'
@@ -45,6 +49,7 @@
                  brew --task-id $id
                  jenkins
                  brew-build-name
+                 pipeline-state-reporter --category=covscan ${pipeline_state_reporter_options}
                  covscan
                  make-bus-messages
                  publisher-ci-bus

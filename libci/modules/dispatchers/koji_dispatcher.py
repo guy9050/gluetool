@@ -713,7 +713,12 @@ class KojiTaskDispatcher(Module):
                 if self._subthread_counter is not None:
                     self._subthread_counter += 1
 
-                    args = ['--testing-thread-id', '{}-{}'.format(self._thread_id, self._subthread_counter)] + args
+                    child_thread_id = '{}-{}'.format(self._thread_id, self._subthread_counter)
+                    args = ['--testing-thread-id', child_thread_id] + args
+
+                if self.has_shared('report_pipeline_state'):
+                    self.shared('report_pipeline_state', 'scheduled', thread_id=child_thread_id,
+                                pipeline_category='TODO')
 
                 self.debug("module='{}', args='{}'".format(module, args))
                 self.run_module(module, args)

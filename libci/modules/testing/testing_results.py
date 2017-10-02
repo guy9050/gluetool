@@ -35,7 +35,7 @@ class TestingResults(libci.Module):
         }
     }
 
-    shared_functions = ('results',)
+    shared_functions = ('results', 'serialize_results')
 
     def __init__(self, *args, **kwargs):
         super(TestingResults, self).__init__(*args, **kwargs)
@@ -79,21 +79,37 @@ class TestingResults(libci.Module):
 
         return parsed
 
-    def _serialize_to_json(self, stream):
-        stream.write(libci.utils.format_dict([result.serialize('json') for result in self._results]))
+    @staticmethod
+    def _serialize_to_json(results):
+        return [result.serialize('json') for result in results]
 
-    def _serialize_to_xunit(self, stream):
+    @staticmethod
+    def _serialize_to_xunit(results):
         test_suites = new_xml_element('testsuites')
 
-        for result in self._results:
+        for result in results:
             test_suites.append(result.serialize('xunit'))
 
-        stream.write(test_suites.prettify(encoding='utf-8'))
+        return test_suites
 
-    serializers = {
-        'json': _serialize_to_json,
-        'xunit': _serialize_to_xunit
+    writers = {
+        'json': lambda stream, results: stream.write(libci.utils.format_dict([result for result in results])),
+        'xunit': lambda stream, results: stream.write(results.prettify(encoding='utf-8'))
     }
+
+    def serialize_results(self, output_format, results=None):
+        if results is None:
+            results = self._results
+
+        serializer = {
+            'json': TestingResults._serialize_to_json,
+            'xunit': TestingResults._serialize_to_xunit
+        }.get(output_format, None)
+
+        if serializer is None:
+            raise libci.CIError("Output format '{}' is not supported".format(output_format))
+
+        return serializer(results)
 
     def execute(self):
         initfile = self.option('init-file')
@@ -163,13 +179,10 @@ class TestingResults(libci.Module):
         libci.log.log_dict(self.debug, 'outputs', outputs)
 
         for output_format, output_file in outputs:
-            serializer = self.serializers.get(output_format, None)
-
-            if serializer is None:
-                raise libci.CIError("Output format '{}' is not supported".format(output_format))
+            serialized = self.serialize_results(output_format, self._results)
 
             with open(output_file, 'w') as f:
-                serializer(self, f)
+                self.writers[output_format](f, serialized)
                 f.flush()
 
             self.info("Results in format '{}' saved into '{}'".format(output_format, output_file))

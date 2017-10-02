@@ -69,7 +69,7 @@ def test_serialize_json(tmpdir, module, result):
     module._results.append(result)
 
     with open(str(output_file), 'w') as f:
-        module._serialize_to_json(f)
+        module.writers['json'](f, module._serialize_to_json(module._results))
         f.flush()
 
     with open(str(output_file), 'r') as f:

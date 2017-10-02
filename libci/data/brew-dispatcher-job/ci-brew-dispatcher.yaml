@@ -25,6 +25,10 @@
       - string:
           name: target
           description: 'Brew target'
+      - string:
+          name: pipeline_state_reporter_options
+          default: ''
+          description: 'Additional options for pipeline-state-reporter module.'
     triggers:
       - ci-trigger:
           jms-selector: >
@@ -40,6 +44,7 @@
                  testing-thread
                  jenkins
                  brew-build-name
+                 pipeline-state-reporter --category=dispatcher ${pipeline_state_reporter_options}
                  brew-dispatcher
     properties:
       - build-discarder:
