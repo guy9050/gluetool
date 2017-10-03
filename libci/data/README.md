@@ -87,6 +87,8 @@ Modules have dependencies, CI teams have requirements, but this is, in general, 
         brew --task-id $id \
         jenkins \
         brew-build-name \
+        publisher-umb-bus \
+        pipeline-state-reporter --category=rpmdiff ${pipeline_state_reporter_options} \
         ansible \
         restraint \
         guest-setup --playbooks=${CITOOL_CONFIG}/guest-setup/openstack-restraint.yaml \
@@ -114,6 +116,8 @@ First lines we can call a "standard" header of BaseOS CI pipelines:
         brew --task-id $id \
         jenkins \
         brew-build-name \
+        publisher-umb-bus \
+        pipeline-state-reporter --category=rpmdiff ${pipeline_state_reporter_options}
 ```
 
 #### `notify-recipients` must stand at the beginning
@@ -141,6 +145,15 @@ Many modules may kill the pipeline, therefore it'd be good to name the build rat
     jenkins \
     brew-build-name \
     ...
+```
+
+#### Pipeline state reporting
+
+Report the progress of your CI pipeline, ideally on the message bus. Provide the correct category, accept additional options.
+
+```
+        publisher-umb-bus \
+        pipeline-state-reporter --category=rpmdiff ${pipeline_state_reporter_options} \
 ```
 
 #### Support modules

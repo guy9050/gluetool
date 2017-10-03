@@ -194,6 +194,12 @@ class KojiTask(object):
         return builds[1]["nvr"] if builds and len(builds) > 1 else None
 
     @cached_property
+    def branch(self):
+        # pylint: disable=no-self-use
+
+        return None
+
+    @cached_property
     def srcrpm(self):
         """
         :returns: URL to the source rpm or None if artifacts gone (for scratch build only)

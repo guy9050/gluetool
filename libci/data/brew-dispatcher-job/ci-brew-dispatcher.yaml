@@ -44,6 +44,7 @@
                  testing-thread
                  jenkins
                  brew-build-name
+                 publisher-umb-bus
                  pipeline-state-reporter --category=dispatcher ${pipeline_state_reporter_options}
                  brew-dispatcher
     properties:

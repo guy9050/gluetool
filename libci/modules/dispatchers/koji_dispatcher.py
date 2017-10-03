@@ -717,8 +717,10 @@ class KojiTaskDispatcher(Module):
                     args = ['--testing-thread-id', child_thread_id] + args
 
                 if self.has_shared('report_pipeline_state'):
-                    self.shared('report_pipeline_state', 'scheduled', thread_id=child_thread_id,
-                                pipeline_category='TODO')
+                    # category set explicitly to 'unknown - dispatcher doesn't know, dispatcher doesn't care.
+                    # let's wait for the actual dispatched job to report and fill in the blanks
+
+                    self.shared('report_pipeline_state', 'scheduled', thread_id=child_thread_id, category='unknown')
 
                 self.debug("module='{}', args='{}'".format(module, args))
                 self.run_module(module, args)
