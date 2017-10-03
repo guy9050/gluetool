@@ -1,7 +1,9 @@
 import pytest
 
 from mock import MagicMock
-from libci.modules.helpers.make_bus_messages import CIMakeBusMessages
+
+import libci
+from libci.modules.helpers.exporter_resultsdb import CIExporterResultsDB
 from libci.results import TestResult
 from libci.modules.static_analysis.covscan.covscan import CovscanTestResult
 from libci.modules.static_analysis.rpmdiff.rpmdiff import RpmdiffTestResult
@@ -12,30 +14,37 @@ from . import create_module, patch_shared, assert_shared
 
 @pytest.fixture(name='module')
 def fixture_module():
-    return create_module(CIMakeBusMessages)
+    ci, module = create_module(CIExporterResultsDB)
+
+    module._config['topic-pattern'] = 'topic://dummy/topic/{category}/foo'
+
+    return ci, module
 
 
 def test_loadable(module):
     ci, _ = module
     # pylint: disable=protected-access
-    python_mod = ci._load_python_module('helpers', 'make_bus_messages',
-                                        'libci/modules/helpers/make_bus_messages.py')
+    python_mod = ci._load_python_module('helpers', 'exporter_resultsdb',
+                                        'libci/modules/helpers/exporter_resultsdb.py')
 
-    assert hasattr(python_mod, 'CIMakeBusMessages')
+    assert hasattr(python_mod, 'CIExporterResultsDB')
 
 
 def test_unknown_type(log, module, monkeypatch):
     _, module = module
     result_type = 'unsupported_type'
 
+    mock_publish = MagicMock()
+
     patch_shared(monkeypatch, module, {
-        'results': [TestResult(module.ci, result_type, 'overall_results')]
+        'results': [TestResult(module.ci, result_type, 'overall_results')],
+        'publish_bus_messages': mock_publish
     })
-    monkeypatch.setattr(module, 'store', MagicMock())
 
     module.execute()
+
     assert log.records[-1].message == "skipping unsupported result type '{}'".format(result_type)
-    module.store.assert_not_called()
+    mock_publish.assert_not_called()
 
 
 def test_covscan_nobrew(module, monkeypatch):
@@ -46,10 +55,7 @@ def test_covscan_nobrew(module, monkeypatch):
         'results': [TestResult(module.ci, result_type, 'overall_results')]
     })
 
-    monkeypatch.setattr(module, 'store', MagicMock())
-
     assert_shared('primary_task', module.execute)
-    module.store.assert_not_called()
 
 
 def test_covscan(module, monkeypatch):
@@ -65,37 +71,61 @@ def test_covscan(module, monkeypatch):
     mocked_task = MagicMock(nvr=nvr, scratch=True, task_id=task_id, url=brew_url, latest=latest)
     mocked_covscan_result = MagicMock(url=covscan_url, add=[], fixed=[])
     mocked_result = CovscanTestResult(module.ci, overall_results, mocked_covscan_result, mocked_task)
+    mocked_publish = MagicMock()
 
     patch_shared(monkeypatch, module, {
         'primary_task': mocked_task,
         'results': [mocked_result, mocked_result]
     })
 
+    module.ci.shared_functions['publish_bus_messages'] = mocked_publish
+
     module.execute()
 
-    result = module.bus_messages()
+    assert len(mocked_publish.mock_calls) == 4
 
-    assert len(result) == 1
-    assert len(result['covscan']) == 2
+    _, args, kwargs = mocked_publish.mock_calls[1]
 
-    assert result['covscan'][0].headers['CI_TYPE'] == 'resultsdb'
-    assert result['covscan'][0].headers['type'] == 'koji_build_pair'
-    assert result['covscan'][0].headers['testcase'] == 'dist.covscan'
-    assert result['covscan'][0].headers['scratch']
-    assert result['covscan'][0].headers['taskid'] == task_id
-    assert result['covscan'][0].headers['item'] == '{} {}'.format(nvr, latest)
+    message1 = args[0]
+    assert kwargs['topic'] == 'topic://dummy/topic/covscan/foo'
 
-    assert result['covscan'][1].body['data']['item'] == '{} {}'.format(nvr, latest)
-    assert result['covscan'][1].body['data']['newnvr'] == nvr
-    assert result['covscan'][1].body['data']['oldnvr'] == latest
-    assert result['covscan'][1].body['data']['scratch']
-    assert result['covscan'][1].body['data']['taskid'] == task_id
+    _, args, kwargs = mocked_publish.mock_calls[3]
 
-    assert result['covscan'][1].body['outcome'] == overall_results
-    assert result['covscan'][1].body['ref_url'] == covscan_url
+    message2 = args[0]
+    assert kwargs['topic'] == 'topic://dummy/topic/covscan/foo'
+
+    assert message1.headers['CI_TYPE'] == 'resultsdb'
+    assert message1.headers['type'] == 'koji_build_pair'
+    assert message1.headers['testcase'] == 'dist.covscan'
+    assert message1.headers['scratch']
+    assert message1.headers['taskid'] == task_id
+    assert message1.headers['item'] == '{} {}'.format(nvr, latest)
+
+    assert message2.headers['CI_TYPE'] == 'resultsdb'
+    assert message2.headers['type'] == 'koji_build_pair'
+    assert message2.headers['testcase'] == 'dist.covscan'
+    assert message2.headers['scratch']
+    assert message2.headers['taskid'] == task_id
+    assert message2.headers['item'] == '{} {}'.format(nvr, latest)
+
+    assert message1.body['data']['item'] == '{} {}'.format(nvr, latest)
+    assert message1.body['data']['newnvr'] == nvr
+    assert message1.body['data']['oldnvr'] == latest
+    assert message1.body['data']['scratch']
+    assert message1.body['data']['taskid'] == task_id
+    assert message1.body['outcome'] == overall_results
+    assert message1.body['ref_url'] == covscan_url
+
+    assert message2.body['data']['item'] == '{} {}'.format(nvr, latest)
+    assert message2.body['data']['newnvr'] == nvr
+    assert message2.body['data']['oldnvr'] == latest
+    assert message2.body['data']['scratch']
+    assert message2.body['data']['taskid'] == task_id
+    assert message2.body['outcome'] == overall_results
+    assert message2.body['ref_url'] == covscan_url
 
 
-def rpmdiff(result_type, module, monkeypatch):
+def rpmdiff(result_type, topic, module, monkeypatch):
     _, module = module
 
     task_id = 'dummy_task_id'
@@ -120,38 +150,39 @@ def rpmdiff(result_type, module, monkeypatch):
 
     mocked_result = RpmdiffTestResult(module.ci, run_info, result_type, payload=[subresult, subresult, subresult])
 
-    def mocked_shared(key):
-        return {
-            'task': mocked_task,
-            'results': [mocked_result, mocked_result]
-        }[key]
+    patch_shared(monkeypatch, module, {
+        'primary_task': mocked_task,
+        'results': [mocked_result, mocked_result]
+    })
 
-    monkeypatch.setattr(module, 'shared', mocked_shared)
+    mocked_publish = MagicMock()
+    module.ci.shared_functions['publish_bus_messages'] = mocked_publish
 
     module.execute()
 
-    result = module.bus_messages()
-    result_type = 'rpmdiff-{}'.format(result_type)
+    assert len(mocked_publish.mock_calls) == 12
 
-    assert len(result) == 1
-    assert len(result[result_type]) == 6
+    _, args, kwargs = mocked_publish.mock_calls[1]
 
-    assert result[result_type][0].headers['CI_TYPE'] == 'resultsdb'
-    assert result[result_type][0].headers['type'] == rpmdiff_type
-    assert result[result_type][0].headers['testcase'] == name
-    assert result[result_type][0].headers['scratch']
-    assert result[result_type][0].headers['taskid'] == task_id
-    assert result[result_type][0].headers['item'] == item
+    message = args[0]
+    assert kwargs['topic'] == 'topic://dummy/topic/rpmdiff.{}/foo'.format(topic)
 
-    assert result[result_type][0].body == subresult
+    assert message.headers['CI_TYPE'] == 'resultsdb'
+    assert message.headers['type'] == rpmdiff_type
+    assert message.headers['testcase'] == name
+    assert message.headers['scratch']
+    assert message.headers['taskid'] == task_id
+    assert message.headers['item'] == item
+
+    assert message.body == subresult
 
 
 def test_rpmdiff_comparison(module, monkeypatch):
-    rpmdiff('comparison', module, monkeypatch)
+    rpmdiff('comparison', 'comparison', module, monkeypatch)
 
 
 def test_rpmdiff_analysis(module, monkeypatch):
-    rpmdiff('analysis', module, monkeypatch)
+    rpmdiff('analysis', 'analysis', module, monkeypatch)
 
 
 DUMMY_RUN1 = {
@@ -188,6 +219,7 @@ def functional_testing(test_result, module, monkeypatch):
     distro = 'dummy_distro'
     component = 'dummy_component'
     target = 'dummy_target'
+    result_type = test_result.test_type
 
     mocked_task = MagicMock(nvr=nvr, scratch=scratch, task_id=task_id, url='dummy_brew_url',
                             latest='dummy_baseline', component=component, target=target)
@@ -207,38 +239,42 @@ def functional_testing(test_result, module, monkeypatch):
     monkeypatch.setenv('JOB_URL', job_url)
     monkeypatch.setenv('BUILD_URL', build_url)
 
+    mocked_publish = MagicMock()
+    module.ci.shared_functions['publish_bus_messages'] = mocked_publish
+
     module.execute()
 
-    result = module.bus_messages()
-    result_type = test_result.test_type
+    assert len(mocked_publish.mock_calls) == 4
 
-    assert len(result) == 1
-    assert len(result[result_type]) == 2
+    _, args, kwargs = mocked_publish.mock_calls[1]
 
-    assert result[result_type][0].headers['CI_TYPE'] == 'ci-metricsdata'
-    assert result[result_type][0].headers['component'] == nvr
-    assert result[result_type][0].headers['taskid'] == task_id
+    message = args[0]
+    assert kwargs['topic'] == 'topic://dummy/topic/tier1/foo'
 
-    assert result[result_type][1].body['component'] == nvr
-    assert result[result_type][1].body['trigger'] == 'brew build'
+    assert message.headers['CI_TYPE'] == 'ci-metricsdata'
+    assert message.headers['component'] == nvr
+    assert message.headers['taskid'] == task_id
 
-    assert result[result_type][1].body['tests'][0]['executor'] == 'CI_OSP' if result_type == 'restraint' else 'beaker'
-    assert result[result_type][1].body['tests'][0]['executed'] == EXECUTED
-    assert result[result_type][1].body['tests'][0]['failed'] == FAILED
+    assert message.body['component'] == nvr
+    assert message.body['trigger'] == 'brew build'
 
-    assert result[result_type][1].body['base_distro'] == distro
-    assert result[result_type][1].body['brew_task_id'] == task_id
+    assert message.body['tests'][0]['executor'] == 'CI_OSP' if result_type == 'restraint' else 'beaker'
+    assert message.body['tests'][0]['executed'] == EXECUTED
+    assert message.body['tests'][0]['failed'] == FAILED
+
+    assert message.body['base_distro'] == distro
+    assert message.body['brew_task_id'] == task_id
     job_name = 'ci-{}-brew-{}-2-runtest'.format(component, target)
-    assert result[result_type][1].body['job_name'] == job_name
+    assert message.body['job_name'] == job_name
 
-    assert result[result_type][1].body['build_type'] == build_type
-    assert result[result_type][1].body['jenkins_job_url'] == job_url
-    assert result[result_type][1].body['jenkins_build_url'] == build_url
-    assert result[result_type][1].body['build_number'] == 'unknown'
-    assert result[result_type][1].body['CI_tier'] == 1
-    assert result[result_type][1].body['team'] == 'baseos'
+    assert message.body['build_type'] == build_type
+    assert message.body['jenkins_job_url'] == job_url
+    assert message.body['jenkins_build_url'] == build_url
+    assert message.body['build_number'] == 'unknown'
+    assert message.body['CI_tier'] == 1
+    assert message.body['team'] == 'baseos'
     # this need fix in other commit
-    assert result[result_type][1].body['recipients'] == 'u,n,k,n,o,w,n'
+    assert message.body['recipients'] == 'unknown'
 
 
 def test_beaker(module, monkeypatch):
@@ -258,10 +294,7 @@ def test_restraint(module, monkeypatch):
 def test_ci_metricsdata_no_brew(module, monkeypatch):
     _, module = module
 
-    monkeypatch.setattr(module, 'store', MagicMock())
-
     assert_shared('primary_task', module.process_ci_metricsdata, 'dummy_result', 'dummy_result_type')
-    module.store.assert_not_called()
 
 
 def test_ci_metricsdata_no_distro(module, monkeypatch):
@@ -271,7 +304,4 @@ def test_ci_metricsdata_no_distro(module, monkeypatch):
         'primary_task': None,
     })
 
-    monkeypatch.setattr(module, 'store', MagicMock())
-
     assert_shared('distro', module.process_ci_metricsdata, 'dummy_result', 'dummy_result_type')
-    module.store.assert_not_called()

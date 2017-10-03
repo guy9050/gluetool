@@ -1,37 +1,31 @@
 import os
 import collections
 from libci import Module
+from libci.ci import DryRunLevels
 
-Message = collections.namedtuple('Message', 'headers body')
+Message = collections.namedtuple('Message', ('headers', 'body'))
 
 
-class CIMakeBusMessages(Module):
+class CIExporterResultsDB(Module):
     """
-    This module converts results of testing to messages, which can be sent to some message bus.
+    This module converts results of testing to messages, which are then published on a message bus.
     """
 
-    name = 'make-bus-messages'
-    description = 'Make messages, which can be send to message bus by other modules'
+    name = 'exporter-resultsdb'
+    description = 'Export results to resultsDB with using publish method of publish* modules'
 
-    shared_functions = ['bus_messages']
+    options = {
+        'topic-pattern': {
+            'help': 'Pattern used to create message topics. It should contain variable named ``category``.',
+            'type': str
+        }
+    }
 
-    def __init__(self, *args, **kwargs):
-        super(CIMakeBusMessages, self).__init__(*args, **kwargs)
-        self.messages = {}
+    required_options = ('topic-pattern',)
 
-    def store(self, message_type, new_message):
-        if message_type in self.messages.keys():
-            self.messages[message_type].append(new_message)
-        else:
-            self.messages[message_type] = [new_message]
+    supported_dryrun_level = DryRunLevels.ISOLATED
 
-    def bus_messages(self):
-        """
-        Returns dictionary of messages. Message are sorted by their types. Message consists of headers and body.
-        """
-        return self.messages
-
-    def process_rpmdiff_analysis(self, result):
+    def process_rpmdiff_analysis(self, result, topic_spec='rpmdiff.analysis'):
         for subresult in result.payload:
             headers = {
                 'CI_TYPE': 'resultsdb',
@@ -42,7 +36,8 @@ class CIMakeBusMessages(Module):
                 'item': subresult['data']['item'],
             }
 
-            self.store(result.test_type, Message(headers=headers, body=subresult))
+            topic = self.option('topic-pattern').format(category=topic_spec)
+            self.shared('publish_bus_messages', Message(headers=headers, body=subresult), topic=topic)
 
     def process_rpmdiff_comparison(self, result):
         """
@@ -51,7 +46,7 @@ class CIMakeBusMessages(Module):
         test type and for rpmdiff we have two test types: rpmdiff-analysis and rpmdiff-comparison,
         thus the need to have a separate handler method.
         """
-        self.process_rpmdiff_analysis(result)
+        self.process_rpmdiff_analysis(result, topic_spec='rpmdiff.comparison')
 
     def process_covscan(self, result):
         self.require_shared('primary_task')
@@ -85,7 +80,8 @@ class CIMakeBusMessages(Module):
             }
         }
 
-        self.store(result.test_type, Message(headers=headers, body=body))
+        topic = self.option('topic-pattern').format(category='covscan')
+        self.shared('publish_bus_messages', Message(headers=headers, body=body), topic=topic)
 
     def process_beaker(self, result):
         self.process_ci_metricsdata(result, 'beaker')
@@ -100,15 +96,14 @@ class CIMakeBusMessages(Module):
         of CI messages used to report results from old BaseOS CI.
         """
 
-        self.require_shared('primary_task')
-        self.require_shared('distro')
+        self.require_shared('primary_task', 'distro')
 
         task = self.shared('primary_task')
         distro = self.shared('distro')
 
         recipients = self.shared('notification_recipients', result_type=result_type)
         if recipients is None:
-            recipients = 'unknown'
+            recipients = ['unknown']
 
         # count the executed and failed tests from all results
         executed = 0
@@ -154,7 +149,8 @@ class CIMakeBusMessages(Module):
             'recipients': ','.join(recipients)
         }
 
-        self.store(result.test_type, Message(headers=headers, body=body))
+        topic = self.option('topic-pattern').format(category='tier1')
+        self.shared('publish_bus_messages', Message(headers=headers, body=body), topic=topic)
 
     def process_result(self, result):
         # in case the results type is a multi word, replace '-' with '_' to get a valid function name
@@ -163,7 +159,7 @@ class CIMakeBusMessages(Module):
             # we're sure process_function *is* callable
             # pylint: disable=not-callable
             process_function(result)
-            self.info('{} results processed'.format(result.test_type))
+            self.info('{} results sent'.format(result.test_type))
         else:
             self.warn("skipping unsupported result type '{}'".format(result.test_type), sentry=True)
 
