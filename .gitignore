@@ -1,7 +1,6 @@
 **/*~
 **/*.pyc
 **/*.pyo
-build
 dist
 version.py
 libatt.egg-info

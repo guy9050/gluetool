@@ -1,0 +1,4 @@
+source_directories:
+{% for directory in absolute_source_directories %}
+  - {{ directory | basename }}
+{% endfor -%}

@@ -1,0 +1,110 @@
+---
+
+#
+# Build a docker image of given flavor.
+#
+# Creates an image named "{{ project_name }}-{{ citool-flavor }}-centos7
+#
+
+#
+# Uses `ansible-container` to actually build the image, this playbook only prepares the environment
+# for this tool. `ansible-container` uses playbooks and roles instead of Dockerfiles, and these
+# playbooks and roles are then running in the context of the emerging image. This playbook creates
+# a temporary directory, copies necessary assests into it - `container.yml`, which describes some basic
+# properties of the image, mainly the roles to use, and our custom role, `roles/citool-docker`, which
+# is an analogy of the Dockerfile. This playbook also gathers lists of requirements, given the citool
+# flavor, and injects the additional tasks into the role.
+#
+
+- hosts: 127.0.0.1
+  connection: local
+
+  vars:
+    citool_flavor: "full"
+    project_name: "citool"
+    image_name: "{{ citool_flavor }}-centos7"
+    workdir: "/tmp/citool-docker-{{ citool_flavor }}"
+
+  tasks:
+    - fail:
+        msg: "Please provide path to citool flavor definitions, via `citool_flavors` variable."
+      when: citool_flavors is not defined
+
+    - name: "Make sure docker service is running"
+      service:
+        name: docker
+        state: started
+
+    - name: Create work directory
+      file:
+        name: "{{ workdir }}"
+        state: directory
+
+    - name: Import flavors and their definitions
+      include_vars:
+        name: flavors
+        file: "{{ citool_flavors }}"
+
+    - name: Copy role into the workdir
+      copy:
+        src: roles
+        dest: "{{ workdir }}/"
+
+    - name: "Copy source directories"
+      synchronize:
+        src: "{{ item.path }}"
+        dest: "{{ workdir }}"
+      with_items: "{{ flavors[citool_flavor] | json_query('module_dirs[?type==`directory`]') }}"
+
+    - name: "Clone source git repositories"
+      git:
+        repo: "{{ item.repo }}"
+        dest: "{{ workdir }}/{{ item.repo | replace(':', '_') | replace('/', '_') }}"
+        version: "{{ item.version }}"
+      with_items: "{{ flavors[citool_flavor] | json_query('module_dirs[?type==`git`]') }}"
+
+    # Gather all source directories:
+    - set_fact:
+        source_directories: []
+
+    # 1) those specified directly
+    - set_fact:
+        source_directories: "{{ source_directories }} + [ '{{ item.path | basename }}' ]"
+      with_items: "{{ flavors[citool_flavor] | json_query('module_dirs[?type==`directory`]') }}"
+
+    # 2) and those converted from git repository URLs
+    - set_fact:
+        source_directories: "{{ source_directories }} + [ '{{ item.repo | replace(':', '_') | replace('/', '_') }}' ]"
+      with_items: "{{ flavors[citool_flavor] | json_query('module_dirs[?type==`git`]') }}"
+
+    - set_fact:
+        absolute_source_directories: []
+
+    - set_fact:
+        absolute_source_directories: "{{ absolute_source_directories }} + [ '{{ workdir }}/{{ item }}' ]"
+      with_items:
+        - "{{ source_directories }}"
+
+    - name: Copy container.yml
+      template:
+        src: container.yml.j2
+        dest: "{{ workdir }}/container.yml"
+
+    - name: Copy vars.yml
+      template:
+        src: vars.yml.j2
+        dest: "{{ workdir }}/roles/citool-docker/vars/main.yml"
+
+    - name: Generate lists of requirements
+      command: "citool dep-list --module-dirs {{ absolute_source_directories | join(',') }} --output {{ workdir }}/compose --only-modules={{ flavors[citool_flavor].modules | join(',') }}"
+
+    - name: Inject compose tasks
+      copy:
+        src: "{{ workdir }}/compose-tasks.yml"
+        dest: "{{ workdir }}/roles/citool-docker/tasks/compose-tasks.yml"
+        mode: "u=rw,go=r"
+
+    - name: Create an image
+      command: "ansible-container build"
+      args:
+        chdir: "{{ workdir }}"
