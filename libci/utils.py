@@ -562,6 +562,8 @@ def load_yaml(filepath, logger=None):
 
     real_filepath = os.path.expanduser(filepath)
 
+    logger.debug("attempt to load YAML from '{}' (maps to '{}')".format(filepath, real_filepath))
+
     if not os.path.exists(real_filepath):
         raise CIError("File '{}' does not exist".format(filepath))
 
@@ -599,6 +601,70 @@ def _json_byteify(data, ignore_dicts=False):
 
 def load_json(stream):
     return _json_byteify(json.load(stream, object_hook=_json_byteify), ignore_dicts=True)
+
+
+class SimplePatternMap(object):
+    # pylint: disable=too-few-public-methods
+
+    """
+    `Pattern map` is a list of ``<pattern>``: ``<result>`` pairs. ``Pattern`` is a
+    regular expression used to match a string, ``result`` is what the matching
+    string maps to.
+
+    Basically an ordered dictionary with regexp matching of keys, backed by an YAML file.
+
+    :param str filepath: Path to a YAML file with map definition.
+    :param libci.log.ContextLogger logger: Logger used for logging.
+    """
+
+    def __init__(self, filepath, logger=None):
+        self.logger = logger or Logging.get_logger()
+        logger.connect(self)
+
+        pattern_map = load_yaml(filepath, logger=self.logger)
+
+        if pattern_map is None:
+            raise CIError("pattern map '{}' does not contain any patterns".format(filepath))
+
+        self._compiled_map = []
+
+        for pattern_dict in pattern_map:
+            if not isinstance(pattern_dict, dict):
+                raise CIError("Invalid format: '- <pattern>: <result>' expected, '{}' found".format(pattern_dict))
+
+            pattern = pattern_dict.keys()[0]
+            result = pattern_dict[pattern].strip()
+
+            try:
+                pattern = re.compile(pattern)
+
+            except re.error as exc:
+                raise CIError("Pattern '{}' is not valid: {}".format(pattern, str(exc)))
+
+            self._compiled_map.append((pattern, result))
+
+    def match(self, s):
+        """
+        Try to match ``s`` by the map. If the match is found - the first one wins - then its
+        transformation is applied to the ``s``.
+
+        :rtype: str
+        :returns: if matched, output of the corresponding transformation.
+        """
+
+        self.debug("trying to match string '{}' with patterns in the map".format(s))
+
+        for pattern, result in self._compiled_map:
+            self.debug("testing pattern '{}'".format(pattern.pattern))
+
+            match = pattern.match(s)
+            if match is None:
+                continue
+
+            self.debug('  matched!')
+            return result
+
+        raise CIError("Could not match string '{}' with any pattern".format(s))
 
 
 class PatternMap(object):

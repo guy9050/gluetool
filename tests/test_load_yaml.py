@@ -32,7 +32,7 @@ def test_sanity(log, tmpdir):
     loaded = load_yaml(filepath)
 
     assert data == loaded
-    assert log.records[0].message == "loaded YAML data from '{}':\n{}".format(filepath, format_dict(data))
+    assert log.records[-1].message == "loaded YAML data from '{}':\n{}".format(filepath, format_dict(data))
 
 
 def test_invalid_path():

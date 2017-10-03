@@ -3,6 +3,7 @@ import shlex
 import ast
 import _ast
 
+import libci
 from libci import Module, CIError, SoftCIError
 from libci.log import format_dict, log_dict
 from libci.utils import cached_property, load_yaml
@@ -321,9 +322,15 @@ class KojiTaskDispatcher(Module):
             'action': 'append',
             'default': []
         },
+        'pipeline-categories': {
+            # pylint: disable=line-too-long
+            'help': 'Mapping between jobs and their default pipeline category, as reported later by ``pipeline-state-reporter`` module.',
+            'type': str,
+            'default': None
+        }
     }
 
-    required_options = ['config']
+    required_options = ('config',)
 
     def __init__(self, *args, **kwargs):
         super(KojiTaskDispatcher, self).__init__(*args, **kwargs)
@@ -357,6 +364,13 @@ class KojiTaskDispatcher(Module):
                 self.debug("job '{}' provides results of type '{}'".format(job, result_type))
 
         return mapping
+
+    @cached_property
+    def pipeline_categories(self):
+        if not self.option('pipeline-categories'):
+            return None
+
+        return libci.utils.SimplePatternMap(self.option('pipeline-categories'), logger=self.logger)
 
     @cached_property
     def _rules_locals(self):
@@ -717,10 +731,33 @@ class KojiTaskDispatcher(Module):
                     args = ['--testing-thread-id', child_thread_id] + args
 
                 if self.has_shared('report_pipeline_state'):
-                    # category set explicitly to 'unknown - dispatcher doesn't know, dispatcher doesn't care.
-                    # let's wait for the actual dispatched job to report and fill in the blanks
+                    # finding the correct category might be tricky
+                    category = 'other'
 
-                    self.shared('report_pipeline_state', 'scheduled', thread_id=child_thread_id, category='unknown')
+                    # try to find out whether the command sets pipeline category, overriding any static setting
+                    joined_args = ' '.join(args)
+
+                    # pylint: disable=line-too-long
+                    match = re.search(r"""--pipeline-state-reporter-options\s*=?[\"']?\s*--category\s*=?(.*?)[ \"']""", joined_args)  # Ignore PEP8Bear
+                    if match is not None:
+                        category = match.group(1)
+
+                    # if not, there might be defaults
+                    elif self.pipeline_categories is not None:
+                        full_command = [module] + args
+
+                        try:
+                            # try to match our command with an entry from the category map, to get what
+                            # confgurator thinks would be an appropriate default category for such command
+
+                            category = self.pipeline_categories.match(' '.join(full_command))
+
+                        except CIError:
+                            # pylint: disable=line-too-long
+
+                            self.warn('Cannot find a pipeline category for job:\n{}'.format(libci.log.format_dict(full_command)), sentry=True)    # Ignore PEP8Bear
+
+                    self.shared('report_pipeline_state', 'scheduled', thread_id=child_thread_id, category=category)
 
                 self.debug("module='{}', args='{}'".format(module, args))
                 self.run_module(module, args)
