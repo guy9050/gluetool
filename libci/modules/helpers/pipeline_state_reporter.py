@@ -109,7 +109,6 @@ class PipelineStateReporter(libci.Module):
                               test_overall_result=None, test_results=None, note=None,
                               artifact=None, error_soft=None, error_message=None):
         # pylint: disable=too-many-arguments
-
         """
         Send out the message reporting the pipeline state.
 
