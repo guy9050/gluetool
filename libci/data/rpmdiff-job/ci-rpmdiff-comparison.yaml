@@ -100,6 +100,14 @@
                       manager.addBadge("info.gif", "Testing skipped - blacklisted package");
                       manager.createSummary("grey.gif").appendText("<h1>Testing skipped</h1>",
                                                                    false, false, false, "grey");
+
+                  } else if (manager.logContains(".*skipping blacklisted package.*")) {
+                      manager.listener.logger.println("[groovy-postbuild]: Skippped testing because package " +
+                                                      " blacklisted");
+                      manager.addBadge("info.gif", "Testing skipped - blacklisted package");
+                      manager.createSummary("grey.gif").appendText("<h1>Testing skipped</h1>",
+                                                                   false, false, false, "grey");
+
                   } else {
                       manager.listener.logger.println("[groovy-postbuild]: Cannot find result of the testing process");
                       manager.addBadge("warning.gif", "Tests result unknown");
@@ -110,17 +118,9 @@
               } else {
                   manager.listener.logger.println("[groovy-postbuild]: Failure - giving up on result search");
                   manager.addBadge("error.gif", "CI pipeline crashed");
+                  manager.addBadge("error.gif", "Tests did not run correctly");
                   manager.createSummary("red.gif").appendText("<h1>CI pipeline failed to finish</h1>",
                                                               false, false, false, "red");
-                  if (manager.logContains(".*could not find baseline for this build.*")) {
-                      manager.listener.logger.println("[groovy-postbuild]: Skippped testing because baseline" +
-                                                      " build not found in Brew");
-                      manager.addBadge("info.gif", "Testing skipped - no baseline build found in Brew");
-                      manager.createSummary("grey.gif").appendText("<h1>Testing skipped</h1>",
-                                                                   false, false, false, "grey");
-                  } else {
-                      manager.addBadge("error.gif", "Tests did not run correctly");
-                      manager.createSummary("red.gif").appendText("<h1>Tests did not run correctly</h1>",
-                                                                  false, false, false, "red");
-                  }
+                  manager.createSummary("red.gif").appendText("<h1>Tests did not run correctly</h1>",
+                                                              false, false, false, "red");
               }
