@@ -105,7 +105,7 @@
              jenkins \
              brew-build-name \
              publisher-umb-bus \
-             pipeline-state-reporter --category=openstack ${pipeline_state_reporter_options} \
+             pipeline-state-reporter --category=tier1 ${pipeline_state_reporter_options} \
              build-dependencies ${build_dependencies_options} \
              ansible \
              restraint \
