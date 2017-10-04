@@ -94,10 +94,13 @@ class PipelineStateReporter(libci.Module):
             'help': 'Do not send out a "started" message automatically.',
             'action': 'store_true',
             'default': False
+        },
+        'bus-topic': {
+            'help': 'Topic of the messages sent to the message bus.'
         }
     }
 
-    required_options = ('categories', 'category')
+    required_options = ('categories', 'category', 'bus-topic')
 
     shared_functions = ('report_pipeline_state',)
 
@@ -172,8 +175,15 @@ class PipelineStateReporter(libci.Module):
 
         libci.log.log_dict(self.info, 'pipeline state', message.serialize())
 
+        if not self.has_shared('publish_bus_messages'):
+            return
+
+        message = libci.utils.Bunch(headers={}, body=message.serialize())
+
+        self.shared('publish_bus_messages', message, topic=self.option('bus-topic'))
+
     def sanity(self):
-        if not self.options('categories') or not self.option('category'):
+        if not self.option('categories') or not self.option('category'):
             # both are required, and core will catch at least one of them is missing
             return
 

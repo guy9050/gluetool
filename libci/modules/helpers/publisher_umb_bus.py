@@ -207,6 +207,7 @@ class UMBPublisher(Module):
         self._environment = None
 
     def publish_bus_messages(self, messages, topic=None, **kwargs):
+        # pylint: disable=unused-argument
         """
         Publish one or more message to the message bus.
 
@@ -222,42 +223,27 @@ class UMBPublisher(Module):
         :raises libci.ci.CIError: When there are messages that module failed to send.
         """
 
-        # preserve original arguments for later call of publish_bus_messages
-        original_args = (messages,)
-        original_kwargs = libci.utils.dict_update({
-            'topic': topic
-        }, kwargs)
-
         if not isinstance(messages, list):
             messages = [messages]
 
-        # copy given list of messages - we want to pass the original down the pipeline later, therefore
-        # we must not touch it.
-        message_buffer = messages[:]
-
         topic = topic or self._environment.get('topic', None)
 
-        messages_count = len(message_buffer)
+        messages_count = len(messages)
 
         for url in self._environment['urls']:
             self.info("Creating a container for: '{}'".format(url))
 
-            container = proton.reactor.Container(TestHandler(self, url, message_buffer, topic))
+            container = proton.reactor.Container(TestHandler(self, url, messages, topic))
             container.run()
-
-            if container.connected:
-                self.info('Container connected successfully')
 
             if not messages:
                 self.info('{} messages successfully sent'.format(messages_count))
                 break
 
-            self.warn('Failed to sent out all messages, {} remaining'.format(len(message_buffer)))
+            self.warn('Failed to sent out all messages, {} remaining'.format(len(messages)))
 
-        if message_buffer:
-            raise libci.CIError('Could not send all the messages, {} remained.'.format(len(message_buffer)))
-
-        self.shared('publish_bus_messages', *original_args, **original_kwargs)
+        if messages:
+            raise libci.CIError('Could not send all the messages, {} remained.'.format(len(messages)))
 
     def execute(self):
         environments = libci.utils.load_yaml(self.option('environments'), logger=self.logger)

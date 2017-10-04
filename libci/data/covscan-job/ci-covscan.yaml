@@ -49,10 +49,8 @@
                  brew --task-id $id
                  jenkins
                  brew-build-name
+                 publisher-umb-bus
                  pipeline-state-reporter --category=covscan ${pipeline_state_reporter_options}
-                 covscan
-                 make-bus-messages
-                 publisher-ci-bus
                  covscan
                  exporter-resultsdb
                  notify-email ${notify_email_options}

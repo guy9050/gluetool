@@ -52,8 +52,8 @@
                  brew --task-id $id
                  jenkins
                  brew-build-name
+                 publisher-umb-bus
                  pipeline-state-reporter --category=rpmdiff ${pipeline_state_reporter_options}
-                 publisher-ci-bus
                  rpmdiff --type comparison
                  postgresql
                  rpmdiff-waiver

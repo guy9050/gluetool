@@ -59,6 +59,7 @@ class CIBusPublisher(Module):
         return session
 
     def publish_bus_messages(self, messages, **kwargs):
+        # pylint: disable=unused-argument
         """
         Publish one or more message to the message bus.
 
@@ -74,16 +75,10 @@ class CIBusPublisher(Module):
         :raises libci.ci.CIError: When there are messages that module failed to send.
         """
 
-        # preserve original arguments for later call of publish_bus_messages
-        original_args = (messages,)
-        original_kwargs = kwargs.copy()
-
         if not isinstance(messages, list):
             messages = [messages]
 
-        message_buffer = messages[:]
-
-        for message in message_buffer:
+        for message in messages:
             # body needs to be a string
             body = format_dict(message.body)
 
@@ -95,5 +90,3 @@ class CIBusPublisher(Module):
                 continue
 
             self._session.send(body=body, headers=message.headers, destination=self.option('destination'))
-
-        self.shared('publish_bus_messages', *original_args, **original_kwargs)
