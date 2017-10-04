@@ -93,7 +93,7 @@
             jenkins \
             brew-build-name \
             publisher-umb-bus \
-            pipeline-state-reporter --category=beaker ${pipeline_state_reporter_options} \
+            pipeline-state-reporter --category=other ${pipeline_state_reporter_options} \
             build-dependencies ${build_dependencies_options} \
             wow --wow-options="${wow_options}" \
             beah-result-parser \
