@@ -83,6 +83,12 @@
                       manager.createSummary("green.gif").appendText("<h1>Tests passed</h1>",
                                                                     false, false, false, "green");
 
+                  } else if (manager.logContains(".* Covscan testing failed.*")) {
+                      manager.listener.logger.println("[groovy-postbuild]: Covscan testing failed");
+                      manager.addBadge("error.gif", "Covscan testing failed");
+                      manager.createSummary("red.gif").appendText("<h1>Covscan testing failed</h1>",
+                                                                    false, false, false, "red");
+
                   } else if (manager.logContains(".*covscan.*skipping job.*")) {
                       manager.listener.logger.println("[groovy-postbuild]: Skippped testing because build" +
                                                       " target not enabled");
