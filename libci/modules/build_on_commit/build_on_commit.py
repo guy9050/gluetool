@@ -172,7 +172,7 @@ class CIBuildOnCommit(Module):
         self.info("Waiting for brew to finish task: {0}".format(task_url))
 
         if self.has_shared('report_pipeline_state'):
-            self.shared('report_pipeline_state', 'started', task={
+            self.shared('report_pipeline_state', 'started', artifact={
                 'id': taskid,
                 'branch': self.branch,
                 'scratch': True
@@ -183,7 +183,7 @@ class CIBuildOnCommit(Module):
         self._run_command(command, exception=BocBuildError)
 
         if self.has_shared('report_pipeline_state'):
-            self.shared('report_pipeline_state', 'finished', task={
+            self.shared('report_pipeline_state', 'finished', artifact={
                 'id': taskid,
                 'branch': self.branch,
                 'scratch': True
