@@ -53,7 +53,7 @@
                  jenkins
                  brew-build-name
                  publisher-umb-bus
-                 pipeline-state-reporter --category=rpmdiff ${pipeline_state_reporter_options}
+                 pipeline-state-reporter --category=rpmdiff.comparison ${pipeline_state_reporter_options}
                  rpmdiff --type comparison
                  postgresql
                  rpmdiff-waiver
