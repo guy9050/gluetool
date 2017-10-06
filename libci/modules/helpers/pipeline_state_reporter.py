@@ -173,7 +173,7 @@ class PipelineStateReporter(libci.Module):
                 'scratch': task.scratch
             }
 
-        libci.log.log_dict(self.info, 'pipeline state', message.serialize())
+        libci.log.log_dict(self.debug, 'pipeline state', message.serialize())
 
         if not self.has_shared('publish_bus_messages'):
             return
