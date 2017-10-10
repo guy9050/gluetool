@@ -422,7 +422,7 @@ class Beaker(Module):
             # this most probably means that the jobs aborted
             if exc.output.exit_code == 2:
                 matrix_url = self._get_matrix_url(exc.output.stdout)
-                raise BeakerJobwatchError(self.shared('brew_task'), matrix_url)
+                raise BeakerJobwatchError(self.shared('primary_task'), matrix_url)
             raise CIError("Failure during 'jobwatch' execution: {}".format(exc.output.stderr))
 
         return output
