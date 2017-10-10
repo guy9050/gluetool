@@ -1,30 +1,34 @@
-import os
+import tempfile
 
-from libci import Module, CIError, CICommandError
+import libci
+from libci import CIError, CICommandError
 
 
-class CIMTF(Module):
+class CIMTF(libci.Module):
     name = 'mtf'
 
     options = {
-        'fedmsgfile': {
-            'help': 'file containing received fedmsg'
-        },
         'test-module': {
             'help': 'which module to test',
             'default': 'testing-module'
         }
     }
 
-    required_options = ['fedmsgfile']
-
     def execute(self):
-        fedmsgf = os.path.abspath(self.option('fedmsgfile'))
+        self.require_shared('trigger_message', 'image', 'provision')
+
+        trigger_message = self.shared('trigger_message')
+
         module = self.option('test-module')
 
-        self.shared('jenkins').set_build_name(module)
+        if module is None:
+            module = trigger_message.get('msg', {}).get('name', None)
 
-        self.require_shared('image', 'provision')
+            if module is None:
+                # pylint: disable=line-too-long
+                raise CIError("Cannot find module to test - either use --test-module option, or provide 'trigger_message' shared function")  # Ignore PEP8Bear
+
+        self.shared('jenkins').set_build_name(module)
 
         image = self.shared('image')
         if image is None:
@@ -37,13 +41,18 @@ class CIMTF(Module):
 
         guest = guests[0]
 
-        setupcmds = [
-            'dnf -y copr enable phracek/meta-test-family-devel',
-            'dnf -y install  meta-test-family'
-        ]
+        # Fedora does not have Python2, while Ansible needs Python2...
+        guest.execute('dnf install -y python2 python2-dnf libselinux-python')
 
-        map(guest.execute, setupcmds)
-        guest.copy_to(fedmsgf, '/tmp/message.yaml')
+        # Store message into a file which we then copy to the guest
+        message_file = tempfile.NamedTemporaryFile()
+        message_file.close()
+
+        libci.utils.dump_yaml(trigger_message, message_file.name, logger=self.logger)
+
+        guest.setup(variables={
+            'FEDMSG_FILE': message_file.name
+        })
 
         try:
             cmd = 'bash /usr/share/moduleframework/tools/run-them.sh {} /tmp/message.yaml'.format(module)

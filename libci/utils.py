@@ -587,7 +587,7 @@ def dump_yaml(data, filepath, logger=None):
 
     logger = logger or Logging.get_logger()
 
-    real_filepath = os.path.expanduser(filepath)
+    real_filepath = os.path.abspath(os.path.expanduser(filepath))
     dirpath = os.path.dirname(real_filepath)
 
     if not os.path.exists(dirpath):
@@ -597,6 +597,7 @@ def dump_yaml(data, filepath, logger=None):
 
         with open(real_filepath, 'w') as f:
             YAML.dump(data, f)
+            f.flush()
 
     except ruamel.yaml.YAMLError as e:
         raise CIError("Unable to save YAML file '{}': {}".format(filepath, str(e)))
@@ -623,8 +624,42 @@ def _json_byteify(data, ignore_dicts=False):
     return data
 
 
-def load_json(stream):
+def _load_json(stream):
     return _json_byteify(json.load(stream, object_hook=_json_byteify), ignore_dicts=True)
+
+
+def load_json(filepath, logger=None):
+    """
+    Load data stored in JSON file, and return their Python representation.
+
+    :param str filepath: Path to a file. ``~`` or ``~<username>`` are expanded before using.
+    :param libci.log.ContextLogger logger: Logger used for logging.
+    :rtype: object
+    :returns: structures representing data in the file.
+    :raises libci.ci.CIError: if it was not possible to successfully load content of the file.
+    """
+
+    if not filepath:
+        raise CIError('File path is not valid: {}'.format(filepath))
+
+    logger = logger or Logging.get_logger()
+
+    real_filepath = os.path.expanduser(filepath)
+
+    logger.debug("attempt to load JSON from '{}' (maps to '{}')".format(filepath, real_filepath))
+
+    if not os.path.exists(real_filepath):
+        raise CIError("File '{}' does not exist".format(filepath))
+
+    try:
+        with open(real_filepath, 'r') as f:
+            data = _load_json(f)
+            logger.debug("loaded JSON data from '{}':\n{}".format(filepath, format_dict(data)))
+
+            return data
+
+    except Exception as exc:
+        raise CIError("Unable to load JSON file '{}': {}".format(filepath, str(exc)))
 
 
 class SimplePatternMap(object):
