@@ -16,6 +16,7 @@ class TriggerMessage(libci.Module):
     """
 
     name = 'trigger-message'
+    description = 'Provides access to the message that triggered the current pipeline.'
 
     options = {
         'source': {

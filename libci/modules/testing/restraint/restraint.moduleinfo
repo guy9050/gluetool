@@ -1,6 +1,6 @@
 ---
 - name: restraint
-  description: Restraint
+  description: "Provides basic access to restraint client."
   dependencies:
     repo:
       - name: beaker-harness

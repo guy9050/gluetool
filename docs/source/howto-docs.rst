@@ -34,23 +34,11 @@ How to generate HTML documentation locally
 
      pip install -r requirements.txt
 
-* regenerate RST documents from their Python sources
+* generate documentation with ansible playbook
 
   .. code-block:: bash
 
-     sphinx-apidoc -T -e -o docs/source/ libci/
-
-* regenerate RST documents for ``citool`` modules
-
-  .. code-block:: bash
-
-     python docs/generate-module-page.py
-
-* generate documentation
-
-  .. code-block:: bash
-
-     make -C docs/ html
+     ansible-playbook generate-docs.yml
 
 You documentation awaits you at ``docs/build/html/index.html``.
 

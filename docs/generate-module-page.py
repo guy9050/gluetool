@@ -6,11 +6,14 @@ Generate RST files documenting modules.
 
 import inspect
 import os
+import sys
+import re
 
 import libci
 
 
 LOGGER = libci.log.Logging.create_logger()
+OUTPUT_DIR = 'docs/source'
 
 MOD_TEMPLATE = """
 ``{name}``
@@ -74,6 +77,11 @@ def gather_module_data():
         # strip the CWD out
         filepath = filepath.replace(os.path.commonprefix([cwd, filepath]), '')
 
+        modpath = os.path.splitext(filepath)[0].replace('/', '.')
+
+        # strip tox modpath out
+        modpath = re.sub(r'\.tox\..*\.site-packages\.', '', modpath)
+
         description = properties['description'] if properties['description'] is not None else ''
 
         modules.append({
@@ -82,15 +90,15 @@ def gather_module_data():
             'klass': klass,
             'filepath': filepath,
             'modclass': properties['class'],
-            'modpath': os.path.splitext(filepath)[0].replace('/', '.'),
+            'modpath': modpath,
             'filepath_mtime': os.stat(filepath).st_mtime
         })
 
     return modules
 
 
-def write_module_doc(module_data):
-    doc_file = 'docs/source/modules/{}.rst'.format(module_data['name'])
+def write_module_doc(module_data, output_dir):
+    doc_file = '{}/modules/{}.rst'.format(output_dir, module_data['name'])
 
     try:
         doc_mtime = os.stat(doc_file).st_mtime
@@ -121,8 +129,8 @@ def write_module_doc(module_data):
     LOGGER.info('module {} doc page written'.format(module_data['name']))
 
 
-def write_args_parser_getters(modules):
-    with open('docs/source/module_parsers.py', 'w') as f:
+def write_args_parser_getters(modules, output_dir):
+    with open('{}/module_parsers.py'.format(output_dir), 'w') as f:
         f.write('# pylint: disable=invalid-name,protected-access\n')
 
         for module_data in modules:
@@ -131,9 +139,9 @@ def write_args_parser_getters(modules):
         f.flush()
 
 
-def write_index_doc(modules):
+def write_index_doc(modules, output_dir):
     with open('docs/source/modules.txt', 'r') as f:
-        with open('docs/source/modules.rst', 'w') as g:
+        with open('{}/modules.rst'.format(output_dir), 'w') as g:
             g.write(f.read().format(modules='\n'.join(sorted([
                 # pylint: disable=line-too-long
                 '   ' + libci.utils.render_template('{name}: {description} <modules/{name}>', **module_data) for module_data in modules
@@ -142,13 +150,14 @@ def write_index_doc(modules):
 
 
 def main():
+    output_dir = OUTPUT_DIR if len(sys.argv) == 1 else sys.argv[1]
     modules = gather_module_data()
 
     for module_data in modules:
-        write_module_doc(module_data)
+        write_module_doc(module_data, output_dir)
 
-    write_args_parser_getters(modules)
-    write_index_doc(modules)
+    write_args_parser_getters(modules, output_dir)
+    write_index_doc(modules, output_dir)
 
 
 if __name__ == '__main__':

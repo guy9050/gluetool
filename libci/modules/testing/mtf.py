@@ -6,6 +6,7 @@ from libci import CIError, CICommandError
 
 class CIMTF(libci.Module):
     name = 'mtf'
+    description = 'Provides basic access to restraint client.'
 
     options = {
         'test-module': {

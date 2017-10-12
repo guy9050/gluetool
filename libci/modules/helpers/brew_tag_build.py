@@ -22,6 +22,8 @@ class CIBrewTagBuild(Module):
     """
 
     name = 'brew-tag-build'
+    description = 'Tags brew builds with given tag if given build target is matched and the overall result of' \
+                  'testing results is passed.'
     config = None
 
     options = {

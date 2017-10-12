@@ -23,6 +23,7 @@ class Restraint(libci.Module):
     """
 
     name = 'restraint'
+    description = 'Provides basic access to restraint client.'
 
     options = {
         'restraint-options': {

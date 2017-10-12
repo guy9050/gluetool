@@ -9,6 +9,7 @@ class ExecuteCommand(libci.Module):
     """
 
     name = 'execute-command'
+    description = 'Run an arbitrary command, or their sequence, and log the output.'
 
     options = {
         'command': {

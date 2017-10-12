@@ -54,6 +54,7 @@ class RestraintRunner(libci.Module):
     """
 
     name = 'restraint-runner'
+    description = 'This module runs recipe sets, prepared by other modules, using restraint harness.'
 
     options = {
         'use-snapshots': {

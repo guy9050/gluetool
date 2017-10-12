@@ -8,6 +8,7 @@ class GuestSetup(libci.Module):
     """
 
     name = 'guest-setup'
+    description = 'Prepare guests for testing process.'
 
     options = {
         'playbooks': {

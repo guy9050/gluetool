@@ -13,6 +13,7 @@ class Docker(libci.Module):
     """
 
     name = 'docker'
+    description = 'Provides access to Docker server via Python API.'
 
     options = {
         'protocol-version': {
