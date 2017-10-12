@@ -85,7 +85,7 @@ def test_connect(configured_module, monkeypatch):
 def test_connect_fail(module, monkeypatch):
     _, module = module
     monkeypatch.setattr(psycopg2, "connect", MagicMock(side_effect=Exception))
-    with pytest.raises(libci.CIError, match=r"could not connect to PostgreSQL"):
+    with pytest.raises(libci.CIError, match=r"Could not connect to PostgreSQL server 'None': "):
         module.connect()
 
 

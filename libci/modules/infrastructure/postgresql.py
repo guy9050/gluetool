@@ -87,9 +87,8 @@ class CIPostgreSQL(libci.Module):
         try:
             self._connection = psycopg2.connect(host=host, port=port, dbname=dbname,
                                                 user=user, password=password)
-        except Exception as e:
-            self.debug('connection error: {}'.format(e))
-            raise libci.CIError("could not connect to PostgreSQL '{}': {}".format(host, str(e)))
+        except Exception as exc:
+            raise libci.CIError("Could not connect to PostgreSQL server '{}': {}".format(host, exc.message))
 
     def server_version(self):
         cursor = self._connection.cursor()
