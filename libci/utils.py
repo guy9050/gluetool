@@ -12,15 +12,21 @@ import sys
 import threading
 import time
 import urllib2
-import yaml
 
 import bs4
 import urlnorm
 import jinja2
 
+# Don't know why pylint reports "Relative import 'ruamel.yaml', should be 'libci.ruamel.yaml'" :(
+# pylint: disable=relative-import
+import ruamel.yaml
+
 from libci import CIError, SoftCIError, CICommandError
 from libci.log import Logging, ContextAdapter, log_blob, BlobLogger, format_dict
 
+
+YAML = ruamel.yaml.YAML()
+YAML.indent(sequence=4, mapping=4, offset=2)
 
 try:
     # pylint: disable=ungrouped-imports
@@ -559,13 +565,41 @@ def load_yaml(filepath, logger=None):
 
     try:
         with open(real_filepath, 'r') as f:
-            data = yaml.load(f)
+            data = YAML.load(f)
             logger.debug("loaded YAML data from '{}':\n{}".format(filepath, format_dict(data)))
 
             return data
 
-    except yaml.YAMLError as e:
+    except ruamel.yaml.YAMLError as e:
         raise CIError("Unable to load YAML file '{}': {}".format(filepath, str(e)))
+
+
+def dump_yaml(data, filepath, logger=None):
+    """
+    Save data stored in variable to YAML file.
+
+    :param object data: Data to store in YAML file
+    :param str filepath: Path to an output file.
+    :raises libci.ci.CIError: if it was not possible to successfully save data to file.
+    """
+    if not filepath:
+        raise CIError("File path is not valid: '{}'".format(filepath))
+
+    logger = logger or Logging.get_logger()
+
+    real_filepath = os.path.expanduser(filepath)
+    dirpath = os.path.dirname(real_filepath)
+
+    if not os.path.exists(dirpath):
+        raise CIError("Cannot save file in nonexistent directory '{}'".format(dirpath))
+
+    try:
+
+        with open(real_filepath, 'w') as f:
+            YAML.dump(data, f)
+
+    except ruamel.yaml.YAMLError as e:
+        raise CIError("Unable to save YAML file '{}': {}".format(filepath, str(e)))
 
 
 def _json_byteify(data, ignore_dicts=False):

@@ -1,0 +1,11 @@
+---
+- name: rpmdiff-waiver
+  description: Run autowaivers from Errata on RPMDiff runs
+  dependencies:
+    yum:
+      - postgresql
+    pip:
+      - psycopg2==2.7.1
+      - requests==2.18.4
+      - requests-kerberos==0.11.0
+      - beautifulsoup4==4.5.3

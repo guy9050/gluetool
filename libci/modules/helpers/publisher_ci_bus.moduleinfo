@@ -1,0 +1,6 @@
+---
+- name: publisher-ci-bus
+  description: Notification module - CI msg bus
+  dependencies:
+    pip:
+      - stomp.py==4.1.17

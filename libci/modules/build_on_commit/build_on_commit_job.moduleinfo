@@ -1,0 +1,6 @@
+---
+- name: build-on-commit-job
+  description: Jenkins build-on-commit job
+  dependencies:
+    pip:
+      - jenkins-job-builder==1.6.2

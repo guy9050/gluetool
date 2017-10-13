@@ -1,0 +1,7 @@
+---
+- name: publisher-umb-bus
+  description: "Notification module - Unified message bus (UMB)"
+  dependencies:
+    pip:
+      - proton==0.8.8
+      - python-qpid-proton==0.17.0

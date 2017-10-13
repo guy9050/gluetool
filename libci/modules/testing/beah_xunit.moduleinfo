@@ -1,0 +1,3 @@
+---
+- name: beah-xunit
+  description: "xUnit serializer for Beaker and Restraint testing results."

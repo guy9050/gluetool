@@ -1,0 +1,48 @@
+---
+- name: koji
+  description: Provide Koji task details to other modules
+  dependencies:
+    yum:
+      - koji
+      - brewkoji
+    pip:
+      - pyOpenSSL==17.0.0
+      - beautifulsoup4==4.5.3
+    ansible_tasks:
+      - name: "Inject system rpm package into virtualenv"
+        file:
+          path: "{{ citool_virtualenv }}/lib64/python2.7/site-packages/rpm"
+          state: link
+          src: "/usr/lib64/python2.7/site-packages/rpm"
+      - name: "Inject system rpmUtils package into virtualenv"
+        file:
+          path: "{{ citool_virtualenv }}/lib64/python2.7/site-packages/rpmUtils"
+          state: link
+          src: "/usr/lib/python2.7/site-packages/rpmUtils"
+      - name: "Create temporary directory"
+        command: "mktemp -d"
+        register: tmpdir
+      - name: "Check whether koji modules are installed"
+        shell: "source {{ citool_virtualenv }}/bin/activate && python -c 'import koji; import koji_cli'"
+        ignore_errors: "yes"
+        register: koji_present
+      - name: "Clone koji repository"
+        git:
+          clone: "yes"
+          repo: "https://pagure.io/koji.git"
+          dest: "{{ tmpdir.stdout }}/koji"
+        when: koji_present.rc == 1
+      - name: "Install koji module"
+        shell: "source {{ citool_virtualenv }}/bin/activate && make install"
+        args:
+          chdir: "{{ tmpdir.stdout }}/koji/koji"
+        when: koji_present.rc == 1
+      - name: "Install koji_cli module"
+        shell: "source {{ citool_virtualenv }}/bin/activate && make install"
+        args:
+          chdir: "{{ tmpdir.stdout }}/koji/cli/koji_cli"
+        environment:
+          DESTDIR: "/"
+        when: koji_present.rc == 1
+      - name: "Check whether koji modules are installed"
+        shell: "source {{ citool_virtualenv }}/bin/activate && python -c 'import koji; import koji_cli'"

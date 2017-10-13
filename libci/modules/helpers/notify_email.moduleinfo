@@ -1,0 +1,6 @@
+---
+- name: notify-email
+  description: Notification module - e-mail
+  dependencies:
+    pip:
+      - mako==1.0.6

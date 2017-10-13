@@ -1,0 +1,6 @@
+---
+- name: koji-dispatcher
+  description: "Configurable brew dispatcher"
+
+- name: brew-dispatcher
+  description: "Configurable brew dispatcher"
