@@ -82,7 +82,7 @@
             notify_email_opts="--add-reservation"
           fi
 
-          timeout --preserve-status --foreground --signal=SIGTERM ${timeout_duration} \
+          timeout --preserve-status --foreground --signal=SIGUSR1 ${timeout_duration} \
           citool -c -i -o citool-debug.txt \
             ${pipeline_prepend} \
             notify-recipients ${notify_recipients_options} \

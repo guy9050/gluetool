@@ -18,7 +18,7 @@ DEFAULT_CITOOL_CONFIG_PATHS = [
     os.path.expanduser('~/.citool.d/citool')
 ]
 
-DEFAULT_HANDLED_SIGNALS = (signal.SIGUSR1, signal.SIGUSR2)
+DEFAULT_HANDLED_SIGNALS = (signal.SIGUSR2,)
 
 
 def split_module_argv(argv, modules):
@@ -100,10 +100,16 @@ def main():
         if handler is not None:
             return handler(signum, frame)
 
+    def _sigusr1_handler(signum, frame):
+        # pylint: disable=unused-argument
+
+        raise CIError('Pipeline timeout expired.')
+
     sigint_handler = functools.partial(_signal_handler,
                                        handler=orig_sigint_handler, msg='Interrupted by SIGINT (Ctrl+C?)')
     sigterm_handler = functools.partial(_signal_handler,
                                         handler=orig_sigint_handler, msg='Interrupted by SIGTERM')
+    sigusr1_handler = functools.partial(_signal_handler, handler=_sigusr1_handler)
 
     # pylint: disable=too-many-nested-blocks,broad-except
     try:
@@ -113,6 +119,7 @@ def main():
         # CI is initialized, we can install our logging handlers
         signal.signal(signal.SIGINT, sigint_handler)
         signal.signal(signal.SIGTERM, sigterm_handler)
+        signal.signal(signal.SIGUSR1, sigusr1_handler)
 
         for signum in DEFAULT_HANDLED_SIGNALS:
             signal.signal(signum, _signal_handler)
