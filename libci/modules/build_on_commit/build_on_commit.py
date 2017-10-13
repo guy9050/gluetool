@@ -11,17 +11,6 @@ REQUIRED_CMDS = ['rhpkg', 'brew', 'rpmbuild']
 
 
 class BocBuildError(SoftCIError):
-    MODULE_NAME = 'build-on-commit'
-    SUBJECT = 'Failed to build {component}, branch {branch}'
-    BODY = """
-Build on commit failed for {component} from branch {branch} while trying to build for target {target}
-
-Please, see the brew task for more details about the problem:
-
-    {task_url}
-    """
-    BODY_HEADER = ''
-
     def __init__(self, branch, component, target, task_url):
         super(BocBuildError, self).__init__('Build failed')
 
@@ -29,14 +18,6 @@ Please, see the brew task for more details about the problem:
         self.component = component
         self.target = target
         self.task_url = task_url
-
-    def _template_variables(self):
-        return {
-            'branch': self.branch,
-            'component': self.component,
-            'target': self.target,
-            'task_url': self.task_url
-        }
 
 
 class CIBuildOnCommit(Module):

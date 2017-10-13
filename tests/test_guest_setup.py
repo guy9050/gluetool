@@ -45,7 +45,7 @@ def test_setup(log, module):
 
     # pylint: disable=protected-access
     mod._config['playbooks'] = ','.join(playbooks)
-    ci._add_shared('run_playbook', None, dummy_run_playbook)
+    ci._add_shared('run_playbook', mod, dummy_run_playbook)
 
     ci.shared('setup_guest', guests, dummy_option=17)
 

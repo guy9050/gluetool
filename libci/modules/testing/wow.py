@@ -5,25 +5,6 @@ from libci import CIError, SoftCIError, CICommandError
 
 
 class NoTestAvailableError(SoftCIError):
-    SUBJECT = 'No tests found for component'
-    BODY = """
-
-CI could not find any suitable tests for the component. This can have many different causes, e.g.:
-
-    * component's configuration is incomplete, it does not provide correct test plan with tests
-      for the component, or
-    * the test plan is provided but it's empty, or
-    * the test plan is not empty but there are filters applied in the configuration, and the result
-      is an empty set of tests.
-
-Please, see the documentation on CI configuration and what is required to correctly enable CI for
-a component ([1]), current configuration ([2]), and/or consult with component's QE how to resolve
-this situation.
-
-[1] https://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/UserHOWTO#EnableCIforacomponent
-[2] https://gitlab.cee.redhat.com/baseos-qe/citool-config/raw/production/brew-dispatcher.yaml
-    """
-
     def __init__(self):
         super(NoTestAvailableError, self).__init__('No tests provided for the component')
 
@@ -73,6 +54,9 @@ class WorkflowTomorrow(libci.Module):
         """
 
         self.info('running workflow-tomorrow to get job description')
+
+        if not self.option('wow-options'):
+            raise NoTestAvailableError()
 
         self.require_shared('tasks', 'primary_task')
 
@@ -150,7 +134,3 @@ class WorkflowTomorrow(libci.Module):
                 raise NoTestAvailableError()
 
             raise CIError("Failure during 'wow' execution: {}".format(exc.output.stderr))
-
-    def sanity(self):
-        if not self.option('wow-options'):
-            raise NoTestAvailableError()

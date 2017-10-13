@@ -8,65 +8,21 @@ import libci
 from libci import Module, CIError, SoftCIError
 from libci.ci import DryRunLevels
 from libci.log import log_blob, format_dict
-from libci.utils import cached_property, run_command, check_for_commands, CICommandError, dict_update
+from libci.utils import cached_property, run_command, check_for_commands, CICommandError, dict_update, Bunch
 from libci.results import TestResult, publish_result
 
 REQUIRED_CMDS = ['covscan']
 
 
 class CovscanFailedError(SoftCIError):
-    SUBJECT = 'Failed to test {nvr}'
-    MODULE_NAME = 'covscan'
-    BODY = """
-CI aborted while trying to test the build via Covscan.
-This is usually caused by:
-
-* build via Covscan failed
-* Covscan failed to finish testing for some reason
-
-See Covscan logs for more details {covscan_result_url}.
-
-If you have any questions, feel free to ask at Red Hat IRC channel #coverity or coverity-users@redhat.com
-    """
-
-    def __init__(self, url, task):
+    def __init__(self, url):
         super(CovscanFailedError, self).__init__('Covscan testing failed, task did not pass')
 
-        self.url = url
-        self.task = task
-
-    def _template_variables(self):
-        variables = super(CovscanFailedError, self)._template_variables()
-
-        variables.update({
-            'covscan_result_url': self.url,
-            'nvr': self.task.nvr
-        })
-
-        return variables
+        self.covscan_result_url = url
 
 
 class NoCovscanBaselineFoundError(SoftCIError):
     STATUS = 'SKIP'
-    MODULE_NAME = 'covscan'
-    SUBJECT = 'Could not find baseline package for Covscan'
-    BODY = """
-CI skipped the testing due to the fact, that the baseline build for Covscan was not found.
-This can be caused by:
-
-    * this is the first build of the package on this build target
-    * there is some issue with build propagation for the build target
-
-To check the tagged packages for given brew build you can user the 'brew' tool (e.g. for build
-target 'rhel-7.4-candidate' and package bash):
-
-    $ brew list-tagged rhel-7.4-candidate bash
-
-Please file an issue to release enginnering if you encounter inconsistencies in Brew by sending
-out an email to 'release-engineering@redhat.com'.
-
-If you have any questions, feel free to ask at Red Hat IRC channel #coverity or coverity-users@redhat.com
-    """
 
     def __init__(self):
         super(NoCovscanBaselineFoundError, self).__init__('Could not find baseline for this build')
@@ -76,10 +32,11 @@ class CovscanTestResult(TestResult):
     # pylint: disable=too-few-public-methods
 
     def __init__(self, ci, overall_result, covscan_result, task, **kwargs):
-        urls = {
+        urls = kwargs.pop('urls', {})
+        urls.update({
             'covscan_url': covscan_result.url,
             'brew_url': task.url
-        }
+        })
 
         super(CovscanTestResult, self).__init__(ci, 'covscan', overall_result, urls=urls, **kwargs)
 
@@ -87,9 +44,25 @@ class CovscanTestResult(TestResult):
         self.added = len(covscan_result.added)
         self.baseline = task.latest
 
+    @classmethod
+    def _unserialize_from_json(cls, ci, input_data):
+        covscan_result = Bunch(url=input_data['urls']['covscan_url'],
+                               fixed=range(0, input_data['fixed']),
+                               added=range(0, input_data['added']))
+
+        task = Bunch(url=input_data['urls']['brew_url'], latest=input_data['baseline'])
+
+        return CovscanTestResult(ci, input_data['overall_result'], covscan_result, task,
+                                 ids=input_data['ids'], urls=input_data['urls'], payload=input_data['payload'])
+
     def _serialize_to_json(self):
         serialized = super(CovscanTestResult, self)._serialize_to_json()
-        return dict_update(serialized, {'baseline': self.baseline})
+
+        return dict_update(serialized, {
+            'baseline': self.baseline,
+            'fixed': self.fixed,
+            'added': self.added
+        })
 
     def _serialize_to_xunit_property_dict(self, parent, properties, names):
         if 'covscan_url' in properties:
@@ -114,7 +87,7 @@ class CovscanResult(object):
         try:
             diff = json.loads(diff_json)
         except ValueError:
-            raise CovscanFailedError(url, self.module.task)
+            raise CovscanFailedError(url)
         log_blob(self.module.debug, 'This is what we got from covscan', diff)
         defects = diff['defects']
         self.module.debug('Defects:\n{}\nfetched from {}'.format(format_dict(defects), url))
@@ -232,7 +205,7 @@ class CICovscan(Module):
         self.info('Covscan task url: {0}'.format(covscan_result.url))
 
         if covscan_result.status_failed():
-            raise CovscanFailedError(covscan_result.url, self.task)
+            raise CovscanFailedError(covscan_result.url)
 
         covscan_result.download_artifacts()
 

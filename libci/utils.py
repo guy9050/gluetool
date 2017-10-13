@@ -16,7 +16,7 @@ import yaml
 
 import bs4
 import urlnorm
-import mako
+import jinja2
 
 from libci import CIError, SoftCIError, CICommandError
 from libci.log import Logging, ContextAdapter, log_blob, BlobLogger, format_dict
@@ -58,24 +58,7 @@ def dict_update(dst, *args):
 
 
 class IncompatibleOptionsError(SoftCIError):
-    SUBJECT = 'Incompatible options detected'
-    BODY = """
-    Configuration of your component uses incompatible options for `{module.unique_name}` module:
-
-        {message}
-
-    Please, review the configuration of your component - the default settings are usually sane
-    and should not lead to this error. For valid options, their values and possible combinations
-    see documentation for `{module.unique_name}` module.
-    """
-
-    def __init__(self, module, message):
-        super(IncompatibleOptionsError, self).__init__(message)
-
-        self.module = module
-
-    def _template_variables(self):
-        return dict_update(super(IncompatibleOptionsError, self)._template_variables(), {'module': self.module})
+    pass
 
 
 class Bunch(object):
@@ -517,12 +500,12 @@ def treat_url(url, shorten=False, logger=None):
     return url.strip()
 
 
-def render_template(tmpl, **kwargs):
+def render_template(tmpl, logger=None, **kwargs):
     """
     Render template. Logs errors, and raises an exception when it's not possible
     to correctly render the remplate.
 
-    :param tmpl: Template to render. It can be either :py:class:`mako.template.Template` instance,
+    :param tmpl: Template to render. It can be either :py:class:`jinja2.environment.Template` instance,
       or a string.
     :param dict kwargs: Keyword arguments passed to render process.
     :rtype: str
@@ -530,18 +513,25 @@ def render_template(tmpl, **kwargs):
     :raises libci.ci.CIError: when the rednering failed.
     """
 
+    logger = logger or Logging.get_logger()
+
     try:
         if isinstance(tmpl, str):
+            log_blob(logger.debug, 'template', tmpl)
+
             return tmpl.format(**kwargs).strip()
 
-        if isinstance(tmpl, mako.template.Template):
+        if isinstance(tmpl, jinja2.environment.Template):
+            if tmpl.filename != '<template>':
+                with open(tmpl.filename, 'r') as f:
+                    log_blob(logger.debug, 'rendering template: template', f.read())
+
             return tmpl.render(**kwargs).strip()
 
         raise CIError('Unhandled template type {}'.format(type(tmpl)))
 
-    except:
-        details = mako.exceptions.text_error_template().render()
-        raise CIError('Cannot render template:\n{}'.format(details))
+    except Exception as exc:
+        raise CIError('Cannot render template: {}'.format(str(exc)))
 
 
 def load_yaml(filepath, logger=None):

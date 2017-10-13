@@ -7,7 +7,7 @@ import bs4
 import libci
 from libci.log import log_blob, log_dict
 from libci.results import TestResult, publish_result
-from libci.utils import new_xml_element
+from libci.utils import new_xml_element, IncompatibleOptionsError
 
 
 # The exit status values come from restraint sources: https://github.com/p3ck/restraint/blob/master/src/errors.h
@@ -16,25 +16,6 @@ class RestraintExitCodes(enum.IntEnum):
     # pylint: disable=invalid-name
     RESTRAINT_TASK_RUNNER_RESULT_ERROR = 10
     RESTRAINT_SSH_ERROR = 14
-
-
-class IncompatibleOptionsError(libci.SoftCIError):
-    SUBJECT = 'Incompatible options detected'
-    BODY = """
-Configuration of your component uses incompatible options for `restraint-runner` module:
-
-    {message}
-
-Please, review the configuration of your component - the default settings are usually sane
-and should not lead to this error. For valid options, their values and possible combinations
-see documentation for `restraint-runner` ([1]).
-
-[1] https://url.corp.redhat.com/e19c028
-    """
-
-    def __init__(self):
-        msg = '--parallelize-task-sets is not supported when snapshots are disabled'
-        super(IncompatibleOptionsError, self).__init__(msg)
 
 
 class RestraintTestResult(TestResult):
@@ -432,7 +413,7 @@ class RestraintRunner(libci.Module):
                 self.info('Will run recipe set tasks serially, using snapshots')
         else:
             if self.parallelize_task_sets:
-                raise IncompatibleOptionsError()
+                raise IncompatibleOptionsError('--parallelize-task-sets is not supported when snapshots are disabled')
 
             self.info('Will run recipe set tasks serially, without snapshots')
 

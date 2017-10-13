@@ -7,31 +7,17 @@ from libci.utils import cached_property, dict_update, fetch_url, format_dict, wa
 
 
 class NotBuildTaskError(SoftCIError):
-    SUBJECT = 'Task id does not point to a valid build task'
-    BODY = """
-Task id passed to the {} module does not point to a valid build task. CI needs a valid build task to work. If you entered the task id manually you might have passed in an incorrect id. If this failure comes from automated build, something is obviously wrong and this incident should be reported as a bug.
-    """
+    def __init__(self, task_id):
+        super(NotBuildTaskError, self).__init__('Task is not a valid, finished build task')
 
-    def __init__(self, task_id, name):
-        NotBuildTaskError.BODY = NotBuildTaskError.BODY.format(name)
-        NotBuildTaskError.SUBJECT = NotBuildTaskError.SUBJECT.format(name)
-
-        super(NotBuildTaskError, self).__init__("task '{}' is not a valid finished build task".format(task_id))
+        self.task_id = task_id
 
 
 class NoArtifactsError(SoftCIError):
-    SUBJECT = 'No artifacts found for the {} task'
-    BODY = """
-Koji task has no artifacts - packages, logs, etc. This can happen e.g. in the case of scratch
-builds - their artifacts are removed from {} few days after their completion.
-    """
+    def __init__(self, task_id):
+        super(NoArtifactsError, self).__init__('No artifacts found for task')
 
-    def __init__(self, task_id, name):
-        NoArtifactsError.BODY = NoArtifactsError.BODY.format(name)
-        NoArtifactsError.SUBJECT = NoArtifactsError.SUBJECT.format(name)
-
-        msg = "no artifacts found for {} task '{}', expired scratch build?".format(name, task_id)
-        super(NoArtifactsError, self).__init__(msg)
+        self.task_id = task_id
 
 
 class KojiTask(object):
@@ -82,7 +68,7 @@ class KojiTask(object):
             wait('waiting for task to be non waiting', self._check_nonwaiting_task, timeout=wait_timeout)
 
         if not self._valid_task():
-            raise NotBuildTaskError(self.task_id, module_name)
+            raise NotBuildTaskError(self.task_id)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.task_id)
@@ -239,7 +225,7 @@ class KojiTask(object):
             base_path = koji.pathinfo.taskrelpath(task['id'])
             return '/'.join(['{0}/work'.format(self.pkgs_url), base_path, filename])
 
-        raise NoArtifactsError(self.task_id, self.module_name)
+        raise NoArtifactsError(self.task_id)
 
     @cached_property
     def nvr(self):

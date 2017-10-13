@@ -110,6 +110,7 @@
              ansible \
              restraint \
              guest-setup --playbooks=${CITOOL_CONFIG}/guest-setup/openstack-restraint.yaml \
+             notify-email-beah-formatter \
              wow --wow-options="${wow_options}" \
              beah-result-parser \
              openstack ${openstack_opts} \

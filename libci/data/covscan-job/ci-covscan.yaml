@@ -51,6 +51,7 @@
                  brew-build-name
                  publisher-umb-bus
                  pipeline-state-reporter --category=covscan ${pipeline_state_reporter_options}
+                 notify-email-covscan-formatter
                  covscan
                  exporter-resultsdb
                  notify-email ${notify_email_options}

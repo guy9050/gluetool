@@ -95,6 +95,7 @@
             publisher-umb-bus \
             pipeline-state-reporter --category=other ${pipeline_state_reporter_options} \
             build-dependencies ${build_dependencies_options} \
+            notify-email-beah-formatter \
             wow --wow-options="${wow_options}" \
             beah-result-parser \
             guess-product ${guess_product_options} \

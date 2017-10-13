@@ -1,0 +1,21 @@
+[
+    {
+        "baseline": "pacemaker-1.1.16-12.el7_4.2",
+        "ids": {
+            "testing-thread-id": "0bf4a49ff70d-3"
+        },
+        "overall_result": "FAILED",
+        "payload": [],
+        "result_class": "libci.ci.static_analysis/covscan-covscan.CovscanTestResult",
+        "test_type": "covscan",
+        "urls": {
+            "brew_url": "https://brewweb.engineering.redhat.com/brew/taskinfo?taskID=14148106",
+            "covscan_url": "http://cov01.lab.eng.brq.redhat.com/covscanhub/task/56967/",
+            "jenkins_build": "https://baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/job/ci-covscan/38885/"
+        },
+        "added": 17,
+        "fixed": 19,
+        "result_class": "libci.ci.static_analysis/covscan-covscan.CovscanTestResult",
+        "baseline": "dummy-baseline"
+    }
+]

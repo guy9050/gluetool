@@ -177,7 +177,7 @@ def run(result, log, module, monkeypatch, tmpdir):
 
     module.execute()
 
-    assert log.records[-1].message == 'Result of testing: {}'.format(result)
+    assert log.match(message='Result of testing: {}'.format(result))
 
 
 def test_pass_run(log, module, monkeypatch, tmpdir):

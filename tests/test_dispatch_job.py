@@ -3,7 +3,7 @@ import pytest
 import libci
 import libci.dispatch_job
 
-from . import create_module
+from . import create_module, patch_shared
 
 
 class FakeJenkins(object):
@@ -118,7 +118,7 @@ def test_no_recipients(module):
     assert mod.build_params == expected_params
 
 
-def test_dispatch(module, job_name='ci-dummy'):
+def test_dispatch(module, monkeypatch, job_name='ci-dummy'):
     ci, mod = module
 
     # Init options & build params
@@ -127,12 +127,10 @@ def test_dispatch(module, job_name='ci-dummy'):
     # DispatchJenkinsJobModule does not have any build byt default, let's set use some dummy name
     mod.job_name = job_name
 
-    def dummy_jenkins():
-        return {
+    patch_shared(monkeypatch, mod, {
+        'jenkins': {
             job_name: FakeJenkins(**expected_params)
         }
-
-    # pylint: disable=protected-access
-    ci._add_shared('jenkins', None, dummy_jenkins)
+    })
 
     mod.execute()

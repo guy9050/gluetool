@@ -37,22 +37,6 @@ REQUIRED_CMDS = ['rpmdiff-remote']
 # NOT USED CURRENTLY, keeping here for future usage
 class NoBaselineFoundError(SoftCIError):
     STATUS = 'SKIP'
-    SUBJECT = 'Could not find baseline for RPMDiff'
-    BODY = """
-CI skipped the testing due to the fact, that the baseline build for comparison was not found.
-This can be caused by:
-
-    * this is the first build of the package on this build target
-    * there is some issue with build propagation for the build target
-
-To check the tagged packages for given brew build you can user the 'brew' tool (e.g. for build
-target 'rhel-7.4-candidate' and package bash):
-
-    $ brew list-tagged rhel-7.4-candidate bash
-
-Please file an issue to release enginnering if you encounter inconsistencies in  Brew by sending
-out an email to 'release-engineering@redhat.com'.
-    """
 
     def __init__(self):
         super(NoBaselineFoundError, self).__init__('Could not find baseline for this build')
@@ -70,13 +54,15 @@ class RpmdiffTestResult(TestResult):
     def __init__(self, ci, runinfo, test_type, **kwargs):
         overall_result = RPMDIFF_OVERALL_SCORE[runinfo['overall_score']['description']]
 
-        ids = {
+        ids = kwargs.pop('ids', {})
+        ids.update({
             'rpmdiff_run_id': runinfo['run_id'],
-        }
+        })
 
-        urls = {
+        urls = kwargs.pop('urls', {})
+        urls.update({
             'rpmdiff_url': runinfo['web_url']
-        }
+        })
 
         super(RpmdiffTestResult, self).__init__(ci, 'rpmdiff-{}'.format(test_type), overall_result,
                                                 ids=ids, urls=urls, **kwargs)
@@ -84,6 +70,19 @@ class RpmdiffTestResult(TestResult):
     @property
     def rpmdiff_test_type(self):
         return self.test_type.split("-")[1]
+
+    @classmethod
+    def _unserialize_from_json(cls, ci, input_data):
+        runinfo = {
+            'overall_score': {
+                'description': input_data['overall_result'].replace('_', ' ').lower().capitalize()
+            },
+            'run_id': input_data['ids']['rpmdiff_run_id'],
+            'web_url': input_data['urls']['rpmdiff_url']
+        }
+
+        return RpmdiffTestResult(ci, runinfo, input_data['test_type'].split('-')[1],
+                                 ids=input_data['ids'], urls=input_data['urls'], payload=input_data['payload'])
 
     def _serialize_to_xunit_property_dict(self, parent, properties, names):
         if 'rpmdiff_run_id' in properties:

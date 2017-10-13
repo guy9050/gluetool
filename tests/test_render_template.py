@@ -5,16 +5,15 @@ import pytest
 import libci
 from libci.utils import render_template
 
-from mako.template import Template
+import jinja2
 
 
 TMPL_STR = """
 This is a dummy string template: {foo}
 """
 
-
-TMPL_MAKO = Template("""
-This is a dummy Mako template: ${bar}
+TMPL_JINJA2 = jinja2.Template("""
+This is a dummy Jinja2 template: {{ bar }}
 """)
 
 
@@ -22,8 +21,8 @@ def test_render_string():
     assert render_template(TMPL_STR, foo='baz') == 'This is a dummy string template: baz'
 
 
-def test_render_mako():
-    assert render_template(TMPL_MAKO, bar='baz') == 'This is a dummy Mako template: baz'
+def test_render_jinja2():
+    assert render_template(TMPL_JINJA2, bar='baz') == 'This is a dummy Jinja2 template: baz'
 
 
 def test_unexpected_template_type():
@@ -36,6 +35,5 @@ def test_missing_variable_string():
         render_template(TMPL_STR)
 
 
-def test_missing_variable_mako():
-    with pytest.raises(libci.CIError):
-        render_template(TMPL_MAKO)
+def test_missing_variable_jinja2():
+    assert render_template(TMPL_JINJA2) == 'This is a dummy Jinja2 template:'

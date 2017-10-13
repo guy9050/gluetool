@@ -2,24 +2,9 @@ import collections
 import re
 
 import libci
-from libci import CIError, SoftCIError, Module
+from libci import CIError, Module
 from libci.log import format_dict
-from libci.utils import cached_property, PatternMap
-
-
-class IncompatibleOptionsError(SoftCIError):
-    SUBJECT = 'Incompatible options detected'
-    BODY = """
-Configuration of your component uses incompatible options for `guess-openstack-image` module:
-
-    {message}
-
-Please, review the configuration of your component - the default settings are usually sane
-and should not lead to this error. For valid options, their values and possible combinations
-see documentation for `guess-openstack-image` ([1]).
-
-[1] https://url.corp.redhat.com/9249e74
-    """
+from libci.utils import cached_property, PatternMap, IncompatibleOptionsError
 
 
 class GuessOpenstackImage(Module):

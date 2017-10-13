@@ -61,6 +61,24 @@ static-analysis-coala:
   script:
     - /usr/bin/coala --non-interactive --config .coafile
 
+# Run integration tests
+#
+# Note: integration tests have - so far - the configuration available. While making use
+# of dry-run levels, they may be able to test integration of modules or even whole pipelines.
+#
+# Might deserve a better integration with CI process, this will run into issues when testing
+# against changes in the configuration that were not merged yet :/
+integration-tests:
+  stage: test
+  script:
+    - yum -y install wget
+    - wget --no-check-certificate -O /etc/pki/ca-trust/source/anchors/RH-IT-Root-CA.crt https://password.corp.redhat.com/RH-IT-Root-CA.crt
+    - update-ca-trust
+    - git clone https://gitlab.cee.redhat.com/baseos-qe/citool-config.git ~/.citool.d
+    - pushd ~/.citool.d && git checkout production && popd
+    - pip install tox
+    - tox -e py27-integration-tests -- --integration-config=$(echo ~/.citool.d)
+
 # Generate documentation from the sources
 #
 # Note: executed for all commits in all branches to make sure it is actually possible

@@ -17,6 +17,8 @@ class BeahResultParser(libci.Module):
 
     shared_functions = ('parse_beah_result',)
 
+    supported_dryrun_level = libci.ci.DryRunLevels.DRY
+
     def _find_architecture(self, result, task, journal, recipe):
         # Architecture is not in <task/> but journal and recipe seem to be a reliable sources
 

@@ -361,8 +361,8 @@ def test_not_valid_build_tasks(module):
     # not finished build tasks
     for task in NON_BUILD_TASKS:
         FakeClientSession.fake_key = task
-        match = "task '{}' is not a valid finished build task".format(task)
-        with pytest.raises(libci.CIError, match=match):
+
+        with pytest.raises(libci.CIError, match=r'Task is not a valid, finished build task'):
             module.tasks([task])
 
 
@@ -370,8 +370,7 @@ def test_unavailable_artifacts(module):
     # not finished build tasks
     for task in EXPIRED_TASKS:
         FakeClientSession.fake_key = task
-        match = "no artifacts found for dummy-module task '{}', expired scratch build?".format(task)
-        with pytest.raises(libci.CIError, match=match):
+        with pytest.raises(libci.CIError, match=r'No artifacts found for task'):
             module.tasks([task])
 
 
