@@ -389,7 +389,7 @@ class Notify(Module):
 
         return utils.Bunch(task_id='<Task ID not available>', nvr='<NVR not available>',
                            owner='<Owner not available>', issuer='<No issuer available>',
-                           branch='<Branch not available>', target=utils.Bunch(target='<Build target not available>'))
+                           branch='<Branch not available>', target='<Build target not available>')
 
     def _format_result(self, result):
         self.debug('result:\n{}'.format(result))
