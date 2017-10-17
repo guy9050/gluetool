@@ -1,3 +1,4 @@
+import copy
 import os
 
 import libci
@@ -223,6 +224,9 @@ class UMBPublisher(Module):
         :raises libci.ci.CIError: When there are messages that module failed to send.
         """
 
+        orig_args = (copy.copy(messages),)
+        orig_kwargs = libci.utils.dict_update({}, kwargs, {'topic': topic})
+
         if not isinstance(messages, list):
             messages = [messages]
 
@@ -230,8 +234,10 @@ class UMBPublisher(Module):
 
         messages_count = len(messages)
 
+        self.info('Publishing {} messages on the CI bus'.format(messages_count))
+
         for url in self._environment['urls']:
-            self.info("Creating a container for: '{}'".format(url))
+            self.debug("Creating a container for: '{}'".format(url))
 
             container = proton.reactor.Container(TestHandler(self, url, messages, topic))
             container.run()
@@ -244,6 +250,8 @@ class UMBPublisher(Module):
 
         if messages:
             raise libci.CIError('Could not send all the messages, {} remained.'.format(len(messages)))
+
+        self.overloaded_shared('publish_bus_messages', *orig_args, **orig_kwargs)
 
     def execute(self):
         environments = libci.utils.load_yaml(self.option('environments'), logger=self.logger)
