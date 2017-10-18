@@ -148,7 +148,7 @@ class RpmDiffWaiver(Module):
         :rtype: dict
         :returns: waiver lists in dictionary, key is test name
         """
-        cursor = self.shared("postgresql_cursor")
+        cursor = self.shared("db_cursor")
         search = {
             'package': package,
             'products': product_versions
@@ -168,7 +168,7 @@ class RpmDiffWaiver(Module):
         :rtype: tuple
         :returns: found product versions
         """
-        cursor = self.shared("postgresql_cursor")
+        cursor = self.shared("db_cursor")
         search = {
             'brew_tag': brew_tag
         }
@@ -318,7 +318,7 @@ class RpmDiffWaiver(Module):
             self.info('looks like rpmdiff was not run, cowardly refusing to run')
             return
 
-        self.require_shared('postgresql')
+        self.require_shared('db_cursor')
 
         if self.option('mapping'):
             self.mapping = load_yaml(self.option('mapping'), logger=self.logger)
