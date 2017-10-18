@@ -549,6 +549,11 @@ class Module(Configurable):
     :ivar dict _config: internal configuration store. Values of all module options
       are stored here, regardless of them being set on command-line or in the
       configuration file.
+    :ivar dict _overloaded_shared_functions: If a shared function added by this module
+        overloades an older function of the same name, registered by a previous module,
+        the overloaded one is added into this dictionary. The module can then call this
+        saved function - using :py:meth:`overloaded_shared` - to implement a "chain" of
+        shared functions, when one calls another, implementing the same operation.
     """
 
     name = None
@@ -557,7 +562,6 @@ class Module(Configurable):
     description = None
     """Short module description, displayed in ``citool``'s module listing."""
 
-    #: A list of names of module's shared functions
     shared_functions = []
     """Iterable of names of shared functions exported by the module."""
 
@@ -596,6 +600,8 @@ class Module(Configurable):
 
         else:
             self.debug('no data file found')
+
+        self._overloaded_shared_functions = {}
 
     @property
     def dryrun_level(self):
@@ -654,8 +660,11 @@ class Module(Configurable):
         to use them.
         """
 
-        for func in self.shared_functions:
-            self.ci.add_shared(func, self)
+        for funcname in self.shared_functions:
+            if self.has_shared(funcname):
+                self._overloaded_shared_functions[funcname] = self.get_shared(funcname)
+
+            self.ci.add_shared(funcname, self)
 
     def del_shared(self, funcname):
         self.ci.del_shared(funcname)
@@ -665,6 +674,9 @@ class Module(Configurable):
 
     def require_shared(self, *names, **kwargs):
         return self.ci.require_shared(*names, **kwargs)
+
+    def get_shared(self, funcname):
+        return self.ci.get_shared(funcname)
 
     def execute(self):
         # pylint: disable-msg=no-self-use
@@ -691,6 +703,20 @@ class Module(Configurable):
 
     def shared(self, *args, **kwargs):
         return self.ci.shared(*args, **kwargs)
+
+    def overloaded_shared(self, funcname, *args, **kwargs):
+        """
+        Call a shared function overloaded by the one provided by this module. This way,
+        a module can give chance to other implementations of its action, e.g. to publish
+        messages on a different message bus.
+        """
+
+        if funcname not in self._overloaded_shared_functions:
+            return None
+
+        self.debug("calling overloaded shared function '{}'".format(funcname))
+
+        return self._overloaded_shared_functions[funcname](*args, **kwargs)
 
     def run_module(self, module, args=None):
         self.ci.run_module(module, args or [])
@@ -914,7 +940,12 @@ class CI(Configurable):
 
         return all([_check(name) for name in names])
 
-    # call a shared function
+    def get_shared(self, funcname):
+        if not self.has_shared(funcname):
+            return None
+
+        return self.shared_functions[funcname][1]
+
     def shared(self, funcname, *args, **kwargs):
         if funcname not in self.shared_functions:
             return None
