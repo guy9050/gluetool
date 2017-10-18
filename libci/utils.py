@@ -469,14 +469,12 @@ def fetch_url(url, logger=None, success_codes=(200,)):
     return response, content
 
 
-def treat_url(url, shorten=False, logger=None):
+def treat_url(url, logger=None):
     """
     Remove "weird" artifacts from the given URL. Collapse adjacent '.'s, apply '..', etc.
 
     :param str url: URL to clear.
-    :param bool shorten: If ``True``, will try to shorten the URL, using remote service.
-    :param libci.log.ContextAdapter logger: parent logger whose methods will be used for logging.
-      This is purely optional, used only when contacting shortening service.
+    :param libci.log.ContextAdapter logger: logger to use for logging.
     :rtype: str
     :returns: Treated URL.
     """
@@ -495,13 +493,6 @@ def treat_url(url, shorten=False, logger=None):
 
         else:
             raise exc
-
-    if shorten is True:
-        try:
-            _, url = fetch_url('https://url.corp.redhat.com/new?{}'.format(url), logger=logger)
-
-        except CIError as exc:
-            logger.warn('Unable to shorten URL (see log for more details): {}'.format(exc.message), sentry=True)
 
     return url.strip()
 
