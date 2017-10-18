@@ -16,6 +16,10 @@
           name: pipeline_append
           default: ''
           description: 'citool options that will be added at the end of citool pipeline'
+      - string:
+          name: timeout_duration
+          default: '24h'
+          description: 'Kill the build when it is still running after this period of time.'
     triggers:
       - ci-trigger:
           jms-selector:
@@ -28,17 +32,16 @@
       - workspace-cleanup
     builders:
       - shell: |
-          env
-          export CI_MESSAGE
-          echo $CI_MESSAGE
-          MODULENAME=`echo "$CI_MESSAGE" | egrep -o '"name".*'|sed 's/.*: "\(.*\)".*/\1/'`
-          echo "$CI_MESSAGE" > exported-fedmsg.yaml
+          timeout --preserve-status --foreground --signal=SIGTERM ${timeout_duration} \
           citool -c -i -o citool-debug.txt \
                  ${pipeline_prepend} \
+                 trigger-message --source=environment --env-var=CI_MESSAGE --output-file=trigger-message.yaml \
                  jenkins \
+                 ansible \
+                 guest-setup --playbooks=${CITOOL_CONFIG}/guest-setup/openstack-mtf.yaml \
                  openstack --user-data=$CITOOL_CONFIG/default-user-data.yaml \
                  guess-openstack-image --method force --image 'Fedora-Cloud-Base-26-compose-latest' \
-                 mtf --fedmsgfile=exported-fedmsg.yaml --test-module=$MODULENAME \
+                 mtf --fedmsg-file=fedmsg.yaml \
                  ${pipeline_append}
     properties:
       - build-discarder:

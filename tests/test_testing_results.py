@@ -72,8 +72,7 @@ def test_serialize_json(tmpdir, module, result):
         module.writers['json'](f, module._serialize_to_json(module._results))
         f.flush()
 
-    with open(str(output_file), 'r') as f:
-        assert result.serialize('json') == libci.utils.load_json(f)[0]
+    assert result.serialize('json') == libci.utils.load_json(str(output_file))[0]
 
 
 def test_unknown_serializer(module):
@@ -125,8 +124,7 @@ def test_store(log, module, result, tmpdir):
     assert log.match(message="Results in format 'json' saved into '{}'".format(str(json_file)))
     assert log.match(message="Results in format 'xunit' saved into '{}'".format(str(xunit_file)))
 
-    with open(str(json_file), 'r') as f:
-        written_results = libci.utils.load_json(f)
+    written_results = libci.utils.load_json(str(json_file))
 
     assert isinstance(written_results, list)
     assert len(written_results) == 1
