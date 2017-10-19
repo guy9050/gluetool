@@ -41,7 +41,7 @@
                  guest-setup --playbooks=${CITOOL_CONFIG}/guest-setup/openstack-mtf.yaml \
                  openstack --user-data=$CITOOL_CONFIG/default-user-data.yaml \
                  guess-openstack-image --method force --image 'Fedora-Cloud-Base-26-compose-latest' \
-                 mtf --fedmsg-file=fedmsg.yaml \
+                 mtf \
                  ${pipeline_append}
     properties:
       - build-discarder:
