@@ -1,3 +1,5 @@
+import copy
+
 import stomp
 
 import libci
@@ -75,8 +77,13 @@ class CIBusPublisher(Module):
         :raises libci.ci.CIError: When there are messages that module failed to send.
         """
 
+        orig_args = (copy.copy(messages),)
+        orig_kwargs = kwargs.copy()
+
         if not isinstance(messages, list):
             messages = [messages]
+
+        self.info('Publishing {} messages on the CI bus'.format(len(messages)))
 
         for message in messages:
             # body needs to be a string
@@ -90,3 +97,7 @@ class CIBusPublisher(Module):
                 continue
 
             self._session.send(body=body, headers=message.headers, destination=self.option('destination'))
+
+        self.info('{} messages successfully sent'.format(len(messages)))
+
+        self.overloaded_shared('publish_bus_messages', *orig_args, **orig_kwargs)
