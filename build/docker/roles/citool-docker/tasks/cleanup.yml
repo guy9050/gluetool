@@ -1,0 +1,7 @@
+---
+
+- name: Clean up /tmp
+  command: "rm -rf /tmp/*"
+
+- name: Clean yum caches
+  command: "yum clean all"
