@@ -1,4 +1,5 @@
 import pytest
+from mock import MagicMock
 
 import libci
 import libci.dispatch_job
@@ -42,8 +43,8 @@ def test_loadable(module):
     assert hasattr(python_mod, 'BeakerJob')
 
 
-def test_build_params(module):
-    _, mod = module
+def test_build_params(module_with_primary_task, monkeypatch):
+    mod = module_with_primary_task
 
     expected_params = create_beaker_build_params(mod)
 

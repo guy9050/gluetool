@@ -1,10 +1,11 @@
 # pylint: disable=blacklisted-name
 
 import pytest
+from mock import MagicMock
 
 import libci
 
-from . import CaplogWrapper
+from . import CaplogWrapper, patch_shared
 
 
 def pytest_addoption(parser):
@@ -46,3 +47,15 @@ def fixture_log(caplog):
     wrapper = CaplogWrapper(caplog)
     wrapper.clear()
     return wrapper
+
+
+@pytest.fixture(name='module_with_primary_task')
+def fixture_module_with_primary_task(module, monkeypatch):
+    _, module = module
+
+    # make sure primary_task exists to get to check for jenkins module
+    patch_shared(monkeypatch, module, {
+        'primary_task': MagicMock(task_id=17),
+    })
+
+    return module

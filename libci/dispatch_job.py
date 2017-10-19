@@ -1,6 +1,3 @@
-import os
-
-from libci import CIError
 from libci.utils import cached_property, format_dict
 
 
@@ -15,8 +12,7 @@ class DispatchJenkinsJobMixin(object):
 
     .. note::
 
-       Value of the ``--id`` option is, by default, first searched in the environment, at it is expected
-       to be set by Jenkins' machinery, e.g. by the ``redhat-ci-plugin``'.
+       Value of the ``id`` parameter is read from the shared function ``primary_task``.
 
     .. note::
 
@@ -31,10 +27,6 @@ class DispatchJenkinsJobMixin(object):
     options = {
         'testing-thread-id': {
             'help': 'Testing thread ID'
-        },
-        'id': {
-            'help': 'Task ID. If environment variable ``id`` exists, it overrides the command-line option.',
-            'type': int
         },
         'job-name': {
             'help': 'Jenkins job name. Use this option to override the default name.'
@@ -62,13 +54,6 @@ class DispatchJenkinsJobMixin(object):
         }
     }
 
-    def sanity(self):
-        # if there's `id` env var, use it
-        self._config['id'] = os.environ.get('id', self._config.get('id'))
-
-        if not self.option('id'):
-            raise CIError('Task ID not specified')
-
     @cached_property
     def build_params(self):
         """
@@ -87,7 +72,9 @@ class DispatchJenkinsJobMixin(object):
 
         return {
             'testing_thread_id': self.option('testing-thread-id'),
-            'id': self.option('id'),
+            # note that id is kept here for legacy reasons for now, should be removed in the future
+            'id': self.shared('primary_task').task_id,
+            'task_id': self.shared('primary_task').task_id,
             'pipeline_prepend': self.option('pipeline-prepend'),
             'pipeline_append': self.option('pipeline-append'),
             'pipeline_state_reporter_options': self.option('pipeline-state-reporter-options'),
@@ -102,12 +89,9 @@ class DispatchJenkinsJobMixin(object):
 
         :param str job_name: name of the Jenkins job to invoke.
         :param dict build_params: build parameters.
-        :raises libci.ci.CIError: when Jenkins connection is not available.
         """
 
         jenkins = self.shared('jenkins')
-        if jenkins is None:
-            raise CIError("Module requires Jenkins connection, provided e.g. by the 'jenkins' module")
 
         self.debug("invoking job '{}' with parameters:\n{}".format(job_name, format_dict(build_params)))
         jenkins[job_name].invoke(build_params=build_params)
@@ -116,5 +100,7 @@ class DispatchJenkinsJobMixin(object):
 
     def execute(self):
         job_name = self.option('job-name') if self.option('job-name') else self.job_name
+
+        self.require_shared('primary_task', 'jenkins')
 
         self._dispatch(job_name, self.build_params)
