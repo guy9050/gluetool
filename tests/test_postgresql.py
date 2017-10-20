@@ -2,7 +2,7 @@ import pytest
 
 import psycopg2
 import libci
-import libci.modules.infrastructure.postgresql
+import libci.modules.database.postgresql
 from mock import MagicMock
 from . import create_module
 
@@ -11,7 +11,7 @@ from . import create_module
 def fixture_module():
     # pylint: disable=unused-argument
 
-    return create_module(libci.modules.infrastructure.postgresql.CIPostgreSQL)
+    return create_module(libci.modules.database.postgresql.PostgreSQL)
 
 
 @pytest.fixture(name='configured_module')
@@ -33,15 +33,14 @@ def fixture_configured_module(module, monkeypatch):
 def test_loadable(module):
     # pylint: disable=protected-access
     ci, _ = module
-    python_mod = ci._load_python_module("infrastructure/postgresql", "pytest_postgresql",
-                                        "libci/modules/infrastructure/postgresql.py")
-    assert hasattr(python_mod, "CIPostgreSQL")
+    python_mod = ci._load_python_module("database/postgresql", "pytest_postgresql",
+                                        "libci/modules/database/postgresql.py")
+    assert hasattr(python_mod, "PostgreSQL")
 
 
 def test_shared(module):
     ci, module = module
-    assert ci.has_shared("postgresql")
-    assert ci.has_shared("postgresql_cursor")
+    assert ci.has_shared("db_cursor")
 
 
 def test_shared_postgresql(module):
@@ -49,25 +48,13 @@ def test_shared_postgresql(module):
     assert ci.shared("postgresql") is None
 
 
-def test_shared_postgresql_reconnect(module, monkeypatch):
+def test_shared_postgresql_cursor_fail(module, monkeypatch):
     ci, _ = module
-    connection_mock = MagicMock()
-    monkeypatch.setattr(psycopg2, "connect", MagicMock(return_value=connection_mock))
-    assert ci.shared("postgresql", reconnect=True) == connection_mock
 
+    monkeypatch.setattr(psycopg2, 'connect', MagicMock(side_effect=Exception('Connection failed!')))
 
-def test_shared_postgresql_cursor_fail(module):
-    ci, _ = module
-    with pytest.raises(libci.CIError, match=r"connection object not initialized"):
-        ci.shared("postgresql_cursor")
-
-
-def test_shared_postgresql_cursor_reconnect(module, monkeypatch):
-    ci, _ = module
-    cursor_mock = MagicMock()
-    connection_mock = MagicMock(cursor=cursor_mock)
-    monkeypatch.setattr(psycopg2, "connect", MagicMock(return_value=connection_mock))
-    assert ci.shared("postgresql_cursor", reconnect=True) == cursor_mock()
+    with pytest.raises(libci.CIError, match=r"Could not connect to PostgreSQL server 'None': Connection failed!"):
+        ci.shared("db_cursor")
 
 
 def test_connect(configured_module, monkeypatch):
@@ -77,7 +64,7 @@ def test_connect(configured_module, monkeypatch):
     connect_mock = MagicMock(return_value=connection_mock)
     monkeypatch.setattr(psycopg2, "connect", connect_mock)
     assert module._connection is None
-    module.connect()
+    _ = module.connection  # Ignore PyUnusedCodeBear
     connect_mock.assert_called_with(host="host1", port="1234", dbname="dbname1", user="user1", password="password1")
     assert module._connection is connection_mock
 
@@ -86,22 +73,25 @@ def test_connect_fail(module, monkeypatch):
     _, module = module
     monkeypatch.setattr(psycopg2, "connect", MagicMock(side_effect=Exception))
     with pytest.raises(libci.CIError, match=r"Could not connect to PostgreSQL server 'None': "):
-        module.connect()
+        _ = module.connection  # Ignore PyUnusedCodeBear
 
 
 def test_execute(configured_module, monkeypatch, log):
     _, module = configured_module
-    cursor_mock = MagicMock(fetchone=MagicMock(return_value=["TEEID 1.2"]))
-    connection_mock = MagicMock(cursor=MagicMock(return_value=cursor_mock))
-    monkeypatch.setattr(psycopg2, "connect", MagicMock(return_value=connection_mock))
+
+    mock_cursor = MagicMock(fetchone=MagicMock(return_value=["TEEID 1.2"]))
+
+    monkeypatch.setattr(module, 'db_cursor', MagicMock(return_value=mock_cursor))
+
     module.execute()
-    assert log.match(message="connected to postgresql 'host1' version 'TEEID 1.2'")
+    assert log.match(message="Connected to a PostgreSQL 'host1', version 'TEEID 1.2'")
 
 
 def test_execute_fail_server_version(configured_module, monkeypatch):
     _, module = configured_module
+
     cursor_mock = MagicMock(fetchone=MagicMock(return_value=None))
-    connection_mock = MagicMock(cursor=MagicMock(return_value=cursor_mock))
-    monkeypatch.setattr(psycopg2, "connect", MagicMock(return_value=connection_mock))
-    with pytest.raises(libci.CIError, match=r"could not fetch server version"):
+    monkeypatch.setattr(module, 'db_cursor', MagicMock(return_value=cursor_mock))
+
+    with pytest.raises(libci.CIError, match=r"Could not discover server version"):
         module.execute()
