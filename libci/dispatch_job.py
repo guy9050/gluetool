@@ -55,6 +55,10 @@ class DispatchJenkinsJobMixin(object):
         },
         'notify-email-options': {
             'help': 'Additional options for ``notify-email`` module.'
+        },
+        'timeout-duration': {
+            'help': 'Kill the pipeline when this many seconds elapsed.',
+            'type': int
         }
     }
 
@@ -88,7 +92,8 @@ class DispatchJenkinsJobMixin(object):
             'pipeline_append': self.option('pipeline-append'),
             'pipeline_state_reporter_options': self.option('pipeline-state-reporter-options'),
             'notify_recipients_options': notify_recipients_options,
-            'notify_email_options': self.option('notify-email-options')
+            'notify_email_options': self.option('notify-email-options'),
+            'timeout_duration': self.option('timeout-duration')
         }
 
     def _dispatch(self, job_name, build_params):
