@@ -2,10 +2,11 @@
 -r requirements.txt
 
 # And these are the actual test requirements...
-yamllint
-pytest-pylint
-pytest-flake8
-pytest-cov
-pytest-catchlog
-pytest-mock
-pytest
+flake8==3.4.1
+yamllint==1.9.0
+pytest-pylint==0.7.1
+pytest-flake8==0.8.1
+pytest-cov==2.5.1
+pytest-catchlog==1.2.2
+pytest-mock==1.6.3
+pytest==3.2.3
