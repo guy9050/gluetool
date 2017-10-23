@@ -111,11 +111,14 @@ class Failure(object):
     :ivar libci.ci.Module module: module in which the error happened, or ``None``.
     :ivar Exception exception: Shortcut to ``exc_info[1]``, if available, or ``None``.
     :ivar tuple exc_info: Exception information as returned by :py:func:`sys.exc_info`.
+    :ivar str sentry_event_id: If set, the failure was reported to the Sentry under this ID.
     """
 
     def __init__(self, module, exc_info):
         self.module = module
         self.exc_info = exc_info
+
+        self.sentry_event_id = None
 
         if exc_info:
             self.exception = exc_info[1]
@@ -844,44 +847,25 @@ class CI(Configurable):
 
         return self.option('module-config-path') or DEFAULT_MODULE_CONFIG_PATHS
 
-    def sentry_submit_exception(self, exc_info, **kwargs):
+    # pylint: disable=method-hidden
+    def sentry_submit_exception(self, *args, **kwargs):
         """
-        Provide modules way to submit exceptions to Sentry. Unhandled exceptions
-        are submitted automagically, but they might feel the need to share
-        arbitrary issues with the world.
+        Submits exceptions to the Sentry server. Does nothing by default, unless this instance
+        is initialized with a :py:class:`libci.sentry.Sentry` instance which actually does
+        the job.
 
-        When Sentry is not enabled (via ``SENTRY_DSN`` env var), this method simply returns
-        without sending anything anywhere.
-
-        :param tuple exc_info: Exception info as provided by :py:func:`sys.exc_info` method
-          or ``exc_info`` attribute of :py:class:`libci.ci.Failure` class.
-        :param dict kwargs: additional arguments that will be passed to Sentry's ``captureException``
-          method.
+        See :py:meth:`libci.sentry.Sentry.submit_exception`.
         """
 
-        if self._sentry is None:
-            return
-
-        self._sentry.captureException(exc_info=exc_info, **kwargs)
-
-    def sentry_submit_warning(self, msg, **kwargs):
+    # pylint: disable=method-hidden
+    def sentry_submit_warning(self, *args, **kwargs):
         """
-        Provide modules way to submit messages to Sentry. They might feel the need
-        to share arbitrary issues - e.g. warning that are not serious enough to kill
-        the citool - with the world.
+        Submits warnings to the Sentry server. Does nothing by default, unless this instance
+        is initialized with a :py:class:`libci.sentry.Sentry` instance which actually does
+        the job.
 
-        When Sentry is not enabled (via ``SENTRY_DSN`` env var), this method simply returns
-        without sending anything anywhere.
-
-        :param str msg: Message describing the issue.
-        :param dict kwargs: additional arguments that will be passed to Sentry's ``captureMessage``
-          method.
+        See :py:meth:`libci.sentry.Sentry.submit_warning`.
         """
-
-        if self._sentry is None:
-            return
-
-        self._sentry.captureMessage(msg, **kwargs)
 
     def _add_shared(self, funcname, module, func):
         """
@@ -1156,6 +1140,12 @@ class CI(Configurable):
         # Right now, we don't know the desired log level, or if
         # output file is in play, just get simple logger before
         # the actual configuration is known.
+        self._sentry = sentry
+
+        if sentry is not None:
+            self.sentry_submit_exception = sentry.submit_exception
+            self.sentry_submit_warning = sentry.submit_warning
+
         logger = Logging.create_logger(sentry=sentry, sentry_submit_warning=self.sentry_submit_warning)
 
         self.logger = ContextAdapter(logger)
@@ -1176,8 +1166,6 @@ class CI(Configurable):
         #: Shared function registry.
         #: funcname: (module, fn)
         self.shared_functions = {}
-
-        self._sentry = sentry
 
     # pylint: disable=arguments-differ
     def parse_config(self, paths):
@@ -1249,11 +1237,14 @@ class CI(Configurable):
                 module.destroy(failure=failure)
 
             # pylint: disable=broad-except
-            except Exception as exception:
-                exc_info = sys.exc_info()
+            except Exception as exc:
+                destroy_failure = Failure(module=module, exc_info=sys.exc_info())
 
-                self.exception('error in destroy function: {}'.format(str(exception)))
-                self.sentry_submit_exception(exc_info)
+                msg = "Exception raised while destroying module '{}': {}".format(module.unique_name, exc.message)
+                self.exception(msg, exc_info=destroy_failure.exc_info)
+                self.sentry_submit_exception(destroy_failure, logger=self.logger)
+
+                return destroy_failure
 
         self._for_each_module(reversed(self._module_instances), _destroy)
 

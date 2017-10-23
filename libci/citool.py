@@ -6,8 +6,11 @@ import functools
 import os
 import signal
 import sys
+import traceback
 
 import libci
+import libci.sentry
+
 from libci import CIError, CIRetryError, Failure
 from libci.log import log_dict
 from libci.utils import format_command_line
@@ -60,31 +63,138 @@ def log_cmdline(ci, argv, pipeline_description):
     ci.info('command-line:\n{}'.format(format_command_line(cmdline)))
 
 
+def _get_exit_logger():
+    """
+    Return logger for use when finishing the ``citool`` pipeline.
+    """
+
+    # We want to use the current logger, if there's any set up.
+    logger = libci.log.Logging.get_logger()
+
+    if logger:
+        return logger
+
+    # This may happen only when something went wrong during logger initialization
+    # when CI instance was created. Falling back to a very basic Logger seems
+    # to be the best option here.
+
+    import logging
+
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger()
+
+    logger.warn('Cannot use custom logger, falling back to a default one')
+
+    return logger
+
+
+def _quit(exit_status):
+    """
+    Log exit status and quit.
+    """
+
+    logger = _get_exit_logger()
+
+    (logger.debug if exit_status == 0 else logger.error)('Exiting with status {}'.format(exit_status))
+
+    sys.exit(exit_status)
+
+
+# pylint: disable=invalid-name
+def _cleanup(CI, failure=None):
+    """
+    Clear CI pipeline by calling modules' ``destroy`` methods.
+    """
+
+    if not CI:
+        return 0
+
+    destroy_failure = CI.destroy_modules(failure=failure)
+
+    # if anything happend while destroying modules, crash the pipeline
+    if not destroy_failure:
+        return 0
+
+    logger = _get_exit_logger()
+    logger.warn('Exception raised when destroying modules, overriding exit status')
+
+    return -1
+
+
+# pylint: disable=invalid-name
+def _handle_failure_core(failure, CI, sentry):
+    logger = _get_exit_logger()
+
+    # Handle simple 'sys.exit(0)' - no exception happened
+    if failure.exc_info[0] == SystemExit and failure.exc_info[1].code == 0:
+        _quit(0)
+
+    # soft errors are up to users to fix, no reason to kill pipeline
+    exit_status = 0 if failure.soft is True else -1
+
+    if failure.module:
+        msg = "Exception raised in module '{}': {}".format(failure.module.unique_name, failure.exc_info[1].message)
+
+    else:
+        msg = "Exception raised: {}".format(failure.exc_info[1].message)
+
+    logger.exception(msg, exc_info=failure.exc_info)
+
+    sentry.submit_exception(failure, logger=logger)
+
+    exit_status = min(exit_status, _cleanup(CI, failure=failure))
+
+    _quit(exit_status)
+
+
+# pylint: disable=invalid-name
+def _handle_failure(failure, CI, sentry):
+    try:
+        _handle_failure_core(failure, CI, sentry)
+
+    # pylint: disable=broad-except
+    except Exception:
+        exc_info = sys.exc_info()
+
+        # Don't trust anyone, the exception might have occured inside logging code, therefore
+        # resorting to plain print.
+
+        print >> sys.stderr
+        print >> sys.stderr, '!!! While handling an exception, another one appeared !!!'
+        print >> sys.stderr
+        print >> sys.stderr, 'Will try to submit it to Sentry but giving up on everything else.'
+
+        try:
+            # pylint: disable=protected-access
+            print >> sys.stderr, libci.log.LoggingFormatter._format_exception_chain(sys.exc_info())
+
+            # Anyway, try to submit this exception to Sentry, but be prepared for failure in case the original
+            # exception was raised right in Sentry-related code.
+            sentry.submit_exception(Failure(None, exc_info))
+
+        # pylint: disable=broad-except
+        except Exception:
+            # tripple error \o/
+
+            print >> sys.stderr
+            print >> sys.stderr, '!!! While submitting an exception to the Sentry, another exception appeared !!!'
+            print >> sys.stderr, '    Giving up on everything...'
+            print >> sys.stderr
+
+            traceback.print_exc()
+
+        # Don't use _quit() here - it might try to use complicated logger, and we don't trust
+        # anythign at this point. Just die already.
+        sys.exit(-1)
+
+
 def main():
     # pylint: disable=too-many-branches,too-many-statements
 
-    sentry = None
-
-    if 'SENTRY_DSN' in os.environ:
-        import raven
-
-        sentry = raven.Client(os.getenv('SENTRY_DSN'), install_logging_hook=True)
-
-        # Enrich Sentry context with information that are important for us
-        context = {}
-
-        # env variables
-        for name, value in os.environ.iteritems():
-            context['env.{}'.format(name)] = value
-
-        sentry.extra_context(context)
+    sentry = libci.sentry.Sentry()
 
     # pylint: disable=invalid-name
     CI = None
-
-    # If not None, exception happened and we want to let modules know
-    # during their "destroy" time.
-    failure = None
 
     # Python installs SIGINT handler that translates signal to
     # a KeyboardInterrupt exception. It's so good we want to use
@@ -198,33 +308,10 @@ def main():
 
             break
 
-    except (SystemExit, KeyboardInterrupt) as e:
-        failure = Failure(module=CI.current_module, exc_info=sys.exc_info())
-        raise e
+    except (SystemExit, KeyboardInterrupt, Exception):
+        _handle_failure(Failure(CI.current_module if CI else None, sys.exc_info()), CI, sentry)
 
-    except Exception as e:
-        exit_status = -1
+    else:
+        exit_status = _cleanup(CI)
 
-        failure = Failure(module=CI.current_module, exc_info=sys.exc_info())
-
-        if CI.current_module:
-            msg = "Exception raised in module '{}': {}".format(CI.current_module.unique_name, e.message)
-        else:
-            msg = "Exception raised: {}".format(e.message)
-
-        libci.Logging.get_logger().exception(msg, exc_info=failure.exc_info)
-
-        if failure.soft is True:
-            # soft errors are up to users to fix, no reason to kill pipeline
-            exit_status = 0
-
-        elif sentry is not None:
-            # we could use CI.sentry_submit_exception but ci may not exist yet,
-            # use sentry client directly
-            sentry.captureException(exc_info=failure.exc_info)
-
-        sys.exit(exit_status)
-
-    finally:
-        if CI:
-            CI.destroy_modules(failure=failure)
+        _quit(exit_status)

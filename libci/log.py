@@ -89,7 +89,7 @@ def warn_sentry(self, message, *args, **kwargs):
     self.orig_warning(message, *args, **kwargs)
 
     if report_to_sentry:
-        self.sentry_submit_warning(message, **kwargs)
+        self.sentry_submit_warning(message, logger=self, **kwargs)
 
 
 logging.Logger.orig_warning = logging.Logger.warning
@@ -472,11 +472,9 @@ class Logging(object):
         that would actually create and set up the logger.
 
         :rtype: logging.Logger
-        :returns: a :py:class:`logging.Logger` instance, set up for logging.
-        :raises AssertionError: when there's no instance yet.
+        :returns: a :py:class:`logging.Logger` instance, set up for logging, or ``None`` when there's
+            no logger yet.
         """
-
-        assert Logging.logger is not None
 
         return Logging.logger
 
@@ -559,9 +557,7 @@ class Logging(object):
             atexit.register(Logging._close_output_file)
 
         if sentry is not None:
-            import raven.breadcrumbs
-
-            raven.breadcrumbs.register_special_log_handler(logger, lambda *args: False)
+            sentry.enable_logging_breadcrumbs(logger)
 
         logger.debug("logger set up: output_file='{}', level={}".format(output_file, level))
 
