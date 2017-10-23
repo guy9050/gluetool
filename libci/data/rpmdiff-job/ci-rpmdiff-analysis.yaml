@@ -52,6 +52,7 @@
                  brew --task-id $id
                  jenkins
                  brew-build-name
+                 publisher-ci-bus
                  publisher-umb-bus
                  pipeline-state-reporter --category=rpmdiff.analysis ${pipeline_state_reporter_options}
                  notify-email-rpmdiff-formatter
