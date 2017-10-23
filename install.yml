@@ -11,6 +11,25 @@
 
   tasks:
     #
+    # Dump variables
+    #
+    - name: Format variables
+      set_fact:
+        _formatted_vars: "{{ vars | to_nice_json }}"
+
+    - name: Format environmental variables
+      set_fact:
+        _formatted_environ: "{{ environment | to_nice_json }}"
+
+    - name: Variables
+      debug:
+        var: _formatted_vars
+
+    - name: Environmental variables
+      debug:
+        var: _formatted_environ
+
+    #
     # Check whether installation runs inside an active virtualenv
     #
     - name: "Find virtualenv path"
