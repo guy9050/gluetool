@@ -19,6 +19,7 @@ class TestingResults(libci.Module):
     """
 
     name = 'testing-results'
+    description = 'Provides support for gathering and exporting testing results.'
 
     supported_dryrun_level = libci.ci.DryRunLevels.DRY
 

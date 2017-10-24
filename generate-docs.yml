@@ -1,0 +1,84 @@
+---
+- hosts: localhost
+  vars:
+    sphinx_builder: html
+    generate_dir: ./docs
+    log_path: "{{ generate_dir }}/build/sphinx_build_stderr.log"
+    clean: false
+    static_rst:
+      - source/howto-tests.rst
+      - source/howto-docs.rst
+      - source/index.rst
+    base_files:
+      - source/conf.py
+      - source/modules.txt
+    clean_files:
+      - build
+      - source/module_parsers.py
+      - source/modules.rst
+      - source/libci.*
+      - source/modules/*.rst
+  tasks:
+    - name: Ensure directory hierarchy exists
+      file:
+        path: "{{ item }}"
+        state: directory
+      with_items:
+        - "{{ generate_dir }}/"
+        - "{{ generate_dir }}/source/"
+        - "{{ generate_dir }}/source/modules/"
+
+    - name: "Clean doc in '{{ generate_dir }}'"
+      shell: rm -rf {{ generate_dir }}/{{ item }}
+      args:
+        removes: "{{ generate_dir }}/{{ item }}"
+      when: clean
+      with_items: "{{ clean_files }}"
+      tags:
+        - clean
+
+    - name: Copy static_rst files
+      copy:
+        src: "docs/{{ item }}"
+        dest: "{{ generate_dir }}/{{ item }}"
+      with_items: "{{ static_rst }}"
+
+    - name: Copy base files
+      copy:
+        src: "docs/{{ item }}"
+        dest: "{{ generate_dir }}/{{ item }}"
+      with_items: "{{ base_files }}"
+
+    - name: Generate apidoc
+      command: sphinx-apidoc -T -e -o "{{ generate_dir }}/source/" libci/
+
+    - name: Generate module page
+      command: python docs/generate-module-page.py "{{ generate_dir }}/source"
+
+    - name: Generate documentation
+      command: sphinx-build -M "{{ sphinx_builder }}" source build
+      register: sphinx_build
+      args:
+        chdir: "{{ generate_dir }}"
+
+    - name: "Create error log file {{log_path}}"
+      copy:
+        content: "{{ sphinx_build.stderr }}"
+        dest: "{{ log_path }}"
+
+    - name: "Check log file for errors"
+      command: grep "ERROR:" "{{ log_path }}"
+      ignore_errors: true
+      register: check_build
+
+    - fail:
+        msg: 'Something happens while checking for errors in log file'
+      when: check_build.rc == 2
+
+    - fail:
+        msg: 'Errors were detected, check log file and your docs'
+      when: check_build.rc == 0
+
+    - debug:
+        msg: 'Docs built fine'
+      when: check_build.rc == 1

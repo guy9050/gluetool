@@ -88,15 +88,11 @@ integration-tests:
 generate-docs:
   stage: test
   script:
-    - virtualenv -p /usr/bin/python2.7 /tmp/virtualenv-citool
-    - source /tmp/virtualenv-citool/bin/activate
-    - /usr/bin/ansible-playbook install.yml
-    - sphinx-apidoc -T -e -o docs/source/ libci/
-    - python docs/generate-module-page.py
-    - make -C docs/ html
+    - pip install tox
+    - tox -e py27-doctest -- ./docs
   artifacts:
     paths:
-      - docs/build/html
+      - .tox/py27-doctest/tmp/docs/build/html
 
 
 #
@@ -138,7 +134,7 @@ upload-docs:
   dependencies:
     - generate-docs
   script:
-    - rsync -avz -e "ssh $SSH_OPTIONS" docs/build/html/ $DOCS_UPLOAD
+    - rsync -avz -e "ssh $SSH_OPTIONS" .tox/py27-doctest/tmp/docs/build/html/ $DOCS_UPLOAD
 
 
 # Upload coverage report to the remote location

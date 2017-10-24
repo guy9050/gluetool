@@ -166,7 +166,7 @@ class CIRpmdiff(Module):
 
         :param list(str) command: command line arguments as items of list
         :rtype libci.utils.ProcessOutput instance
-        :returns: :py:class:`libci.utils.ProcessOutput` instance whose attributes contain
+        :returns: :py:class:`libci.utils.ProcessOutput` instance whose attributes contain \
             data returned by the process.
         :raises libci.CIError: when command was not found or command failed during execution
         """

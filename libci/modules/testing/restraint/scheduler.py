@@ -28,6 +28,7 @@ class RestraintScheduler(libci.Module):
     """
 
     name = 'restraint-scheduler'
+    description = 'Prepares "schedule" for runners of restraint.'
     options = {
         'install-task-not-build': {
             'help': 'Try to install SUT using brew task ID as a referrence, instead of the brew build ID.',

@@ -81,6 +81,7 @@ class PipelineStateReporter(libci.Module):
     """
 
     name = 'pipeline-state-reporter'
+    description = 'Sends messages reporting the pipeline state.'
 
     options = {
         'category': {
