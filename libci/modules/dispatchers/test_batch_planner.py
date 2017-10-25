@@ -619,6 +619,8 @@ class TestBatchPlanner(Module):
 
             return test_batch
 
+        return []
+
     def sanity(self):
         self._planners = {
             'static-config': self._plan_by_static_config
@@ -628,7 +630,6 @@ class TestBatchPlanner(Module):
 
         if isinstance(methods, (str, unicode)):
             methods = [method for method in methods.split(',')]
-            self.warn(methods)
 
         self._methods = [method.strip() for method in methods]
 
