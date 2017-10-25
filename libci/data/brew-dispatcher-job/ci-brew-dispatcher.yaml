@@ -46,7 +46,7 @@
                  brew-build-name
                  publisher-umb-bus
                  pipeline-state-reporter --category=dispatcher ${pipeline_state_reporter_options}
-                 test-batch-planner
+                 test-batch-planner --methods=static-config --config=${CITOOL_CONFIG}/brew-dispatcher.yaml
                  brew-dispatcher
     properties:
       - build-discarder:
