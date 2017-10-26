@@ -11,10 +11,10 @@ import tempfile
 
 from functools import partial
 
-import libci
+import gluetool
 
 
-class GuestLoggingAdapter(libci.log.ContextAdapter):
+class GuestLoggingAdapter(gluetool.log.ContextAdapter):
     """
     Custom logger adapter, adding guest's name as a context.
     """
@@ -110,10 +110,10 @@ class Guest(object):
             the condition is assumed to pass the test and waiting ends.
         :param int timeout: fail after this many seconds. ``None`` means test forever.
         :param int tick: test condition every ``tick`` seconds.
-        :raises CIError: when ``timeout`` elapses while condition did not pass the check.
+        :raises GlueError: when ``timeout`` elapses while condition did not pass the check.
         """
 
-        return libci.utils.wait(label, check, timeout=timeout, tick=tick, logger=self.logger)
+        return gluetool.utils.wait(label, check, timeout=timeout, tick=tick, logger=self.logger)
 
     def create_file(self, dst, content):
         """
@@ -154,7 +154,7 @@ class NetworkedGuest(Guest):
     """
     Guest, accessible over network, using ssh for control.
 
-    :param libci.Module module: parent module
+    :param gluetool.Module module: parent module
     :param str hostname: box hostname - this is used for connecting to the host.
     :param str name: box name - this one appears in log messages, identifies the guest.
       If not set, `hostname` is used.
@@ -208,12 +208,12 @@ class NetworkedGuest(Guest):
     def setup(self, **kwargs):
         # pylint: disable=arguments-differ
         if not self._module.has_shared('setup_guest'):
-            raise libci.CIError("Module 'guest-setup' is required to actually set the guests up.")
+            raise gluetool.GlueError("Module 'guest-setup' is required to actually set the guests up.")
 
         return self._module.shared('setup_guest', [self.hostname], **kwargs)
 
     def _execute(self, cmd, **kwargs):
-        return libci.utils.run_command(cmd, logger=self.logger, **kwargs)
+        return gluetool.utils.run_command(cmd, logger=self.logger, **kwargs)
 
     def execute(self, cmd, ssh_options=None, **kwargs):
         # pylint: disable=arguments-differ
@@ -228,7 +228,7 @@ class NetworkedGuest(Guest):
 
         try:
             output = self.execute('type systemctl')
-        except libci.CICommandError as exc:
+        except gluetool.GlueCommandError as exc:
             output = exc.output
 
         if output.exit_code == 0:
@@ -237,7 +237,7 @@ class NetworkedGuest(Guest):
 
         try:
             output = self.execute('type initctl')
-        except libci.CICommandError as exc:
+        except gluetool.GlueCommandError as exc:
             output = exc.output
 
         if output.exit_code == 0:
@@ -281,7 +281,7 @@ class NetworkedGuest(Guest):
             if output.stdout.strip() == msg:
                 return True
 
-        except libci.CICommandError:
+        except gluetool.GlueCommandError:
             self.debug('echo attempt failed, ignoring error')
 
         return False
@@ -290,7 +290,7 @@ class NetworkedGuest(Guest):
         try:
             output = self.execute(cmd, ssh_options=ssh_options)
 
-        except libci.CICommandError as exc:
+        except gluetool.GlueCommandError as exc:
             output = exc.output
 
         return output.stdout.strip()
@@ -321,7 +321,7 @@ class NetworkedGuest(Guest):
                 self.debug('only ignored services are degraded, report ready')
                 return True
 
-            raise libci.CIError('unexpected services reported as degraded')
+            raise gluetool.GlueError('unexpected services reported as degraded')
 
         self.debug("systemctl not reporting ready: '{}'".format(status))
         return False

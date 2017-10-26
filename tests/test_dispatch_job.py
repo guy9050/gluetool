@@ -1,6 +1,6 @@
 import pytest
 
-import libci
+import gluetool
 import libci.dispatch_job
 
 from . import create_module, patch_shared
@@ -20,7 +20,7 @@ class FakeJenkins(object):
 def fixture_module():
     # pylint: disable=unused-argument
 
-    class DummyDispatchModule(libci.dispatch_job.DispatchJenkinsJobMixin, libci.Module):
+    class DummyDispatchModule(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         name = 'dummy-job'
 
     return create_module(DummyDispatchModule)
@@ -65,7 +65,7 @@ def test_sanity(module):
 def test_no_task_id(module):
     _, mod = module
 
-    with pytest.raises(libci.CIError, match=r'Task ID not specified'):
+    with pytest.raises(gluetool.GlueError, match=r'Task ID not specified'):
         mod.sanity()
 
 
@@ -98,7 +98,7 @@ def test_no_jenkins(module):
     # pylint: disable=protected-access
     mod._config['id'] = 13
 
-    with pytest.raises(libci.CIError,
+    with pytest.raises(gluetool.GlueError,
                        match=r"Module requires Jenkins connection, provided e\.g\. by the 'jenkins' module"):
         mod.execute()
 

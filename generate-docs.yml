@@ -11,13 +11,9 @@
       - source/index.rst
     base_files:
       - source/conf.py
-      - source/modules.txt
     clean_files:
       - build
-      - source/module_parsers.py
-      - source/modules.rst
       - source/libci.*
-      - source/modules/*.rst
   tasks:
     - name: Ensure directory hierarchy exists
       file:
@@ -26,7 +22,6 @@
       with_items:
         - "{{ generate_dir }}/"
         - "{{ generate_dir }}/source/"
-        - "{{ generate_dir }}/source/modules/"
 
     - name: "Clean doc in '{{ generate_dir }}'"
       shell: rm -rf {{ generate_dir }}/{{ item }}
@@ -51,9 +46,6 @@
 
     - name: Generate apidoc
       command: sphinx-apidoc -T -e -o "{{ generate_dir }}/source/" libci/
-
-    - name: Generate module page
-      command: python docs/generate-module-page.py "{{ generate_dir }}/source"
 
     - name: Generate documentation
       command: sphinx-build -M "{{ sphinx_builder }}" source build

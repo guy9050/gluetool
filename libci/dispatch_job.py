@@ -1,7 +1,7 @@
 import os
 
-from libci import CIError
-from libci.utils import cached_property, format_dict
+from gluetool import GlueError
+from gluetool.utils import cached_property, format_dict
 
 
 class DispatchJenkinsJobMixin(object):
@@ -11,7 +11,7 @@ class DispatchJenkinsJobMixin(object):
     a given task.
 
     This class brings only pieces relevant to its purpose, it's up to its children to
-    be based not just on this mixin class but on the :py:class:`libci.ci.Module` as well.
+    be based not just on this mixin class but on the :py:class:`gluetool.glue.Module` as well.
 
     .. note::
 
@@ -67,7 +67,7 @@ class DispatchJenkinsJobMixin(object):
         self._config['id'] = os.environ.get('id', self._config.get('id'))
 
         if not self.option('id'):
-            raise CIError('Task ID not specified')
+            raise GlueError('Task ID not specified')
 
     @cached_property
     def build_params(self):
@@ -102,12 +102,12 @@ class DispatchJenkinsJobMixin(object):
 
         :param str job_name: name of the Jenkins job to invoke.
         :param dict build_params: build parameters.
-        :raises libci.ci.CIError: when Jenkins connection is not available.
+        :raises gluetool.glue.GlueError: when Jenkins connection is not available.
         """
 
         jenkins = self.shared('jenkins')
         if jenkins is None:
-            raise CIError("Module requires Jenkins connection, provided e.g. by the 'jenkins' module")
+            raise GlueError("Module requires Jenkins connection, provided e.g. by the 'jenkins' module")
 
         self.debug("invoking job '{}' with parameters:\n{}".format(job_name, format_dict(build_params)))
         jenkins[job_name].invoke(build_params=build_params)

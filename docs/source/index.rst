@@ -11,7 +11,6 @@ Welcome to citool's documentation!
 .. toctree::
    :maxdepth: 1
 
-   modules
    howto-tests
    howto-docs
 
@@ -22,15 +21,9 @@ Welcome to citool's documentation!
 .. toctree::
    :maxdepth: 2
 
-   libci.ci
-   libci.citool
-   libci.help
+   libci.tool
    libci.guest
-   libci.log
-   libci.modules
-   libci.proxy
    libci.results
-   libci.utils
    libci.version
 
 

@@ -1,6 +1,0 @@
-subject: "[CI] [notify-email] [ERROR] No artifacts found for task dummy task ID"
-body: |-
-  CI pipeline was halted due to the following error:
-
-  Koji task has no artifacts - packages, logs, etc. This can happen e.g. in the case of scratch
-  builds - their artifacts are removed from notify-email few days after their completion.

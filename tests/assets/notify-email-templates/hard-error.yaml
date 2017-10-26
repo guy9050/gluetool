@@ -1,7 +1,0 @@
-subject: "[CI] [ABORT] CI pipeline crashed, operations team was notified"
-body: |-
-  CI pipeline crashed due to errors, and the operations team has been
-  informed about the issue by this message.
-recipients:
-  - dummy-recipient@redhat.com
-  - qe-baseos-automation@redhat.com

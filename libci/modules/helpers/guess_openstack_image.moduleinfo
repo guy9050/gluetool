@@ -1,3 +1,0 @@
----
-- name: guess-openstack-image
-  description: "Guess openstack image from build target of a brew build"

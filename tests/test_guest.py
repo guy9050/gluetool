@@ -4,10 +4,9 @@ import tempfile
 import pytest
 from mock import MagicMock
 
+import gluetool
 import libci
 import libci.guest
-import libci.log
-import libci.utils
 
 from . import NonLoadingCI, Bunch
 
@@ -15,7 +14,7 @@ from . import NonLoadingCI, Bunch
 @pytest.fixture(name='guest')
 def fixture_guest():
     ci = NonLoadingCI()
-    mod = libci.Module(ci, 'dummy-module')
+    mod = gluetool.Module(ci, 'dummy-module')
     guest = libci.guest.Guest(mod, 'dummy-guest')
 
     return guest
@@ -70,12 +69,12 @@ def test_copy_from(guest):
 
 def test_wait(guest, monkeypatch):
     mock_check = MagicMock()
-    monkeypatch.setattr(libci.utils, 'wait', MagicMock())
+    monkeypatch.setattr(gluetool.utils, 'wait', MagicMock())
 
     guest.wait('dummy wait', mock_check, timeout=13, tick=17)
 
     # pylint: disable=no-member
-    libci.utils.wait.assert_called_once_with('dummy wait', mock_check, timeout=13, tick=17, logger=guest.logger)
+    gluetool.utils.wait.assert_called_once_with('dummy wait', mock_check, timeout=13, tick=17, logger=guest.logger)
 
 
 def test_create_file(guest, monkeypatch):

@@ -1,9 +1,7 @@
-# Include the package requirements
--r requirements.txt
+# Temporary!
+http://liver3.brq.redhat.com/gluetool/packages/testing/gluetool-1.0-py2-none-any.whl
 
-# And these are the actual test requirements...
 flake8==3.4.1
-yamllint==1.9.0
 pytest-pylint==0.7.1
 pytest-flake8==0.8.1
 pytest-cov==2.5.1
