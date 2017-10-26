@@ -1,0 +1,12 @@
+subject: "[CI] [notify-email] [ERROR] Failed to test dummy-package-1.2.3-79.el7"
+body: |-
+  CI pipeline was halted due to the following error:
+
+  CI aborted while trying to test the build via Covscan. This is usually caused by:
+
+      * build via Covscan failed
+      * Covscan failed to finish testing for some reason
+
+  See Covscan logs for more details covscan task URL.
+
+  If you have any questions, feel free to ask at Red Hat IRC channel #coverity or coverity-users@redhat.com

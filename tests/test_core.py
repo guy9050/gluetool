@@ -1,0 +1,190 @@
+# pylint: disable=blacklisted-name
+
+import logging
+import pytest
+
+import libci
+
+from . import NonLoadingCI
+
+
+def test_check_for_commands():
+    commands = ('ls', 'gzip')
+
+    # these should exist...
+    for cmd in commands:
+        libci.utils.check_for_commands([cmd])
+
+    # ... and these probably not.
+    for cmd in commands:
+        cmd = 'does-not-exists-' + cmd
+
+        with pytest.raises(libci.CIError, match=r"^Command '{0}' not found on the system$".format(cmd)):
+            libci.utils.check_for_commands([cmd])
+
+
+def test_cached_property():
+    from libci.utils import cached_property
+
+    counter = {
+        'count': 0
+    }
+
+    class DummyClass(object):
+        # pylint: disable=too-few-public-methods
+        @cached_property
+        def foo(self):
+            # pylint: disable=no-self-use
+            counter['count'] += 1
+            return counter['count']
+
+        @cached_property
+        def bar(self):
+            # pylint: disable=no-self-use
+            raise Exception('This property raised an exception')
+
+    obj = DummyClass()
+    assert counter['count'] == 0
+    assert 'foo' not in obj.__dict__
+    assert 'bar' not in obj.__dict__
+
+    # first access should increase the counter
+    assert 'bar' not in obj.__dict__
+    assert obj.foo == 1
+    assert counter['count'] == 1
+    assert obj.__dict__['foo'] == 1
+
+    # the second access should return cached value
+    assert 'bar' not in obj.__dict__
+    assert obj.foo == 1
+    assert counter['count'] == 1
+    assert obj.__dict__['foo'] == 1
+
+    # increase counter, and observe property
+    counter['count'] += 1
+    assert 'bar' not in obj.__dict__
+    assert obj.foo == 1
+    assert obj.__dict__['foo'] == 1
+
+    # remove attribute, and try again - this should clear the cache
+    del obj.foo
+    assert 'bar' not in obj.__dict__
+    assert obj.foo == 3
+    assert counter['count'] == 3
+    assert obj.__dict__['foo'] == 3
+
+    # when exception is raised, there should be no changes in __dict__
+    with pytest.raises(Exception, match=r'^This property raised an exception$'):
+        # pylint: disable=pointless-statement
+        obj.bar
+
+    assert obj.foo == 3
+    assert counter['count'] == 3
+    assert obj.__dict__['foo'] == 3
+    assert 'bar' not in obj.__dict__
+
+
+#
+# Modules
+#
+
+def test_check_module_file(log, tmpdir):
+    # pylint: disable=protected-access
+
+    mfile = tmpdir.join('dummy.py')
+    ci = NonLoadingCI()
+
+    def try_pass(file_content):
+        mfile.write(file_content)
+
+        log.clear()
+        assert ci._check_module_file(str(mfile)) is True
+        assert log.records[0].message == "check possible module file '{}'".format(mfile)
+        assert log.records[0].levelno == logging.DEBUG
+
+    def try_fail(file_content, error):
+        mfile.write(file_content)
+
+        log.clear()
+        assert ci._check_module_file(str(mfile)) is False
+        assert log.records[0].message == "check possible module file '{}'".format(mfile)
+        assert log.records[0].levelno == logging.DEBUG
+        assert log.records[1].message == error
+        assert log.records[1].levelno == logging.DEBUG
+
+    # Test empty Python file
+    try_fail('pass', "  no 'import libci' found")
+
+    # Check file that imports libci but does not have module class
+    try_fail('import libci', "  no child of libci.Module found")
+    try_fail('from libci import CI', "  no child of libci.Module found")
+
+    # Check we ignore module classes with wrong base class
+    try_fail("""
+import libci
+
+class DummyModule(object):
+    pass
+""", "  no child of libci.Module found")
+
+    # Check file that does have module class, but that does not import libci
+    try_fail("""
+class DummyModule(libci.Module):
+    pass
+""", "  no 'import libci' found")
+
+    # Check file that both imports libci, and has module class
+    try_pass("""
+import libci
+
+class DummyModule(libci.Module):
+    pass
+""")
+
+    try_pass("""
+from libci import Module
+
+class DummyModule(Module):
+    pass
+""")
+
+    # Check if module can have multiple names
+    try_pass("""
+from libci import Module
+
+class DummyModule(Module):
+    name = ['dummy', 'dummy-alias']
+""")
+
+
+class DummyModule(libci.Module):
+    """
+    Very dummy module, implementing necessary methods and attributes
+    to pass through CI's internal machinery.
+    """
+
+    name = 'Dummy module'
+
+
+def test_module_instantiate():
+    """
+    Try to instantiate a module, and check some of its properties.
+    """
+
+    ci = NonLoadingCI()
+    mod = DummyModule(ci, 'module')
+
+    assert mod.ci == ci
+
+    # pylint: disable=protected-access,no-member
+    assert mod.debug == mod.logger.debug
+    assert mod.verbose == mod.logger.verbose
+    assert mod.info == mod.logger.info
+    assert mod.warn == mod.logger.warning
+    assert mod.error == mod.logger.error
+    assert mod.exception == mod.logger.exception
+
+    # pylint: disable-msg=protected-access
+    assert not mod._config
+
+    assert mod.data_path is None  # There's no data path for our "Dummy module"

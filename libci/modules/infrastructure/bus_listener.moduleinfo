@@ -1,0 +1,6 @@
+---
+- name: bus-listener
+  description: "Generic, event-based bus listening module."
+  dependencies:
+    pip:
+      - stomp.py==4.1.17

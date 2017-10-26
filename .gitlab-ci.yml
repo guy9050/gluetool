@@ -2,14 +2,14 @@
 
 stages:
   - test
-  - build
-  - accessories
+#  - build
+  - deploy
 
 
 variables:
-  SSH_OPTIONS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i http-space.key"
-  DOCS_UPLOAD: "mprchlik@liver3.lab.eng.brq.redhat.com:/var/www/gluetool/docs/citool"
-  COVERAGE_UPLOAD: "mprchlik@liver3.lab.eng.brq.redhat.com:/var/www/gluetool/coverage/citool"
+  SSH_OPTIONS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i docs/citool-doc.key"
+  DOCS_UPLOAD: "citool-doc@liver3.lab.eng.brq.redhat.com:/home/citool-doc/public_html"
+  COVERAGE_UPLOAD: "citool-doc@liver3.lab.eng.brq.redhat.com:/home/citool-doc/public_html/coverage-report"
 
 image: "docker-registry.engineering.redhat.com/baseos-ci/citool-gitlab-ci"
 
@@ -25,11 +25,8 @@ before_script:
   #  - pip install -U setuptools
   #  - pip install ansible virtualenv
 
-  - echo "$HTTP_SPACE_KEY" > http-space.key
-  - chmod u=rw,go= http-space.key
-
-  - echo "$TOWER_CLI_CONFIG" > ~/.tower_cli.cfg
-  - chmod u=rw,go= ~/.tower_cli.cfg
+  # This one is *not* handled by CI image because it depends on repository being cloned in the container
+  - chmod u=rw,go= docs/citool-doc.key
 
 
 #
@@ -64,6 +61,24 @@ static-analysis-coala:
   script:
     - /usr/bin/coala --non-interactive --config .coafile
 
+# Run integration tests
+#
+# Note: integration tests have - so far - the configuration available. While making use
+# of dry-run levels, they may be able to test integration of modules or even whole pipelines.
+#
+# Might deserve a better integration with CI process, this will run into issues when testing
+# against changes in the configuration that were not merged yet :/
+integration-tests:
+  stage: test
+  script:
+    - yum -y install wget
+    - wget --no-check-certificate -O /etc/pki/ca-trust/source/anchors/RH-IT-Root-CA.crt https://password.corp.redhat.com/RH-IT-Root-CA.crt
+    - update-ca-trust
+    - git clone https://gitlab.cee.redhat.com/baseos-qe/citool-config.git ~/.citool.d
+    - pushd ~/.citool.d && git checkout production && popd
+    - pip install tox
+    - tox -e py27-integration-tests -- --integration-config=$(echo ~/.citool.d)
+
 # Generate documentation from the sources
 #
 # Note: executed for all commits in all branches to make sure it is actually possible
@@ -79,41 +94,72 @@ generate-docs:
     paths:
       - .tox/py27-doctest/tmp/docs/build/html
 
+
 #
 # BUILD steps
 #
-# We're not building anything in the pipeline, just triggering jobs via AWX
 
-# Trigger "[BaseOS CI] [gluetool] Build citool Python packages"
-build-python-packages:
-  stage: build
-  only:
-    - gluetoolize-gluetool@baseos-qe/citool
-  script:
-    - pip install ansible-tower-cli==3.2.0
-    - tower-cli job launch --monitor -J 17
+#build-rpm:
+#  stage: build
+#  only:
+#    - master@baseos-qe/citool
+#  allow_failure: true
+#  script:
+#    - pip install copr copr-cli simplejson
+#    # we need to use python-requests from rpm to have update-ca-trust to work
+#    - pip uninstall -y requests
+#    - yum -y install python-requests rpm-build
+#    # this script was developed for Common Criteria Certification and is used for a few python tools
+#    - curl -so /usr/bin/build_python_project http://cc-git.lab.eng.brq.redhat.com/cgit/gov-cert-tools/plain/tools/build_python_project
+#    - chmod +x /usr/bin/build_python_project
+#    # RH IT Root CA is required for copr to work
+#    - curl -sko /etc/pki/ca-trust/source/anchors/RH-IT-Root-CA.crt https://password.corp.redhat.com/RH-IT-Root-CA.crt
+#    - update-ca-trust
+#    # add copr config for the jenkins/baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com@REDHAT.COM user
+#    - mkdir ~/.config
+#    - echo "W2NvcHItY2xpXQpsb2dpbiA9IFkyOXdjZz09IyNpbXZ4eWZibHFoa2dybWdzdHlmaAp1c2VybmFtZSA9IGplbmtpbnNfYmFzZW9zLWplbmtpbnMucmhldi1jaS12bXMuZW5nLnJkdTIucmVkaGF0LmNvbQp0b2tlbiA9IHJqb29lcmN2ZHdrcnh1eGptYmJ1YXNvb2lzdGp3bApjb3ByX3VybCA9IGh0dHBzOi8vY29wci5kZXZlbC5yZWRoYXQuY29tCg==" | base64 -d > ~/.config/copr
+#    - cat ~/.config/copr
+#    - build_python_project
+
 
 #
-# ACCESSORIES steps
+# DEPLOY steps
 #
 
 # Upload documentation to the remote location
 upload-docs:
-  stage: accessories
+  stage: deploy
   only:
-    - gluetoolize-citool@baseos-qe/citool
+    - master@baseos-qe/citool
   dependencies:
     - generate-docs
   script:
-    - rsync -avz -e "ssh $SSH_OPTIONS" .tox/py27-doctest/tmp/docs/build/html/ $DOCS_SPACE
+    - rsync -avz -e "ssh $SSH_OPTIONS" .tox/py27-doctest/tmp/docs/build/html/ $DOCS_UPLOAD
 
 
 # Upload coverage report to the remote location
 upload-coverage:
-  stage: accessories
+  stage: deploy
   only:
-    - gluetoolize-citool@baseos-qe/citool
+    - master@baseos-qe/citool
   dependencies:
     - unit-tests
   script:
-    - rsync -avz -e "ssh $SSH_OPTIONS" coverage-report/ $COVERAGE_SPACE
+    - rsync -avz -e "ssh $SSH_OPTIONS" coverage-report/ $COVERAGE_UPLOAD
+
+# Automated deployment on staging instance
+staging-deploy:
+  stage: deploy
+  only:
+    - master@baseos-qe/citool
+  script:
+    - yum -y install wget
+    - pip install -r requirements.txt
+    - wget --no-check-certificate -O /etc/pki/ca-trust/source/anchors/RH-IT-Root-CA.crt https://password.corp.redhat.com/RH-IT-Root-CA.crt
+    - update-ca-trust
+    - git clone https://gitlab.cee.redhat.com/baseos-qe/ansible-baseos-ci.git
+    - cd ansible-baseos-ci
+    - ansible-galaxy install -r requirements.yml
+    - chmod 600 secrets/ci_id_rsa
+    - ansible-playbook -l stage-citool -t citool_update infrastructure.yml
+    - ansible-playbook -l stage-citool -t citool_jjb_update -e "citool_jjb_update=true citool_jjb_force_update=true" infrastructure.yml

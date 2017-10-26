@@ -1,0 +1,13 @@
+subject: "[CI] [notify-email] [ERROR] Incompatible options detected"
+body: |-
+  CI pipeline was halted due to the following error:
+
+  Configuration of your component uses incompatible options for `notify-email` module:
+
+      option --foo does not work when --bar is set
+
+  Please, review the configuration of your component - the default settings are usually sane
+  and should not lead to this error. For valid options, their values and possible combinations
+  see documentation for `notify-email` ([1]).
+
+  [1] http://liver3.lab.eng.brq.redhat.com/~citool-doc/modules.html

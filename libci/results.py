@@ -1,7 +1,7 @@
 import os
 
-import gluetool
-from gluetool.utils import new_xml_element
+import libci
+from libci.utils import new_xml_element
 
 
 class TestResult(object):
@@ -11,7 +11,7 @@ class TestResult(object):
     Meaning of most of the fields depends on the result type, there are only
     few "points of contact" between two different result types.
 
-    :param gluetool.glue.Glue ci: Glue instance the results belongs to - the results was either created
+    :param libci.ci.CI ci: CI instance the results belongs to - the results was either created
         by this instance, or loaded by it.
     :param str test_type: Type of testing. Makes sense to producers and consumers,
       ``Result`` class does not care of its actual value.
@@ -48,7 +48,7 @@ class TestResult(object):
             self.urls['jenkins_build'] = os.environ['BUILD_URL']
 
     def __repr__(self):
-        return gluetool.utils.format_dict(self._serialize_to_json())
+        return libci.utils.format_dict(self._serialize_to_json())
 
     def _serialize_to_json(self):
         """
@@ -89,7 +89,7 @@ class TestResult(object):
             new_xml_element('property', _parent=parent, name=xunit_name, value=value)
 
         if properties:
-            self.ci.warn('Unconsumed properties:\n{}'.format(gluetool.log.format_dict(properties)), sentry=True)
+            self.ci.warn('Unconsumed properties:\n{}'.format(libci.log.format_dict(properties)), sentry=True)
 
     def _serialize_to_xunit(self):
         test_suite = new_xml_element('testsuite', name=self.test_type)
@@ -134,13 +134,13 @@ class TestResult(object):
         Return representation of the result in given format.
 
         :param str output_format: Output data format.
-        :raises gluetool.glue.GlueError: when result class does not support the output format.
+        :raises libci.ci.CIError: when result class does not support the output format.
         """
 
         serializer = getattr(self, '_serialize_to_{}'.format(output_format), None)
 
         if not serializer:
-            raise gluetool.GlueError("Cannot serialize into output format '{}'".format(output_format))
+            raise libci.CIError("Cannot serialize into output format '{}'".format(output_format))
 
         # pylint: disable=not-callable
         return serializer()
@@ -152,13 +152,13 @@ class TestResult(object):
 
         :param str input_format: Input data format name.
         :param input_data: Input data in given format.
-        :raises gluetool.glue.GlueError: when result class does not support the input format.
+        :raises libci.ci.CIError: when result class does not support the input format.
         """
 
         unserializer = getattr(cls, '_unserialize_from_{}'.format(input_format), None)
 
         if not unserializer:
-            raise gluetool.GlueError("Cannot unserialize from input format '{}'".format(input_format))
+            raise libci.CIError("Cannot unserialize from input format '{}'".format(input_format))
 
         # pylint: disable=not-callable
         return unserializer(ci, input_data)
@@ -172,7 +172,7 @@ def publish_result(module, result_class, *args, **kwargs):
     Requires shared function named ``results`` that returns list of results
     gathered so far.
 
-    :param gluetool.glue.Module module: Module publishing the result.
+    :param libci.ci.Module module: Module publishing the result.
     :param Result result_class: Class of the result.
     :param tuple args: arguments passed to result class constructor.
     :param dict kwargs: keyword arguments passed to result class constructor.
@@ -182,6 +182,6 @@ def publish_result(module, result_class, *args, **kwargs):
         return
 
     result = result_class(module.ci, *args, **kwargs)
-    gluetool.log.log_dict(module.debug, 'result', result.serialize('json'))
+    libci.log.log_dict(module.debug, 'result', result.serialize('json'))
 
     module.shared('results').append(result)

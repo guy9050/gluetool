@@ -1,0 +1,15 @@
+---
+- name: wow
+  description: "Uses workflow-tomorrow to create beaker job XML description."
+  dependencies:
+    repo:
+      - name: beaker-client
+        description: Beaker client repository
+        baseurl: http://download-node-02.eng.bos.redhat.com/beakerrepos/client/RedHatEnterpriseLinux7
+        exclude: kobo kobo-rpmlib kobo-client
+      - name: beaker-harness
+        description: Beaker harness repository
+        baseurl: http://beaker.engineering.redhat.com/harness/RedHatEnterpriseLinux7
+        exclude: "rhts-* restraint-rhts"
+    yum:
+      - beaker-client

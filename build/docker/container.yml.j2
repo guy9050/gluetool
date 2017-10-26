@@ -1,0 +1,17 @@
+settings:
+  project_name: {{ project_name }}
+  conductor_base: centos:7
+  vars_files:
+    - "{{ workdir }}/compose-requirements.yml"
+
+services:
+  {{ image_name }}:
+    from: centos:7
+    entrypoint: [/entrypoint.sh]
+    command: [--help]
+    volumes:
+      - "{{ workdir }}:/build-workdir"
+    roles:
+      - role: citool-docker
+        citool_flavor: "{{ citool_flavor }}"
+        workdir: "{{ workdir }}"

@@ -2,9 +2,18 @@
 
 import pytest
 
-import gluetool
+import libci
 
 from . import CaplogWrapper
+
+
+def pytest_addoption(parser):
+    parser.addoption('--integration-config', action='store', default=str, help='Path to the real configuration')
+
+
+@pytest.fixture(name='integration_config')
+def fixture_integration_config(request):
+    return request.config.getoption('--integration-config')
 
 
 @pytest.fixture(name='logger', scope='session', autouse=True)
@@ -14,7 +23,7 @@ def fixture_enable_logger():
     but we don't have such luxury in the ``libci`` unit tests.
     """
 
-    return gluetool.log.Logging.create_logger()
+    return libci.Logging.create_logger()
 
 
 @pytest.fixture(name='enable_logger_propagate', scope='session', autouse=True)
@@ -24,7 +33,7 @@ def fixture_enable_logger_propagate():
     not work as it sets up another logger, capturing messages propagated by our "real" loggers.
     """
 
-    gluetool.log.Logging.create_logger().propagate = True
+    libci.Logging.create_logger().propagate = True
 
 
 @pytest.fixture(name='log', scope='function')

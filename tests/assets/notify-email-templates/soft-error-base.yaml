@@ -1,0 +1,16 @@
+header: |-
+  Brew task:      123456
+  Build target:   release-candidate
+  Tested package: dummy-package-1.2.3-79.el7
+  Build issuer:   bar@redhat.com
+  Summary:        http://baseos-ci.engineering.redhat.com/index.php/b-ci-openstack-2692
+footer: |-
+  --
+  Troubleshooting Tips: http://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/Troubleshoot
+  CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation
+  IRC: #baseosci
+recipients:
+  - dummy-recipient@redhat.com
+cc:
+  - platform-ci-notification@redhat.com
+sender: "qe-baseos-automation@redhat.com"

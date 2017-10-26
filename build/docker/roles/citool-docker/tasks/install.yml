@@ -1,0 +1,81 @@
+---
+
+- name: Install entrypoint.sh
+  template:
+    src: entrypoint.sh.j2
+    dest: /entrypoint.sh
+    mode: "ugo=rx"
+
+- name: Install basic system packages
+  yum:
+    state: present
+    name: "{{ item }}"
+  with_items:
+    - "{{ system_rpm_packages }}"
+
+- name: Download pip bootstrap
+  get_url:
+    url: "{{ pip_source_url }}"
+    dest: /tmp/get-pip.py
+    mode: 0440
+
+- name: Install pip
+  command: "python /tmp/get-pip.py"
+
+- name: Install basic Python packages
+  pip:
+    state: latest
+    name: "{{ item }}"
+  with_items:
+    - "{{ system_python_packages }}"
+
+- name: Download certificates
+  get_url:
+    url: "{{ item }}"
+    dest: "/etc/pki/ca-trust/source/anchors"
+    mode: 440
+    validate_certs: no
+  with_items:
+    - "{{ certificates }}"
+
+- name: Update CAs
+  command: "update-ca-trust"
+
+- name: Create a virtualenv
+  command: "virtualenv -p /usr/bin/python2.7 {{ citool_virtualenv }}"
+
+- name: "Install repositories required by '{{ citool_flavor }}' compose"
+  yum_repository:
+    state: present
+    name: "{{ item.name }}"
+    description: "{{ item.name | default('No description set') }}"
+    baseurl: "{{ item.baseurl | default(omit) }}"
+    metalink: "{{ item.metalink | default(omit) }}"
+    enabled: "{{ item.enabled | default(1) }}"
+    gpgcheck: "{{ item.gpgcheck | default(0) }}"
+    gpgkey: "{{ item.gpgkey | default(omit) }}"
+    exclude: "{{ item.exclude | default(omit) }}"
+  with_items:
+    - "{{ compose_requirements.repositories }}"
+
+- name: Refresh yum caches
+  shell: "yum clean metadata && yum makecache"
+
+# We must pass these tasks the whole list at once, and let yum/pip solve the versions
+# and requirements. It is possible to install packages one by one but that could install
+# the different version and then fail with the more specific one.
+
+- name: "Install RPM requirements of '{{ citool_flavor }}' compose"
+  command: "yum install -y {{ compose_requirements.yum | join(' ') }}"
+  when: compose_requirements.yum
+
+- name: "Install Python requirements of '{{ citool_flavor }}' compose"
+  shell: "source {{ citool_virtualenv }}/bin/activate && pip --no-cache-dir install {{ compose_requirements.pip | join(' ') }}"
+  when: compose_requirements.pip
+
+- name: Install citool packages
+  command: "{{ citool_virtualenv }}/bin/python setup.py install"
+  args:
+    chdir: "/build-workdir/{{ item }}"
+  with_items:
+    - "{{ source_directories }}"

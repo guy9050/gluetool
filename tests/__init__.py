@@ -1,6 +1,13 @@
 # pylint: disable=blacklisted-name
 
-import gluetool
+import bs4
+
+# pylint: disable=relative-import
+import ruamel.yaml
+
+import pytest
+
+import libci
 
 from mock import MagicMock
 
@@ -16,7 +23,7 @@ class Bunch(object):
         self.__dict__.update(kwargs)
 
 
-class NonLoadingCI(gluetool.Glue):
+class NonLoadingCI(libci.CI):
     """
     Current CI implementation loads modules and configs when instantiated,
     which makes it *really* hard to make assumptions of the state of its
@@ -71,6 +78,22 @@ class CaplogWrapper(object):
         return matcher(_cmp(record) for record in self.records)
 
 
+def assert_shared(name, func, *args, **kwargs):
+    """
+    Syntax sugar for ``pytest.raises`` when testing whether called code checks for shared function.
+
+    :param str name: name of shared function the test expect to be missing.
+    :param callable func: Callable piece that should raise an exception.
+    :param args: Arguments for ``func``.
+    :param kwargs: Keyword arguments for ``func``.
+    """
+
+    pattern = r"^Shared function '{}' is required. See `citool -L` to find out which module provides it.$".format(name)
+
+    with pytest.raises(libci.CIError, match=pattern):
+        func(*args, **kwargs)
+
+
 def patch_shared(monkeypatch, module, shared_functions):
     """
     Monkeypatch registry of shared functions. This helper is intended for simple and common use cases
@@ -82,7 +105,7 @@ def patch_shared(monkeypatch, module, shared_functions):
     :param dict(str, obj) shared_functions: Maping between names and return values.
     """
 
-    monkeypatch.setattr(module.glue, 'shared_functions', {
+    monkeypatch.setattr(module.ci, 'shared_functions', {
         name: (None, MagicMock(return_value=value)) for name, value in shared_functions.iteritems()
     })
 
@@ -95,3 +118,17 @@ def create_module(module_class, ci=None, ci_class=NonLoadingCI, name='dummy-modu
         mod.add_shared()
 
     return ci, mod
+
+
+def create_yaml(tmpdir, name, data):
+    f = tmpdir.join(name)
+
+    with open(str(f), 'w') as stream:
+        ruamel.yaml.YAML().dump(data, stream)
+        stream.flush()
+
+    return f
+
+
+def xml(text):
+    return bs4.BeautifulSoup(text, 'xml').contents[0]

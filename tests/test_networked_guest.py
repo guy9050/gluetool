@@ -3,9 +3,10 @@ import pytest
 
 from mock import MagicMock, call
 
-import gluetool
 import libci
 import libci.guest
+import libci.log
+import libci.utils
 
 from . import NonLoadingCI, Bunch
 
@@ -26,7 +27,7 @@ To show all installed unit files use 'systemctl list-unit-files'.
 @pytest.fixture(name='guest')
 def fixture_guest():
     ci = NonLoadingCI()
-    mod = gluetool.Module(ci, 'dummy-module')
+    mod = libci.Module(ci, 'dummy-module')
     guest = libci.guest.NetworkedGuest(mod, '10.20.30.40', 'dummy-guest', port=13, username='ssh-user',
                                        key='/tmp/ssh.key', options=['Foo=17'])
 
@@ -73,13 +74,13 @@ def test_repr(guest):
 
 def test_private_execute(guest, monkeypatch):
     output = MagicMock()
-    monkeypatch.setattr(gluetool.utils, 'run_command', MagicMock(return_value=output))
+    monkeypatch.setattr(libci.utils, 'run_command', MagicMock(return_value=output))
 
     # pylint: disable=protected-access
     assert guest._execute('/usr/bin/foo', bar='baz') == output
 
     # pylint: disable=no-member
-    gluetool.utils.run_command.assert_called_once_with('/usr/bin/foo', logger=guest.logger, bar='baz')
+    libci.utils.run_command.assert_called_once_with('/usr/bin/foo', logger=guest.logger, bar='baz')
 
 
 def test_execute(guest, monkeypatch):
@@ -136,7 +137,7 @@ def test_discover_rc_error(guest, monkeypatch, raise_error, expected):
     def mock_execute(*args, **kwargs):
         # pylint: disable=unused-argument
         if raise_error.pop(0) is True:
-            raise gluetool.GlueCommandError(None, Bunch(exit_code=1))
+            raise libci.CICommandError(None, Bunch(exit_code=1))
 
         return Bunch(exit_code=0)
 
@@ -180,7 +181,7 @@ def test_echo_check(guest, monkeypatch, message, raises_error, ssh_options, expe
         def throw(*args, **kwargs):
             # pylint: disable=unused-argument
 
-            raise gluetool.GlueCommandError(None, Bunch(exit_code=1))
+            raise libci.CICommandError(None, Bunch(exit_code=1))
 
         mock_execute = MagicMock(side_effect=throw)
 
@@ -247,7 +248,7 @@ def test_get_rc_status_error(guest, monkeypatch):
     def throw(*args, **kwargs):
         # pylint: disable=unused-argument
 
-        raise gluetool.GlueCommandError(None, Bunch(exit_code=1, stdout='  rc status  '))
+        raise libci.CICommandError(None, Bunch(exit_code=1, stdout='  rc status  '))
 
     monkeypatch.setattr(guest, 'execute', MagicMock(side_effect=throw))
 
@@ -301,7 +302,7 @@ def test_check_boot_systemctl_not_ignored(guest, monkeypatch):
     monkeypatch.setattr(guest, '_get_rc_status', MagicMock(return_value='degraded'))
     monkeypatch.setattr(guest, 'execute', MagicMock(return_value=Bunch(stdout=DEGRADED_REPORT)))
 
-    with pytest.raises(gluetool.GlueError, match=r'unexpected services reported as degraded'):
+    with pytest.raises(libci.CIError, match=r'unexpected services reported as degraded'):
         # pylint: disable=protected-access
         guest._check_boot_systemctl()
 
@@ -380,7 +381,7 @@ def test_setup_missing_support(guest, monkeypatch):
     # pylint: disable=protected-access
     monkeypatch.setattr(guest._module, 'has_shared', MagicMock(return_value=False))
 
-    with pytest.raises(gluetool.GlueError, match=r"Module 'guest-setup' is required to actually set the guests up."):
+    with pytest.raises(libci.CIError, match=r"Module 'guest-setup' is required to actually set the guests up."):
         guest.setup()
 
 

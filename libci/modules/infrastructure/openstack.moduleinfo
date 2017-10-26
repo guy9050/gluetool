@@ -1,0 +1,8 @@
+---
+- name: openstack
+  description: Provides Openstack guests
+  dependencies:
+    pip:
+      - retrying==1.3.3
+      - python-novaclient==7.1.0
+      - python-openstackclient==3.9.0

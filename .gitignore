@@ -1,9 +1,9 @@
 **/*~
 **/*.pyc
 **/*.pyo
-
-build
 dist
+version.py
+libatt.egg-info
 *.sw[a-z]
 .ropeproject
 *.egg-info
@@ -16,6 +16,5 @@ dist
 
 # auto-generated *.rst docs
 docs/source/libci.*
-
-# Ansible "retry" files
-*.retry
+docs/source/modules.rst
+docs/source/module_parsers.py
