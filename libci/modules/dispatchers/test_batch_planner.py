@@ -614,7 +614,7 @@ class TestBatchPlanner(Module):
             test_batch = self._planners[method]()
 
             if not test_batch:
-                self.info("Method '{}' provided no tests, moving on".format(test_batch))
+                self.info("Method '{}' provided no tests, moving on".format(method))
                 continue
 
             return test_batch

@@ -234,7 +234,7 @@ class UMBPublisher(Module):
 
         messages_count = len(messages)
 
-        self.info('Publishing {} messages on the CI bus'.format(messages_count))
+        self.info('Publishing {} messages on the UMB'.format(messages_count))
 
         for url in self._environment['urls']:
             self.debug("Creating a container for: '{}'".format(url))
