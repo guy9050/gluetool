@@ -57,6 +57,10 @@
           default: ''
           description: 'Additional options for workflow-tomorrow module.'
       - string:
+          name: openstack_options
+          default: ''
+          description: 'Additional options for openstack module.'
+      - string:
           name: restraint_runner_options
           default: ''
           description: 'Additional options for restraint-runner module.'
@@ -86,12 +90,9 @@
       - workspace-cleanup
     builders:
       - shell: |
-           if [ "${reserve}" != "true" ]; then
-             openstack_opts=""
-             notify_email_opts=""
-           else
-             openstack_opts="--reserve --reserve-time ${reservation_time}"
-             notify_email_opts="--add-reservation"
+           if [ "${reserve}" = "true" ]; then
+             openstack_options="${openstack_options} --reserve --reserve-time ${reservation_time}"
+             notify_email_options="${notify_email_options} --add-reservation"
            fi
 
            timeout --preserve-status --foreground --signal=SIGUSR1 ${timeout_duration} \
@@ -113,13 +114,13 @@
              notify-email-beah-formatter \
              wow --wow-options="${wow_options}" \
              beah-result-parser \
-             openstack ${openstack_opts} \
+             openstack ${openstack_options} \
              guess-product ${guess_product_options} \
              guess-beaker-distro ${guess_beaker_distro_options} \
              guess-openstack-image ${guess_openstack_image_options} \
              restraint-scheduler \
              restraint-runner ${restraint_runner_options} \
-             notify-email --add-frontend-url ${notify_email_options} ${notify_email_opts} \
+             notify-email --add-frontend-url ${notify_email_options} \
              ${pipeline_append}
     publishers:
       - archive:
