@@ -1,4 +1,5 @@
 import pytest
+from mock import MagicMock
 
 import libci
 import libci.dispatch_job
@@ -30,8 +31,8 @@ def test_loadable(module):
     assert hasattr(python_mod, 'RpmdiffJob')
 
 
-def test_build_params(module):
-    _, mod = module
+def test_build_params(module_with_primary_task, monkeypatch):
+    mod = module_with_primary_task
 
     expected_params = create_build_params(mod)
 
@@ -44,7 +45,7 @@ def test_dispatch_analysis(module, monkeypatch):
     # pylint: disable=protected-access
     mod._config['type'] = 'analysis'
 
-    basic_test_dispatch(module, monkeypatch, job_name='ci-rpmdiff-analysis')
+    basic_test_dispatch(mod, monkeypatch, job_name='ci-rpmdiff-analysis')
 
 
 def test_dispatch_comparison(module, monkeypatch):
@@ -53,4 +54,4 @@ def test_dispatch_comparison(module, monkeypatch):
     # pylint: disable=protected-access
     mod._config['type'] = 'comparison'
 
-    basic_test_dispatch(module, monkeypatch, job_name='ci-rpmdiff-comparison')
+    basic_test_dispatch(mod, monkeypatch, job_name='ci-rpmdiff-comparison')
