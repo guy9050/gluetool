@@ -25,24 +25,6 @@ Table of contents
    DEVELOPMENT
 
 
-``libci`` API
--------------
-
-.. toctree::
-   :maxdepth: 2
-
-   libci.ci
-   libci.citool
-   libci.help
-   libci.guest
-   libci.log
-   libci.modules
-   libci.proxy
-   libci.results
-   libci.utils
-   libci.version
-
-
 Indices and tables
 ==================
 

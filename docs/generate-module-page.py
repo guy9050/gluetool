@@ -9,10 +9,10 @@ import os
 import sys
 import re
 
-import libci
+import gluetool
 
 
-LOGGER = libci.log.Logging.create_logger()
+LOGGER = gluetool.log.Logging.create_logger()
 OUTPUT_DIR = 'docs/source'
 
 MOD_TEMPLATE = """
@@ -57,14 +57,19 @@ def get_parser_{klass}():
 def gather_module_data():
     LOGGER.info('gathering data on all available modules')
 
-    ci = libci.CI()
-    ci.load_modules()
+    glue = gluetool.Glue()
+    glue.load_modules()
 
     cwd = os.getcwd() + '/'
     modules = []
     classes = {}
 
-    for name, properties in ci.modules.iteritems():
+    for name, properties in glue.modules.iteritems():
+        # dep-list is provided by gluetool, therefore it's not easily importable by Sphinx
+        # skipping it here to allow Sphinx to continue with our local modules.
+        if name == 'dep-list':
+            continue
+
         klass = properties['class'].__name__
         if klass in classes:
             continue
@@ -81,8 +86,17 @@ def gather_module_data():
 
         # strip tox modpath out
         modpath = re.sub(r'\.tox\..*\.site-packages\.', '', modpath)
+        modpath = re.sub(r'\.tox\..*\.gluetool_modules.', '', modpath)
 
         description = "**{}**".format(properties['description']) if properties['description'] else ''
+
+        filepath = filepath.replace('-', '_')
+
+        try:
+            stat = os.stat(filepath)
+
+        except OSError:
+            stat = None
 
         modules.append({
             'name': name,
@@ -90,8 +104,8 @@ def gather_module_data():
             'klass': klass,
             'filepath': filepath,
             'modclass': properties['class'],
-            'modpath': modpath,
-            'filepath_mtime': os.stat(filepath).st_mtime
+            'modpath': 'gluetool_modules.{}'.format(modpath),
+            'filepath_mtime': stat.st_mtime if stat else sys.maxint
         })
 
     return modules
@@ -122,7 +136,7 @@ def write_module_doc(module_data, output_dir):
         module_data['shared_functions'] = ''
 
     with open(doc_file, 'w') as f:
-        f.write(libci.utils.render_template(MOD_TEMPLATE, **module_data))
+        f.write(gluetool.utils.render_template(MOD_TEMPLATE, **module_data))
         f.flush()
 
     LOGGER.info('module {} doc page written'.format(module_data['name']))
@@ -143,7 +157,7 @@ def write_index_doc(modules, output_dir):
         with open('{}/modules.rst'.format(output_dir), 'w') as g:
             g.write(f.read().format(modules='\n'.join(sorted([
                 # pylint: disable=line-too-long
-                '   ' + libci.utils.render_template('{name}: {description} <modules/{name}>', **module_data) for module_data in modules
+                '   ' + gluetool.utils.render_template('{name}: {description} <modules/{name}>', **module_data) for module_data in modules
             ]))))
             g.flush()
 

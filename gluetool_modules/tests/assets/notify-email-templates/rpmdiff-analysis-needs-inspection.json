@@ -1,0 +1,529 @@
+[
+    {
+        "ids": {
+            "rpmdiff_run_id": 151276,
+            "testing-thread-id": "0bf4a49ff70d-1"
+        },
+        "overall_result": "NEEDS_INSPECTION",
+        "payload": [
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "NEEDS_INSPECTION",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis",
+                    "ref_url": "https://url.corp.redhat.com/rpmdiff-in-ci"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/13",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.abi_symbols",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-abi-symbols"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/30",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.build_log",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-build-log"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/22",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.rpm_changelog",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-changelog"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/21",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.rpm_config_doc_files",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-configdoc"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/31",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.desktop_file_sanity",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-valid-file"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/11",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.elflint",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-elf-binarylibrary"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/43",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.empty_payload",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-empty-payload"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/7",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.execshield",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-elf-binarylibrary"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/3",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.file_list",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-file-list"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/42",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.ipv6",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-ipv6"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/49",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.java_byte_code",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-java-byte-code"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/19",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.manpage_integrity",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-valid-file"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/47",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.metadata",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-metadata"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/18",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.multilib_regressions",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-multilib"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/44",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.ownership",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-ownership"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/17",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.patches",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-patches"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/48",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.pathnames",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-pathnames"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/6",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.file_permissions",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-file-permissions"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/35",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.politics",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-politics"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/20",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.rpm_requires_provides",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-rpm-requires-provides"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/45",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.rpath",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-rpath"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/24",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.rpm_scripts",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-rpm-scripts-and-triggers"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/36",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.shell_syntax",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-shell-scripts"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/5",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.file_sizes",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-file-sizes"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "NEEDS_INSPECTION",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/29",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.specfile_checks",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-specfile"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/4",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.binary_stripping",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-elf-stripping"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/27",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.symlinks",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-symlinks"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/23",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.rpm_triggers",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-rpm-scripts-and-triggers"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/28",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.upstream_source",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-upstream"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/25",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.virus_scan",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-virus-scan"
+                }
+            },
+            {
+                "data": {
+                    "item": "pacemaker-1.1.16-12.el7_4.3",
+                    "newnvr": "pacemaker-1.1.16-12.el7_4.3",
+                    "oldnvr": "pacemaker-1.1.16-12.el7_4.2",
+                    "scratch": true,
+                    "taskid": 14148106,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151276/26",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.xml_validity",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-valid-file"
+                }
+            }
+        ],
+        "result_class": "gluetool.glue.static_analysis/rpmdiff-rpmdiff.RpmdiffTestResult",
+        "test_type": "rpmdiff-analysis",
+        "urls": {
+            "jenkins_build": "https://baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/job/ci-rpmdiff-analysis/40794/",
+            "rpmdiff_url": "https://rpmdiff.engineering.redhat.com/run/151276"
+        }
+    }
+]

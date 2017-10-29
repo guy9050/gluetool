@@ -1,6 +1,0 @@
----
-- name: rpmdiff-job
-  description: Jenkins rpmdiff job
-  dependencies:
-    pip:
-      - jenkins-job-builder==1.6.2
