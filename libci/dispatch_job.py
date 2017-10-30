@@ -49,8 +49,7 @@ class DispatchJenkinsJobMixin(object):
             'help': 'Additional options for ``notify-email`` module.'
         },
         'timeout-duration': {
-            'help': 'Kill the pipeline when this many seconds elapsed.',
-            'type': int
+            'help': 'Kill the pipeline when this many seconds elapsed.'
         }
     }
 
