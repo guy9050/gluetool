@@ -24,6 +24,9 @@ class BeakerFedoraJob(DispatchJenkinsJobMixin, Module):
     job_name = 'ci-beaker-fedora'
 
     options = dict_update({}, DispatchJenkinsJobMixin.options, {
+        'build-dependencies-options': {
+            'help': 'Additional options for ``build-dependencies-options`` module.'
+        },
         'guess-product-options': {
             'help': 'Additional options for ``guess-product`` module.'
         },
@@ -43,6 +46,7 @@ class BeakerFedoraJob(DispatchJenkinsJobMixin, Module):
     @cached_property
     def build_params(self):
         return dict_update(super(BeakerFedoraJob, self).build_params, {
+            'build_dependencies_options': self.option('build-dependencies-options'),
             'guess_product_options': self.option('guess-product-options'),
             'guess_distro_options': self.option('guess-distro-options'),
             'wow_options': self.option('wow-options'),
