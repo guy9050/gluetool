@@ -149,6 +149,26 @@ def retry(*args):
     return wrap
 
 
+class ArgumentParser(argparse.ArgumentParser):
+    """
+    Pretty much the :py:class:`argparse.ArgumentParser`, it overrides just
+    the :py:meth:`argparse.ArgumentParser.error` method, to catch errors and to wrap them
+    into nice and common :py:class:`CIError` instances.
+
+    The original prints (for us) useless message, including the program name, and raises ``SystemExit``
+    exception. Such action does not provide necessary information when encountered in Sentry, for example.
+    """
+
+    def error(self, message):
+        """
+        Must not return - raising an exception is a good way to "not return".
+
+        :raises libci.ci.CIError: When argument parser encounters an error.
+        """
+
+        raise CIError('Parsing command-line options failed: {}'.format(message))
+
+
 class Configurable(object):
     """
     Base class of two main ``citool`` classes - :py:class:`libci.ci.CI` and :py:class:`libci.ci.Module`.
@@ -348,7 +368,7 @@ class Configurable(object):
         :param dict kwargs: Additional arguments passed to :py:class:`argparse.ArgumentParser`.
         """
 
-        root_parser = argparse.ArgumentParser(**kwargs)
+        root_parser = ArgumentParser(**kwargs)
 
         def _add_option(parser, name, names, params):
             if params.get('raw', False) is True:
