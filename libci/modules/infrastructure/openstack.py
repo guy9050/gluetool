@@ -5,10 +5,12 @@ import re
 from time import gmtime, strftime
 from datetime import datetime, timedelta
 
+import novaclient.exceptions
 from novaclient import client
 from novaclient.exceptions import BadRequest, NotFound, Unauthorized
 from retrying import retry
 
+import libci
 from libci import Module, CIError, CICommandError
 from libci.guest import NetworkedGuest
 from libci.log import format_dict
@@ -43,6 +45,58 @@ class OpenstackGuest(NetworkedGuest):
 
     ALLOW_DEGRADED = ('cloud-config.service',)
 
+    @staticmethod
+    def _acquire_resource(resource, logger, func, *args, **kwargs):
+        """
+        Acquire a resource from OpenStack. If there are quotas in play, this method will handle
+        "quota exceeded" responses, and will wait till the resource becomes available.
+
+        ``func`` is one of ``novaclient`` methods, e.g. ``floating_ips.create``. When it is not
+        possible to acquire a resource because of quota, these functions raise
+        :py:class:`novaclient.exceptions.Forbidden` with known message.
+
+        Note the ``logger`` attribute - this method is called usually when the guest object
+        is not yet initialized (before calling super's ``__init__``), therefore there's no
+        such thing as ``self.logger`` or ``self._module.logger``.
+
+        :param str resource: Resource type (``instance``, ``floating IP``, etc.).
+        :param libci.log.ContextLogger logger: Logger used for logging.
+        :param callable func: Function which, when called, will acquire the resource.
+        :param tuple args: Positional arguments for ``func``.
+        :param dict kwargs: Keyword arguments for ``func``.
+        """
+
+        def _ask():
+            try:
+                return func(*args, **kwargs)
+
+            except novaclient.exceptions.Forbidden as exc:
+                if not exc.message.startswith('Quota exceeded'):
+                    raise CIError('Failed to acquire {}: {}'.format(resource, exc.message))
+
+                # Original message "Quota exceeded for cores: Requested 8, but already used 77 of 80 cores" is good
+                # enough for public use, we just add a bit of sugar to let user know we're working on it.
+                logger.info('{}. Will try again in a moment.'.format(exc.message))
+
+                # let wait() know we need to try again
+                return False
+
+        return libci.utils.wait('acquire {} from OpenStack'.format(resource), _ask, logger=logger)
+
+    def _check_resource_status(self, resource, rid, status):
+        """
+        Check whether the resource with given ID is in expected state.
+
+        param: str resource: Resource type (``images``, ``servers``, etc.)
+        param: unicode id: ID of the resource to check.
+        param: unicode status: Expected status of the resource. Note the ``unicode`` type.
+        """
+
+        obj = getattr(self._nova, resource).find(id=rid)
+        self.debug('{} resource status: {}'.format(resource, obj.status))
+        if obj.status != status:
+            raise CIError("{} resource has invalid status '{}', expected '{}'".format(resource, obj.status, status))
+
     @retry(stop_max_attempt_number=10, wait_fixed=60000)
     def _assign_ip(self):
         """
@@ -64,7 +118,8 @@ class OpenstackGuest(NetworkedGuest):
             assert details is not None, 'no details passed to OpenstackGuest constructor'
 
             # get an floating IP from a random available pool
-            self._ip = self._nova.floating_ips.create(details['ip_pool_name'])
+            self._ip = OpenstackGuest._acquire_resource('floating IP', module.logger, self._nova.floating_ips.create,
+                                                        details['ip_pool_name'])
 
             # add additional network if specified
             nics = [{'net-id': network.id} for network in details['network']] if details.get('network', None) else []
@@ -80,12 +135,13 @@ class OpenstackGuest(NetworkedGuest):
 
             # complete userdata - use our default
             # create openstack instance
-            self._instance = self._nova.servers.create(name=name,
-                                                       flavor=details['flavor'],
-                                                       image=details['image'],
-                                                       nics=nics,
-                                                       key_name=details['key_name'],
-                                                       userdata=details['user_data'])
+            self._instance = OpenstackGuest._acquire_resource('instance', module.logger, self._nova.servers.create,
+                                                              name=name,
+                                                              flavor=details['flavor'],
+                                                              image=details['image'],
+                                                              nics=nics,
+                                                              key_name=details['key_name'],
+                                                              userdata=details['user_data'])
 
             self._assign_ip()
 
@@ -185,20 +241,6 @@ class OpenstackGuest(NetworkedGuest):
             self.verbose("removed instance '{}'".format(self._instance.name))
         except NotFound:
             self.debug('instance already deleted - skipping')
-
-    def _check_resource_status(self, resource, rid, status):
-        """
-        Check if resource with given id is in expected status.
-
-        param: str resource: resource type (images, servers, etc.)
-        param: unicode id: ID of the resource to check
-        param: unicode status: expected status of the resource in unicode
-
-        """
-        obj = getattr(self._nova, resource).find(id=rid)
-        self.debug('{} resource status: {}'.format(resource, obj.status))
-        if obj.status != status:
-            raise CIError("{} resource has invalid status '{}', expected '{}'".format(resource, obj.status, status))
 
     def _wait_alive(self):
         """
@@ -699,7 +741,7 @@ class CIOpenstack(Module):
         # 3. from image option from configuration file
         # 4. from openstack_image shared function
         if image is None:
-            image = self.option('image') or self.shared('openstack_image')
+            image = self.option('image') or self.shared('image')
             if image is None:
                 raise CIError('no image name specified')
 
