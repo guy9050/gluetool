@@ -29,7 +29,7 @@ class KojiTask(object):
         ``url`` - a base URL for the koji instance
         ``pkgs_url`` - a base URL for the packages location
 
-    :param dict instance: Instance details, see ``required_instance_keys``
+    :param dict details: Instance details, see ``required_instance_keys``
     :param int task_id: Initialize from given TaskID
     :param str module_name: Name of the module, i.e. 'brew' or 'koji'
     :param libci.log.ContextLogger logger: logger used for logging
@@ -150,7 +150,13 @@ class KojiTask(object):
         """
         :returns: build target name
         """
-        return self.task_info["request"][1]
+        if self.task_info["request"][1]:
+            return self.task_info["request"][1]
+
+        # inform admins about this weird build
+        self.warn("task '{}' build '{}' has no build target".format(self.task_id, self.nvr), sentry=True)
+
+        return '<no build target available>'
 
     @cached_property
     def scratch(self):
