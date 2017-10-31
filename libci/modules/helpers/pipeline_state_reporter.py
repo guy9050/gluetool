@@ -10,6 +10,7 @@ an exceptional state of the pipeline:
 of the Koji/Brew/etc. artifact triggering the pipeline:
 
 * ``id`` (int): artifact ID.
+* ``namespace`` (string): ID namespace - Koji, Copr, Docker, etc.
 * ``nvr`` (string, optional): built package NVR.
 * ``branch`` (string, optional): branch in git repository the artifact was build from.
 * ``issuer`` (string, optional): user who started the artifact.
@@ -168,6 +169,7 @@ class PipelineStateReporter(libci.Module):
 
             message['artifact'] = {
                 'id': task.task_id,
+                'namespace': task.ARTIFACT_NAMESPACE,
                 'nvr': task.nvr,
                 'branch': task.branch,
                 'issuer': task.issuer,

@@ -155,6 +155,7 @@ class CIBuildOnCommit(Module):
         if self.has_shared('report_pipeline_state'):
             self.shared('report_pipeline_state', 'started', artifact={
                 'id': taskid,
+                'namespace': 'brew',
                 'branch': self.branch,
                 'scratch': True
             })
@@ -166,6 +167,7 @@ class CIBuildOnCommit(Module):
         if self.has_shared('report_pipeline_state'):
             self.shared('report_pipeline_state', 'finished', artifact={
                 'id': taskid,
+                'namespace': 'brew',
                 'branch': self.branch,
                 'scratch': True
             })
