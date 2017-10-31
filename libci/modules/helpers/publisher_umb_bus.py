@@ -3,6 +3,7 @@ import os
 
 import libci
 from libci import Module
+from libci.ci import DryRunLevels
 
 import proton
 import proton.handlers
@@ -111,18 +112,18 @@ class TestHandler(proton.handlers.MessagingHandler):
     def send_messages(self, event):
         self.debug('send_messages: {}'.format(event))
 
-        for message in self.messages:
+        for message in self.messages[:]:
             self.debug('  sending the message')
             libci.log.log_dict(self.debug, '  header', message.headers)
             libci.log.log_dict(self.debug, '  body', message.body)
 
-            if not self._module.dryrun_allows('Sending messages to the message bus'):
-                del self.messages[message]
-                continue
-
             pending_message = proton.Message(address=self.topic, body=libci.log.format_dict(message.body),
                                              content_type='text/json')
             self.debug('  pending message: {}'.format(pending_message))
+
+            if not self._module.dryrun_allows('Sending messages to the message bus'):
+                self.messages.remove(message)
+                continue
 
             delivery = event.sender.send(pending_message)
             self.pending[delivery] = message
@@ -200,7 +201,7 @@ class UMBPublisher(Module):
     required_options = ('environments', 'environment')
     shared_functions = ('publish_bus_messages',)
 
-    supported_dryrun_level = libci.ci.DryRunLevels.ISOLATED
+    supported_dryrun_level = DryRunLevels.ISOLATED
 
     def __init__(self, *args, **kwargs):
         super(UMBPublisher, self).__init__(*args, **kwargs)
@@ -234,12 +235,20 @@ class UMBPublisher(Module):
 
         messages_count = len(messages)
 
+        isolated_run = False
+        if not self.isolatedrun_allows('Connecting to message bus'):
+            isolated_run = True
+
         self.info('Publishing {} messages on the UMB'.format(messages_count))
 
         for url in self._environment['urls']:
             self.debug("Creating a container for: '{}'".format(url))
 
             container = proton.reactor.Container(TestHandler(self, url, messages, topic))
+
+            if isolated_run:
+                continue
+
             container.run()
 
             if not messages:
@@ -248,7 +257,7 @@ class UMBPublisher(Module):
 
             self.warn('Failed to sent out all messages, {} remaining'.format(len(messages)))
 
-        if messages:
+        if messages and not isolated_run:
             raise libci.CIError('Could not send all the messages, {} remained.'.format(len(messages)))
 
         self.overloaded_shared('publish_bus_messages', *orig_args, **orig_kwargs)
