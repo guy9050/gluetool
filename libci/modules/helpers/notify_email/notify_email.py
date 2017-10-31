@@ -213,12 +213,12 @@ class Notify(Module):
                 'help': 'Path to a body footer template, relative to ``template-root``.',
                 'metavar': 'FILE'
             },
-            'soft-error-message-template': {
-                'help': 'Path to a soft-error template, relative to ``template-root``.',
+            'custom-error-message-template': {
+                'help': 'Path to a template for errors with custom templates, relative to ``template-root``.',
                 'metavar': 'FILE'
             },
-            'hard-error-message-template': {
-                'help': 'Path to a hard-error template, relative to ``template-root``.',
+            'error-message-template': {
+                'help': 'Path to a template for errors without custom templates, relative to ``template-root``.',
                 'metavar': 'FILE'
             },
             'frontend-url-template': {
@@ -231,7 +231,7 @@ class Notify(Module):
     required_options = ('smtp-server', 'sender', 'email-map',
                         'template-root',
                         'subject-template', 'body-footer-template', 'body-header-template',
-                        'soft-error-message-template', 'hard-error-message-template',
+                        'custom-error-message-template', 'error-message-template',
                         'frontend-url-template')
 
     _formatters = None
@@ -457,19 +457,20 @@ class Notify(Module):
 
         body_footer = self.render_template(self.option('body-footer-template'))
 
-        failure_subject, failure_body = '', ''
+        # Any subclass of CIError (which covers all soft errors by default) can provide its own templates
+        # - but not the CIError or SoftCIError, these are way too generic.
+        if isinstance(failure.exception, libci.CIError) \
+                and failure.exception.__class__ not in (libci.CIError, libci.SoftCIError):
+            body_template = 'custom-error-message-template'
 
-        if failure.soft:
             klass_name = failure.exc_info[0].__name__
 
-            def _render_template(postfix, default=None):
+            def _render_template(postfix, default):
                 template_filename = '{}-{}.j2'.format(klass_name, postfix)
 
                 if not os.path.exists(os.path.join(self.template_root, template_filename)):
-                    if default is None:
-                        self.warn("Exception '{}' does not provide template for '{}'".format(klass_name, postfix),
-                                  sentry=True)
-                        return ''
+                    self.warn("Exception '{}' does not provide template for '{}'".format(klass_name, postfix),
+                              sentry=True)
 
                     return default
 
@@ -477,18 +478,21 @@ class Notify(Module):
                     'FAILURE': failure
                 })
 
-            body_header = _render_template('header', default=body_header)
-            failure_subject = _render_template('subject')
-            failure_body = _render_template('body')
-            body_footer = _render_template('footer', default=body_footer)
+            body_header = _render_template('header', body_header)
+            failure_subject = _render_template('subject', '')
+            failure_body = _render_template('body', '')
+            body_footer = _render_template('footer', body_footer)
+
+        else:
+            body_template = 'error-message-template'
+            failure_subject, failure_body = '', ''
 
         subject = self.render_template(self.option('subject-template'), **{
             'FAILURE': failure,
             'FAILURE_SUBJECT': failure_subject
         })
 
-        body_template = self.option('soft-error-message-template' if failure.soft else 'hard-error-message-template')
-        body = self.render_template(body_template, **{
+        body = self.render_template(self.option(body_template), **{
             'FAILURE': failure,
             'FAILURE_BODY': failure_body
         })
