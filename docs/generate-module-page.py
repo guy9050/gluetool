@@ -19,7 +19,7 @@ MOD_TEMPLATE = """
 ``{name}``
 {title_underline}
 
-**{description}**
+{description}
 
 .. automoddesc:: {modpath}.{klass}
    :noindex:
@@ -82,7 +82,7 @@ def gather_module_data():
         # strip tox modpath out
         modpath = re.sub(r'\.tox\..*\.site-packages\.', '', modpath)
 
-        description = properties['description'] if properties['description'] is not None else ''
+        description = "**{}**".format(properties['description']) if properties['description'] else ''
 
         modules.append({
             'name': name,
