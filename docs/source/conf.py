@@ -48,10 +48,9 @@ extensions = [
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
-# The suffix(es) of source filenames.
-# You can specify multiple suffix as a list of string:
+# The suffix of source filenames as a string.
+# You can specify multiple suffixes as a list of strings.
 #
-# source_suffix = ['.rst', '.md']
 source_suffix = '.rst'
 
 # The master toctree document.
@@ -59,8 +58,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'citool'
-copyright = u'2017, mvadkerti@redhat.com'
-author = u'mvadkerti@redhat.com'
+copyright = u'2017, mprchlik@redhat.com, mvadkert@redhat.com and others'
+author = u'mprchlik@redhat.com, mvadkert@redhat.com and others'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

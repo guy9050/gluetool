@@ -103,8 +103,7 @@ def write_module_doc(module_data, output_dir):
     try:
         doc_mtime = os.stat(doc_file).st_mtime
 
-    # pylint: disable-msg=bare-except
-    except:
+    except BaseException:
         doc_mtime = 0
 
     if module_data['filepath_mtime'] <= doc_mtime:

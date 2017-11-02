@@ -165,7 +165,7 @@ class CIRpmdiff(Module):
         Run external command.
 
         :param list(str) command: command line arguments as items of list
-        :rtype libci.utils.ProcessOutput instance
+        :rtype: libci.utils.ProcessOutput instance
         :returns: :py:class:`libci.utils.ProcessOutput` instance whose attributes contain \
             data returned by the process.
         :raises libci.CIError: when command was not found or command failed during execution
@@ -180,7 +180,7 @@ class CIRpmdiff(Module):
         Execute rpmdiff-remote runinfo command to obtain runinfo.
 
         :param int run_id: ID of RPMdiff run
-        :rtype dict
+        :rtype: dict
         :returns: informations about RPMdiff run
         """
         # make sure run_id is a string here, as utils run_command requires it
@@ -196,7 +196,7 @@ class CIRpmdiff(Module):
         Helper function to ensure that run already finished.
 
         :param int run_id: ID of RPMdiff run
-        :rtype dict
+        :rtype: dict
         :returns: informations about RPMdiff run
         :raises libci.CIError: when run timeout exceed, defined in self.max_timeout
         """
@@ -217,7 +217,7 @@ class CIRpmdiff(Module):
         :param str test_type: one of 'analysis', 'comparison'
         :param str or None nvr_baseline: package NVR against which RPMdiff comparison should be run,
             valid and required for test_type comparison
-        :rtype dict
+        :rtype: dict
         :returns: informations about RPMdiff run
         """
         if self.task.scratch:

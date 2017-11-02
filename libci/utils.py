@@ -853,7 +853,7 @@ def wait(label, check, timeout=None, tick=30, logger=None):
     :param int timeout: fail after this many seconds. ``None`` means test forever.
     :param int tick: test condition every ``tick`` seconds.
     :param libci.log.ContextAdapter logger: parent logger whose methods will be used for logging.
-    :raises CIError: when ``timeout`` elapses while condition did not pass the check.
+    :raises libci.ci.CIError: when ``timeout`` elapses while condition did not pass the check.
     """
 
     if not isinstance(tick, int):
