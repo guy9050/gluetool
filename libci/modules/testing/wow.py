@@ -1,4 +1,5 @@
 import shlex
+import qe
 
 import libci
 from libci import CIError, SoftCIError, CICommandError
@@ -16,6 +17,10 @@ class WorkflowTomorrow(libci.Module):
     options = {
         'wow-options': {
             'help': 'Additional options for workflow-tomorrow'
+        },
+        'use-general-test-plan': {
+            'help': 'Use general test plan for available build identified from primary_task shared function.',
+            'action': 'store_true'
         }
     }
 
@@ -55,7 +60,7 @@ class WorkflowTomorrow(libci.Module):
 
         self.info('running workflow-tomorrow to get job description')
 
-        if not self.option('wow-options'):
+        if not self.option('wow-options') and not self.option('use-general-test-plan'):
             raise NoTestAvailableError()
 
         self.require_shared('tasks', 'primary_task')
@@ -111,6 +116,14 @@ class WorkflowTomorrow(libci.Module):
 
         for name, value in _task_params.iteritems():
             options += ['--taskparam', '{}={}'.format(name, value)]
+
+        # incorporate general test plan if requested
+        if self.option('use-general-test-plan'):
+            component = self.shared('primary_task').component
+            try:
+                options += ['--plan', str(qe.GeneralPlan(component).id)]
+            except qe.GeneralPlanError:
+                raise CIError("no general test plan found for '{}'".format(component))
 
         #
         # construct command-line
