@@ -96,7 +96,8 @@ class CIBusPublisher(Module):
             if not self.dryrun_allows('Sending messages to message bus'):
                 continue
 
-            self._session.send(body=body, headers=message.headers, destination=self.option('destination'))
+            if self._session is not None:
+                self._session.send(body=body, headers=message.headers, destination=self.option('destination'))
 
         self.info('{} messages successfully sent'.format(len(messages)))
 
