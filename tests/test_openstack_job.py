@@ -23,6 +23,7 @@ def create_openstack_build_params(mod, **kwargs):
         'guess_beaker_distro_options': 'some guess-distro options',
         'guess_openstack_image_options': 'some guess-openstack-image options',
         'wow_options': 'some w-t options',
+        'openstack_options': 'some openstack options',
         'restraint_runner_options': 'some restraint-runner options'
     }
 

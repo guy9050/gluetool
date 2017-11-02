@@ -39,6 +39,9 @@ class OpenStackJob(DispatchJenkinsJobMixin, Module):
         'wow-options': {
             'help': 'Additional options for workflow-tomorrow.'
         },
+        'openstack-options': {
+            'help': 'Additional options for openstack module.',
+        },
         'restraint-runner-options': {
             'help': 'Additional options for restraint-runner module.'
         }
@@ -54,5 +57,6 @@ class OpenStackJob(DispatchJenkinsJobMixin, Module):
             'guess_beaker_distro_options': self.option('guess-beaker-distro-options'),
             'guess_openstack_image_options': self.option('guess-openstack-image-options'),
             'wow_options': self.option('wow-options'),
+            'openstack_options': self.option('openstack-options'),
             'restraint_runner_options': self.option('restraint-runner-options'),
         })
