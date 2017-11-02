@@ -1,3 +1,6 @@
 ---
 - name: dep-list
   description: Collect module dependencies for citool modules
+  dependencies:
+    pip:
+      - packaging==16.8
