@@ -67,18 +67,4 @@
         dest: "{{ log_path }}"
 
     - name: "Check log file for errors"
-      command: grep "ERROR:" "{{ log_path }}"
-      ignore_errors: true
-      register: check_build
-
-    - fail:
-        msg: 'Something happens while checking for errors in log file'
-      when: check_build.rc == 2
-
-    - fail:
-        msg: 'Errors were detected, check log file and your docs'
-      when: check_build.rc == 0
-
-    - debug:
-        msg: 'Docs built fine'
-      when: check_build.rc == 1
+      command: awk '/ERROR:/ { print "Errors were detected, check log file and your docs"; exit 1; }' "{{ log_path }}"
