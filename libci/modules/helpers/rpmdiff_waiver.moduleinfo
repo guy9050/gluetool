@@ -4,6 +4,8 @@
   dependencies:
     yum:
       - postgresql
+      - krb5-devel
+      - e2fsprogs-devel
     pip:
       - psycopg2==2.7.1
       - requests==2.18.4
