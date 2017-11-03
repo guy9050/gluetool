@@ -336,7 +336,7 @@ class TestBatchPlanner(Module):
 
                 self.debug('final set flags:\n{}'.format(format_dict(set_flags)))
 
-                if set_flags['options']:
+                if set_flags.get('options', None):
                     options = set_flags['options']
 
                     self.debug('set-wide options set to:\n{}'.format(format_dict(options)))
