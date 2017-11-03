@@ -3,6 +3,9 @@
   description: Run covscan
   dependencies:
     repo:
+      - name: epel
+        description: Extra Packages for Enterprise Linux 7
+        baseurl: http://download.fedoraproject.org/pub/epel/7/$basearch
       - name: covscan
         description: Covscan repository
         baseurl: http://coprbe.devel.redhat.com/repos/kdudka/covscan/epel-7-$basearch/
