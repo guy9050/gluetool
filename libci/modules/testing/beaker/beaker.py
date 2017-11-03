@@ -254,15 +254,16 @@ class Beaker(Module):
             options += _add_brew_install('--brew-task', 'task_id')
 
         else:
-            if any([task.scratch for task in tasks]):
-                self.debug('at least one task is a scratch build - using task ID for installation')
+            for task in tasks:
+                if task.scratch:
+                    self.debug('task {} is a scratch build, using task ID for installation')
 
-                options += _add_brew_install('--brew-task', 'task_id')
+                    options += ['--brew-task', str(task.task_id)]
 
-            else:
-                self.debug('all tasks are regular tasks - using build ID for installation')
+                else:
+                    self.debug('task {} is a regular task, using build ID for installation')
 
-                options += _add_brew_install('--brew-build', 'build_id')
+                    options += ['--brew-build', str(task.build_id)]
 
         # we could use --reserve but we must be sure the reservesys is *the last* taskin the recipe
         # users may require their own "last" tasks and --last-task is mightier than mere --reserve.

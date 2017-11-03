@@ -87,25 +87,29 @@ class RestraintScheduler(libci.Module):
 
         options = {
             'brew_method': 'install',
-            'brew_tasks': '',
-            'brew_builds': ''
+            'brew_tasks': [],
+            'brew_builds': []
         }
 
         if self.option('install-task-not-build'):
             self.debug('asked to install by task ID')
 
-            options['brew_tasks'] = ' '.join([str(task.task_id) for task in tasks])
+            options['brew_tasks'] = [task.task_id for task in tasks]
 
         else:
-            if any([task.scratch for task in tasks]):
-                self.debug('at least one task is a scratch build - using task ID for installation')
+            for task in tasks:
+                if task.scratch:
+                    self.debug('task {} is a scratch build, using task ID for installation')
 
-                options['brew_tasks'] = ' '.join([str(task.task_id) for task in tasks])
+                    options['brew_tasks'].append(task.task_id)
 
-            else:
-                self.debug('all tasks are regular tasks - using build ID for installation')
+                else:
+                    self.debug('task {} is a regular task, using build ID for installation')
 
-                options['brew_builds'] = ' '.join([str(task.build_id) for task in tasks])
+                    options['brew_builds'].append(task.build_id)
+
+        options['brew_tasks'] = ' '.join(str(i) for i in options['brew_tasks'])
+        options['brew_builds'] = ' '.join(str(i) for i in options['brew_builds'])
 
         job_xml = """
             <job>
