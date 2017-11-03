@@ -24,6 +24,11 @@ DEFAULT_CITOOL_CONFIG_PATHS = [
 DEFAULT_HANDLED_SIGNALS = (signal.SIGUSR2,)
 
 
+class TimeoutExpiredError(libci.CIError):
+    def __init__(self):
+        super(TimeoutExpiredError, self).__init__('Pipeline timeout expired')
+
+
 def split_module_argv(argv, modules):
     """
     Split command-line arguments, left by ``citool``, into groups starting with module names.
@@ -213,7 +218,7 @@ def main():
     def _sigusr1_handler(signum, frame):
         # pylint: disable=unused-argument
 
-        raise CIError('Pipeline timeout expired.')
+        raise TimeoutExpiredError()
 
     sigint_handler = functools.partial(_signal_handler,
                                        handler=orig_sigint_handler, msg='Interrupted by SIGINT (Ctrl+C?)')
