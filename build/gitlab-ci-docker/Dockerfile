@@ -25,4 +25,8 @@ RUN    yum install -y ca-certificates \
     && pip install ansible virtualenv \
     && curl -k -o /etc/pki/ca-trust/source/anchors/RH-IT-Root-CA.crt https://password.corp.redhat.com/RH-IT-Root-CA.crt \
     && curl -k -o /etc/pki/ca-trust/source/anchors/Eng-CA.crt https://engineering.redhat.com/Eng-CA.crt \
-    && update-ca-trust
+    && update-ca-trust \
+    && yum clean metadata
+
+COPY contrib/pip.conf /etc/pip.conf
+COPY contrib/.pydistutils.cfg /root/.pydistutils.cfg
