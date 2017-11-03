@@ -22,11 +22,19 @@ def create_beaker_build_params(mod, **kwargs):
         'guess_product_options': 'some guess-product options',
         'guess_distro_options': 'some guess-distro options',
         'wow_options': 'some w-t options',
-        'jobwatch_options': 'some jobwatch options'
+        'jobwatch_options': 'some jobwatch options',
+        'beaker_options': 'some beaker options'
     }
 
     params.update(kwargs)
-    return create_build_params(mod, **params)
+
+    params = create_build_params(mod, **params)
+
+    if mod._config.get('install-rpms-blacklist', None):
+        params['beaker_options'] = '{} --install-rpms-blacklist="{}"'.format(params['beaker_options'],
+                                                                             mod._config['install-rpms-blacklist'])
+
+    return params
 
 
 def test_sanity(module):
@@ -44,9 +52,14 @@ def test_loadable(module):
     assert hasattr(python_mod, 'BeakerJob')
 
 
-def test_build_params(module_with_primary_task, monkeypatch):
+@pytest.mark.parametrize('rpm_blacklist', [
+    None,
+    'blacklisted packages'
+])
+def test_build_params(module_with_primary_task, monkeypatch, rpm_blacklist):
     mod = module_with_primary_task
 
+    mod._config['install-rpms-blacklist'] = rpm_blacklist
     expected_params = create_beaker_build_params(mod)
 
     assert mod.build_params == expected_params

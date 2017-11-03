@@ -36,11 +36,22 @@ class OpenStackJob(DispatchJenkinsJobMixin, Module):
         'guess-openstack-image-options': {
             'help': 'Additional options for guess-openstack-image module.'
         },
+        # passed to restraint-scheduler module
+        'install-rpms-blacklist': {
+            # pylint: disable=line-too-long
+            'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
+            'type': str,
+            'default': ''
+        },
         'wow-options': {
             'help': 'Additional options for workflow-tomorrow.'
         },
         'openstack-options': {
             'help': 'Additional options for openstack module.',
+        },
+        'restraint-scheduler-options': {
+            'help': 'Additional options for ``restraint-scheduler`` module.',
+            'default': ''
         },
         'restraint-runner-options': {
             'help': 'Additional options for restraint-runner module.'
@@ -51,6 +62,13 @@ class OpenStackJob(DispatchJenkinsJobMixin, Module):
 
     @cached_property
     def build_params(self):
+        restraint_scheduler_options = self.option('restraint-scheduler-options')
+        install_rpms_blacklist = self.option('install-rpms-blacklist')
+
+        if install_rpms_blacklist:
+            restraint_scheduler_options = '{} --install-rpms-blacklist="{}"'.format(restraint_scheduler_options,
+                                                                                    install_rpms_blacklist)
+
         return dict_update(super(OpenStackJob, self).build_params, {
             'build_dependencies_options': self.option('build-dependencies-options'),
             'guess_product_options': self.option('guess-product-options'),
@@ -58,5 +76,6 @@ class OpenStackJob(DispatchJenkinsJobMixin, Module):
             'guess_openstack_image_options': self.option('guess-openstack-image-options'),
             'wow_options': self.option('wow-options'),
             'openstack_options': self.option('openstack-options'),
-            'restraint_runner_options': self.option('restraint-runner-options'),
+            'restraint_scheduler_options': restraint_scheduler_options,
+            'restraint_runner_options': self.option('restraint-runner-options')
         })
