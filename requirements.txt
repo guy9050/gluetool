@@ -9,7 +9,7 @@
 # as well.
 
 # required by guest-setup module
-ansible==2.2.2.0
+ansible==2.4.1.0
 # required to build docker images
 ansible-container==0.9.2
 # required by many modules for XML/HTML manipulatiion
