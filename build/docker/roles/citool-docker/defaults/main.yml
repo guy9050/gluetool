@@ -2,12 +2,19 @@ playbook_debug: false
 
 citool_virtualenv: "/opt/citool"
 
+citool_config_git_ref: "docker-staging"
+
+citool_config_git_url: "https://gitlab.cee.redhat.com/baseos-qe/citool-config.git"
+
+citool_config_clone_dir: "/root/.citool.d"
+
 system_rpm_packages:
   - ca-certificates
   - git
   - gcc
   - make
   - python-devel
+  - krb5-workstation
 
 system_python_packages:
   - ansible

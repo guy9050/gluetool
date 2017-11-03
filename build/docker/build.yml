@@ -105,6 +105,6 @@
         mode: "u=rw,go=r"
 
     - name: Create an image
-      command: "ansible-container build"
+      command: "ansible-container build --no-cache"
       args:
         chdir: "{{ workdir }}"

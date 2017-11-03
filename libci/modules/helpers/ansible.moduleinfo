@@ -3,4 +3,4 @@
   description: Run ansible playbooks
   dependencies:
     pip:
-      - ansible==2.2.2.0
+      - ansible==2.4.1.0
