@@ -12,17 +12,19 @@ def test_sanity(log):
 
     wait('dummy check', lambda: return_values.pop(0), timeout=10, tick=2)
 
-    assert len(log.records) == 7
+    assert len(log.records) == 9
 
     # todo: check decreasing remaining time
     # pylint: disable=line-too-long
     assert re.match(r"waiting for condition 'dummy check', timeout \d seconds, check every 2 seconds", log.records[0].message) is not None  # Ignore PEP8Bear
-    assert re.match(r'\d seconds left, sleeping for 2 seconds$', log.records[1].message) is not None
-    assert log.records[2].message == 'check failed, assuming failure'
+    assert log.records[1].message == 'calling callback function'
+    assert log.records[2].message == 'check failed with False, assuming failure'
     assert re.match(r'\d seconds left, sleeping for 2 seconds$', log.records[3].message) is not None
-    assert log.records[4].message == 'check failed, assuming failure'
-    assert re.match(r'\d seconds left, sleeping for 2 seconds$', log.records[5].message) is not None
-    assert log.records[6].message == 'check passed, assuming success'
+    assert log.records[4].message == 'calling callback function'
+    assert log.records[5].message == 'check failed with False, assuming failure'
+    assert re.match(r'\d seconds left, sleeping for 2 seconds$', log.records[6].message) is not None
+    assert log.records[7].message == 'calling callback function'
+    assert log.records[8].message == 'check passed, assuming success'
 
 
 def test_timeout():

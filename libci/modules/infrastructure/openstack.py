@@ -4,11 +4,11 @@ import os
 import re
 from time import gmtime, strftime
 from datetime import datetime, timedelta
+from retrying import retry
 
 import novaclient.exceptions
 from novaclient import client
 from novaclient.exceptions import BadRequest, NotFound, Unauthorized
-from retrying import retry
 
 import libci
 from libci import Module, CIError, CICommandError
@@ -46,7 +46,7 @@ class OpenstackGuest(NetworkedGuest):
     ALLOW_DEGRADED = ('cloud-config.service',)
 
     @staticmethod
-    def _acquire_resource(resource, logger, func, *args, **kwargs):
+    def _acquire_os_resource(resource, logger, tick, func, *args, **kwargs):
         """
         Acquire a resource from OpenStack. If there are quotas in play, this method will handle
         "quota exceeded" responses, and will wait till the resource becomes available.
@@ -81,7 +81,20 @@ class OpenstackGuest(NetworkedGuest):
                 # let wait() know we need to try again
                 return False
 
-        return libci.utils.wait('acquire {} from OpenStack'.format(resource), _ask, logger=logger)
+            except novaclient.exceptions.BadRequest as exc:
+                # Handle floating IP not yet available for assignment
+                if not exc.message.startswith('Instance network is not ready yet'):
+                    raise CIError('Failed to acquire {}: {}'.format(resource, exc.message))
+
+                logger.info('{}. Will try again in a moment.'.format(exc.message))
+
+                # let wait() know we need to try again
+                return False
+
+        return libci.utils.wait('acquire {} from OpenStack'.format(resource),
+                                _ask,
+                                logger=logger,
+                                tick=tick)
 
     def _check_resource_status(self, resource, rid, status):
         """
@@ -97,14 +110,17 @@ class OpenstackGuest(NetworkedGuest):
         if obj.status != status:
             raise CIError("{} resource has invalid status '{}', expected '{}'".format(resource, obj.status, status))
 
-    @retry(stop_max_attempt_number=10, wait_fixed=60000)
-    def _assign_ip(self):
+    def _assign_floating_ip(self, floating_ip):
         """
-        The assignment of IP can fail if done too early. So retry for 10 minutes
-        to be sure that we do not hit this. Also retrying should improve a bit
-        situation with shorter outages happening regularly on Openstack.
+        The add_floating_ip returns an instance of novaclient.base.TupleWithMeta
+        https://docs.openstack.org/python-novaclient/latest/reference/api/novaclient.v2.servers.html
+
+        :param nova.novaclient.v2.floating_ips.FloatingIP floating_ip: floating IP to assign
+        :returns: True if floating IP successfully assigned, False otherwise
         """
-        self._instance.add_floating_ip(self._ip)
+        if isinstance(self._instance.add_floating_ip(floating_ip), novaclient.base.TupleWithMeta):
+            return True
+        return False
 
     def __init__(self, module, details=None, instance_id=None):
         self._snapshots = []
@@ -117,9 +133,10 @@ class OpenstackGuest(NetworkedGuest):
         if instance_id is None:
             assert details is not None, 'no details passed to OpenstackGuest constructor'
 
-            # get an floating IP from a random available pool
-            self._ip = OpenstackGuest._acquire_resource('floating IP', module.logger, self._nova.floating_ips.create,
-                                                        details['ip_pool_name'])
+            # get an floating IP from a random available pool, tick for 30s before retrying
+            # pylint: disable=line-too-long
+            self._floating_ip = OpenstackGuest._acquire_os_resource('floating IP', module.logger, 30, self._nova.floating_ips.create,
+                                                                    details['ip_pool_name'])
 
             # add additional network if specified
             nics = [{'net-id': network.id} for network in details['network']] if details.get('network', None) else []
@@ -127,30 +144,35 @@ class OpenstackGuest(NetworkedGuest):
             # create instance name with floating IP and optionally add JOB_NAME and BUILD_ID
             name = [
                 details['name'],
-                self._ip.ip
+                self.floating_ip
             ]
             if 'JOB_NAME' in os.environ:
                 name.append('{}-{}'.format(os.environ['JOB_NAME'], os.environ['BUILD_ID']))
             name = '-'.join(name)
 
             # complete userdata - use our default
-            # create openstack instance
-            self._instance = OpenstackGuest._acquire_resource('instance', module.logger, self._nova.servers.create,
-                                                              name=name,
-                                                              flavor=details['flavor'],
-                                                              image=details['image'],
-                                                              nics=nics,
-                                                              key_name=details['key_name'],
-                                                              userdata=details['user_data'])
+            # create openstack instance, tick for 30s before retrying
+            # pylint: disable=line-too-long
+            self._instance = OpenstackGuest._acquire_os_resource('instance', module.logger, 30, self._nova.servers.create,
+                                                                 name=name,
+                                                                 flavor=details['flavor'],
+                                                                 image=details['image'],
+                                                                 nics=nics,
+                                                                 key_name=details['key_name'],
+                                                                 userdata=details['user_data'])
 
-            self._assign_ip()
+            # the assignment of IP can fail if done too early. So retry if needed.
+            # to be sure that we do not hit this. Also retrying should improve a bit
+            # situation with shorter outages happening regularly on Openstack.
+            # pylint: disable=line-too-long
+            OpenstackGuest._acquire_os_resource('IP assignment', module.logger, 1, self._assign_floating_ip, self._floating_ip)  # Ignore PEP8Bear
 
         #
         # Intialize from an existing instance
         #
         else:
             self._instance = self._nova.servers.find(id=instance_id)
-            self._ip = self._nova.floating_ips.find(instance_id=instance_id)
+            self._floating_ip = self._nova.floating_ips.find(instance_id=instance_id)
             name = self._instance.to_dict()['name']
             details.update({
                 'username': module.option('ssh-user'),
@@ -231,7 +253,7 @@ class OpenstackGuest(NetworkedGuest):
             self.warn('Failed to store console output in the file: {}'.format(str(exc)), sentry=True)
 
         try:
-            self._ip.delete()
+            self._floating_ip.delete()
             self.verbose("removed floating IP '{}'".format(self.floating_ip))
         except NotFound:
             self.debug('associated floating IP already removed - skipping')
@@ -360,7 +382,7 @@ class OpenstackGuest(NetworkedGuest):
 
         :returns: floating IP address of the guest
         """
-        return str(self._ip.ip)
+        return str(self._floating_ip.ip)
 
     @cached_property
     def instance_id(self):

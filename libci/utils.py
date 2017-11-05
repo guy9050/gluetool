@@ -874,15 +874,16 @@ def wait(label, check, timeout=None, tick=30, logger=None):
                                                                                          tick))
 
     while timeout is None or time.time() < end_time:
-        logger.debug('{} left, sleeping for {} seconds'.format(_timeout(), tick))
-        time.sleep(tick)
-
+        logger.debug("calling callback function")
         ret = check()
         if ret:
             logger.debug('check passed, assuming success')
             return ret
 
-        logger.debug('check failed, assuming failure')
+        logger.debug("check failed with {}, assuming failure".format(ret))
+
+        logger.debug('{} left, sleeping for {} seconds'.format(_timeout(), tick))
+        time.sleep(tick)
 
     raise CIError("Condition '{}' failed to pass within given time".format(label))
 
