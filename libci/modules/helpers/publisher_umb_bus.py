@@ -10,6 +10,11 @@ import proton.handlers
 import proton.reactor
 
 
+DEFAULT_GLOBAL_TIMEOUT = 120
+DEFAULT_CONNECT_TIMEOUT = 30
+DEFAULT_SENDABLE_TIMEOUT = 30
+
+
 class ContainerAdapter(libci.log.ContextAdapter):
     def __init__(self, logger, handler):
         super(ContainerAdapter, self).__init__(logger, {'ctx_container_url': (100, handler.url)})
@@ -83,8 +88,8 @@ class TestHandler(proton.handlers.MessagingHandler):
 
         event.container.create_sender(conn, target=self.topic)
 
-        self._set_timeout(event.container, 'step', 5, 'waiting for connection')
-        self._set_timeout(event.container, 'global', 30, 'global timeout')
+        self._set_timeout(event.container, 'step', self._module.option('connect-timeout'), 'waiting for connection')
+        self._set_timeout(event.container, 'global', self._module.option('global-timeout'), 'global timeout')
 
     def on_timer_task(self, event):
         self.debug('on_timer_task: {}'.format(event))
@@ -100,7 +105,7 @@ class TestHandler(proton.handlers.MessagingHandler):
 
         self.debug('  connection opened successfully: {}'.format(event.connection.hostname))
 
-        self._set_timeout(event.container, 'step', 30, 'waiting for sendable')
+        self._set_timeout(event.container, 'step', self._module.option('sendable-timeout'), 'waiting for sendable')
 
     def on_sendable(self, event):
         self.debug('on_sendable: {}'.format(event))
@@ -188,15 +193,37 @@ class UMBPublisher(Module):
     name = 'publisher-umb-bus'
     description = 'Sending messages over UMB.'
 
-    options = {
-        'environments': {
-            'help': 'Definitions of UMB environments.',
-            'metavar': 'FILE'
-        },
-        'environment': {
-            'help': 'What environment to use.'
-        }
-    }
+    options = [
+        ('UMB environment options', {
+            'environments': {
+                'help': 'Definitions of UMB environments.',
+                'metavar': 'FILE'
+            },
+            'environment': {
+                'help': 'What environment to use.'
+            }
+        }),
+        ('Timeout options', {
+            'connect-timeout': {
+                # pylint: disable=line-too-long
+                'help': 'Wait at max N second before giving up on a broker connection (default: {}).'.format(DEFAULT_CONNECT_TIMEOUT),  # Ignore PEP8Bear
+                'type': int,
+                'default': DEFAULT_CONNECT_TIMEOUT
+            },
+            'sendable-timeout': {
+                # pylint: disable=line-too-long
+                'help': 'Wait at max N second before giving up before broker allows message sending (default: {}).'.format(DEFAULT_SENDABLE_TIMEOUT),  # Ignore PEP8Bear
+                'type': int,
+                'default': DEFAULT_SENDABLE_TIMEOUT
+            },
+            'global-timeout': {
+                # pylint: disable=line-too-long
+                'help': 'Wait at max N second before giving up on the whole publishing action (default: {}).'.format(DEFAULT_GLOBAL_TIMEOUT),  # Ignore PEP8Bear
+                'type': int,
+                'default': DEFAULT_GLOBAL_TIMEOUT
+            }
+        })
+    ]
 
     required_options = ('environments', 'environment')
     shared_functions = ('publish_bus_messages',)
