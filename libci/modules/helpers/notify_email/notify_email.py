@@ -465,12 +465,14 @@ class Notify(Module):
 
             klass_name = failure.exc_info[0].__name__
 
-            def _render_template(postfix, default):
+            def _render_template(postfix, default=None):
                 template_filename = '{}-{}.j2'.format(klass_name, postfix)
 
                 if not os.path.exists(os.path.join(self.template_root, template_filename)):
-                    self.warn("Exception '{}' does not provide template for '{}'".format(klass_name, postfix),
-                              sentry=True)
+                    if default is None:
+                        self.warn("Exception '{}' does not provide template for '{}'".format(klass_name, postfix),
+                                  sentry=True)
+                        return ''
 
                     return default
 
@@ -478,10 +480,10 @@ class Notify(Module):
                     'FAILURE': failure
                 })
 
-            body_header = _render_template('header', body_header)
-            failure_subject = _render_template('subject', '')
-            failure_body = _render_template('body', '')
-            body_footer = _render_template('footer', body_footer)
+            body_header = _render_template('header', default=body_header)
+            failure_subject = _render_template('subject')
+            failure_body = _render_template('body')
+            body_footer = _render_template('footer', default=body_footer)
 
         else:
             body_template = 'error-message-template'
