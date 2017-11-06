@@ -110,6 +110,7 @@ class RestraintScheduler(libci.Module):
 
         options['brew_tasks'] = ' '.join(str(i) for i in options['brew_tasks'])
         options['brew_builds'] = ' '.join(str(i) for i in options['brew_builds'])
+        options['brew_server'] = self.shared('primary_task').ARTIFACT_NAMESPACE
 
         job_xml = """
             <job>
@@ -121,6 +122,7 @@ class RestraintScheduler(libci.Module):
                       <param name="METHOD" value="install"/>
                       <param name="TASKS" value="{brew_tasks}"/>
                       <param name="BUILDS" value="{brew_builds}"/>
+                      <param name="SERVER" value="{brew_server}"/>
                     </params>
                     <rpm name="test(/distribution/install/brew-build)" path="/mnt/tests/distribution/install/brew-build"/>
                   </task>
