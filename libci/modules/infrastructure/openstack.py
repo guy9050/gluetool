@@ -158,7 +158,7 @@ class OpenstackGuest(NetworkedGuest):
             })
 
         super(OpenstackGuest, self).__init__(module,
-                                             str(self._ip.ip),
+                                             self.floating_ip,
                                              name=name,
                                              username=details['username'],
                                              key=details['key'],
@@ -189,7 +189,7 @@ class OpenstackGuest(NetworkedGuest):
         # workaround-openstack-hostname.yaml requires hostname and domainname.
         # If not set, create ones - some tests may depend on resolvable hostname.
         if 'GUEST_HOSTNAME' not in variables:
-            variables['GUEST_HOSTNAME'] = re.sub(r'10\.(\d+)\.(\d+)\.(\d+)', r'host-\1-\2-\3', str(self._ip.ip))
+            variables['GUEST_HOSTNAME'] = re.sub(r'10\.(\d+)\.(\d+)\.(\d+)', r'host-\1-\2-\3', self.floating_ip)
 
         if 'GUEST_DOMAINNAME' not in variables:
             variables['GUEST_DOMAINNAME'] = 'host.centralci.eng.rdu2.redhat.com'
@@ -232,7 +232,7 @@ class OpenstackGuest(NetworkedGuest):
 
         try:
             self._ip.delete()
-            self.verbose("removed floating IP '{}'".format(self._ip.ip))
+            self.verbose("removed floating IP '{}'".format(self.floating_ip))
         except NotFound:
             self.debug('associated floating IP already removed - skipping')
         self._remove_snapshots()
