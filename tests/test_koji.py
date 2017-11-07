@@ -67,7 +67,7 @@ FAKE_CLIENT_SESSION = {
             'owner': 3823,
             'request': [
                 'cli-build/1498396792.492652.jYJCrkUF/bash-4.4.12-5.fc26.src.rpm',
-                'rawhide',
+                None,
                 {'scratch': True}
             ],
             'state': 2
@@ -200,7 +200,7 @@ VALID_TASKS = {
         'build_id': None,
         'component': 'bash',
         'destination_tag': 'f27-pending',
-        'full_name': "task '20166983' scratch build 'bash-4.4.12-5.fc27' target 'rawhide'",
+        'full_name': "task '20166983' scratch build 'bash-4.4.12-5.fc27' target '<no build target available>'",
         'issuer': 'mvadkert',
         'owner': 'mvadkert',
         'latest': 'bash-4.4.12-5.fc27',
@@ -210,7 +210,7 @@ VALID_TASKS = {
         'scratch': True,
         'short_name': '20166983:S:bash-4.4.12-5.fc27',
         'srcrpm': 'https://kojipkgs.fedoraproject.org/work/tasks/6985/20166985/bash-4.4.12-5.fc27.src.rpm',
-        'target': 'rawhide',
+        'target': '<no build target available>',
         'task_id': 20166983,
         'url': 'https://koji.fedoraproject.org/koji/taskinfo?taskID=20166983',
         'version': '4.4.12',
