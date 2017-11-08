@@ -107,14 +107,14 @@
         msg: "Install package providing krb5.h (usually provided by krb5-devel)"
       when: krb5_present.stat.isreg is not defined or not krb5_present.stat.isreg
 
-      #- name: "Check whether qe.py is available"
-      #stat:
-      #  path: "/usr/share/qa-tools/python-modules/qe.py"
-      #register: qepy_present
+    - name: "Check whether qe.py is available"
+      stat:
+        path: "/usr/share/qa-tools/python-modules/qe.py"
+      register: qepy_present
 
-      #- fail:
-      #  msg: "Install package providing qe.py (usually provided qa-tools-workstation)"
-      #when: qepy_present.stat.isreg is not defined or not qepy_present.stat.isreg
+    - fail:
+      msg: "Install package providing qe.py (usually provided qa-tools-workstation)"
+      when: qepy_present.stat.isreg is not defined or not qepy_present.stat.isreg
 
     - name: "Create temporary directory"
       command: "mktemp -d"
@@ -172,11 +172,11 @@
         state: link
         src: "/usr/lib/python2.7/site-packages/rpmUtils"
 
-      #- name: "Inject qe.py into virtualenv"
-      #file:
-      #  path: "{{ virtualenv_path }}/lib64/python2.7/site-packages/qe.py"
-      #  state: link
-      #  src: "/usr/share/qa-tools/python-modules/qe.py"
+    - name: "Inject qe.py into virtualenv"
+      file:
+        path: "{{ virtualenv_path }}/lib64/python2.7/site-packages/qe.py"
+        state: link
+        src: "/usr/share/qa-tools/python-modules/qe.py"
 
     #
     # Install koji module
