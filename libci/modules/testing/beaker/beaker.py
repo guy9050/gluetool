@@ -95,6 +95,12 @@ class Beaker(Module):
             'metavar': 'ID',
             'type': int
         },
+        'install-rpms-blacklist': {
+            # pylint: disable=line-too-long
+            'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
+            'type': str,
+            'default': ''
+        },
         'install-task-not-build': {
             'help': 'Try to install SUT using brew task ID as a referrence, instead of the brew build ID.',
             'action': 'store_true',
@@ -218,6 +224,7 @@ class Beaker(Module):
         return [job_id], bs4.BeautifulSoup(output.stdout, 'xml')
 
     def _run_wow(self):
+        # pylint: disable=too-many-statements
         """
         Create job XML and submit it to beaker.
 
@@ -245,25 +252,52 @@ class Beaker(Module):
                                                                primary_task.task_id, primary_task.target)
         ]
 
-        def _add_brew_install(option, attr):
-            return sum([[option, str(getattr(task, attr))] for task in tasks], [])
+        # gather builds and tasks
+        brew_build_params = {
+            'BUILDS': [],
+            'TASKS': []
+        }
 
         if self.option('install-task-not-build'):
             self.debug('asked to install by task ID')
 
-            options += _add_brew_install('--brew-task', 'task_id')
+            brew_build_params['TASKS'] = [task.task_id for task in tasks]
 
         else:
             for task in tasks:
                 if task.scratch:
                     self.debug('task {} is a scratch build, using task ID for installation')
 
-                    options += ['--brew-task', str(task.task_id)]
+                    brew_build_params['TASKS'].append(task.task_id)
 
                 else:
                     self.debug('task {} is a regular task, using build ID for installation')
 
-                    options += ['--brew-build', str(task.build_id)]
+                    brew_build_params['BUILDS'].append(task.build_id)
+
+        # remove empty parameters
+        if not brew_build_params['TASKS']:
+            del brew_build_params['TASKS']
+
+        if not brew_build_params['BUILDS']:
+            del brew_build_params['BUILDS']
+
+        # now squash param values into a space-separated strings: <param>: '1 2 3 4 ...'
+        for param, values in brew_build_params.iteritems():
+            brew_build_params[param] = ' '.join([str(i) for i in values])
+
+        # add RPM blacklist - it's already a string
+        if self.option('install-rpms-blacklist'):
+            brew_build_params['RPM_BLACKLIST'] = self.option('install-rpms-blacklist')
+
+        # and convert params to a space-separated list of params, with values wrapped
+        # by the quotes: <param>="foo bar" <param>="baz" ...
+        brew_build_params = ' '.join(['{}="{}"'.format(param, value) for param, value in brew_build_params.iteritems()])
+
+        options += [
+            '--init-task',
+            '{} /distribution/install/brew-build'.format(brew_build_params)
+        ]
 
         # we could use --reserve but we must be sure the reservesys is *the last* taskin the recipe
         # users may require their own "last" tasks and --last-task is mightier than mere --reserve.

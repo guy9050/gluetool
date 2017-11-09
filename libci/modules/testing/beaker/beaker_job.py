@@ -38,6 +38,17 @@ class BeakerJob(DispatchJenkinsJobMixin, Module):
         },
         'jobwatch-options': {
             'help': 'Additional options for ``beaker-jobwatch``.'
+        },
+        'beaker-options': {
+            'help': 'Additional options for ``beaker`` module.',
+            'default': ''
+        },
+        # passed to beaker module
+        'install-rpms-blacklist': {
+            # pylint: disable=line-too-long
+            'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
+            'type': str,
+            'default': ''
         }
     })
 
@@ -45,10 +56,17 @@ class BeakerJob(DispatchJenkinsJobMixin, Module):
 
     @cached_property
     def build_params(self):
+        beaker_options = self.option('beaker-options')
+        install_rpms_blacklist = self.option('install-rpms-blacklist')
+
+        if install_rpms_blacklist:
+            beaker_options = '{} --install-rpms-blacklist="{}"'.format(beaker_options, install_rpms_blacklist)
+
         return dict_update(super(BeakerJob, self).build_params, {
             'build_dependencies_options': self.option('build-dependencies-options'),
             'guess_product_options': self.option('guess-product-options'),
             'guess_distro_options': self.option('guess-distro-options'),
             'wow_options': self.option('wow-options'),
-            'jobwatch_options': self.option('jobwatch-options')
+            'jobwatch_options': self.option('jobwatch-options'),
+            'beaker_options': beaker_options
         })

@@ -34,6 +34,12 @@ class RestraintScheduler(libci.Module):
             'help': 'Try to install SUT using brew task ID as a referrence, instead of the brew build ID.',
             'action': 'store_true',
             'default': False
+        },
+        'install-rpms-blacklist': {
+            # pylint: disable=line-too-long
+            'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
+            'type': str,
+            'default': ''
         }
     }
 
@@ -88,7 +94,9 @@ class RestraintScheduler(libci.Module):
         options = {
             'brew_method': 'install',
             'brew_tasks': [],
-            'brew_builds': []
+            'brew_builds': [],
+            'brew_server': self.shared('primary_task').ARTIFACT_NAMESPACE,
+            'rpm_blacklist': self.option('install-rpms-blacklist')
         }
 
         if self.option('install-task-not-build'):
@@ -110,7 +118,6 @@ class RestraintScheduler(libci.Module):
 
         options['brew_tasks'] = ' '.join(str(i) for i in options['brew_tasks'])
         options['brew_builds'] = ' '.join(str(i) for i in options['brew_builds'])
-        options['brew_server'] = self.shared('primary_task').ARTIFACT_NAMESPACE
 
         job_xml = """
             <job>
@@ -123,6 +130,7 @@ class RestraintScheduler(libci.Module):
                       <param name="TASKS" value="{brew_tasks}"/>
                       <param name="BUILDS" value="{brew_builds}"/>
                       <param name="SERVER" value="{brew_server}"/>
+                      <param name="RPM_BLACKLIST" value="{rpm_blacklist}"/>
                     </params>
                     <rpm name="test(/distribution/install/brew-build)" path="/mnt/tests/distribution/install/brew-build"/>
                   </task>
