@@ -36,6 +36,7 @@ class SclRun(libci.Module):
         * ``BASEOS_CI=true``
         * ``BASEOS_CI_TASKS=<comma-separated list of Brew/Koji tasks installed on the box>``
         * ``BASEOS_CI_COMPONENT=<component name>``
+        * ``BASEOS_CI_TASK_TARGET=<build target if the primary task>``
         * ``BEAKERLIB_RPM_DOWNLOAD_METHODS='yum direct'``
 
         To override any of these variables, simply pass your own value in ``task_params`` parameter.
@@ -103,7 +104,8 @@ class SclRun(libci.Module):
             'BASEOS_CI': 'true',
             'BEAKERLIB_RPM_DOWNLOAD_METHODS': 'yum\\ direct',
             'BASEOS_CI_TASKS': ','.join([str(task.task_id) for task in self.shared('tasks')]),
-            'BASEOS_CI_COMPONENT': str(primary_task.component)
+            'BASEOS_CI_COMPONENT': str(primary_task.component),
+            'BASEOS_CI_TASK_TARGET': str(self.shared('primary_task').target)
         }
 
         # incorporate changes demanded by user
