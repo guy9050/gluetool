@@ -101,6 +101,11 @@ class Beaker(Module):
             'type': str,
             'default': ''
         },
+        'install-method': {
+            'help': 'Yum method to use for installation (default: ``localupdate``).',
+            'type': str,
+            'default': 'localupdate'
+        },
         'install-task-not-build': {
             'help': 'Try to install SUT using brew task ID as a referrence, instead of the brew build ID.',
             'action': 'store_true',
@@ -286,9 +291,12 @@ class Beaker(Module):
         for param, values in brew_build_params.iteritems():
             brew_build_params[param] = ' '.join([str(i) for i in values])
 
-        # add RPM blacklist - it's already a string
+        # add RPM blacklist - it's already a string...
         if self.option('install-rpms-blacklist'):
             brew_build_params['RPM_BLACKLIST'] = self.option('install-rpms-blacklist')
+
+        # ... and a method
+        brew_build_params['METHOD'] = self.option('install-method')
 
         # and convert params to a space-separated list of params, with values wrapped
         # by the quotes: <param>="foo bar" <param>="baz" ...

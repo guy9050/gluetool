@@ -36,13 +36,6 @@ class OpenStackJob(DispatchJenkinsJobMixin, Module):
         'guess-openstack-image-options': {
             'help': 'Additional options for guess-openstack-image module.'
         },
-        # passed to restraint-scheduler module
-        'install-rpms-blacklist': {
-            # pylint: disable=line-too-long
-            'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
-            'type': str,
-            'default': ''
-        },
         'wow-options': {
             'help': 'Additional options for workflow-tomorrow.'
         },
@@ -55,6 +48,19 @@ class OpenStackJob(DispatchJenkinsJobMixin, Module):
         },
         'restraint-runner-options': {
             'help': 'Additional options for restraint-runner module.'
+        },
+
+        # following options are passed to restraint-scheduler module
+        'install-rpms-blacklist': {
+            # pylint: disable=line-too-long
+            'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
+            'type': str,
+            'default': ''
+        },
+        'install-method': {
+            'help': 'Yum method to use for installation (default: ``localinstall``).',
+            'type': str,
+            'default': 'localinstall'
         }
     })
 
@@ -64,10 +70,14 @@ class OpenStackJob(DispatchJenkinsJobMixin, Module):
     def build_params(self):
         restraint_scheduler_options = self.option('restraint-scheduler-options')
         install_rpms_blacklist = self.option('install-rpms-blacklist')
+        install_method = self.option('install-method')
 
         if install_rpms_blacklist:
             restraint_scheduler_options = '{} --install-rpms-blacklist="{}"'.format(restraint_scheduler_options,
                                                                                     install_rpms_blacklist)
+
+        if install_method:
+            restraint_scheduler_options = '{} --install-method={}'.format(restraint_scheduler_options, install_method)
 
         return dict_update(super(OpenStackJob, self).build_params, {
             'build_dependencies_options': self.option('build-dependencies-options'),
