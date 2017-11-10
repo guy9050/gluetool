@@ -40,6 +40,11 @@ class RestraintScheduler(libci.Module):
             'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
             'type': str,
             'default': ''
+        },
+        'install-method': {
+            'help': 'Yum method to use for installation (default: ``localinstall``).',
+            'type': str,
+            'default': 'localinstall'
         }
     }
 
@@ -92,7 +97,7 @@ class RestraintScheduler(libci.Module):
         self.info('installing the SUT packages')
 
         options = {
-            'brew_method': 'install',
+            'brew_method': self.option('install-method'),
             'brew_tasks': [],
             'brew_builds': [],
             'brew_server': self.shared('primary_task').ARTIFACT_NAMESPACE,
@@ -126,7 +131,7 @@ class RestraintScheduler(libci.Module):
                   <task name="/distribution/install/brew-build" role="None">
                     <params>
                       <param name="BASEOS_CI" value="true"/>
-                      <param name="METHOD" value="install"/>
+                      <param name="METHOD" value="{brew_method}"/>
                       <param name="TASKS" value="{brew_tasks}"/>
                       <param name="BUILDS" value="{brew_builds}"/>
                       <param name="SERVER" value="{brew_server}"/>

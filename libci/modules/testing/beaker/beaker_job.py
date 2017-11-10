@@ -43,12 +43,18 @@ class BeakerJob(DispatchJenkinsJobMixin, Module):
             'help': 'Additional options for ``beaker`` module.',
             'default': ''
         },
-        # passed to beaker module
+
+        # following options passed to beaker module
         'install-rpms-blacklist': {
             # pylint: disable=line-too-long
             'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
             'type': str,
             'default': ''
+        },
+        'install-method': {
+            'help': 'Yum method to use for installation (default: ``localupdate``).',
+            'type': str,
+            'default': 'localinstall'
         }
     })
 
@@ -58,9 +64,13 @@ class BeakerJob(DispatchJenkinsJobMixin, Module):
     def build_params(self):
         beaker_options = self.option('beaker-options')
         install_rpms_blacklist = self.option('install-rpms-blacklist')
+        install_method = self.option('install-method')
 
         if install_rpms_blacklist:
             beaker_options = '{} --install-rpms-blacklist="{}"'.format(beaker_options, install_rpms_blacklist)
+
+        if install_method:
+            beaker_options = '{} --install-method={}'.format(beaker_options, install_method)
 
         return dict_update(super(BeakerJob, self).build_params, {
             'build_dependencies_options': self.option('build-dependencies-options'),
