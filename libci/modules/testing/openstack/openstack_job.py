@@ -58,9 +58,9 @@ class OpenStackJob(DispatchJenkinsJobMixin, Module):
             'default': ''
         },
         'install-method': {
-            'help': 'Yum method to use for installation (default: ``localinstall``).',
+            'help': 'Yum method to use for installation (default: ``install``).',
             'type': str,
-            'default': 'localinstall'
+            'default': 'install'
         }
     })
 
