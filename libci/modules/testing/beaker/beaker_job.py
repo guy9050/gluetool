@@ -52,9 +52,9 @@ class BeakerJob(DispatchJenkinsJobMixin, Module):
             'default': ''
         },
         'install-method': {
-            'help': 'Yum method to use for installation (default: ``localupdate``).',
+            'help': 'Yum method to use for installation (default: ``update``).',
             'type': str,
-            'default': 'localinstall'
+            'default': 'update'
         }
     })
 
