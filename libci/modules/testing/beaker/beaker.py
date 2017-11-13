@@ -102,9 +102,9 @@ class Beaker(Module):
             'default': ''
         },
         'install-method': {
-            'help': 'Yum method to use for installation (default: ``localupdate``).',
+            'help': 'Yum method to use for installation (default: ``update``).',
             'type': str,
-            'default': 'localupdate'
+            'default': 'update'
         },
         'install-task-not-build': {
             'help': 'Try to install SUT using brew task ID as a referrence, instead of the brew build ID.',
