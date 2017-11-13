@@ -156,7 +156,7 @@ class RestraintScheduler(libci.Module):
 
         sut_install_logs = None
 
-        match = re.search(r'Using (\./tmp[a-zA-Z0-9\.]+?) for job run', output.stdout)
+        match = re.search(r'Using (\./tmp[a-zA-Z0-9\._]+?) for job run', output.stdout)
         if match is not None:
             sut_install_logs = '{}/index.html'.format(match.group(1))
 
