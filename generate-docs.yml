@@ -11,6 +11,7 @@
       - source/howto-docs.rst
       - source/howto-modules.rst
       - source/index.rst
+      - source/DEVELOPMENT.rst
     base_files:
       - source/conf.py
       - source/modules.txt
