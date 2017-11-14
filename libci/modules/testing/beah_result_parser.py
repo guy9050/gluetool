@@ -31,7 +31,7 @@ class BeahResultParser(libci.Module):
             result['bkr_arch'] = journal.arch.string.strip()
 
         else:
-            self.warn('Cannot deduce architecture')
+            self.debug('Cannot deduce architecture')
 
     def _find_connectable_host(self, result, connectable_hostname):
         # Connectable hostname
@@ -53,7 +53,7 @@ class BeahResultParser(libci.Module):
             result['bkr_distro'] = recipe['distro']
 
         else:
-            self.warn('Cannot deduce recipe distro')
+            self.debug('Cannot deduce recipe distro')
 
     def _find_duration(self, result, task, journal, recipe):
         # Task duration - Beaker provides this info in <task/>, restraint does not but it's possible
@@ -84,7 +84,7 @@ class BeahResultParser(libci.Module):
             result['bkr_duration'] = int((ended - started).total_seconds())
 
         else:
-            self.warn('Cannot deduce task duration')
+            self.debug('Cannot deduce task duration')
 
     def _find_machine(self, result, task, journal, recipe):
         # Machine the task ran on
@@ -98,7 +98,7 @@ class BeahResultParser(libci.Module):
             result['bkr_host'] = journal.hostname.string.strip()
 
         else:
-            self.warn('Cannot deduce hostname')
+            self.debug('Cannot deduce hostname')
 
     def _find_packages(self, result, task, journal, recipe):
         # Packages - sometimes they are listed, sometimes not, but always in journal
@@ -117,7 +117,7 @@ class BeahResultParser(libci.Module):
             result['bkr_packages'] = [k.strip() for k in sorted(packages.keys())]
 
         else:
-            self.warn('Cannot deduce involved packages')
+            self.debug('Cannot deduce involved packages')
 
     def _find_params(self, result, task, journal, recipe):
         # Task params are just in <task/>
@@ -130,7 +130,7 @@ class BeahResultParser(libci.Module):
             ]
 
         else:
-            self.warn('Cannot deduce task parameters')
+            self.debug('Cannot deduce task parameters')
 
     def _find_recipe_id(self, result, task, journal, recipe):
         # Recipe ID is only in recipe
@@ -141,7 +141,7 @@ class BeahResultParser(libci.Module):
             result['bkr_recipe_id'] = int(recipe['id'])
 
         else:
-            self.warn('Cannot deduce recipe ID')
+            self.debug('Cannot deduce recipe ID')
 
     def _find_variant(self, result, task, journal, recipe):
         # Distro variant is only in recipe
@@ -152,7 +152,7 @@ class BeahResultParser(libci.Module):
             result['bkr_variant'] = recipe['variant']
 
         else:
-            self.warn('Cannot deduce recipe variant')
+            self.debug('Cannot deduce recipe variant')
 
     def _find_version(self, result, task, journal, recipe):
         # Version - restraint does not export this
