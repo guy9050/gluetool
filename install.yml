@@ -113,7 +113,7 @@
       register: qepy_present
 
     - fail:
-      msg: "Install package providing qe.py (usually provided qa-tools-workstation)"
+        msg: "Install package providing qe.py (usually provided qa-tools-workstation)"
       when: qepy_present.stat.isreg is not defined or not qepy_present.stat.isreg
 
     - name: "Create temporary directory"
