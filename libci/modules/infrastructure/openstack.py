@@ -587,7 +587,7 @@ class CIOpenstack(Module):
         if not user_data.startswith('#cloud-config'):
             self.debug("loading userdata from '{}'".format(user_data))
 
-            with open(user_data, 'r') as f:
+            with open(os.path.expanduser(user_data), 'r') as f:
                 user_data = f.read()
 
         self.debug('userdata:\n{}'.format(user_data))
