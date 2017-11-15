@@ -1,4 +1,5 @@
 import json
+import os
 
 import libci
 from libci.log import format_dict
@@ -31,6 +32,7 @@ class Ansible(libci.Module):
         :returns: :py:class:`libci.utils.ProcessOutput` instance.
         """
 
+        playbook_path = os.path.expanduser(playbook_path)
         self.debug("running playbook '{}'".format(playbook_path))
 
         cmd = [
