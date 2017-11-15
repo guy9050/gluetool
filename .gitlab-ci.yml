@@ -115,16 +115,16 @@ generate-docs:
 build-python-package:
   stage: build-python
   only:
-    - gluetoolize-modules@baseos-qe/citool
+    - master@baseos-qe/gluetool-modules
   script:
     - pip install ansible-tower-cli
-    - tower-cli job launch -J "$PUBLISH_JOB" --monitor --extra-vars "GIT_REPO=https://gitlab.cee.redhat.com/baseos-qe/citool.git GIT_VERSION=gluetoolize-modules"
+    - tower-cli job launch -J "$PUBLISH_JOB" --monitor --extra-vars "GIT_REPO=https://gitlab.cee.redhat.com/baseos-qe/gluetool-modules.git GIT_VERSION=master"
 
 # Trigger RPM build
 build-rpm-packages:
   stage: build-rpm
   only:
-    - gluetoolize-modules@baseos-qe/citool
+    - master@baseos-qe/gluetool-modules
   script:
     - pip install ansible-tower-cli
     - tower-cli workflow_job launch -W "$RPM_JOB" --monitor --extra-vars "COPR_LOGIN=$COPR_LOGIN COPR_USERNAME=$COPR_USERNAME COPR_TOKEN=$COPR_TOKEN COPR_URL=$COPR_URL"
@@ -138,7 +138,7 @@ build-rpm-packages:
 upload-docs:
   stage: accessories
   only:
-    - gluetoolize-modules@baseos-qe/citool
+    - master@baseos-qe/gluetool-modules
   dependencies:
     - generate-docs
   script:
@@ -149,7 +149,7 @@ upload-docs:
 upload-coverage:
   stage: accessories
   only:
-    - gluetoolize-modules@baseos-qe/citool
+    - master@baseos-qe/gluetool-modules
   dependencies:
     - unit-tests
   script:
