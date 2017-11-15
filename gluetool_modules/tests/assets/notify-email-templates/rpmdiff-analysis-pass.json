@@ -1,0 +1,513 @@
+[
+    {
+        "ids": {
+            "rpmdiff_run_id": 151300,
+            "testing-thread-id": "4764f207f12a-1"
+        },
+        "overall_result": "PASSED",
+        "payload": [
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis",
+                    "ref_url": "https://url.corp.redhat.com/rpmdiff-in-ci"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/13",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.abi_symbols",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-abi-symbols"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/30",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.build_log",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-build-log"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/22",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.rpm_changelog",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-changelog"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/21",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.rpm_config_doc_files",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-configdoc"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/31",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.desktop_file_sanity",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-valid-file"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/11",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.elflint",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-elf-binarylibrary"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/43",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.empty_payload",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-empty-payload"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/7",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.execshield",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-elf-binarylibrary"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/3",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.file_list",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-file-list"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/42",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.ipv6",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-ipv6"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/49",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.java_byte_code",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-java-byte-code"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/19",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.manpage_integrity",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-valid-file"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/47",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.metadata",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-metadata"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/44",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.ownership",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-ownership"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/17",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.patches",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-patches"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/48",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.pathnames",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-pathnames"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/6",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.file_permissions",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-file-permissions"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/35",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.politics",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-politics"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/20",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.rpm_requires_provides",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-rpm-requires-provides"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/45",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.rpath",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-rpath"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/24",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.rpm_scripts",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-rpm-scripts-and-triggers"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/36",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.shell_syntax",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-shell-scripts"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/5",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.file_sizes",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-file-sizes"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/29",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.specfile_checks",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-specfile"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/4",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.binary_stripping",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-elf-stripping"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/27",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.symlinks",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-symlinks"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/23",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.rpm_triggers",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-rpm-scripts-and-triggers"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/28",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.upstream_source",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-upstream"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/25",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.virus_scan",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-virus-scan"
+                }
+            },
+            {
+                "data": {
+                    "item": "release-e2e-test-1.0.918-1.el7",
+                    "newnvr": "release-e2e-test-1.0.918-1.el7",
+                    "oldnvr": "release-e2e-test-1.0.917-1.el7",
+                    "scratch": false,
+                    "taskid": 14148765,
+                    "type": "koji_build"
+                },
+                "outcome": "PASSED",
+                "ref_url": "https://rpmdiff.engineering.redhat.com/run/151300/26",
+                "testcase": {
+                    "name": "dist.rpmdiff.analysis.xml_validity",
+                    "ref_url": "https://docs.engineering.redhat.com/display/HTD/rpmdiff-valid-file"
+                }
+            }
+        ],
+        "result_class": "gluetool.glue.static_analysis/rpmdiff-rpmdiff.RpmdiffTestResult",
+        "test_type": "rpmdiff-analysis",
+        "urls": {
+            "jenkins_build": "https://baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/job/ci-rpmdiff-analysis/40818/",
+            "rpmdiff_url": "https://rpmdiff.engineering.redhat.com/run/151300"
+        }
+    }
+]

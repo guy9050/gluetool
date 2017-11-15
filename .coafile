@@ -10,8 +10,4 @@ use_spaces = True
 bears = PyUnusedCodeBear,PEP8Bear
 
 [all.libci]
-files = libci/**/*.py
-
-[all.tests]
-files = tests/**/*.py
-# bandit_skipped_tests = B101
+files = gluetool_modules/**/*.py

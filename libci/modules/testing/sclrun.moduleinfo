@@ -1,3 +1,0 @@
----
-- name: sclrun
-  description: "Uses sclrun (layer above workflow-tomorrow) to create beaker job XML description."

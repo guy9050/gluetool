@@ -1,0 +1,4 @@
+---
+
+name: notify-email-rpmdiff-formatter
+description: Notification module - e-mail formatting of RPMdiff results

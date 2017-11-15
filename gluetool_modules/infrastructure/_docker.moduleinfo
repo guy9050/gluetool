@@ -1,0 +1,9 @@
+---
+
+name: docker
+description: "Provides access to Docker server via Python API."
+dependencies:
+  pip:
+    - docker==2.5.1
+    - docker-pycreds==0.2.1
+    - requestsexceptions==1.2.0

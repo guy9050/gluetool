@@ -1,0 +1,4 @@
+---
+
+name: exporter-resultsdb
+description: "Make messages, which can be send to message bus by other modules"

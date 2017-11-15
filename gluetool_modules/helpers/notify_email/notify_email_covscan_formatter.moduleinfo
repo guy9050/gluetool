@@ -1,0 +1,4 @@
+---
+
+name: notify-email-covscan-formatter
+description: Notification module - e-mail formatting of Covscan results

@@ -1,0 +1,46 @@
+---
+
+name: wow
+description: "Uses workflow-tomorrow to create beaker job XML description."
+dependencies:
+  repo:
+    - name: beaker-client
+      description: Beaker client repository
+      baseurl: http://download-node-02.eng.bos.redhat.com/beakerrepos/client/RedHatEnterpriseLinux7
+      exclude: kobo kobo-rpmlib kobo-client
+    - name: beaker-harness
+      description: Beaker harness repository
+      baseurl: http://beaker.engineering.redhat.com/harness/RedHatEnterpriseLinux7
+      exclude: "rhts-* restraint-rhts"
+
+    # for qa-tools-workstation
+    - name: qa-tools
+      description: qa-tools repository
+      baseurl: http://liver2.lab.eng.brq.redhat.com/repo
+  pip:
+    # both required by qe.py
+    - git+https://github.com/psss/python-nitrate.git@1.3-2#egg=nitrate
+    - python-dateutil==2.6.1
+
+  yum:
+    # because the module uses qe.py to discover test plans from TCMS
+    - qa-tools-workstation
+
+  ansible_tasks:
+    - name: "Requires: add krb5-devel to install pykerberos"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^Requires: krb5-devel"
+        line: "# added by 'beaker' module\nRequires: krb5-devel\n"
+        state: present
+        insertbefore: "^# TASK: GLOBAL-BEFORE-DESCRIPTION"
+      when: BUILDING_SPECFILE is defined
+
+    - name: "%post: inject system qe.py package into virtualenv"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^ln -s /usr/lib/python2.7/site-packages/qe.py %GLUETOOL_BASE/"
+        line: "# added by 'beaker' module\nln -s /usr/share/qa-tools/python-modules/qe.py %GLUETOOL_BASE/lib/python2.7/site-packages/qe.py\n"
+        state: present
+        insertafter: "^# TASK: POST-START"
+      when: BUILDING_SPECFILE is defined

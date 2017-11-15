@@ -1,0 +1,52 @@
+---
+
+name: koji
+description: Provide Koji task details to other modules
+dependencies:
+  yum:
+    - brewkoji
+    - koji
+    - python2-koji
+    - python2-rpm
+  pip:
+    - pyOpenSSL==17.0.0
+    - beautifulsoup4==4.5.3
+  ansible_tasks:
+    #
+    # Specfile building
+    #
+    - name: "%post: inject system koji package into virtualenv"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^ln -s /usr/lib/python2.7/site-packages/koji %GLUETOOL_BASE/"
+        line: "# added by 'koji_fedora' module\nln -s /usr/lib/python2.7/site-packages/koji %GLUETOOL_BASE/lib/python2.7/site-packages/koji\n"
+        state: present
+        insertafter: "^# TASK: POST-START"
+      when: BUILDING_SPECFILE is defined
+
+    - name: "%post: inject system koji_cli package into virtualenv"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^ln -s /usr/lib/python2.7/site-packages/koji_cli %GLUETOOL_BASE/"
+        line: "# added by 'koji_fedora' module\nln -s /usr/lib/python2.7/site-packages/koji_cli %GLUETOOL_BASE/lib/python2.7/site-packages/koji_cli\n"
+        state: present
+        insertafter: "^# TASK: POST-START"
+      when: BUILDING_SPECFILE is defined
+
+    - name: "%post: inject system rpm package into virtualenv"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^ln -s /lib64/python2.7/site-packages/rpm %GLUETOOL_BASE/"
+        line: "# added by 'koji_fedora' module\nln -s /lib64/python2.7/site-packages/rpm %GLUETOOL_BASE/lib/python2.7/site-packages/rpm\n"
+        state: present
+        insertafter: "^# TASK: POST-START"
+      when: BUILDING_SPECFILE is defined
+
+    - name: "%post: inject system rpmUtils package into virtualenv"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^ln -s /usr/lib/python2.7/site-packages/rpmUtils %GLUETOOL_BASE/"
+        line: "# added by 'koji_fedora' module\nln -s /usr/lib/python2.7/site-packages/rpmUtils %GLUETOOL_BASE/lib/python2.7/site-packages/rpmUtils\n"
+        state: present
+        insertafter: "^# TASK: POST-START"
+      when: BUILDING_SPECFILE is defined

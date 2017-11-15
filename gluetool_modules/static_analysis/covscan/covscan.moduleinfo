@@ -1,0 +1,58 @@
+---
+
+name: covscan
+description: Run covscan
+dependencies:
+  repo:
+    - name: epel
+      description: Extra Packages for Enterprise Linux 7
+      baseurl: http://download.fedoraproject.org/pub/epel/7/$basearch
+    - name: covscan
+      description: Covscan repository
+      baseurl: http://coprbe.devel.redhat.com/repos/kdudka/covscan/epel-7-$basearch/
+    - name: rel-eng
+      description: RCMTOOLS repository
+      baseurl: http://download-ipv4.eng.brq.redhat.com/rel-eng/RCMTOOLS/latest-RCMTOOLS-2-RHEL-7/compose/Server/$basearch/os
+  yum:
+    - covscan-client
+    - libcurl-devel
+  pip:
+    - urlgrabber==3.10.2
+    - requests==2.18.4
+    - pycurl==7.43.0
+  ansible_tasks:
+    #
+    # Specfile building
+    #
+    - name: "BuildRequires: add curl-devel"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^BuildRequires: curl-devel"
+        line: "# added by 'covscan' module\nBuildRequires: curl-devel\n"
+        state: present
+        insertbefore: "^# TASK: GLOBAL-BEFORE-DESCRIPTION"
+      when: BUILDING_SPECFILE is defined
+
+    - name: "%install: download pycurl with the correct backend"
+      replace:
+        dest: "{{ SPECFILE }}"
+        regexp: "^# TASK: INSTALL-START"
+        replace: "# TASK: INSTALL-START\n\n# added by 'covscan' module\nexport PYCURL_SSL_LIBRARY=nss\n"
+      when: BUILDING_SPECFILE is defined
+
+    - name: "%post: install pycurl with the correct backend"
+      replace:
+        dest: "{{ SPECFILE }}"
+        regexp: "^# TASK: POST-START"
+        replace: "# TASK: POST-START\n\n# added by 'covscan' module\nexport PYCURL_SSL_LIBRARY=nss\n"
+      when: BUILDING_SPECFILE is defined
+
+    # when running citool/gluetool directly, without activating the virtualenv, just adding an export into activate
+    # would not work... We must use stronger weaponry.
+    - name: "%post: force requests to use system CA bundle"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^export REQUESTS_CA_BUNDLE="
+        line: "# added by 'covscan' module\necho 'export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-bundle.crt' >> /etc/profile.d/citool\n"
+        insertafter: "^# TASK: POST-START"
+      when: BUILDING_SPECFILE is defined

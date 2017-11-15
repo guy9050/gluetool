@@ -1,3 +1,0 @@
----
-- name: beah-result-parser
-  description: "Processing of XML results provided by Beaker or Restraint."

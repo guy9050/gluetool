@@ -1,6 +1,0 @@
-#!/bin/sh
-
-. /opt/citool/bin/activate
-
-kinit -k -t /root/baseos-jenkins.keytab jenkins/baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com@REDHAT.COM
-exec citool "$@"

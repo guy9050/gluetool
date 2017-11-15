@@ -1,0 +1,7 @@
+---
+
+name: restraint-scheduler
+description: restraint-scheduler
+dependencies:
+  pip:
+    - beautifulsoup4==4.5.3
