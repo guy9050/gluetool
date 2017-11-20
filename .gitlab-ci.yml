@@ -11,8 +11,8 @@ variables:
   SSH_OPTIONS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i http-space.key"
   DOCS_SPACE: "mprchlik@liver3.lab.eng.brq.redhat.com:/home/mprchlik/webspace/testing/docs/gluetool-modules"
   COVERAGE_SPACE: "mprchlik@liver3.lab.eng.brq.redhat.com:/home/mprchlik/webspace/testing/coverage/gluetool-modules"
-  PUBLISH_JOB: "20"  # [BaseOS CI] [gluetool] Publish Python package
-  RPM_JOB: "24"  # [BaseOS CI] [gluetool] Build RPM packages
+  PUBLISH_JOB: "20"  # [BaseOS CI] Publish Python package
+  RPM_JOB: "24"  # [BaseOS CI] Build RPM packages
 
   # This one keeps popping up again and again and again... It works locally while tox is not
   # psssing this variable to its command... That should not work at all :/
@@ -118,7 +118,12 @@ build-python-package:
     - master@baseos-qe/gluetool-modules
   script:
     - pip install ansible-tower-cli
-    - tower-cli job launch -J "$PUBLISH_JOB" --monitor --extra-vars "GIT_REPO=https://gitlab.cee.redhat.com/baseos-qe/gluetool-modules.git GIT_VERSION=master"
+    - tower-cli job launch -J "$PUBLISH_JOB" --monitor --extra-vars "DEVPI_INDEX=$DEVPI_INDEX"
+                                                       --extra-vars "DEVPI_USERNAME=$DEVPI_USERNAME"
+                                                       --extra-vars "DEVPI_PASSWORD=$DEVPI_PASSWORD"
+                                                       --extra-vars "DEVPI_URL=$DEVPI_URL"
+                                                       --extra-vars "GIT_REPO=https://gitlab.cee.redhat.com/baseos-qe/gluetool-modules.git"
+                                                       --extra-vars "GIT_VERSION=master"
 
 # Trigger RPM build
 build-rpm-packages:
@@ -127,7 +132,10 @@ build-rpm-packages:
     - master@baseos-qe/gluetool-modules
   script:
     - pip install ansible-tower-cli
-    - tower-cli workflow_job launch -W "$RPM_JOB" --monitor --extra-vars "COPR_LOGIN=$COPR_LOGIN COPR_USERNAME=$COPR_USERNAME COPR_TOKEN=$COPR_TOKEN COPR_URL=$COPR_URL"
+    - tower-cli workflow_job launch -W "$RPM_JOB" --monitor --extra-vars "COPR_LOGIN=$COPR_LOGIN"
+                                                            --extra-vars "COPR_USERNAME=$COPR_USERNAME"
+                                                            --extra-vars "COPR_TOKEN=$COPR_TOKEN"
+                                                            --extra-vars "COPR_URL=$COPR_URL"
 
 
 #
