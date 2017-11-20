@@ -16,7 +16,7 @@ dependencies:
         insertbefore: "^# TASK: GLOBAL-BEFORE-DESCRIPTION"
         marker: "# {mark} added by 'publisher-umb-bus' module"
         block: |
-          %if 0{?rhel}
+          %if 0%{?rhel}
           Requires: openssl-devel
           %else
           # Fedora 26+
