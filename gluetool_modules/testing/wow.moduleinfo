@@ -31,7 +31,7 @@ dependencies:
       lineinfile:
         dest: "{{ SPECFILE }}"
         regexp: "^Requires: krb5-devel"
-        line: "# added by 'beaker' module\nRequires: krb5-devel\n"
+        line: "# added by 'wow' module\nRequires: krb5-devel\n"
         state: present
         insertbefore: "^# TASK: GLOBAL-BEFORE-DESCRIPTION"
       when: BUILDING_SPECFILE is defined
@@ -39,8 +39,8 @@ dependencies:
     - name: "%post: inject system qe.py package into virtualenv"
       lineinfile:
         dest: "{{ SPECFILE }}"
-        regexp: "^ln -s /usr/lib/python2.7/site-packages/qe.py %GLUETOOL_BASE/"
-        line: "# added by 'beaker' module\nln -s /usr/share/qa-tools/python-modules/qe.py %GLUETOOL_BASE/lib/python2.7/site-packages/qe.py\n"
+        regexp: "^ln -s /usr/share/qa-tools/python-modules/qe\\.py %GLUETOOL_BASE/lib/python2\\.7/site-packages/qe\\.py"
+        line: "# added by 'wow' module\nln -s /usr/share/qa-tools/python-modules/qe.py %GLUETOOL_BASE/lib/python2.7/site-packages/qe.py\n"
         state: present
         insertafter: "^# TASK: POST-START"
       when: BUILDING_SPECFILE is defined

@@ -121,11 +121,6 @@
         msg: "Install package providing Python package for Koji CLI (e.g. python-koji or similar)"
       when: koji_cli_present.stat.isdir is not defined or not koji_cli_present.stat.isdir
 
-      #- name: "Check whether qe.py is available"
-      #stat:
-      #  path: "/usr/share/qa-tools/python-modules/qe.py"
-      #register: qepy_present
-
     #
     # Modify `activate` script to set additional variables
     #
