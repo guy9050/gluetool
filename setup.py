@@ -44,7 +44,7 @@ INSTALL_REQUIRES = [
     "pycurl==7.43.0",
     "python-novaclient==7.1.0",
     "python-openstackclient==3.9.0",
-    "python-qpid-proton==0.17.0",
+    "python-qpid-proton==0.18.1",
     "requests-kerberos==0.11.0",
     "requests==2.18.4",
     "requestsexceptions==1.2.0",
