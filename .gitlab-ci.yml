@@ -4,6 +4,7 @@ stages:
   - test
   - build-python
   - build-rpm
+  - build-docker
   - accessories
 
 
@@ -13,6 +14,7 @@ variables:
   COVERAGE_SPACE: "mprchlik@liver3.lab.eng.brq.redhat.com:/home/mprchlik/webspace/testing/coverage/gluetool-modules"
   PUBLISH_JOB: "20"  # [BaseOS CI] Publish Python package
   RPM_JOB: "24"  # [BaseOS CI] Build RPM packages
+  DOCKER_JOB: "31"  # [BaseOS CI] Build Docker images
 
   # This one keeps popping up again and again and again... It works locally while tox is not
   # psssing this variable to its command... That should not work at all :/
@@ -136,6 +138,17 @@ build-rpm-packages:
                                                             --extra-vars "COPR_USERNAME=$COPR_USERNAME"
                                                             --extra-vars "COPR_TOKEN=$COPR_TOKEN"
                                                             --extra-vars "COPR_URL=$COPR_URL"
+
+# Trigger Docker build
+build-docker-images:
+  stage: build-docker
+  only:
+    - master@baseos-qe/gluetool-modules
+  script:
+    - pip install ansible-tower-cli
+    - tower-cli workflow_job launch -W "$DOCKER_JOB" --monitor --extra-vars "DOCKER_REGISTRY_HOST=$DOCKER_REGISTRY_HOST"
+                                                               --extra-vars "DOCKER_REGISTRY_PROJECT=$DOCKER_REGISTRY_PROJECT"
+                                                               --extra-vars "DOCKER_REGISTRY_TOKEN=$DOCKER_REGISTRY_TOKEN"
 
 
 #
