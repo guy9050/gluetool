@@ -67,7 +67,7 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         install_method = self.option('install-method')
 
         if install_rpms_blacklist:
-            beaker_options = '{} --install-rpms-blacklist="{}"'.format(beaker_options, install_rpms_blacklist)
+            beaker_options = '{} --install-rpms-blacklist={}'.format(beaker_options, install_rpms_blacklist)
 
         if install_method:
             beaker_options = '{} --install-method={}'.format(beaker_options, install_method)
