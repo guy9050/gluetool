@@ -1,9 +1,0 @@
----
-#
-# download citool_config
-#
-- name: Cloning citool_config from '{{ citool_config_git_url }}' to '{{ citool_config_clone_dir }}'
-  git:
-    repo: "{{ citool_config_git_url }}"
-    dest: "{{ citool_config_clone_dir }}"
-    version: "{{ citool_config_git_ref }}"
