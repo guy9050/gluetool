@@ -12,6 +12,7 @@ from gluetool import GlueError, SoftGlueError, GlueCommandError, utils
 from gluetool.log import BlobLogger
 from gluetool.utils import run_command, fetch_url
 from libci.results import TestResult, publish_result
+from libci.sentry import PrimaryTaskFingerprintsMixin
 
 
 REQUIRED_COMMANDS = ['bkr', 'beaker-jobwatch', 'tcms-results']
@@ -21,21 +22,16 @@ TCMS_RESULTS_LOCATIONS = ('/bin', '/usr/bin')
 DEFAULT_RESERVE_TIME = 24
 
 
-class NoTestAvailableError(SoftGlueError):
-    def __init__(self):
-        super(NoTestAvailableError, self).__init__('No tests provided for the component')
+class InvalidTasksError(PrimaryTaskFingerprintsMixin, SoftGlueError):
+    def __init__(self, task, test_tasks):
+        super(InvalidTasksError, self).__init__(task, 'Invalid task names provided')
+
+        self.tasks = test_tasks
 
 
-class InvalidTasksError(SoftGlueError):
-    def __init__(self, tasks):
-        super(InvalidTasksError, self).__init__('Invalid task names provided')
-
-        self.tasks = tasks
-
-
-class BeakerJobwatchError(SoftGlueError):
-    def __init__(self, matrix_url):
-        super(BeakerJobwatchError, self).__init__('Beaker job(s) aborted, inform the user nicely')
+class BeakerJobwatchError(PrimaryTaskFingerprintsMixin, SoftGlueError):
+    def __init__(self, task, matrix_url):
+        super(BeakerJobwatchError, self).__init__(task, 'Beaker job(s) aborted, inform the user nicely')
 
         self.matrix_url = matrix_url
 
@@ -331,7 +327,7 @@ class Beaker(gluetool.Module):
                 s = exc.output.stderr.strip()
                 tasks = [name.strip() for name in s[s.index('Invalid task(s)') + 17:-2].split(',')]
 
-                raise InvalidTasksError(tasks)
+                raise InvalidTasksError(primary_task, tasks)
 
             raise GlueError("Failure during 'job-submit' execution: {}".format(exc.output.stderr))
 
@@ -392,7 +388,7 @@ class Beaker(gluetool.Module):
             # this most probably means that the jobs aborted
             if exc.output.exit_code == 2:
                 matrix_url = self._get_matrix_url(exc.output.stdout)
-                raise BeakerJobwatchError(matrix_url)
+                raise BeakerJobwatchError(self.shared('primary_task'), matrix_url)
 
             raise GlueError("Failure during 'jobwatch' execution: {}".format(exc.output.stderr))
 
