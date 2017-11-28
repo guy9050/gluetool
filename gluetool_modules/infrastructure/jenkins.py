@@ -14,7 +14,6 @@ from gluetool.log import format_dict
 from gluetool.proxy import Proxy
 
 JJB_CONFIG = os.path.expanduser('~/.config/jenkins_jobs/jenkins_jobs.ini')
-JJB_GLOBAL_CONFIG = os.path.expanduser('/etc/jenkins_jobs/jenkins_jobs.ini')
 
 
 class JenkinsProxy(Proxy):
@@ -94,11 +93,9 @@ class CIJenkins(gluetool.Module):
     This modules provides connection to a jenkins instance via jenkinsapi module:
         https://jenkinsapi.readthedocs.io/en/latest/
 
-    This module will also create Jenkins Job Builder configuration file {0},
-    if not found in paths '{0}' or '{1}'.
-
-    You can use the option '--create-jjb-config' to force creation of \'{0}\' file.
-    """.format(JJB_CONFIG, JJB_GLOBAL_CONFIG)
+    You can use the option '--create-jjb-config' to force creation of JJB config file
+    '{0}'.
+    """.format(JJB_CONFIG)
 
     name = 'jenkins'
     description = 'Connect to a jenkins instance via jenkinsapi'
@@ -224,16 +221,10 @@ class CIJenkins(gluetool.Module):
         self._jenkins = JenkinsProxy(jenkins, self)
 
     def execute(self):
-        create_config = self.option('create-jjb-config')
         url = self.option('url')
 
         # create JJB configuration file if forced
-        if create_config:
-            self.create_jjb_config()
-
-        # create JJB configuration file if it does not exist
-        if not os.path.exists(JJB_CONFIG) and \
-                not os.path.exists(JJB_GLOBAL_CONFIG):
+        if self.option('create-jjb-config'):
             self.create_jjb_config()
 
         # connecto to jenkins
