@@ -13,8 +13,6 @@ from gluetool import GlueError
 from gluetool.log import format_dict
 from gluetool.proxy import Proxy
 
-JJB_CONFIG = os.path.expanduser('~/.config/jenkins_jobs/jenkins_jobs.ini')
-
 
 class JenkinsProxy(Proxy):
     # pylint: disable=too-few-public-methods
@@ -93,9 +91,8 @@ class CIJenkins(gluetool.Module):
     This modules provides connection to a jenkins instance via jenkinsapi module:
         https://jenkinsapi.readthedocs.io/en/latest/
 
-    You can use the option '--create-jjb-config' to force creation of JJB config file
-    '{0}'.
-    """.format(JJB_CONFIG)
+    You can use the option '--create-jjb-config' to force creation of JJB config file.
+    """
 
     name = 'jenkins'
     description = 'Connect to a jenkins instance via jenkinsapi'
@@ -107,7 +104,9 @@ class CIJenkins(gluetool.Module):
     options = {
         'create-jjb-config': {
             'help': 'Force creation Jenkins Job Builder configuration',
-            'action': 'store_true',
+            'default': None,
+            'metavar': 'FILE',
+            'type': str
         },
         'password': {
             'help': 'Jenkins admin password (default: None)',
@@ -184,7 +183,9 @@ class CIJenkins(gluetool.Module):
         password = self.option('password')
         url = self.option('url')
         user = self.option('username')
-        config_dir = os.path.dirname(JJB_CONFIG)
+
+        config_file = os.path.expanduser(self.option('create-jjb-config'))
+        config_dir = os.path.dirname(config_file)
 
         # create configuration
         config = ConfigParser.RawConfigParser()
@@ -200,9 +201,10 @@ class CIJenkins(gluetool.Module):
             os.makedirs(config_dir)
 
         # save the configuration
-        with open(JJB_CONFIG, 'wb') as f:
+        with open(config_file, 'wb') as f:
             config.write(f)
-        self.info('created jjb configuration in \'{}\''.format(JJB_CONFIG))
+
+        self.info("created jjb configuration in '{}'".format(config_file))
 
     def connect(self):
         password = self.option('password')

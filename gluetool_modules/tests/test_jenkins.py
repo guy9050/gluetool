@@ -34,13 +34,12 @@ def test_loadable(module):
 def test_execute(module, monkeypatch, tmpdir):
     _, module = module
 
-    module._config['create-jjb-config'] = True
+    path_to_config = str(tmpdir.join('jenkins_jobs.ini'))
+
+    module._config['create-jjb-config'] = path_to_config
     module._config['url'] = 'dummy_url'
     module._config['password'] = 'dummy_passwd'
     module._config['username'] = 'dummy_username'
-
-    path_to_config = str(tmpdir.join('jenkins_jobs.ini'))
-    monkeypatch.setattr(gluetool_modules.infrastructure.jenkins, 'JJB_CONFIG', path_to_config)
 
     monkeypatch.setattr(os.path, 'exists', MagicMock(return_value=False))
     monkeypatch.setattr(os, 'makedirs', MagicMock())
