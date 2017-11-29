@@ -14,15 +14,24 @@ class WorkflowTomorrow(gluetool.Module):
     name = 'wow'
     description = 'Uses workflow-tomorrow to create beaker job XML description.'
 
-    options = {
-        'wow-options': {
-            'help': 'Additional options for workflow-tomorrow'
-        },
-        'use-general-test-plan': {
-            'help': 'Use general test plan for available build identified from primary_task shared function.',
-            'action': 'store_true'
-        }
-    }
+    options = [
+        ('Global options', {
+            'wow-options': {
+                'help': 'Additional options for workflow-tomorrow'
+            },
+            'use-general-test-plan': {
+                'help': 'Use general test plan for available build identified from primary_task shared function.',
+                'action': 'store_true'
+            }
+        }),
+        ('Tweak options', {
+            'default-setup-phases': {
+                'help': 'Comma-separated list of arguments for ``--setup`` option.',
+                'default': '',
+                'type': str
+            }
+        })
+    ]
 
     shared_functions = ['beaker_job_xml']
 
@@ -73,7 +82,9 @@ class WorkflowTomorrow(gluetool.Module):
         #
         # setup phases
         if setup_phases is None:
-            setup_phases = ['beakerlib']
+            setup_phases = [
+                phase.strip() for phase in self.option('default-setup-phases').strip().split(',')
+            ]
 
         for phase in setup_phases:
             options += ['--setup', phase]

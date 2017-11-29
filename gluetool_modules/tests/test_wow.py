@@ -23,8 +23,12 @@ SHARED_PRODUCT = ['product', 'product1']
 
 @pytest.fixture(name='module')
 def fixture_module(monkeypatch):
-    monkeypatch.setattr(gluetool.utils, "run_command", MagicMock())
-    return create_module(WorkflowTomorrow)
+    monkeypatch.setattr(gluetool.utils, 'run_command', MagicMock())
+
+    ci, module = create_module(WorkflowTomorrow)
+    module._config['default-setup-phases'] = ' foo-phase,  bar-phase  '
+
+    return ci, module
 
 
 @pytest.fixture(name='module_with_task')
@@ -165,18 +169,18 @@ def test_without_primary_task(module, monkeypatch):
 @pytest.mark.parametrize('options,environment,task_params,setup_phases,expected_sequencies', [
     (
         None, None, None, None, COMMON_SEQUENCIES + [
-            ['--setup', 'beakerlib'],
+            ['--setup', 'foo-phase', '--setup', 'bar-phase'],
         ]),
     (
         ['--dummy-sw1', 'dummy-val1'], None, None, None, COMMON_SEQUENCIES + [
-            ['--setup', 'beakerlib'],
+            ['--setup', 'foo-phase'],
             ['--dummy-sw1', 'dummy-val1']
         ]),
     (
         None, {'env1': 'v1'}, None, None, COMMON_SEQUENCIES),
     (
         None, None, {'p1': 'v1'}, None, COMMON_SEQUENCIES + [
-            ['--setup', 'beakerlib'],
+            ['--setup', 'foo-phase', '--setup', 'bar-phase'],
             ['--taskparam', 'p1=v1']
         ]),
     (
@@ -184,11 +188,11 @@ def test_without_primary_task(module, monkeypatch):
             ['bkr', 'workflow-tomorrow', '--dry', '--decision'],
             ['--taskparam', 'BASEOS_CI=false'],
             ['--taskparam', 'BEAKERLIB_RPM_DOWNLOAD_METHODS=false'],
-            ['--setup', 'beakerlib']
+            ['--setup', 'foo-phase', '--setup', 'bar-phase']
         ]),
     (
         None, None, {'p1': 'v1', 'p2': 'v2'}, None, COMMON_SEQUENCIES + [
-            ['--setup', 'beakerlib'],
+            ['--setup', 'foo-phase', '--setup', 'bar-phase'],
             ['--taskparam', 'p1=v1'],
             ['--taskparam', 'p2=v2']
         ]),
