@@ -351,7 +351,11 @@ class OpenstackGuest(NetworkedGuest):
         self.info("rebuilding server with snapshot '{}'".format(snapshot))
 
         def _rebuild():
-            self._instance.rebuild(self._module.get_image_ref(snapshot))
+            try:
+                self._instance.rebuild(self._module.get_image_ref(snapshot))
+
+            except novaclient.exceptions.Conflict as exc:
+                self.warn('Failed to rebuild the instance: {}'.format(exc))
 
         self._bring_alive('rebuilding the instance from a snapshot', _rebuild,
                           attempts=self._module.option('restore-snapshot-attempts'))
