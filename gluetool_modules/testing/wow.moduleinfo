@@ -24,6 +24,8 @@ dependencies:
 
   yum:
     # because the module uses qe.py to discover test plans from TCMS
+    - beaker-client
+    - beaker-redhat
     - qa-tools-workstation
 
   ansible_tasks:
