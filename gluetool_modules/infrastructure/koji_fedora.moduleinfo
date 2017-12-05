@@ -8,6 +8,7 @@ dependencies:
     - koji
     - python2-koji
     - python2-rpm
+    - yum
   pip:
     - pyOpenSSL==17.0.0
     - beautifulsoup4==4.5.3
