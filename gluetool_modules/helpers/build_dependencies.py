@@ -79,6 +79,8 @@ class BuildDependencies(gluetool.Module):
                     self.warn("No builds found for component '{}' and target '{}'".format(component, target))
                     return None
 
+                self.debug('No build found, try to fall back')
+
                 try:
                     alternative_target = self.companion_target_fallback_map.match(target)
 
