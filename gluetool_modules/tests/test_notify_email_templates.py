@@ -38,6 +38,8 @@ import gluetool_modules.testing.beaker.beaker
 import gluetool_modules.testing.restraint.scheduler
 import gluetool_modules.testing.wow
 
+from mock import MagicMock
+
 from . import create_module, patch_shared
 
 
@@ -251,7 +253,7 @@ def fixture_result_modules(request, notify_email, monkeypatch):
     ),
     (
         gluetool_modules.testing.beaker.beaker.BeakerJobwatchError,
-        ('beaker matrix URL',),
+        (MagicMock(), 'beaker matrix URL',),
         {},
         asset('BeakerJobwatchError.yaml'),
         {
@@ -301,7 +303,7 @@ def fixture_result_modules(request, notify_email, monkeypatch):
     ),
     (
         gluetool_modules.testing.restraint.scheduler.SUTInstallationFailedError,
-        ('some install logs URL',),
+        (None, 'some install logs URL',),
         {},
         asset('SUTInstallationFailedError.yaml'),
         {
@@ -311,7 +313,7 @@ def fixture_result_modules(request, notify_email, monkeypatch):
     ),
     (
         gluetool_modules.testing.wow.NoTestAvailableError,
-        (),
+        (MagicMock(),),
         {},
         asset('NoTestAvailableError.yaml'),
         {

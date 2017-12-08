@@ -92,8 +92,8 @@ def test_loadable(module):
 
 
 @pytest.mark.parametrize("opts", [None, ''])
-def test_sanity_fail(module, opts):
-    _, module = module
+def test_sanity_fail(module_with_task, opts):
+    _, module = module_with_task
     module._config['wow-options'] = opts
     with pytest.raises(NoTestAvailableError, match=r'No tests provided for the component'):
         module.beaker_job_xml()

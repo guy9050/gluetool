@@ -3,11 +3,12 @@ import qe
 
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError
+from libci.sentry import PrimaryTaskFingerprintsMixin
 
 
-class NoTestAvailableError(SoftGlueError):
-    def __init__(self):
-        super(NoTestAvailableError, self).__init__('No tests provided for the component')
+class NoTestAvailableError(PrimaryTaskFingerprintsMixin, SoftGlueError):
+    def __init__(self, task):
+        super(NoTestAvailableError, self).__init__(task, 'No tests provided for the component')
 
 
 class WorkflowTomorrow(gluetool.Module):
@@ -61,10 +62,10 @@ class WorkflowTomorrow(gluetool.Module):
 
         self.info('running workflow-tomorrow to get job description')
 
-        if not self.option('wow-options') and not self.option('use-general-test-plan'):
-            raise NoTestAvailableError()
-
         self.require_shared('tasks', 'primary_task')
+
+        if not self.option('wow-options') and not self.option('use-general-test-plan'):
+            raise NoTestAvailableError(self.shared('primary_task'))
 
         options = options or []
         environment = environment or {}
@@ -143,9 +144,9 @@ class WorkflowTomorrow(gluetool.Module):
         except GlueCommandError as exc:
             # Check for most common causes, and raise soft error where necessary
             if 'No relevant tasks found in test plan' in exc.output.stderr:
-                raise NoTestAvailableError()
+                raise NoTestAvailableError(self.shared('primary_task'))
 
             if 'No recipe generated (no relevant tasks?)' in exc.output.stderr:
-                raise NoTestAvailableError()
+                raise NoTestAvailableError(self.shared('primary_task'))
 
             raise GlueError("Failure during 'wow' execution: {}".format(exc.output.stderr))

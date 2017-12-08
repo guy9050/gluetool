@@ -5,16 +5,12 @@ import bs4
 
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
+from libci.sentry import PrimaryTaskFingerprintsMixin
 
 
-class NoTestAvailableError(SoftGlueError):
-    def __init__(self):
-        super(NoTestAvailableError, self).__init__('No tests provided for the component')
-
-
-class SUTInstallationFailedError(SoftGlueError):
-    def __init__(self, installation_logs):
-        super(SUTInstallationFailedError, self).__init__('SUT installation failed')
+class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
+    def __init__(self, task, installation_logs):
+        super(SUTInstallationFailedError, self).__init__(task, 'SUT installation failed')
 
         self.installation_logs = installation_logs
 
@@ -169,7 +165,8 @@ class RestraintScheduler(gluetool.Module):
         if output.exit_code != 0:
             self.debug('restraint exited with invalid exit code {}'.format(output.exit_code))
 
-            raise SUTInstallationFailedError('<Not available>' if sut_install_logs is None else sut_install_logs)
+            raise SUTInstallationFailedError(self.shared('primary_task'),
+                                             '<Not available>' if sut_install_logs is None else sut_install_logs)
 
     def create_schedule(self, tasks, job_desc, image):
         """
