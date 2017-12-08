@@ -73,8 +73,8 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         install_method = self.option('install-method')
 
         if install_rpms_blacklist:
-            restraint_scheduler_options = '{} --install-rpms-blacklist="{}"'.format(restraint_scheduler_options,
-                                                                                    install_rpms_blacklist)
+            restraint_scheduler_options = '{} --install-rpms-blacklist={}'.format(restraint_scheduler_options,
+                                                                                  install_rpms_blacklist)
 
         if install_method:
             restraint_scheduler_options = '{} --install-method={}'.format(restraint_scheduler_options, install_method)

@@ -28,8 +28,8 @@ def create_beaker_build_params(mod, **kwargs):
 
     # pylint: disable=protected-access
     if mod._config.get('install-rpms-blacklist', None):
-        params['beaker_options'] = '{} --install-rpms-blacklist="{}"'.format(params['beaker_options'],
-                                                                             mod._config['install-rpms-blacklist'])
+        params['beaker_options'] = '{} --install-rpms-blacklist={}'.format(params['beaker_options'],
+                                                                           mod._config['install-rpms-blacklist'])
 
     return params
 
