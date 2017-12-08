@@ -266,8 +266,8 @@ class UMBPublisher((gluetool.Module)):
 
         self.info('Publishing {} messages on the UMB'.format(messages_count))
 
-        for url in self._environment['urls']:
-            self.debug("Creating a container for: '{}'".format(url))
+        for i, url in enumerate(self._environment['urls'], 1):
+            self.debug("Creating a container for broker #{}: '{}'".format(i, url))
 
             container = proton.reactor.Container(TestHandler(self, url, messages, topic))
 
@@ -280,7 +280,8 @@ class UMBPublisher((gluetool.Module)):
                 self.info('{} messages successfully sent'.format(messages_count))
                 break
 
-            self.warn('Failed to sent out all messages, {} remaining'.format(len(messages)))
+            self.warn('Failed to sent out all messages via broker #{}: {} remaining. Will try another broker.'.format(
+                i, len(messages)))
 
         if messages and not isolated_run:
             raise gluetool.GlueError('Could not send all the messages, {} remained.'.format(len(messages)))
