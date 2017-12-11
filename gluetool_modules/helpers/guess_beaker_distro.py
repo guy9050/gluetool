@@ -2,7 +2,7 @@ import bs4
 
 import gluetool
 from gluetool import GlueError
-from gluetool.log import format_dict
+from gluetool.log import format_dict, log_dict
 from gluetool.utils import fetch_url, cached_property, PatternMap, IncompatibleOptionsError
 
 
@@ -38,7 +38,9 @@ class CIGuessBeakerDistro(gluetool.Module):
             'default': 'target-autodetection'
         },
         'distro': {
-            'help': 'Distro specification, to help your method with guessing'
+            'help': 'Distro specification, to help your method with guessing',
+            'action': 'append',
+            'default': []
         },
         'nightly-listing': {
             'help': """URL where list of nightly composes lies, in a form of web server's
@@ -59,7 +61,10 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
 
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
-    _distro = None
+    def __init__(self, *args, **kwargs):
+        super(CIGuessBeakerDistro, self).__init__(*args, **kwargs)
+
+        self._distro = None
 
     def distro(self):
         """ return guessed distro value """
@@ -207,24 +212,28 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
         return distro
 
     def _guess_force(self):
-        distro = self.option('distro')
-        self.debug("forcing '{}' as a distro".format(distro))
+        self._distro = [s.strip() for s in self.option('distro')]
 
-        self._distro = distro
+        log_dict(self.debug, "forcing distro as ordered by 'force' method", self._distro)
 
     def _guess_target_autodetection(self):
         self.require_shared('primary_task')
 
         target = self.shared('primary_task').target
 
-        self._distro = self.pattern_map.match(target)
-        self.debug("transformed target '{}' to the distro '{}'".format(target, self._distro))
+        self._distro = self.pattern_map.match(target, multiple=True)
+
+        log_dict(self.debug, "transformed target '{}' to the distro".format(target), self._distro)
 
     def _guess_nightly(self):
-        self._distro = self._find_nightly_for_distro(self.option('distro'))
+        self._distro = [
+            self._find_nightly_for_distro(s.strip()) for s in self.option('distro')
+        ]
 
     def _guess_buc(self):
-        self._distro = self._find_buc_for_distro(self.option('distro'))
+        self._distro = [
+            self._find_buc_for_distro(s.strip()) for s in self.option('distro')
+        ]
 
     _methods = {
         'force': _guess_force,
@@ -255,4 +264,5 @@ directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
             raise IncompatibleOptionsError("Unknown 'guessing' method '{}'".format(self.option('method')))
 
         method(self)
-        self.info("Using distro '{}'".format(self._distro))
+
+        log_dict(self.info, 'Using distro', self._distro)

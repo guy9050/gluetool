@@ -227,7 +227,7 @@ def functional_testing(test_result, module, monkeypatch):
     patch_shared(monkeypatch, module, {
         'primary_task': mocked_task,
         'results': [test_result, test_result],
-        'distro': distro,
+        'distro': [distro],
         'notification_recipients': None
     })
 

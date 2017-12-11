@@ -101,7 +101,8 @@ class WorkflowTomorrow(gluetool.Module):
         #
         # add distro if available
         if self.has_shared('distro'):
-            options += ['--distro', self.shared('distro')]
+            for distro in self.shared('distro'):
+                options += ['--distro', distro]
 
         #
         # add global task parameters

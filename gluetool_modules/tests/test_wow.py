@@ -15,7 +15,7 @@ COMMON_SEQUENCIES = [
     ['--taskparam', 'BASEOS_CI=true'],
     ['--taskparam', 'BEAKERLIB_RPM_DOWNLOAD_METHODS=yum\\ direct']
 ]
-SHARED_DISTRO = ['distro', 'distro1']
+SHARED_DISTRO = ['distro', ['distro1', 'distro2']]
 SHARED_TASKS = ['tasks', MagicMock()]
 SHARED_TASK = ['primary_task', MagicMock(component='c1')]
 SHARED_PRODUCT = ['product', 'product1']
@@ -207,7 +207,7 @@ def test_with_basic_params(module_with_shared, options, environment, task_params
 
     expected_sequencies = expected_sequencies + [['--taskparam', 'BASEOS_CI_COMPONENT=c1']]
     if ci.has_shared('distro'):
-        expected_sequencies = expected_sequencies + [['--distro', 'distro1']]
+        expected_sequencies = expected_sequencies + [['--distro', 'distro1'], ['--distro', 'distro2']]
     if ci.has_shared('product'):
         env_data = cmd[cmd.index('--environment') + 1]
         assert re.match(r'.*product=product1.*', env_data)
