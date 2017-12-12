@@ -26,7 +26,7 @@ DESCRIPTION = 'Gluetool & Citool modules'
 #    sys.exit(1)
 
 INSTALL_REQUIRES = [
-    "ansible==2.2.2.0",
+    "ansible==2.4.2.0",
     "beautifulsoup4==4.5.3",
     "python-dateutil==2.6.1",
     "docker-pycreds==0.2.1",
