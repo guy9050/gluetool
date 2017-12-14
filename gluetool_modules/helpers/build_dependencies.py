@@ -144,7 +144,13 @@ class BuildDependencies(gluetool.Module):
     }
 
     def sanity(self):
-        if self.option('method') == 'companions-from-koji' and not self.option('companions'):
+        method = self.option('method')
+        companions = self.option('companions')
+
+        if companions and not method:
+            raise gluetool.utils.IncompatibleOptionsError('--companions option specified but no --method selected')
+
+        if method == 'companions-from-koji' and not companions:
             # pylint: disable=line-too-long
             raise gluetool.utils.IncompatibleOptionsError("--companions option is required with method 'companions-from-koji'")  # Ignore PEP8Bear
 
