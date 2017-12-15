@@ -1,69 +1,24 @@
 """
-**Error information** describes optional bits in the case the message wishes to report
-an exceptional state of the pipeline:
+Sends pipeline messages as specified in draft.
 
-* ``message`` (string): user-presentable description of the error.
-* ``soft`` (bool): whether the error was soft or not. Soft errors are usualy fixable by the user.
-
-
-**Artifact information** describes optional bits in the case the message can report details
-of the Koji/Brew/etc. artifact triggering the pipeline:
-
-* ``id`` (int): artifact ID.
-* ``namespace`` (string): ID namespace - Koji, Copr, Docker, etc.
-* ``nvr`` (string, optional): built package NVR.
-* ``branch`` (string, optional): branch in git repository the artifact was build from.
-* ``issuer`` (string, optional): user who started the artifact.
-* ``scratch`` (bool, optional): whether the artifact represents a scratch build.
-
-
-**The message** structure is following:
-
-* ``state`` (string): describes the state pipeline entered. One of ``started``, ``scheduled``,
-  ``finished``, ``error``
-* ``category`` (string): category of testing implemented by the pipeline.
-* ``thread-id`` (string, optional): testing thread ID, if known.
-* ``test-overall-result`` (string, optional): what is the overall result of the testing performed by
-  the pipeline. One of ``pass``, ``fail``, ``unknown``.
-* ``test-results`` (string, optional): results of the testing, in xUnit format, compressed by :py:mod:`zlib`
-  library, and base64-encoded.
-* ``note`` (string, optional): custom note with some relation towards the message.
-* ``error`` (`Error information`, optional): error information.
-* ``artifact`` (`Artifact information`, optional): artifact information.
-
-
-.. code-block:: json
-
-   {
-       "category": "tier1",
-       "state": "started",
-       "thread-id": "d6c5958237fc"
-   }
-
-   {
-       "category": "tier1",
-       "state": "finished",
-       "test-overall-result": "pass",
-       "test-results": "eJzt...5BGb+g==",
-       "thread-id": "d6c5958237fc"
-   }
+https://docs.google.com/document/d/16L5odC-B4L6iwb9dp8Ry0Xk5Sc49h9KvTHrG86fdfQM/edit?ts=5a2af73c
 """
 
 import base64
-import UserDict
+import os
 import zlib
 
+import jinja2
+
 import gluetool
+from gluetool.log import log_dict
+from gluetool.utils import treat_url
 
 
-class Message(UserDict.UserDict):
-    def __init__(self, module, **kwargs):
-        UserDict.UserDict.__init__(self, **kwargs)
-
-        self.module = module
-
-    def serialize(self):
-        return dict(self)
+STATE_QUEUED = 'queued'
+STATE_RUNNING = 'running'
+STATE_COMPLETE = 'complete'
+STATE_ERROR = 'error'
 
 
 class PipelineStateReporter(gluetool.Module):
@@ -75,7 +30,7 @@ class PipelineStateReporter(gluetool.Module):
         * the first when the module is executed, reporting the pipeline just started. Depending
           on the module position in the pipeline, there were definitely actions taken before sending
           this message.
-          This message can be disabled by ``--dont-report-started`` option.
+          This message can be disabled by ``--dont-report-running`` option.
 
         * the second message is sent when the pipeline is being destroyed. it can contain information
           about the error causing pipeline to crash, or export testing results.
@@ -84,25 +39,60 @@ class PipelineStateReporter(gluetool.Module):
     name = 'pipeline-state-reporter'
     description = 'Sends messages reporting the pipeline state.'
 
-    options = {
-        'category': {
-            'help': 'Sets ``category`` field in the messages. One of those passed to ``--categories`` option.',
-            'type': str
-        },
-        'categories': {
-            'help': 'Comma-separated list of available categories.'
-        },
-        'dont-report-started': {
-            'help': 'Do not send out a "started" message automatically.',
-            'action': 'store_true',
-            'default': False
-        },
-        'bus-topic': {
-            'help': 'Topic of the messages sent to the message bus.'
-        }
-    }
+    options = [
+        ('CI team options', {
+            'ci-name': {
+                'help': "Human-readable name of the CI system, e.g. 'BaseOS CI'.",
+            },
+            'ci-team': {
+                'help': "Human-readable name of the team running the testing, e.g. 'BaseOS QE'."
+            },
+            'ci-url': {
+                'help': 'URL of the CI system.'
+            },
+            'ci-contact-email': {
+                'help': 'Team or CI system contact e-mail.'
+            },
+            'ci-contact-irc': {
+                'help': 'Team or CI system IRC channel.'
+            }
+        }),
+        ('Test options', {
+            'test-category': {
+                # pylint: disable=line-too-long
+                'help': "Category of tests performed in this thread. One of 'static-analysis', 'functional', 'integration' or 'validation'.",  # Ignore PEP8Bear
+                'choices': ['static-analysis', 'functional', 'integration', 'validation']
+            },
+            'test-type': {
+                'help': "Type of tests provided in this thread, e.g. 'tier1', 'rpmdiff-analysis' or 'covscan'."
+            }
+        }),
+        ('Tweaks', {
+            'label': {
+                'help': 'Custom pipeline label, distinguishing the pipelines of the same type.',
+                'default': None
+            },
+            'note': {
+                'help': 'Custom, arbitrary note or comment.',
+                'default': None
+            }
+        }),
+        ('General options', {
+            'dont-report-running': {
+                'help': "Do not send out a 'running' message automatically.",
+                'action': 'store_true',
+                'default': False
+            },
+            'bus-topic': {
+                'help': 'Topic of the messages sent to the message bus.'
+            }
+        })
+    ]
 
-    required_options = ('categories', 'category', 'bus-topic')
+    required_options = (
+        'ci-name', 'ci-team', 'ci-url', 'ci-contact-email', 'ci-contact-irc',
+        'test-category', 'test-type',
+        'bus-topic')
 
     shared_functions = ('report_pipeline_state',)
 
@@ -110,9 +100,75 @@ class PipelineStateReporter(gluetool.Module):
     def categories(self):
         return [s.strip() for s in self.option('categories').split(',')]
 
-    def report_pipeline_state(self, state, thread_id=None, category=None,
-                              test_overall_result=None, test_results=None, note=None,
-                              artifact=None, error_soft=None, error_message=None):
+    def _artifact_info(self):
+        self.require_shared('primary_task')
+
+        task = self.shared('primary_task')
+
+        return {
+            'type': task.ARTIFACT_NAMESPACE,
+            'id': str(task.task_id),
+            'component': task.component,
+            'issuer': task.issuer,
+            'branch': task.branch,
+            'nvr': task.nvr,
+            'scratch': task.scratch
+        }
+
+    def _ci_info(self):
+        return {
+            'name': self.option('ci-name'),
+            'team': self.option('ci-team'),
+            'url': self.option('ci-url'),
+            'email': self.option('ci-contact-email'),
+            'irc': self.option('ci-contact-irc')
+        }
+
+    def _run_info(self):
+        build_url = os.getenv('BUILD_URL', None)
+
+        if not build_url:
+            return {
+                'url': None,
+                'log': None
+            }
+
+        return {
+            'url': treat_url(build_url, logger=self.logger),
+            'log': treat_url('{}/console'.format(build_url))
+        }
+
+    def _init_message(self, test_category, test_type, thread_id):
+        headers = {}
+        body = {}
+
+        artifact = self._artifact_info()
+        ci = self._ci_info()
+        run = self._run_info()
+
+        headers.update(artifact)
+
+        body['ci'] = ci
+        body['run'] = run
+        body['artifact'] = artifact
+
+        body['type'] = test_type or self.option('test-type')
+        body['category'] = test_category or self.option('test-category')
+        body['label'] = self.option('label')
+        body['note'] = self.option('note')
+
+        if thread_id is not None:
+            body['thread_id'] = thread_id
+
+        elif self.has_shared('thread_id'):
+            body['thread_id'] = self.shared('thread_id')
+
+        return headers, body
+
+    def report_pipeline_state(self, state, test_category=None, test_type=None, thread_id=None,
+                              distros=None,
+                              test_overall_result=None, test_results=None,
+                              error_message=None, error_url=None):
         # pylint: disable=too-many-arguments
         """
         Send out the message reporting the pipeline state.
@@ -121,67 +177,84 @@ class PipelineStateReporter(gluetool.Module):
         of ``thread-id`` and ``artifact`` where shared functions could be called, if available.
 
         :param str state: State of the pipeline.
+        :param str test_category: Pipeline category - ``functional``, ``static-analysis``, etc.
+        :param str test_type: Pipeline type - ``tier1``, ``rpmdiff-analysis``, etc.
         :param str thread_id: The thread ID of the pipeline. If not set, shared function ``thread_id``
-            can be used to provide the ID.
-        :param str category: Pipeline category (``tier1``, ``covscan``, ...).
+            is used to provide the ID.
+        :param list(tuple(str, str, str)) distros: List of distros used by the systems in the testing
+            process. Each item is a tuple of three strings:
+
+            * ``label`` - arbitrary label of the system, e.g. ``master`` or ``client``.
+            * ``os`` - identification of used distro, e.g. beaker distro name or OpenStack image name.
+            * ``provider`` - what service provided the system, e.g. ``beaker`` or ``openstack``.
         :param str test_overall_result: Overall test result (``pass``, ``fail``, ``unknown``, ...).
-        :param str note: Optional note.
-        :param dict artifact: Task information. If not set, shared function ``primary_task`` can be used
-            to provide the details.
-        :param bool error_soft: Whether the reported error is soft or not.
+        :param test_results: Internal representation of gathered testing results. If provided,
+            it is serialized into the message.
         :param str error_message: Error message which can be presented to the common user.
+        :param str error_url: URL of the issue in a tracking system which tracks the error. For example,
+            link to an automatically created Sentry issue, or link to a Jira issue discissing the error.
         """
 
-        message = Message(self, state=state)
+        distros = distros or []
 
-        message['category'] = category or self.option('category')
+        headers, body = self._init_message(test_category, test_type, thread_id)
 
-        if test_overall_result is not None:
-            message['test-overall-result'] = test_overall_result
+        if state == STATE_QUEUED:
+            pass
 
-        if test_results is not None:
-            serialized = self.shared('serialize_results', 'xunit', test_results)
-            compressed = zlib.compress(str(serialized))
-            encoded = base64.b64encode(compressed)
+        elif state == STATE_RUNNING:
+            pass
 
-            message['test-results'] = encoded
+        elif state == STATE_COMPLETE:
+            build_url = os.getenv('BUILD_URL', None)
 
-        if note is not None:
-            message['note'] = note
+            if not build_url:
+                body['run'].update({
+                    'debug': None,
+                    'rebuild': None
+                })
+            else:
+                body['run'].update({
+                    'debug': treat_url('{}/artifact/citool-debug.txt'.format(build_url)),
+                    'rebuild': treat_url('{}/rebuild/parameterized'.format(build_url))
+                })
 
-        if error_soft is not None or error_message is not None:
-            message['error'] = {
-                'soft': error_soft,
-                'message': error_message
-            }
+            body['system'] = [
+                {
+                    'label': label,
+                    'os': distro,
+                    'provider': provider
+                } for label, distro, provider in distros
+            ]
 
-        if thread_id is not None:
-            message['thread-id'] = thread_id
+            body['status'] = test_overall_result
 
-        elif self.has_shared('thread_id'):
-            message['thread-id'] = self.shared('thread_id')
+            if test_results is not None:
+                serialized = self.shared('serialize_results', 'xunit', test_results)
+                compressed = zlib.compress(str(serialized))
+                body['xunit'] = base64.b64encode(compressed)
 
-        if artifact is not None:
-            message['artifact'] = artifact
+            if self.has_shared('notification_recipients'):
+                body['recipients'] = self.shared('notification_recipients')
 
-        elif self.has_shared('primary_task'):
-            task = self.shared('primary_task')
+        elif state == STATE_ERROR:
+            body['reason'] = error_message
+            body['issue_url'] = error_url
 
-            message['artifact'] = {
-                'id': task.task_id,
-                'namespace': task.ARTIFACT_NAMESPACE,
-                'nvr': task.nvr,
-                'branch': task.branch,
-                'issuer': task.issuer,
-                'scratch': task.scratch
-            }
+        topic = gluetool.utils.render_template(jinja2.Template(self.option('bus-topic')), logger=self.logger, **{
+            'HEADERS': headers,
+            'BODY': body,
+            'STATE': state
+        })
 
-        gluetool.log.log_dict(self.debug, 'pipeline state', message.serialize())
+        self.debug("topic: '{}'".format(topic))
+        log_dict(self.debug, 'pipeline state headers', headers)
+        log_dict(self.debug, 'pipeline state body', body)
 
         if not self.has_shared('publish_bus_messages'):
             return
 
-        message = gluetool.utils.Bunch(headers={}, body=message.serialize())
+        message = gluetool.utils.Bunch(headers=headers, body=body)
 
         self.shared('publish_bus_messages', message, topic=self.option('bus-topic'))
 
@@ -194,12 +267,12 @@ class PipelineStateReporter(gluetool.Module):
             raise gluetool.GlueError("Unknown category '{}'".format(self.option('category')))
 
     def execute(self):
-        if self.option('dont-report-started'):
+        if self.option('dont-report-running'):
             return
 
         self.info('reporting pipeline beginning')
 
-        self.report_pipeline_state('started')
+        self.report_pipeline_state('running')
 
     def _get_test_result(self):
         if not self.has_shared('results'):
@@ -219,8 +292,9 @@ class PipelineStateReporter(gluetool.Module):
         self.info('reporting pipeline final state')
 
         if failure is None:
-            self.report_pipeline_state('finished', test_overall_result=self._get_test_result(),
+            self.report_pipeline_state(STATE_COMPLETE, test_overall_result=self._get_test_result(),
                                        test_results=self.shared('results'))
             return
 
-        self.report_pipeline_state('error', error_soft=failure.soft, error_message=str(failure.exc_info[1].message))
+        self.report_pipeline_state(STATE_ERROR, error_message=str(failure.exc_info[1].message),
+                                   error_url=failure.sentry_event_url)
