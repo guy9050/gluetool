@@ -100,7 +100,11 @@ class CIExporterResultsDB(gluetool.Module):
         self.require_shared('primary_task', 'distro')
 
         task = self.shared('primary_task')
-        distro = self.shared('distro')
+
+        # When messages gain support for multiple distros in a single messages, this should get a fix.
+        # Until then, using the first distro, whatever that is - it might not be the "primary" one but
+        # it's the best we have.
+        distro = self.shared('distro')[0]
 
         recipients = self.shared('notification_recipients', result_type=result_type)
         if recipients is None:
