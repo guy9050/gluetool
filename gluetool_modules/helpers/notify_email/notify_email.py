@@ -88,6 +88,7 @@ providing templates ``<class name>-[header|footer].j2``.
 
 import os
 import smtplib
+import socket
 from email.mime.text import MIMEText
 
 import jinja2
@@ -147,7 +148,7 @@ class Message(object):
             smtp.sendmail(self.sender, self.recipients + self.cc, msg.as_string())
             smtp.quit()
 
-        except smtplib.SMTPException as exc:
+        except (socket.error, smtplib.SMTPException) as exc:
             self._module.warn('Cannot send e-mail, SMTP raised an exception: {}'.format(str(exc)), sentry=True)
 
 
