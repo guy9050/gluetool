@@ -155,22 +155,22 @@ class CIBuildOnCommit(gluetool.Module):
         task_url = re.sub('Task info: ', '', task_url)
         self.info("Waiting for brew to finish task: {0}".format(task_url))
 
-        if self.has_shared('report_pipeline_state'):
-            self.shared('report_pipeline_state', 'started', artifact={
-                'id': taskid,
-                'namespace': 'brew',
-                'branch': self.branch,
-                'scratch': True
-            })
+        # if self.has_shared('report_pipeline_state'):
+        #    self.shared('report_pipeline_state', 'started', artifact={
+        #        'id': taskid,
+        #        'namespace': 'brew',
+        #        'branch': self.branch,
+        #        'scratch': True
+        #    })
 
         # wait until brew task finish
         command = ["brew", "watch-task", taskid]
         self._run_command(command, exception=BocBuildError)
 
-        if self.has_shared('report_pipeline_state'):
-            self.shared('report_pipeline_state', 'finished', artifact={
-                'id': taskid,
-                'namespace': 'brew',
-                'branch': self.branch,
-                'scratch': True
-            })
+        # if self.has_shared('report_pipeline_state'):
+        #    self.shared('report_pipeline_state', 'finished', artifact={
+        #        'id': taskid,
+        #        'namespace': 'brew',
+        #        'branch': self.branch,
+        #        'scratch': True
+        #    })

@@ -91,7 +91,6 @@ class PipelineStateReporter(gluetool.Module):
 
     required_options = (
         'ci-name', 'ci-team', 'ci-url', 'ci-contact-email', 'ci-contact-irc',
-        'test-category', 'test-type',
         'bus-topic')
 
     shared_functions = ('report_pipeline_state',)
@@ -165,9 +164,9 @@ class PipelineStateReporter(gluetool.Module):
 
         return headers, body
 
-    def report_pipeline_state(self, state, test_category=None, test_type=None, thread_id=None,
+    def report_pipeline_state(self, state, thread_id=None,
+                              test_category=None, test_type=None, test_overall_result=None, test_results=None,
                               distros=None,
-                              test_overall_result=None, test_results=None,
                               error_message=None, error_url=None):
         # pylint: disable=too-many-arguments
         """
