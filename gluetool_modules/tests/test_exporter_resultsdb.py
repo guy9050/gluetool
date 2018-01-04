@@ -135,46 +135,59 @@ def rpmdiff(result_type, topic, module, monkeypatch):
     scratch = True
 
     mocked_task = MagicMock(nvr='nvr', scratch=scratch, task_id=task_id, url='dummy_brew_url', latest='dummy_baseline')
-    run_info = {}
-    run_info['run_id'] = 'run_id'
-    run_info['web_url'] = 'dummy_rpmdiff_url'
-    run_info['overall_score'] = {}
-    run_info['overall_score']['description'] = 'Passed'
-    subresult = {'data': {}, 'testcase': {}}
 
-    subresult['data']['type'] = rpmdiff_type
-    subresult['testcase']['name'] = name
-    subresult['data']['scratch'] = scratch
-    subresult['data']['taskid'] = task_id
-    subresult['data']['item'] = item
+    run_info = {
+        'run_id': 'run_id',
+        'web_url': 'dummy_rpmdiff_url',
+        'overall_score': {
+            'description': 'Passed'
+        }
+    }
 
-    mocked_result = RpmdiffTestResult(module.glue, run_info, result_type, payload=[subresult, subresult, subresult])
+    subresults = [
+        {
+            'data': {
+                'item': item,
+                'type': rpmdiff_type,
+                'scratch': scratch,
+                'taskid': task_id
+            },
+            'testcase': {
+                'name': name
+            },
+            'dummy-id': i
+        } for i in range(0, 3)
+    ]
+
+    mocked_result = RpmdiffTestResult(module.glue, run_info, result_type, payload=subresults)
 
     patch_shared(monkeypatch, module, {
         'primary_task': mocked_task,
-        'results': [mocked_result, mocked_result]
+        'results': [mocked_result, mocked_result],
+        'publish_bus_messages': None
     })
-
-    mocked_publish = MagicMock()
-    module.glue.shared_functions['publish_bus_messages'] = mocked_publish
 
     module.execute()
 
-    assert len(mocked_publish.mock_calls) == 12
+    # mocked publish_bus_messages is available deep in Glue
+    mocked_publish = module.glue.shared_functions['publish_bus_messages'][1]
 
-    _, args, kwargs = mocked_publish.mock_calls[1]
+    assert len(mocked_publish.mock_calls) == 2
 
-    message = args[0]
-    assert kwargs['topic'] == 'topic://dummy/topic/rpmdiff.{}/foo'.format(topic)
+    for _, args, kwargs in mocked_publish.mock_calls:
+        assert kwargs == {'topic': 'topic://dummy/topic/rpmdiff.{}/foo'.format(topic)}
 
-    assert message.headers['CI_TYPE'] == 'resultsdb'
-    assert message.headers['type'] == rpmdiff_type
-    assert message.headers['testcase'] == name
-    assert message.headers['scratch']
-    assert message.headers['taskid'] == task_id
-    assert message.headers['item'] == item
+        assert len(args) == 1
 
-    assert message.body == subresult
+        for i, message in enumerate(args[0]):
+            assert message.headers['CI_TYPE'] == 'resultsdb'
+            assert message.headers['type'] == rpmdiff_type
+            assert message.headers['testcase'] == name
+            assert message.headers['scratch']
+            assert message.headers['taskid'] == task_id
+            assert message.headers['item'] == item
+
+            assert message.body == subresults[i]
 
 
 def test_rpmdiff_comparison(module, monkeypatch):

@@ -27,18 +27,19 @@ class CIExporterResultsDB(gluetool.Module):
     supported_dryrun_level = DryRunLevels.ISOLATED
 
     def process_rpmdiff_analysis(self, result, topic_spec='rpmdiff.analysis'):
-        for subresult in result.payload:
-            headers = {
+        messages = [
+            Message(headers={
                 'CI_TYPE': 'resultsdb',
                 'type': subresult['data']['type'],
                 'testcase': subresult['testcase']['name'],
                 'scratch': subresult['data']['scratch'],
                 'taskid': subresult['data']['taskid'],
                 'item': subresult['data']['item'],
-            }
+            }, body=subresult) for subresult in result.payload
+        ]
 
-            topic = self.option('topic-pattern').format(category=topic_spec)
-            self.shared('publish_bus_messages', Message(headers=headers, body=subresult), topic=topic)
+        topic = self.option('topic-pattern').format(category=topic_spec)
+        self.shared('publish_bus_messages', messages, topic=topic)
 
     def process_rpmdiff_comparison(self, result):
         """
