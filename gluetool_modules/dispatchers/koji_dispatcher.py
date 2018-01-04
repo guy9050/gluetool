@@ -16,9 +16,15 @@ class KojiTaskDispatcher(gluetool.Module):
     description = 'Configurable brew dispatcher'
 
     options = {
-        'pipeline-categories': {
+        'pipeline-test-categories': {
             # pylint: disable=line-too-long
-            'help': 'Mapping between jobs and their default pipeline category, as reported later by ``pipeline-state-reporter`` module.',
+            'help': 'Mapping between jobs and their default test category, as reported later by ``pipeline-state-reporter`` module.',
+            'type': str,
+            'default': None
+        },
+        'pipeline-test-types': {
+            # pylint: disable=line-too-long
+            'help': 'Mapping between jobs and their default test type, as reported later by ``pipeline-state-reporter`` module.',
             'type': str,
             'default': None
         }
@@ -34,11 +40,18 @@ class KojiTaskDispatcher(gluetool.Module):
         self._child_thread_id = None
 
     @cached_property
-    def pipeline_categories(self):
-        if not self.option('pipeline-categories'):
+    def pipeline_test_categories(self):
+        if not self.option('pipeline-test-categories'):
             return None
 
-        return gluetool.utils.SimplePatternMap(self.option('pipeline-categories'), logger=self.logger)
+        return gluetool.utils.SimplePatternMap(self.option('pipeline-test-categories'), logger=self.logger)
+
+    @cached_property
+    def pipeline_test_types(self):
+        if not self.option('pipeline-test-types'):
+            return None
+
+        return gluetool.utils.SimplePatternMap(self.option('pipeline-test-types'), logger=self.logger)
 
     def execute(self):
         """
@@ -54,6 +67,31 @@ class KojiTaskDispatcher(gluetool.Module):
         if self.has_shared('thread_id'):
             self._thread_id = self.shared('thread_id')
 
+        def _find_test_property(module, args, test_property, mapping):
+            joined_args = ' '.join(args)
+
+            # pylint: disable=line-too-long
+            match = re.search(r"""--pipeline-state-reporter-options\s*=?[\"']?\s*--test-{}\s*=?(.*?)[ \"']""".format(test_property), joined_args)  # Ignore PEP8Bear
+            if match is not None:
+                return match.group(1)
+
+            if mapping is None:
+                return 'unknown'
+
+            full_command = [module] + args
+
+            try:
+                # try to match our command with an entry from the mapping, to get what
+                # configurator thinks would be an appropriate default value for such command
+                return mapping.match(' '.join(full_command))
+
+            except gluetool.GlueError:
+                # pylint: disable=line-too-long
+
+                self.warn('Cannot find a test {} for job:\n{}'.format(test_property, gluetool.log.format_dict(full_command)), sentry=True)    # Ignore PEP8Bear
+
+                return 'unknown'
+
         for module, args in batch:
             if self._thread_id is not None:
                 self._subthread_counter += 1
@@ -64,33 +102,14 @@ class KojiTaskDispatcher(gluetool.Module):
                 log_dict(self.debug, 'augmented args with thread-id', args)
 
             if self.has_shared('report_pipeline_state'):
-                # finding the correct category might be tricky
-                category = 'other'
+                # finding the correct test category and type might be tricky
+                test_category, test_type = 'unknown', 'unknown'
 
-                # try to find out whether the command sets pipeline category, overriding any static setting
-                joined_args = ' '.join(args)
+                test_category = _find_test_property(module, args, 'category', self.pipeline_test_categories)
+                test_type = _find_test_property(module, args, 'type', self.pipeline_test_types)
 
-                # pylint: disable=line-too-long
-                match = re.search(r"""--pipeline-state-reporter-options\s*=?[\"']?\s*--category\s*=?(.*?)[ \"']""", joined_args)  # Ignore PEP8Bear
-                if match is not None:
-                    category = match.group(1)
-
-                # if not, there might be defaults
-                elif self.pipeline_categories is not None:
-                    full_command = [module] + args
-
-                    try:
-                        # try to match our command with an entry from the category map, to get what
-                        # confgurator thinks would be an appropriate default category for such command
-
-                        category = self.pipeline_categories.match(' '.join(full_command))
-
-                    except gluetool.GlueError:
-                        # pylint: disable=line-too-long
-
-                        self.warn('Cannot find a pipeline category for job:\n{}'.format(gluetool.log.format_dict(full_command)), sentry=True)    # Ignore PEP8Bear
-
-                self.shared('report_pipeline_state', 'scheduled', thread_id=self._child_thread_id, category=category)
+                self.shared('report_pipeline_state', 'queued', test_category=test_category, test_type=test_type,
+                            thread_id=self._child_thread_id)
 
             log_dict(self.debug, 'command to dispatch', [module, args])
             self.info('    {} {}'.format(module, ' '.join(args)))

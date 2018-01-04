@@ -38,7 +38,7 @@ class KojiTask(object):
     :param bool wait_timeout: Wait for task to become non-waiting
     """
 
-    ARTIFACT_NAMESPACE = 'koji'
+    ARTIFACT_NAMESPACE = 'koji-build'
 
     @staticmethod
     def _check_required_instance_keys(details):
@@ -315,7 +315,7 @@ class BrewTask(KojiTask):
     :param bool wait_timeout: Wait for task to become non-waiting
     """
 
-    ARTIFACT_NAMESPACE = 'brew'
+    ARTIFACT_NAMESPACE = 'brew-build'
 
     def _check_required_instance_keys(self, details):
         """
