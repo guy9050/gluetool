@@ -164,7 +164,7 @@ class PipelineStateReporter(gluetool.Module):
 
         return headers, body
 
-    def report_pipeline_state(self, state, thread_id=None,
+    def report_pipeline_state(self, state, thread_id=None, topic=None,
                               test_category=None, test_type=None, test_overall_result=None, test_results=None,
                               distros=None,
                               error_message=None, error_url=None):
@@ -176,6 +176,7 @@ class PipelineStateReporter(gluetool.Module):
         of ``thread-id`` and ``artifact`` where shared functions could be called, if available.
 
         :param str state: State of the pipeline.
+        :param str topic: Message bus topic to report to. If not set, ``bus-topic`` option is used.
         :param str test_category: Pipeline category - ``functional``, ``static-analysis``, etc.
         :param str test_type: Pipeline type - ``tier1``, ``rpmdiff-analysis``, etc.
         :param str thread_id: The thread ID of the pipeline. If not set, shared function ``thread_id``
@@ -195,6 +196,7 @@ class PipelineStateReporter(gluetool.Module):
         """
 
         distros = distros or []
+        topic = topic or self.option('bus-topic')
 
         headers, body = self._init_message(test_category, test_type, thread_id)
 
@@ -240,7 +242,7 @@ class PipelineStateReporter(gluetool.Module):
             body['reason'] = error_message
             body['issue_url'] = error_url
 
-        topic = gluetool.utils.render_template(jinja2.Template(self.option('bus-topic')), logger=self.logger, **{
+        topic = gluetool.utils.render_template(jinja2.Template(topic), logger=self.logger, **{
             'HEADERS': headers,
             'BODY': body,
             'STATE': state
@@ -255,7 +257,7 @@ class PipelineStateReporter(gluetool.Module):
 
         message = gluetool.utils.Bunch(headers=headers, body=body)
 
-        self.shared('publish_bus_messages', message, topic=self.option('bus-topic'))
+        self.shared('publish_bus_messages', message, topic=topic)
 
     def sanity(self):
         if not self.option('categories') or not self.option('category'):
