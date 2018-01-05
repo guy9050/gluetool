@@ -27,6 +27,11 @@ class KojiTaskDispatcher(gluetool.Module):
             'help': 'Mapping between jobs and their default test type, as reported later by ``pipeline-state-reporter`` module.',
             'type': str,
             'default': None
+        },
+        'pipeline-test-bus-topic': {
+            'help': 'Topic to use for messages sent for dispatched jobs.',
+            'type': str,
+            'default': None
         }
     }
 
@@ -108,8 +113,9 @@ class KojiTaskDispatcher(gluetool.Module):
                 test_category = _find_test_property(module, args, 'category', self.pipeline_test_categories)
                 test_type = _find_test_property(module, args, 'type', self.pipeline_test_types)
 
-                self.shared('report_pipeline_state', 'queued', test_category=test_category, test_type=test_type,
-                            thread_id=self._child_thread_id)
+                self.shared('report_pipeline_state', 'queued', thread_id=self._child_thread_id,
+                            topic=self.option('pipeline-test-bus-topic'),
+                            test_category=test_category, test_type=test_type)
 
             log_dict(self.debug, 'command to dispatch', [module, args])
             self.info('    {} {}'.format(module, ' '.join(args)))
