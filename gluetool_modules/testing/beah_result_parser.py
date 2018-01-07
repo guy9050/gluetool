@@ -171,7 +171,7 @@ class BeahResultParser(gluetool.Module):
             result['bkr_version'] = task['version']
 
         else:
-            self.warn('Cannot deduce bkr version')
+            self.debug('Cannot deduce bkr version')
 
     def _find_logs(self, root, artifact_path):
         # pylint: disable=no-self-use
@@ -220,7 +220,7 @@ class BeahResultParser(gluetool.Module):
             ]
 
         else:
-            self.warn('Cannot deduce task phases')
+            self.debug('Cannot deduce task phases')
 
     def parse_beah_result(self, task, journal=None, recipe=None, artifact_path=None, connectable_hostname=None):
         # pylint: disable=line-too-long
