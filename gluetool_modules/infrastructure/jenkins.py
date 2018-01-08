@@ -184,7 +184,7 @@ class CIJenkins(gluetool.Module):
         url = self.option('url')
         user = self.option('username')
 
-        config_file = os.path.expanduser(self.option('create-jjb-config'))
+        config_file = gluetool.utils.normalize_path(self.option('create-jjb-config'))
         config_dir = os.path.dirname(config_file)
 
         # create configuration
