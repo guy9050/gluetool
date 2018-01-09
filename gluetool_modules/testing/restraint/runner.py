@@ -202,7 +202,7 @@ class RestraintRunner(gluetool.Module):
 
         else:
             def artifact_path(s):
-                path = os.path.abspath('{}/{}'.format(job_dir, s))
+                path = gluetool.utils.normalize_path('{}/{}'.format(job_dir, s))
 
                 return 'file://localhost/{}'.format(path)
 

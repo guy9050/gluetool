@@ -1,5 +1,4 @@
 import json
-import os
 
 import gluetool
 
@@ -31,7 +30,7 @@ class Ansible(gluetool.Module):
         :returns: :py:class:`gluetool.utils.ProcessOutput` instance.
         """
 
-        playbook_path = os.path.expanduser(playbook_path)
+        playbook_path = gluetool.utils.normalize_path(playbook_path)
         self.debug("running playbook '{}'".format(playbook_path))
 
         cmd = [

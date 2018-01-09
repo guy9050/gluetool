@@ -1,7 +1,7 @@
 import copy
-import os
 
 import gluetool
+from gluetool.utils import normalize_path
 
 import proton
 import proton.handlers
@@ -76,8 +76,8 @@ class TestHandler(proton.handlers.MessagingHandler):
         ssl = proton.SSLDomain(proton.SSLDomain.MODE_CLIENT)
 
         # pylint: disable=protected-access
-        certificate = os.path.expanduser(self._module._environment['certificate'])
-        broker_ca = os.path.expanduser(self._module._environment['broker-ca'])
+        certificate = normalize_path(self._module._environment['certificate'])
+        broker_ca = normalize_path(self._module._environment['broker-ca'])
 
         ssl.set_credentials(certificate, certificate, None)
         ssl.set_trusted_ca_db(broker_ca)
