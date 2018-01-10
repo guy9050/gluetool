@@ -16,7 +16,7 @@ dependencies:
     # for qa-tools-workstation
     - name: qa-tools
       description: qa-tools repository
-      baseurl: http://liver2.lab.eng.brq.redhat.com/repo
+      baseurl: http://liver.brq.redhat.com/repo-testing/
 
   yum:
     - beaker-client
