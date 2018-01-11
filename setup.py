@@ -42,6 +42,7 @@ INSTALL_REQUIRES = [
     "psycopg2==2.7.3.1",
     "pyOpenSSL==17.0.0",
     "pycurl==7.43.0",
+    "python-glanceclient==2.8.0",
     "python-novaclient==7.1.0",
     "python-openstackclient==3.9.0",
     "python-qpid-proton==0.18.1",

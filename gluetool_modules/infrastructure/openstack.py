@@ -1,3 +1,5 @@
+# pylint: disable=too-many-lines
+
 import errno
 import gzip
 import os
@@ -36,6 +38,82 @@ MAX_SERVER_SHUTDOWN = 60
 MAX_IMAGE_ACTIVATION = 60
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
+
+
+class OpenStackImage(object):
+    """
+    Represents an OpenStack image, allowing consistent manipulation of images, snapshots
+    and their names and IDs in module internals, with few helper methods on top of that.
+    """
+
+    def __init__(self, module, name, resource=None):
+        self.module = module
+        self.name = name
+        self._resource = resource
+
+        module.logger.connect(self)
+
+    def __repr__(self):
+        return '<OpenStackImage(name="{}")>'.format(self.name)
+
+    @classmethod
+    def factory(cls, module, image, **kwargs):
+        if isinstance(image, cls):
+            return image
+
+        if isinstance(image, str):
+            return cls(module, image, **kwargs)
+
+        raise GlueError("Cannot convert '{}' of type {} to an OpenStackImage instance".format(image, type(image)))
+
+    @property
+    def resource(self):
+        self.debug("get image reference for '{}'".format(self.name))
+
+        if self._resource is None:
+            images = self.module.nova.images.findall(name=self.name)
+
+            if not images:
+                # pylint: disable=protected-access
+                self.module._resource_not_found('images', self.name)
+
+            for image in images:
+                self.debug('name: {}, status: {}'.format(image.name, image.status))
+
+                if image.status == u'ACTIVE':
+                    self._resource = image
+                    break
+
+            else:
+                raise GlueError("Multiple images found for '{}', and none of them is active".format(self.name))
+
+        return self._resource
+
+    def download(self, filename=None):
+        # This chould be implemented using glanceclient API - calling `glance` is easy and quick
+        # but leaks usernames and passwords into the log file. On the other hand, credentials are
+        # in the log aready because gluetool logs every option of the module...
+
+        filename = filename or '{}.img'.format(self.name)
+
+        self.debug("downloading image '{}' into '{}'".format(self.name, filename))
+
+        try:
+            gluetool.utils.run_command([
+                'glance',
+                '--os-auth-url', self.module.option('glance.auth-url'),
+                '--os-project-id', self.module.option('glance.project-id'),
+                '--os-username', self.module.option('glance.username'),
+                '--os-password', self.module.option('glance.password'),
+                'image-download',
+                '--file', filename,
+                str(self.resource.id)
+            ])
+
+        except gluetool.GlueCommandError as exc:
+            raise GlueError('Failed to download snapshot: {}'.format(exc.output.stderr))
+
+        return filename
 
 
 class OpenstackGuest(NetworkedGuest):
@@ -186,14 +264,14 @@ class OpenstackGuest(NetworkedGuest):
                                              key=details['key'],
                                              options=DEFAULT_SSH_OPTIONS)
 
-    @cached_property
+    @property
     def _image(self):
         assert self._instance is not None
 
         img_id = self._instance.image['id']
 
         try:
-            return self._nova.images.findall(id=img_id)[0]
+            return OpenStackImage(self._module, self._nova.images.findall(id=img_id)[0])
 
         except IndexError:
             raise GlueError("Cannot find image by its ID '{}'".format(img_id))
@@ -217,7 +295,7 @@ class OpenstackGuest(NetworkedGuest):
             variables['GUEST_DOMAINNAME'] = 'host.centralci.eng.rdu2.redhat.com'
 
         if 'IMAGE_NAME' not in variables:
-            variables['IMAGE_NAME'] = self._image.to_dict()['name']
+            variables['IMAGE_NAME'] = self._image.name
 
         super(OpenstackGuest, self).setup(variables=variables, **kwargs)
 
@@ -301,7 +379,7 @@ class OpenstackGuest(NetworkedGuest):
 
         raise GlueError('Failed to acquire living instance.')
 
-    def create_snapshot(self):
+    def create_snapshot(self, start_again=True):
         """
         Creates a snapshot from the current running image of the openstack instance.
         As snapshot name the instance name plus current date time is used.
@@ -309,8 +387,10 @@ class OpenstackGuest(NetworkedGuest):
 
         All created snapshots are deleted automatically during destruction.
 
-        :returns: created image id
+        :rtype: OpenStackImage
+        :returns: newly created image.
         """
+
         name = strftime('{}_%Y-%m-%d_%d-%H:%M:%S'.format(self.name), gmtime())
         self.debug("creating image snapshot named '{}'".format(name))
 
@@ -325,7 +405,8 @@ class OpenstackGuest(NetworkedGuest):
 
         # create image
         image_id = self._instance.create_image(name)
-        self._snapshots.append(image_id)
+        image = OpenStackImage(self._module, name)
+        self._snapshots.append(image)
 
         # we need to wait until the image is ready for usage
         # note: we are calling here the parametrized retry decorator
@@ -333,26 +414,28 @@ class OpenstackGuest(NetworkedGuest):
               wait_fixed=1000)(self._check_resource_status)('images', image_id, u'ACTIVE')
         self.info("image snapshot '{}' created".format(name))
 
-        # start instance
-        self._bring_alive('starting the instance', self._instance.start,
-                          attempts=self._module.option('start-after-snapshot-attempts'))
-        self.debug('started and alive')
+        if start_again is True:
+            # start instance
+            self._bring_alive('starting the instance', self._instance.start,
+                              attempts=self._module.option('start-after-snapshot-attempts'))
+            self.debug('started and alive')
 
-        return name
+        return image
 
     def restore_snapshot(self, snapshot):
         """
         Rebuilds server with the given snapshot image.
 
-        param: image instance
+        :param image: Either image name, or an :py:class:`OpenStackImage` instance.
+        :rtype: OpenstackGuest
         :returns: server instance rebuilt from given image.
         """
 
-        self.info("rebuilding server with snapshot '{}'".format(snapshot))
+        self.info("rebuilding server with snapshot '{}'".format(snapshot.name))
 
         def _rebuild():
             try:
-                self._instance.rebuild(self._module.get_image_ref(snapshot))
+                self._instance.rebuild(snapshot.resource)
 
             except novaclient.exceptions.Conflict as exc:
                 self.warn('Failed to rebuild the instance: {}'.format(exc))
@@ -368,10 +451,10 @@ class OpenstackGuest(NetworkedGuest):
         Removes all created snapshots.
         """
         count = len(self._snapshots)
-        for image_id in self._snapshots:
-            image = self._module.nova.images.find(id=image_id)
-            image.delete()
-            self.debug("removed image with id '{}'".format(image_id))
+        for image in self._snapshots:
+            image.resource.delete()
+            self.debug("removed image {}".format(image.name))
+
         if count > 0:
             self.verbose('removed all {} snapshots'.format(count))
         self._snapshots = []
@@ -534,6 +617,22 @@ class CIOpenstack(gluetool.Module):
                         """
             }
         }),
+        ('Glance options', {
+            'glance.auth-url': {
+                'help': 'Glance AUTH URL',
+                'metavar': 'URL'
+            },
+            'glance.project-id': {
+                'help': 'Glance project ID',
+                'metavar': 'ID'
+            },
+            'glance.username': {
+                'help': 'Glance username'
+            },
+            'glance.password': {
+                'help': 'Glance password'
+            }
+        }),
         ('Timeouts', {
             'activation-timeout': {
                 # pylint: disable=line-too-long
@@ -572,7 +671,10 @@ class CIOpenstack(gluetool.Module):
         })
     ]
 
-    required_options = ['auth-url', 'password', 'project-name', 'username', 'ssh-key', 'ip-pool-name']
+    required_options = (
+        'auth-url', 'password', 'project-name', 'username', 'ssh-key', 'ip-pool-name',
+        'glance.auth-url', 'glance.project-id', 'glance.username', 'glance.password'
+    )
     shared_functions = ('openstack', 'provision')
 
     # connection handler
@@ -604,20 +706,6 @@ class CIOpenstack(gluetool.Module):
 
     def openstack(self):
         return self.nova
-
-    def get_image_ref(self, name):
-        self.debug("get image reference for '{}'".format(name))
-
-        image_refs = self.nova.images.findall(name=name)
-        if not image_refs:
-            self._resource_not_found('images', name)
-
-        for image_ref in image_refs:
-            self.debug('name: {}, status: {}'.format(image_ref.name, image_ref.status))
-            if image_ref.status == u'ACTIVE':
-                return image_ref
-
-        raise GlueError("Multiple images found for '{}', and none of them is active".format(name))
 
     def _get_reservation_file_name(self, guest):
         """
@@ -758,21 +846,39 @@ class CIOpenstack(gluetool.Module):
                         self.debug("removing reservation file '{}'".format(path))
                         os.unlink(path)
 
+    def _provision_image(self, image):
+        """
+        Find what image the module should use for provisioning.
+
+        Following images are used, if set, in this order:
+
+            1. the ``image`` argument
+            2. the ``image`` option - command-line overrides config file
+            3. the ``image`` shared function.
+
+        .. warning::
+
+           Found image does not necessary mean there is such image in the OpenStack.
+           It just represents the image module should use - the actual checks whether
+           such image exists will come later.
+
+        :rtype: OpenStackImage
+        :returns: image to be used for provisioning, or ``None`` if the module cannot find
+            the answer.
+        """
+
+        if not image:
+            image = self.option('image') or self.shared('image')
+
+            if image is None:
+                raise GlueError('No image name specified')
+
+        return OpenStackImage.factory(self, image)
+
     def provision(self, count=1, name=DEFAULT_NAME, image=None, flavor=None):
         assert count >= 1, 'count needs to >= 1'
 
-        # read image name in this priority order:
-        # 1. from this function
-        # 2. from image option
-        # 3. from image option from configuration file
-        # 4. from openstack_image shared function
-        if image is None:
-            image = self.option('image') or self.shared('image')
-            if image is None:
-                raise GlueError('no image name specified')
-
-        # get image reference
-        image_ref = self.get_image_ref(image)
+        image = self._provision_image(image)
 
         # get flavor reference
         flavor = flavor or self.option('flavor')
@@ -805,7 +911,7 @@ class CIOpenstack(gluetool.Module):
         for _ in range(count):
             details = {
                 'name': name,
-                'image': image_ref,
+                'image': image.resource,
                 'flavor': flavor_ref,
                 'network': network_ref,
                 'key_name': self.option('key-name'),
@@ -830,7 +936,7 @@ class CIOpenstack(gluetool.Module):
         if self.option('reserve'):
             self._reserve_guests()
 
-        self.info("created {} instance(s) with flavor '{}' from image '{}'".format(count, flavor, image))
+        self.info("created {} instance(s) with flavor '{}' from image '{}'".format(count, flavor, image.name))
 
         return guests
 
