@@ -72,7 +72,7 @@ class Restraint(gluetool.Module):
         log_xml(guest.debug, 'Job', job)
 
         # Make sure restraintd is running and listens for connections
-        guest.execute('service restraind start')
+        guest.execute('service restraintd start')
 
         def _check_restraintd_running():
             try:
