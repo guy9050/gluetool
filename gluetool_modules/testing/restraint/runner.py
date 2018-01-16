@@ -71,6 +71,10 @@ class RestraintRunner(gluetool.Module):
             'help': 'Enable or disable parallelization of test sets (default: no)',
             'default': 'no',
             'metavar': 'yes|no'
+        },
+        'snapshot-on-failure': {
+            'help': 'If set, on restraint failure a snapshot of the guest is taken and stored.',
+            'default': False
         }
     }
 
@@ -261,6 +265,11 @@ class RestraintRunner(gluetool.Module):
                 self.info('restraint reports: One or more tasks failed')
 
             else:
+                if self.option('snapshot-on-failure'):
+                    filename = guest.create_snapshot(start_again=False).download()
+
+                    self.warn("Snapshot saved as '{}'".format(filename))
+
                 raise gluetool.GlueError('restraint command exited with return code {}: {}'.format(
                     output.exit_code, output.stderr))
 
@@ -333,7 +342,7 @@ class RestraintRunner(gluetool.Module):
             for i, task in enumerate(recipe_set.find_all('task'), 1):
                 self.info('running task #{} of {}'.format(i, len(tasks)))
 
-                guest.debug("restoring snapshot '{}' before running next task".format(base_snapshot))
+                guest.debug("restoring snapshot '{}' before running next task".format(base_snapshot.name))
                 actual_guest = guest.restore_snapshot(base_snapshot)
 
                 recipe_set_results.append(self._run_task_set(actual_guest, [task], recipe_attrs, recipe_set_attrs))

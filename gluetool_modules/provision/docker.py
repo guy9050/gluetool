@@ -268,7 +268,7 @@ class DockerGuest(libci.guest.Guest):
 
         return self._execute_shell(['docker', 'cp', '{}:{}'.format(self._container.id, src), dst])
 
-    def create_snapshot(self):
+    def create_snapshot(self, start_again=True):
         self.debug('creating a snapshot')
 
         if self._container is not None:
