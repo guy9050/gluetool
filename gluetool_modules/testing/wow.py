@@ -17,6 +17,11 @@ class WorkflowTomorrow(gluetool.Module):
 
     options = [
         ('Global options', {
+            'wow-options-map': {
+                'help': 'Path to a file with optional target => ``workflow-tomorrow`` options mapping.',
+                'default': None,
+                'metavar': 'FILE'
+            },
             'wow-options': {
                 'help': 'Additional options for workflow-tomorrow'
             },
@@ -37,6 +42,13 @@ class WorkflowTomorrow(gluetool.Module):
     shared_functions = ['beaker_job_xml']
 
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
+
+    @gluetool.utils.cached_property
+    def wow_options_map(self):
+        if not self.option('wow-options-map'):
+            return None
+
+        return gluetool.utils.PatternMap(self.option('wow-options-map'), logger=self.logger)
 
     def beaker_job_xml(self, options=None, environment=None, task_params=None, setup_phases=None):
         """
@@ -79,6 +91,16 @@ class WorkflowTomorrow(gluetool.Module):
         options = options or []
         environment = environment or {}
         task_params = task_params or {}
+
+        if self.wow_options_map:
+            try:
+                # simple split() is too dumb: '--foo "bar baz"' => ['--foo', 'bar baz']. shlex is the right tool
+                # to split command-line options, it obeys quoting.
+                options += shlex.split(self.wow_options_map.match(self.shared('primary_task').target))
+
+            except GlueError:
+                # ignore the error, no match
+                pass
 
         #
         # setup phases
