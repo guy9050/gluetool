@@ -1,3 +1,4 @@
+import re
 import shlex
 import tempfile
 
@@ -7,6 +8,9 @@ from gluetool.utils import Bunch
 
 
 DEFAULT_RESTRAINT_PORT = 8081
+
+DEFAULT_RESTRAINTD_START_TIMEOUT = 30
+DEFAULT_RESTRAINTD_START_TIMEOUT_TICK = 10
 
 
 class StdStreamAdapter(ContextAdapter):
@@ -29,6 +33,20 @@ class Restraint(gluetool.Module):
         'restraint-options': {
             'help': 'Additional restraint options.',
             'default': None
+        },
+        'restraintd-start-timeout': {
+            # pylint: disable=line-too-long
+            'help': 'Wait SECONDS for restraintd to start and listen (default: {})'.format(DEFAULT_RESTRAINTD_START_TIMEOUT),
+            'type': int,
+            'default': DEFAULT_RESTRAINTD_START_TIMEOUT,
+            'metavar': 'SECONDS'
+        },
+        'restraintd-start-timeout-tick': {
+            # pylint: disable=line-too-long
+            'help': 'To pass ``restraintd-start-timeout``, check every SECONDS (default: {})'.format(DEFAULT_RESTRAINTD_START_TIMEOUT_TICK),
+            'type': int,
+            'default': DEFAULT_RESTRAINTD_START_TIMEOUT_TICK,
+            'metavar': 'SECONDS'
         }
     }
 
@@ -52,6 +70,27 @@ class Restraint(gluetool.Module):
         """
 
         log_xml(guest.debug, 'Job', job)
+
+        # Make sure restraintd is running and listens for connections
+        guest.execute('service restraind start')
+
+        def _check_restraintd_running():
+            try:
+                output = guest.execute('ss -lpnt | grep restraintd',
+                                       connection_timeout=self.option('restraintd-start-timeout-tick'))
+
+            except gluetool.GlueCommandError:
+                self.debug('ss check failed, ignoring error')
+                return False
+
+            # ss' output looks like this:
+            # LISTEN     0      5      127.0.0.1:\d+      *:*       users:(("restraind",pid=\d+,fd=\d+))
+            # just match the important bits, address and name. If the output matches, it's good, restraind
+            # is somewhere in the output (using search - match matches from the first character).
+            return re.search(r'.*?\s+127\.0\.0\.1:{}.*?"restraintd".*?'.format(port), output.stdout.strip()) is not None
+
+        guest.wait('restraintd is running', _check_restraintd_running,
+                   timeout=self.option('restraind-start-timeout'), tick=self.option('restraind-start-timeout-tick'))
 
         restraint_command = [
             'restraint', '-v'
