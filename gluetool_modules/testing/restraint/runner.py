@@ -1,5 +1,7 @@
 import copy
 import os
+import sys
+
 from collections import defaultdict
 import enum
 import bs4
@@ -254,7 +256,27 @@ class RestraintRunner(gluetool.Module):
 
         self.debug('Job:\n{}'.format(job_desc))
 
-        output = self.shared('restraint', guest, job)
+        def download_snapshot():
+            if not self.option('snapshot-on-failure'):
+                return
+
+            try:
+                filename = guest.create_snapshot(start_again=False).download()
+
+                self.warn("Snapshot saved as '{}'".format(filename))
+
+            # pylint: disable=broad-except
+            except Exception as exc:
+                self.exception('Exception raised when downloading a snapshot: {}'.format(exc),
+                               exc_info=sys.exc_info())
+
+        try:
+            output = self.shared('restraint', guest, job)
+
+        except gluetool.GlueError as exc:
+            download_snapshot()
+
+            raise exc
 
         if output.exit_code != 0:
             self.debug('restraint exited with invalid exit code {}'.format(output.exit_code))
@@ -265,10 +287,7 @@ class RestraintRunner(gluetool.Module):
                 self.info('restraint reports: One or more tasks failed')
 
             else:
-                if self.option('snapshot-on-failure'):
-                    filename = guest.create_snapshot(start_again=False).download()
-
-                    self.warn("Snapshot saved as '{}'".format(filename))
+                download_snapshot()
 
                 raise gluetool.GlueError('restraint command exited with return code {}: {}'.format(
                     output.exit_code, output.stderr))
