@@ -90,7 +90,7 @@ class Restraint(gluetool.Module):
             return re.search(r'.*?\s+127\.0\.0\.1:{}.*?"restraintd".*?'.format(port), output.stdout.strip()) is not None
 
         guest.wait('restraintd is running', _check_restraintd_running,
-                   timeout=self.option('restraind-start-timeout'), tick=self.option('restraintd-start-timeout-tick'))
+                   timeout=self.option('restraintd-start-timeout'), tick=self.option('restraintd-start-timeout-tick'))
 
         restraint_command = [
             'restraint', '-v'
