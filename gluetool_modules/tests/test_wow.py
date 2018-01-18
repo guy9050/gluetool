@@ -141,6 +141,12 @@ def test_setup_phases_empty(module_with_task):
     assert not sublist_exists(['--setup'])
 
 
+def test_setup_phases_unset(module_with_task):
+    _, module = module_with_task
+    module.beaker_job_xml(setup_phases=None)
+    assert sublist_exists(['--setup', 'foo-phase', '--setup', 'bar-phase'])
+
+
 def test_include_module_wow_options(configured_module):
     _, module = configured_module
     module.beaker_job_xml()

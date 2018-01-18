@@ -28,7 +28,7 @@ class WorkflowTomorrow(gluetool.Module):
         ('Tweak options', {
             'default-setup-phases': {
                 'help': 'Comma-separated list of arguments for ``--setup`` option.',
-                'default': '',
+                'default': None,
                 'type': str
             }
         })
@@ -63,9 +63,9 @@ class WorkflowTomorrow(gluetool.Module):
         :param dict task_params: if set, params will be passed to the tests via multiple
             ``--taskparam`` options.
         :param list setup_phases: if set, it's a list of valus which will be passed to
-            ``workflow-tomorrow`` via multiple ``--setup`` options. If ``None`` is passed,
-            ``['beakerlib']`` is used by default (if you don't want your job to use ``--setup=beakerlib``,
-            use ``setup_phases=[]``).
+            ``workflow-tomorrow`` via multiple ``--setup`` options. If an empty list is
+            passed, no ``--setup`` option is given to ``workflow-tomorrow``. If ``None``
+            is passed, phases set by ``--default-setup-phases`` option are used.
         :returns: :py:class:`gluetool.utils.ProcessOutput` instance with the output of ``workflow-tomorrow``.
         """
 
@@ -82,10 +82,17 @@ class WorkflowTomorrow(gluetool.Module):
 
         #
         # setup phases
+        #
+        # there's no `setup_phases = setup_phases or []` because user can pass setup_phases=[]
+        # to signal "no setup phases"
         if setup_phases is None:
-            setup_phases = [
-                phase.strip() for phase in self.option('default-setup-phases').strip().split(',')
-            ]
+            if self.option('default-setup-phases'):
+                setup_phases = [
+                    phase.strip() for phase in self.option('default-setup-phases').strip().split(',')
+                ]
+
+            else:
+                setup_phases = []
 
         for phase in setup_phases:
             options += ['--setup', phase]
