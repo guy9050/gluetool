@@ -15,7 +15,7 @@ from novaclient.exceptions import BadRequest, NotFound, Unauthorized
 import gluetool
 from gluetool import GlueError, GlueCommandError
 from gluetool.log import format_dict
-from gluetool.utils import cached_property
+from gluetool.utils import cached_property, normalize_path
 from libci.guest import NetworkedGuest
 
 DEFAULT_FLAVOR = 'm1.small'
@@ -745,7 +745,7 @@ class CIOpenstack(gluetool.Module):
         if not user_data.startswith('#cloud-config'):
             self.debug("loading userdata from '{}'".format(user_data))
 
-            with open(os.path.expanduser(user_data), 'r') as f:
+            with open(normalize_path(user_data), 'r') as f:
                 user_data = f.read()
 
         self.debug('userdata:\n{}'.format(user_data))
@@ -791,7 +791,7 @@ class CIOpenstack(gluetool.Module):
         """
         Make sure that reservation directory exists. Will silently ignore if directory already exist.
         """
-        self._reservation_directory = os.path.expanduser(self.option('reserve-directory'))
+        self._reservation_directory = normalize_path(self.option('reserve-directory'))
         # make sure reservation directory exists
         try:
             os.makedirs(self._reservation_directory)
@@ -884,7 +884,7 @@ class CIOpenstack(gluetool.Module):
 
         In case user requested forced cleanup, remove machine without timestamp validation
         """
-        directory = os.path.expanduser(self.option('reserve-directory'))
+        directory = normalize_path(self.option('reserve-directory'))
         for root, _, files in os.walk(directory):
             # we expect here that there are now subdirectories here
             if not files:

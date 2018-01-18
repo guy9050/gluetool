@@ -295,7 +295,7 @@ class BusListener(gluetool.Module):
         self.add_bus_callback('on_message', 'dump message', self._dump_message)
 
         if self.option('queue-directory'):
-            self._queue_directory = os.path.expanduser(self.option('queue-directory'))
+            self._queue_directory = gluetool.utils.normalize_path(self.option('queue-directory'))
             self.add_bus_callback('on_message', 'store message in queue directory', self._store_message)
 
         if self.option('count'):

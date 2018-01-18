@@ -95,7 +95,7 @@ import jinja2
 
 import gluetool
 from gluetool import utils
-from gluetool.utils import render_template
+from gluetool.utils import render_template, normalize_path
 from gluetool.log import log_blob
 import libci
 
@@ -244,7 +244,7 @@ class Notify((gluetool.Module)):
 
     @utils.cached_property
     def template_root(self):
-        return os.path.expanduser(self.option('template-root'))
+        return normalize_path(self.option('template-root'))
 
     @utils.cached_property
     def _template_env(self):

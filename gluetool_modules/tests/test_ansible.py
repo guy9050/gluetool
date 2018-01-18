@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 import gluetool
@@ -124,4 +126,5 @@ def test_dryrun(module, monkeypatch):
 
     module.run_playbook('dummy-path', ['dummy-guest'])
 
-    mock_run_command.assert_called_once_with(['ansible-playbook', '-i', 'dummy-guest,', '-C', 'dummy-path'])
+    mock_run_command.assert_called_once_with(['ansible-playbook', '-i', 'dummy-guest,',
+                                              '-C', os.path.join(os.getcwd(), 'dummy-path')])
