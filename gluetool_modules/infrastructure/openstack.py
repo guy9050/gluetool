@@ -342,6 +342,30 @@ class OpenstackGuest(NetworkedGuest):
         except NotFound:
             self.debug('instance already deleted - skipping')
 
+    def _shutdown(self):
+        """
+        Shut down the instance.
+        """
+
+        self.debug('shutting down...')
+
+        retry(stop_max_attempt_number=MAX_SERVER_SHUTDOWN,
+              wait_fixed=1000)(self._check_resource_status)('servers', self._instance.id, u'SHUTOFF')
+
+        self.debug('shut down finished')
+
+    def _start(self):
+        """
+        Start the instance.
+        """
+
+        self.debug('starting...')
+
+        self._bring_alive('starting the instance', self._instance.start,
+                          attempts=self._module.option('start-after-snapshot-attempts'))
+
+        self.debug('started and alive')
+
     def _wait_alive(self):
         """
         "Wait alive" helper - we're using the same options when calling guest.wait_alive, let's
@@ -350,6 +374,26 @@ class OpenstackGuest(NetworkedGuest):
         """
 
         try:
+            # First check the status of the instance - until it's ACTIVE, don't bother
+            # to check anything else - our network-based checks *may* succeed even during
+            # an instance shutdown process, leading to false positives.
+            def _check_active():
+                try:
+                    self._check_resource_status('servers', self._instance.id, u'ACTIVE')
+
+                except GlueError as exc:
+                    # ignore expected errors - while waiting, different state is fine
+                    if exc.message.startswith('servers resource has invalid status'):
+                        return False
+
+                    # re-raise anything else
+                    raise exc
+
+                return True
+
+            self.wait('"ACTIVE" status', _check_active, timeout=self._module.option('activation-timeout'), tick=1)
+
+            # If the instance is in ACTIVE state, proceed with other checks
             return self.wait_alive(connect_timeout=self._module.option('activation-timeout'), connect_tick=1,
                                    echo_timeout=self._module.option('echo-timeout'), echo_tick=ECHO_TICK,
                                    boot_timeout=self._module.option('boot-timeout'), boot_tick=BOOT_TICK)
@@ -377,6 +421,20 @@ class OpenstackGuest(NetworkedGuest):
                 self.error('Failed to bring the guest alive in attempt #{}: {}'.format(i + 1, exc.message))
                 self.warn('instance status: {}'.format(self._instance.status))
 
+                # If instance status is ACTIVE, it started but some additional check failed. We simply
+                # cannot just run `actor` again because, from the OpenStack's point of view the instance
+                # is already running, and `actor` would probably fail as, for example, cannot "start"
+                # ACTIVE instance. So, stop the instance to give actor leveled field.
+                try:
+                    self._check_resource_status('servers', self._instance.id, u'ACTIVE')
+
+                except GlueError:
+                    # not ACTIVE - ok, just try another attempt
+                    pass
+
+                else:
+                    self._shutdown()
+
         raise GlueError('Failed to acquire living instance.')
 
     def create_snapshot(self, start_again=True):
@@ -398,10 +456,7 @@ class OpenstackGuest(NetworkedGuest):
         self._instance.stop()
 
         # we need to shutdown the instance before creating snapshot
-        # note: we are calling here the parametrized retry decorator
-        retry(stop_max_attempt_number=MAX_SERVER_SHUTDOWN,
-              wait_fixed=1000)(self._check_resource_status)('servers', self._instance.id, u'SHUTOFF')
-        self.debug("server '{}' powered off".format(self.name))
+        self._shutdown()
 
         # create image
         image_id = self._instance.create_image(name)
@@ -415,10 +470,7 @@ class OpenstackGuest(NetworkedGuest):
         self.info("image snapshot '{}' created".format(name))
 
         if start_again is True:
-            # start instance
-            self._bring_alive('starting the instance', self._instance.start,
-                              attempts=self._module.option('start-after-snapshot-attempts'))
-            self.debug('started and alive')
+            self._start()
 
         return image
 
@@ -927,7 +979,7 @@ class CIOpenstack(gluetool.Module):
             self._all.append(guest)
             guests.append(guest)
 
-        self.debug('created {} guests, waiting for them to become ACTIVE'.format(count))
+        self.debug('created {} guests, waiting for them to become alive'.format(count))
 
         for guest in guests:
             # pylint: disable=protected-access
