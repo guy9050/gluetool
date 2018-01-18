@@ -22,6 +22,13 @@ TCMS_RESULTS_LOCATIONS = ('/bin', '/usr/bin')
 DEFAULT_RESERVE_TIME = 24
 
 
+class BeakerError(PrimaryTaskFingerprintsMixin, GlueError):
+    """
+    Hard exception, used instead plain :py:class:`gluetool.GlueError` when task context
+    is available and reasonable.
+    """
+
+
 class InvalidTasksError(PrimaryTaskFingerprintsMixin, SoftGlueError):
     def __init__(self, task, test_tasks):
         super(InvalidTasksError, self).__init__(task, 'Invalid task names provided')
@@ -329,7 +336,7 @@ class Beaker(gluetool.Module):
 
                 raise InvalidTasksError(primary_task, tasks)
 
-            raise GlueError("Failure during 'job-submit' execution: {}".format(exc.output.stderr))
+            raise BeakerError(primary_task, "Failure during 'job-submit' execution: {}".format(exc.output.stderr))
 
         try:
             # Submitted: ['J:1806666', 'J:1806667']
@@ -343,7 +350,7 @@ class Beaker(gluetool.Module):
             # [1806666, 1806667]
 
         except Exception as exc:
-            raise GlueError('Cannot convert job-submit output to job ID: {}'.format(str(exc)))
+            raise BeakerError(primary_task, 'Cannot convert job-submit output to job ID: {}'.format(str(exc)))
 
         return (ids, job)
 
@@ -390,7 +397,8 @@ class Beaker(gluetool.Module):
                 matrix_url = self._get_matrix_url(exc.output.stdout)
                 raise BeakerJobwatchError(self.shared('primary_task'), matrix_url)
 
-            raise GlueError("Failure during 'jobwatch' execution: {}".format(exc.output.stderr))
+            raise BeakerError(self.shared('primary_task'),
+                              "Failure during 'jobwatch' execution: {}".format(exc.output.stderr))
 
         return output
 
@@ -415,14 +423,14 @@ class Beaker(gluetool.Module):
         jobwatch_log = jobwatch_log.strip().split('\n')
 
         if len(jobwatch_log) < 3:
-            raise GlueError('jobwatch output is unexpectedly short')
+            raise BeakerError(self.shared('primary_task'), 'jobwatch output is unexpectedly short')
 
         if not jobwatch_log[-3].startswith('https://beaker.engineering.redhat.com/matrix/'):
-            raise GlueError('Could not find beaker matrix URL in jobwatch output')
+            raise BeakerError(self.shared('primary_task'), 'Could not find beaker matrix URL in jobwatch output')
 
         self.info(jobwatch_log[-1].strip())
         if jobwatch_log[-1].strip() not in ['finished successfully', 'finished unsuccessfully']:
-            raise GlueError('beaker-jobwatch does not report completion')
+            raise BeakerError(self.shared('primary_task'), 'beaker-jobwatch does not report completion')
 
         self.info('beaker-jobwatch finished')
 
@@ -469,7 +477,7 @@ class Beaker(gluetool.Module):
 
             except Exception as e:
                 self.error('Failed to process beaker results - the actual exception should have been logged already')
-                raise GlueError('Failed to process beaker results: {}'.format(str(e)))
+                raise BeakerError(self.shared('primary_task'), 'Failed to process beaker results: {}'.format(str(e)))
 
         # Any single task with a result other than "PASS" - or even with
         # a status other than "COMPLETED" - means testing failed.
