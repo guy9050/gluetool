@@ -231,12 +231,63 @@ class Beaker(gluetool.Module):
 
         return [job_id], bs4.BeautifulSoup(output.stdout, 'xml')
 
+    def _submit_job(self, index, job):
+        # pylint: disable=no-self-use
+        """
+        Submit a job description to Beaker.
+
+        :param element job: XML describing the job.
+        :param int index: index of the job among all jobs we're going to start. Used to keep track of saved
+            XML files.
+        :rtype: list(int)
+        :returns: List of Beaker job IDs.
+        """
+
+        # save the copy
+        job_filename = 'job-{}.xml'.format(index)
+
+        with open(job_filename, 'w') as f:
+            f.write(job.prettify(encoding='utf-8'))
+            f.flush()
+
+        # submit the job to beaker
+        try:
+            output = run_command(['bkr', 'job-submit', job_filename])
+
+        except GlueCommandError as exc:
+            if 'Invalid task(s):' in exc.output.stderr:
+                s = exc.output.stderr.strip()
+                tasks = [name.strip() for name in s[s.index('Invalid task(s)') + 17:-2].split(',')]
+
+                raise InvalidTasksError(self.shared('primary_task'), tasks)
+
+            raise BeakerError(self.shared('primary_task'),
+                              "Failure during 'job-submit' execution: {}".format(exc.output.stderr))
+
+        try:
+            # Submitted: ['J:1806666', 'J:1806667']
+            jobs = output.stdout[output.stdout.index(' ') + 1:]
+            # ['J:1806666', 'J:1806667']
+            jobs = jobs.replace('\'', '"')
+            # ["J:1806666", "J:1806667"]
+            jobs = json.loads(jobs)
+            # ['J:1806666', 'J:1806667']
+            ids = [int(job_id.split(':')[1]) for job_id in jobs]
+            # [1806666, 1806667]
+
+        except Exception as exc:
+            raise BeakerError(self.shared('primary_task'),
+                              'Cannot convert job-submit output to job ID: {}'.format(str(exc)))
+
+        return ids
+
     def _run_wow(self):
         # pylint: disable=too-many-statements
         """
-        Create job XML and submit it to beaker.
+        Create Beaker jobs XMLs for allowed distros.
 
-        :returns: ([job #1 ID, job #2 ID, ...], <job />)
+        :rtype: list(tuple(element, list(int)))
+        :returns: List of pairs ``(job XML, [Beaker job ID #1, Beaker job ID #2, ...])``
         """
 
         if self.option('job'):
@@ -317,49 +368,17 @@ class Beaker(gluetool.Module):
         else:
             options += ['--no-reserve']
 
-        output = self.shared('beaker_job_xml', options=options)
+        return [
+            (job, self._submit_job(index, job)) for index, job in enumerate(self.shared('beaker_job_xml',
+                                                                                        options=options))
+        ]
 
-        job = bs4.BeautifulSoup(output.stdout, 'xml')
-
-        with open('job.xml', 'w') as f:
-            f.write(output.stdout)
-            f.flush()
-
-        # submit the job to beaker
-        try:
-            output = run_command(['bkr', 'job-submit', 'job.xml'])
-
-        except GlueCommandError as exc:
-            if 'Invalid task(s):' in exc.output.stderr:
-                s = exc.output.stderr.strip()
-                tasks = [name.strip() for name in s[s.index('Invalid task(s)') + 17:-2].split(',')]
-
-                raise InvalidTasksError(primary_task, tasks)
-
-            raise BeakerError(primary_task, "Failure during 'job-submit' execution: {}".format(exc.output.stderr))
-
-        try:
-            # Submitted: ['J:1806666', 'J:1806667']
-            jobs = output.stdout[output.stdout.index(' ') + 1:]
-            # ['J:1806666', 'J:1806667']
-            jobs = jobs.replace('\'', '"')
-            # ["J:1806666", "J:1806667"]
-            jobs = json.loads(jobs)
-            # ['J:1806666', 'J:1806667']
-            ids = [int(job_id.split(':')[1]) for job_id in jobs]
-            # [1806666, 1806667]
-
-        except Exception as exc:
-            raise BeakerError(primary_task, 'Cannot convert job-submit output to job ID: {}'.format(str(exc)))
-
-        return (ids, job)
-
-    def _run_jobwatch(self, jobs, job, options):
+    def _run_jobwatch(self, jobs, options):
         """
         Start beaker-jobwatch, to baby-sit our jobs, and wait for its completion.
 
-        :param list job: list of job IDs.
-        :param element job: Job XML description.
+        :param list(tuple(element, list(int))) jobs: List of pairs ``(job XML, [Beaker job ID #1,
+            Beaker job ID #2, ...])``
         :param list options: additional options, usualy coming from jobwatch-options option.
         :returns: gluetool.utils.ProcessOutput with the output of beaker-jobwatch.
         """
@@ -367,23 +386,29 @@ class Beaker(gluetool.Module):
         command = [
             'beaker-jobwatch',
             '--skip-broken-machines'
-        ] + options + ['--job={}'.format(job_id) for job_id in jobs]
+        ] + options
+
+        for _, job_ids in jobs:
+            command += [
+                '--job={}'.format(job_id) for job_id in job_ids
+            ]
 
         if self.option('reserve'):
             next_to_last_tasks = {}
 
-            for recipe_set in job.find_all('recipeSet'):
-                for recipe in recipe_set.find_all('recipe'):
-                    next_to_last_tasks[recipe.find_all('task')[-2]['name']] = True
+            for job, _ in jobs:
+                for recipe_set in job.find_all('recipeSet'):
+                    for recipe in recipe_set.find_all('recipe'):
+                        next_to_last_tasks[recipe.find_all('task')[-2]['name']] = True
 
-            if len(next_to_last_tasks) > 1:
-                self.warn('Multiple next-to-last tasks:\n{}'.format('\n'.join(next_to_last_tasks.keys())))
-                self.warn('Multiple next-to-last tasks detected, beaker-jobwatch may not check them correctly',
-                          sentry=True)
+                if len(next_to_last_tasks) > 1:
+                    self.warn('Multiple next-to-last tasks:\n{}'.format('\n'.join(next_to_last_tasks.keys())))
+                    self.warn('Multiple next-to-last tasks detected, beaker-jobwatch may not check them correctly',
+                              sentry=True)
 
-            command += [
-                '--end-task={}'.format(task) for task in next_to_last_tasks.iterkeys()
-            ]
+                command += [
+                    '--end-task={}'.format(task) for task in next_to_last_tasks.iterkeys()
+                ]
 
         self.info("running 'beaker-jobwatch' to babysit the jobs")
 
@@ -515,10 +540,10 @@ class Beaker(gluetool.Module):
         jobwatch_options = _command_options('jobwatch-options')
 
         # workflow-tomorrow
-        job_ids, job = self._run_wow()
+        jobs = self._run_wow()
 
         # beaker-jobwatch
-        jobwatch_output = self._run_jobwatch(job_ids, job, jobwatch_options)
+        jobwatch_output = self._run_jobwatch(jobs, jobwatch_options)
 
         # evaluate jobs
         overall_result, processed_results, matrix_url = self._process_jobs(jobwatch_output.stdout)

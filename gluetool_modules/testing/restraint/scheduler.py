@@ -275,12 +275,13 @@ class RestraintScheduler(gluetool.Module):
             return shlex.split(opts)
 
         # workflow-tomorrow
-        wow_output = self._run_wow()
+        jobs = self._run_wow()
 
-        job = bs4.BeautifulSoup(wow_output.stdout, 'xml')
+        if len(jobs) > 1:
+            raise GlueError('Multiple planned wow jobs are not supported')
+
+        job = jobs[0]
+
         self.debug('job as planned by wow:\n{}'.format(job.prettify(encoding='utf-8')))
 
         self.create_schedule(tasks, job, image)
-
-    def destroy(self, failure=None):
-        pass
