@@ -670,6 +670,9 @@ class Brew(Koji, (gluetool.Module)):
     required_options = Koji.required_options + ['automation-user-ids', 'dist-git-commit-urls']
 
     def _task_factory(self, task_id, wait_timeout=None, details=None, task_class=None):
+        # options checker does not handle multiple modules in the same file correctly, therefore it
+        # raises "false" negative for the following use of parent's class options
+        # pylint: disable=gluetool-unknown-option
         details = dict_update({}, {
             'automation_user_ids': [int(user.strip()) for user in self.option('automation-user-ids').split(',')],
             'dist_git_commit_urls': [url.strip() for url in self.option('dist-git-commit-urls').split(',')]
