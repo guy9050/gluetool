@@ -30,13 +30,6 @@ image: "docker-registry.engineering.redhat.com/baseos-ci/citool-gitlab-ci"
 # Runs before each and every pipeline job.
 #
 before_script:
-  # Following steps are now covered by CI docker image:
-  #
-  #  - yum -y install git make python-setuptools gcc python-devel krb5-devel libxml2-devel postgresql-devel openssl-devel libcurl-devel python-rpm
-  #  - (curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py && rm -f get-pip.py)
-  #  - pip install -U setuptools
-  #  - pip install ansible virtualenv
-
   # This one is *not* handled by CI image because it depends on repository being cloned in the container
   - echo "$HTTP_SPACE_KEY" > http-space.key
   - chmod u=rw,go= http-space.key
@@ -55,7 +48,6 @@ before_script:
 unit-tests:
   stage: test
   script:
-    - pip install tox
     - tox -e py27-unit-tests -- --cov=gluetool_modules --cov-report=html:coverage-report
   artifacts:
     paths:
@@ -65,7 +57,6 @@ unit-tests:
 static-analysis:
   stage: test
   script:
-    - pip install tox
     - tox -e py27-static-analysis
 
 # Static analysis - coala
@@ -87,12 +78,10 @@ static-analysis-coala:
 integration-tests:
   stage: test
   script:
-    - yum -y install wget
     - wget --no-check-certificate -O /etc/pki/ca-trust/source/anchors/RH-IT-Root-CA.crt https://password.corp.redhat.com/RH-IT-Root-CA.crt
     - update-ca-trust
     - git clone https://gitlab.cee.redhat.com/baseos-qe/citool-config.git ~/.citool.d
     - pushd ~/.citool.d && git checkout production && popd
-    - pip install tox
     - tox -e py27-integration-tests -- --integration-config=$(echo ~/.citool.d)
 
 # Generate documentation from the sources
@@ -104,7 +93,6 @@ integration-tests:
 generate-docs:
   stage: test
   script:
-    - pip install tox
     - tox -e py27-doctest -- ./docs
   artifacts:
     paths:
@@ -121,7 +109,6 @@ build-python-package:
   only:
     - master@baseos-qe/gluetool-modules
   script:
-    - pip install ansible-tower-cli
     - tower-cli job launch -J "$PUBLISH_JOB" --monitor --extra-vars "DEVPI_INDEX=$DEVPI_INDEX"
                                                        --extra-vars "DEVPI_USERNAME=$DEVPI_USERNAME"
                                                        --extra-vars "DEVPI_PASSWORD=$DEVPI_PASSWORD"
@@ -135,7 +122,6 @@ build-rpm-packages:
   only:
     - master@baseos-qe/gluetool-modules
   script:
-    - pip install ansible-tower-cli
     - tower-cli workflow_job launch -W "$RPM_JOB" --monitor --extra-vars "COPR_LOGIN=$COPR_LOGIN"
                                                             --extra-vars "COPR_USERNAME=$COPR_USERNAME"
                                                             --extra-vars "COPR_TOKEN=$COPR_TOKEN"
@@ -147,7 +133,6 @@ build-docker-images:
   only:
     - master@baseos-qe/gluetool-modules
   script:
-    - pip install ansible-tower-cli
     - tower-cli workflow_job launch -W "$DOCKER_JOB" --monitor --extra-vars "DOCKER_REGISTRY_HOST=$DOCKER_REGISTRY_HOST"
                                                                --extra-vars "DOCKER_REGISTRY_PROJECT=$DOCKER_REGISTRY_PROJECT"
                                                                --extra-vars "DOCKER_REGISTRY_TOKEN=$DOCKER_REGISTRY_TOKEN"
@@ -158,7 +143,6 @@ deploy-to-staging:
   only:
     - master@baseos-qe/gluetool-modules
   script:
-    - pip install ansible-tower-cli
     - tower-cli job launch -J "$DEPLOY_JOB" --monitor
 
 
