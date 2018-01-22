@@ -65,9 +65,9 @@ def gather_module_data():
     classes = {}
 
     for name, properties in glue.modules.iteritems():
-        # dep-list is provided by gluetool, therefore it's not easily importable by Sphinx
-        # skipping it here to allow Sphinx to continue with our local modules.
-        if name == 'dep-list':
+        # These modules are provided by gluetool, therefore they are not easily importable
+        # by Sphinx. Skipping them to allow Sphinx to continue with our local modules.
+        if name in ('dep-list', 'yaml-pipeline'):
             continue
 
         klass = properties['class'].__name__
