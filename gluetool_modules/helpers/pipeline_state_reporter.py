@@ -129,12 +129,16 @@ class PipelineStateReporter(gluetool.Module):
         if not build_url:
             return {
                 'url': None,
-                'log': None
+                'log': None,
+                'debug': None,
+                'rebuild': None
             }
 
         return {
             'url': treat_url(build_url, logger=self.logger),
-            'log': treat_url('{}/console'.format(build_url))
+            'log': treat_url('{}/console'.format(build_url)),
+            'debug': treat_url('{}/artifact/citool-debug.txt'.format(build_url)),
+            'rebuild': treat_url('{}/rebuild/parameterized'.format(build_url))
         }
 
     def _init_message(self, test_category, test_type, thread_id):
@@ -207,19 +211,6 @@ class PipelineStateReporter(gluetool.Module):
             pass
 
         elif state == STATE_COMPLETE:
-            build_url = os.getenv('BUILD_URL', None)
-
-            if not build_url:
-                body['run'].update({
-                    'debug': None,
-                    'rebuild': None
-                })
-            else:
-                body['run'].update({
-                    'debug': treat_url('{}/artifact/citool-debug.txt'.format(build_url)),
-                    'rebuild': treat_url('{}/rebuild/parameterized'.format(build_url))
-                })
-
             body['system'] = [
                 {
                     'label': label,
