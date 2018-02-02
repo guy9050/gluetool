@@ -131,7 +131,7 @@ class WorkflowTomorrow(gluetool.Module):
 
             self.debug("constructing options distro '{}'".format(distro))
 
-            custom_locals = {
+            rules_context = {
                 'BUILD_TARGET': self.shared('primary_task').target,
                 'PRIMARY_TASK': self.shared('primary_task'),
                 'TASKS': self.shared('tasks'),
@@ -142,7 +142,7 @@ class WorkflowTomorrow(gluetool.Module):
             for options_set in self.wow_options_map:
                 gluetool.log.log_dict(self.debug, 'options set', options_set)
 
-                if not self.shared('evaluate_rules', options_set.get('rule', 'False'), {}, custom_locals):
+                if not self.shared('evaluate_rules', options_set.get('rule', 'False'), context=rules_context):
                     self.debug('rule does not match, moving on')
                     continue
 
