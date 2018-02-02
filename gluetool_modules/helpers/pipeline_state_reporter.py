@@ -111,7 +111,8 @@ class PipelineStateReporter(gluetool.Module):
             'issuer': task.issuer,
             'branch': task.branch,
             'nvr': task.nvr,
-            'scratch': task.scratch
+            'scratch': task.scratch,
+            'source': task.source,
         }
 
     def _ci_info(self):
