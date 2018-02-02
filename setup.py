@@ -111,6 +111,7 @@ DATA_FILES = [
             "gluetool_modules/helpers/guess_product.py",
             "gluetool_modules/helpers/execute_command.py",
             "gluetool_modules/helpers/trigger_message.py",
+            "gluetool_modules/helpers/rules_engine.py",
             "gluetool_modules/helpers/rpmdiff_waiver.moduleinfo",
             "gluetool_modules/helpers/publisher_umb_bus.moduleinfo",
             "gluetool_modules/helpers/pipeline_state_reporter.moduleinfo",
@@ -128,7 +129,8 @@ DATA_FILES = [
             "gluetool_modules/helpers/ansible.moduleinfo",
             "gluetool_modules/helpers/guess_product.moduleinfo",
             "gluetool_modules/helpers/execute_command.moduleinfo",
-            "gluetool_modules/helpers/trigger_message.moduleinfo"
+            "gluetool_modules/helpers/trigger_message.moduleinfo",
+            "gluetool_modules/helpers/rules_engine.moduleinfo"
         ]
     ],
     [
