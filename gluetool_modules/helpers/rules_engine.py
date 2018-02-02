@@ -3,6 +3,7 @@ import ast
 
 import gluetool
 from gluetool import SoftGlueError
+from gluetool.log import log_dict
 
 import _ast
 
@@ -214,10 +215,14 @@ class RulesEngine(gluetool.Module):
         custom_locals = _enhance_strings(context or {})
 
         self.debug('rules: {}'.format(rules))
-        gluetool.log.log_dict(self.debug, 'globals', custom_globals)
-        gluetool.log.log_dict(self.debug, 'locals', custom_locals)
+        log_dict(self.debug, 'globals', custom_globals)
+        log_dict(self.debug, 'locals', custom_locals)
 
-        return Rules(rules).eval(custom_globals, custom_locals)
+        result = Rules(rules).eval(custom_globals, custom_locals)
+
+        log_dict(self.debug, 'eval result', result)
+
+        return result
 
     def execute(self):
         if not self.option('rules'):
