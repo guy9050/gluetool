@@ -4,6 +4,7 @@ import sys
 import pytest
 
 import gluetool
+import gluetool_modules.helpers.rules_engine
 import gluetool_modules.dispatchers.test_batch_planner
 
 from mock import MagicMock
@@ -36,6 +37,9 @@ def fixture_module(monkeypatch):
         'primary_task': MagicMock(task_id=19, target='dummy-target', issuer='dummy-issuer', nvr='foo-13.17-23.el7',
                                   scratch=False)
     })
+
+    rules_engine = gluetool_modules.helpers.rules_engine.RulesEngine(module.glue, 'rules-engine')
+    module.glue.shared_functions['evaluate_rules'] = (rules_engine, rules_engine.evaluate_rules)
 
     return module
 

@@ -4,11 +4,11 @@
 
 section:
   set1:
-    - MATCH('dummy-target-foo', BREW_TASK_TARGET)
+    - BUILD_TARGET.match('dummy-target-foo')
     - a command
 
   set2:
-    - MATCH('dummy-target-bar', BREW_TASK_TARGET)
+    - BUILD_TARGET.match('dummy-target-bar')
     - another command
 
   default:
