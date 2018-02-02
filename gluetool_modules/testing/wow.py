@@ -147,7 +147,7 @@ class WorkflowTomorrow(gluetool.Module):
                     continue
 
                 if 'add-options' in options_set:
-                    add_options = jinja2.Template(options_set['add-options']).render(**custom_locals)
+                    add_options = jinja2.Template(options_set['add-options']).render(**rules_context)
                     gluetool.log.log_blob(self.debug, 'adding options', add_options)
 
                     # simple split() is too dumb: '--foo "bar baz"' => ['--foo', 'bar baz']. shlex is the right tool
