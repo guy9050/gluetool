@@ -141,6 +141,7 @@ FAKE_CLIENT_SESSION = {
             'version': '4.3.43',
         }],
     },
+    # component by NVR
     'bash': {
         'getBuildTarget': {
             'dest_tag_name': 'f25-updates-candidate',
@@ -169,7 +170,37 @@ FAKE_CLIENT_SESSION = {
     # invalid build
     705705: {
         'getBuild': [None]
-    }
+    },
+    # missing request field
+    10166983: {
+        'getBuildTarget': {
+            'dest_tag_name': 'f27-pending',
+        },
+        'getUser': {
+            'name': 'mvadkert',
+        },
+        'getTaskInfo': {
+            'method': 'build',
+            'state': 2,
+        },
+    },
+    # request field has not enough items in list
+    10166985: {
+        'getBuildTarget': {
+            'dest_tag_name': 'f27-pending',
+        },
+        'getUser': {
+            'name': 'mvadkert',
+        },
+        'getTaskInfo': {
+            'state': 2,
+            'method': 'build',
+            'request': [
+                'git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde',
+                {}
+            ],
+        },
+    },
 }
 
 
@@ -190,6 +221,7 @@ VALID_TASKS = {
         'release': '4.fc25',
         'scratch': False,
         'short_name': '15869828:bash-4.3.43-4.fc25',
+        'source': 'git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde',
         'srcrpm': 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/src/bash-4.3.43-4.fc25.src.rpm',
         'target': 'f25-candidate',
         'task_id': 15869828,
@@ -209,6 +241,7 @@ VALID_TASKS = {
         'release': '5.fc27',
         'scratch': True,
         'short_name': '20166983:S:bash-4.4.12-5.fc27',
+        'source': 'cli-build/1498396792.492652.jYJCrkUF/bash-4.4.12-5.fc26.src.rpm',
         'srcrpm': 'https://kojipkgs.fedoraproject.org/work/tasks/6985/20166985/bash-4.4.12-5.fc27.src.rpm',
         'target': '<no build target available>',
         'task_id': 20166983,
@@ -407,3 +440,27 @@ def test_invalid_build(log, module):
 
     log.match(levelno=logging.WARN, message='Looking for build 705705, remote server returned None - skipping this ID')
     assert module._tasks == []
+
+
+def test_request_missing(module):
+    # pylint: disable=protected-access
+    FakeClientSession.fake_key = 10166983
+    module._config = {
+        'task-id': [10166983],
+    }
+
+    match = "task '10166983' has no request field in task info"
+    with pytest.raises(gluetool.GlueError, match=match):
+        module.execute()
+
+
+def test_request_length_invalid(module):
+    # pylint: disable=protected-access
+    FakeClientSession.fake_key = 10166985
+    module._config = {
+        'task-id': [10166985],
+    }
+
+    match = "task '10166985' has unexpected number of items in request field"
+    with pytest.raises(gluetool.GlueError, match=match):
+        module.execute()

@@ -148,12 +148,22 @@ class KojiTask(object):
         return self.owner
 
     @cached_property
+    def _task_info_request(self):
+        if 'request' not in self.task_info:
+            raise GlueError("task '{}' has no request field in task info".format(self.task_id))
+
+        if len(self.task_info["request"]) < 3:
+            raise GlueError("task '{}' has unexpected number of items in request field".format(self.task_id))
+
+        return self.task_info["request"]
+
+    @cached_property
     def target(self):
         """
         :returns: build target name
         """
-        if self.task_info["request"][1]:
-            return self.task_info["request"][1]
+        if self._task_info_request[1]:
+            return self._task_info_request[1]
 
         # inform admins about this weird build
         self.warn("task '{}' build '{}' has no build target".format(self.task_id, self.nvr), sentry=True)
@@ -161,12 +171,22 @@ class KojiTask(object):
         return '<no build target available>'
 
     @cached_property
+    def source(self):
+        """
+        :returns: task's source, e.g. git+https://src.fedoraproject.org/rpms/rust-tokio-proto.git?#b59219
+        """
+        if self._task_info_request[0]:
+            return self._task_info_request[0]
+
+        raise GlueError("task '{}' has no source defined in the request field".format(self.task_id))
+
+    @cached_property
     def scratch(self):
         """
         :returns: True if task is scratch, False if not
         """
-        if "scratch" in self.task_info["request"][2]:
-            return self.task_info["request"][2]["scratch"]
+        if "scratch" in self._task_info_request[2]:
+            return self._task_info_request[2]["scratch"]
         return False
 
     @cached_property
@@ -339,10 +359,9 @@ class BrewTask(KojiTask):
         :returns: BeatifulSoup4 parsed html from cgit for given component and commit hash
         """
         # get git commit hash and component name
-        request = self.task_info["request"][0]
         try:
-            git_hash = re.search("#[^']*", request).group()[1:]
-            component = re.search("/rpms/[^?]*", request).group()[6:]
+            git_hash = re.search("#[^']*", self.source).group()[1:]
+            component = re.search("/rpms/[^?]*", self.source).group()[6:]
         except AttributeError:
             return None
 
