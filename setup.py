@@ -164,9 +164,9 @@ DATA_FILES = [
     [
         "gluetool_modules/dispatchers",
         [
-            "gluetool_modules/dispatchers/koji_dispatcher.py",
+            "gluetool_modules/dispatchers/task_dispatcher.py",
             "gluetool_modules/dispatchers/test_batch_planner.py",
-            "gluetool_modules/dispatchers/koji_dispatcher.moduleinfo",
+            "gluetool_modules/dispatchers/task_dispatcher.moduleinfo",
             "gluetool_modules/dispatchers/test_batch_planner.moduleinfo"
         ]
     ],

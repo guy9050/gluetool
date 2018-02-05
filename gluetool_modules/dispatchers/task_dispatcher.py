@@ -5,15 +5,14 @@ from gluetool.log import log_dict
 from gluetool.utils import cached_property
 
 
-class KojiTaskDispatcher(gluetool.Module):
+class TaskDispatcher(gluetool.Module):
     """
-    A generic dispatcher for Brew/Koji builds. Given the build, it asks other modules
-    - via ``plan_test_batch`` shared function - for modules and their arguments, and
-    than runs them.
+    A generic task dispatcher. It asks other modules - via ``plan_test_batch``
+    shared function - for modules and their arguments, and than runs them.
     """
 
-    name = ['brew-dispatcher', 'koji-dispatcher']
-    description = 'Configurable brew dispatcher'
+    name = ['task-dispatcher', 'brew-dispatcher', 'koji-dispatcher', 'copr-dispatcher']
+    description = 'Configurable task dispatcher'
 
     options = {
         'pipeline-test-categories': {
@@ -36,7 +35,7 @@ class KojiTaskDispatcher(gluetool.Module):
     }
 
     def __init__(self, *args, **kwargs):
-        super(KojiTaskDispatcher, self).__init__(*args, **kwargs)
+        super(TaskDispatcher, self).__init__(*args, **kwargs)
 
         self.build = {}
 
