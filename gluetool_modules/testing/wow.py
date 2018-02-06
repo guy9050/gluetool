@@ -123,8 +123,8 @@ class WorkflowTomorrow(gluetool.Module):
         task_params = task_params or {}
 
         def _plan_job(distro):
-            command = [
-                'bkr', 'workflow-tomorrow',
+            command = ['bkr', 'workflow-tomorrow']
+            command_options = [
                 '--dry',  # this will make wow to print job description in XML
                 '--decision'  # show desicions about including/not including task in the job
             ] + options
@@ -152,7 +152,17 @@ class WorkflowTomorrow(gluetool.Module):
 
                     # simple split() is too dumb: '--foo "bar baz"' => ['--foo', 'bar baz']. shlex is the right tool
                     # to split command-line options, it obeys quoting.
-                    command += shlex.split(add_options)
+                    command_options += shlex.split(add_options)
+
+                if 'command' in options_set:
+                    command = jinja2.Template(options_set['command']).render(**rules_context)
+                    self.info("using command '{0}' to generate a job xml".format(command))
+
+                    # simple split() is too dumb: '--foo "bar baz"' => ['--foo', 'bar baz']. shlex is the right tool
+                    # to split command-line options, it obeys quoting.
+                    command = shlex.split(command)
+
+            command += command_options
 
             #
             # add options specified on command-line
@@ -186,6 +196,14 @@ class WorkflowTomorrow(gluetool.Module):
 
                 except qe.GeneralPlanError:
                     raise GlueError("no general test plan found for '{}'".format(component))
+
+            # add '"' to strings containing spaces to prevent bad expansion
+            # if command for generating job.xml is shell script
+            command = [('"{}"'.format(option) if ' ' in option and not
+                        (
+                            (option.startswith('"') and option.endswith('"')) or
+                            (option.startswith("'") and option.endswith("'")))
+                        else option) for option in command]
 
             #
             # execute
