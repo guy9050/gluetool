@@ -483,6 +483,7 @@ class TestBatchPlanner(gluetool.Module):
         Commands listed in "default" section of the config file are used when there is
         not specific configuration for the component.
 
+        ;param dict config: config file.
         :param str component: component name.
         """
 
