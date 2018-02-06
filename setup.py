@@ -49,7 +49,6 @@ INSTALL_REQUIRES = [
     "requests-kerberos==0.11.0",
     "requests==2.18.4",
     "requestsexceptions==1.2.0",
-    "retrying==1.3.3",
     "stomp.py==4.1.17",
     "urlgrabber==3.10.2",
     # cannot use the "nitrate" - pip would then fail to build pycurl with the correct SSL backend
