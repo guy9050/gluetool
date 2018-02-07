@@ -8,7 +8,7 @@ import bs4
 
 import gluetool
 from gluetool.log import log_blob, log_dict
-from gluetool.utils import new_xml_element, IncompatibleOptionsError
+from gluetool.utils import new_xml_element, IncompatibleOptionsError, normalize_bool_option
 from libci.results import TestResult, publish_result
 
 
@@ -74,32 +74,43 @@ class RestraintRunner(gluetool.Module):
             'default': 'no',
             'metavar': 'yes|no'
         },
-        'snapshot-on-failure': {
-            'help': 'If set, on restraint failure a snapshot of the guest is taken and stored.',
-            'default': False
+        'on-error-snapshot': {
+            'help': 'If set, on crash of restraint take a snapshot of the guest and download it (default: no).',
+            'default': 'no',
+            'metavar': 'yes|no'
+        },
+        'on-error-continue': {
+            'help': """
+                    If set, on crash of restraint continue with another test case (default: no). Be aware
+                    that you probably wish to use ``--use-snapshots`` as well, as crashed restraint might
+                    have left the SUT in a very bad state.
+                    """,
+            'default': 'no',
+            'metavar': 'yes|no'
         }
     }
 
     _result_class = None
 
-    def _bool_option(self, name):
-        value = self.option(name)
-        if value is None:
-            return False
-
-        return True if value.strip().lower() == 'yes' else False
-
     @gluetool.utils.cached_property
     def use_snapshots(self):
-        return self._bool_option('use-snapshots')
+        return normalize_bool_option(self.option('use-snapshots'))
 
     @gluetool.utils.cached_property
     def parallelize_recipe_sets(self):
-        return self._bool_option('parallelize-recipe-sets')
+        return normalize_bool_option(self.option('parallelize-recipe-sets'))
 
     @gluetool.utils.cached_property
     def parallelize_task_sets(self):
-        return self._bool_option('parallelize-task-sets')
+        return normalize_bool_option(self.option('parallelize-task-sets'))
+
+    @gluetool.utils.cached_property
+    def on_error_snapshot(self):
+        return normalize_bool_option(self.option('on-error-snapshot'))
+
+    @gluetool.utils.cached_property
+    def on_error_continue(self):
+        return normalize_bool_option(self.option('on-error-continue'))
 
     def _merge_task_results(self, tasks_results):
         # pylint: disable=no-self-use
@@ -257,7 +268,8 @@ class RestraintRunner(gluetool.Module):
         self.debug('Job:\n{}'.format(job_desc))
 
         def download_snapshot():
-            if not self.option('snapshot-on-failure'):
+            # If snapshot downloads are not enabled, just do nothing and return.
+            if not self.on_error_snapshot:
                 return
 
             try:
@@ -270,6 +282,9 @@ class RestraintRunner(gluetool.Module):
                 self.exception('Exception raised when downloading a snapshot: {}'.format(exc),
                                exc_info=sys.exc_info())
 
+        # Run restraint with our job. So far, any exception is a serious concern as it signals something
+        # bad happened - 'restraint' shared function returns restraint's output even if its exit status
+        # was non-zero. Take a snapshot, if asked to do so, and re-raise the exception.
         try:
             output = self.shared('restraint', guest, job)
 
@@ -278,26 +293,38 @@ class RestraintRunner(gluetool.Module):
 
             raise exc
 
-        if output.exit_code != 0:
-            self.debug('restraint exited with invalid exit code {}'.format(output.exit_code))
-
-            if output.exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_RESULT_ERROR:
-                # "One or more tasks failed" error - this is a good, well behaving error.
-                # We can safely move on and process results stored in restraint's directory.
-                self.info('restraint reports: One or more tasks failed')
-
-            else:
-                download_snapshot()
-
-                raise gluetool.GlueError('restraint command exited with return code {}: {}'.format(
-                    output.exit_code, output.stderr))
-
         log_blob(self.info, 'Task set output', output.stdout)
 
+        # Find out what is the result - restraint returned back to us, and even with a non-zero
+        # exit status, there should be a result to pick up.
         result = self._gather_task_set_results(guest, output.stdout)
         log_dict(self.debug, 'task set result', result)
 
-        return result
+        # A zero exit status? Fine!
+        if output.exit_code == 0:
+            return result
+
+        self.debug('restraint exited with invalid exit code {}'.format(output.exit_code))
+
+        if output.exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_RESULT_ERROR:
+            # "One or more tasks failed" error - this is a good, well behaving error.
+            # We can safely move on and return results we got from restraint.
+            self.info('restraint reports: One or more tasks failed')
+
+            return result
+
+        # Now we're dealing with an error we don't know how to handle better, so...
+
+        # Dowonload a snapshot.
+        download_snapshot()
+
+        # Return a result and let the caller to decide what to do next.
+        if self.on_error_continue:
+            return result
+
+        # Restraint failed, and no better option was enabled => raise an exception.
+        raise gluetool.GlueError('restraint command exited with return code {}: {}'.format(
+            output.exit_code, output.stderr))
 
     def _run_recipe_set_isolated(self, guest, recipe_set):
         """
