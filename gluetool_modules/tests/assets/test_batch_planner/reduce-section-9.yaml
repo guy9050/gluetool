@@ -8,5 +8,5 @@ section:
     - another command
 
 raises:
-  klass: gluetool_modules.dispatchers.test_batch_planner.RulesSyntaxError
-  match: "Cannot parse rules 'a command': line \\d+, offset \\d+"
+  klass: gluetool_modules.helpers.rules_engine.RulesSyntaxError
+  match: "Cannot parse rules"

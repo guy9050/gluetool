@@ -9,24 +9,6 @@ from gluetool.log import format_dict, log_dict
 from gluetool.utils import cached_property, load_yaml
 
 
-class RulesError(SoftGlueError):
-    """
-    Base class of rules-related soft exceptions.
-
-    :param str message: descriptive message, passed to parent Exception classes.
-    :param Rules rules: rules in question.
-    :param str intro: introductory text, pasted at the beginning of template.
-    :param str error: specific error message.
-    """
-
-    def __init__(self, message, rules, intro, error):
-        super(RulesError, self).__init__(message)
-
-        self.rules = rules
-        self.intro = intro
-        self.error = error
-
-
 class CommandsError(SoftGlueError):
     """
     Base class of commands-related soft exceptions.
@@ -42,42 +24,6 @@ class CommandsError(SoftGlueError):
         self.commands = commands
 
 
-class InvalidASTNodeError(RulesError):
-    def __init__(self, rules, node):
-        super(InvalidASTNodeError, self).__init__(
-            'Node of type {} not allowed in rules'.format(node.__class__.__name__),
-            rules,
-            'Filtering rules employed for component configuration are using disallowed node',
-            'Node of class {} is not allowed or supported.'.format(node.__class__.__name__))
-
-
-class UnsupportedASTCallError(RulesError):
-    def __init__(self, rules, node):
-        super(UnsupportedASTCallError, self).__init__(
-            'Calling function {} not allowed in rules'.format(node.func.id),
-            rules,
-            'Filtering rules employed for component configuration are calling unsupported function'
-            "Function '{}' is not supported.".format(node.func.id))
-
-
-class RulesSyntaxError(RulesError):
-    def __init__(self, rules, exc):
-        super(RulesSyntaxError, self).__init__(
-            "Cannot parse rules '{}': line {}, offset {}".format(rules, exc.lineno, exc.offset),
-            rules,
-            'Syntax error raised while dealing with filtering rules',
-            'line {}, offset {}'.format(exc.lineno, exc.offset))
-
-
-class RulesTypeError(RulesError):
-    def __init__(self, rules, exc):
-        super(RulesTypeError, self).__init__(
-            "Cannot parse rules '{}': {}".format(rules, str(exc)),
-            rules,
-            'Cannot parse filtering rules',
-            str(exc))
-
-
 class NoFilteringRulesError(CommandsError):
     def __init__(self, name, commands):
         super(NoFilteringRulesError, self).__init__(
@@ -90,94 +36,6 @@ class UnexpectedConfigDataError(CommandsError):
         super(UnexpectedConfigDataError, self).__init__(
             'Unexpected command or structures found in config file',
             commands)
-
-
-class SanityASTVisitor(ast.NodeVisitor):
-    """
-    Custom AST visitor. It's only purpose is to visit every node in the tree,
-    and verify that there's no disallowed node. We don't want to allow stuff
-    like calling functions, and limit rules to basic expressions.
-    """
-
-    _valid_classes = tuple([
-        getattr(_ast, node_class) for node_class in (
-            'Expression', 'Expr', 'Compare', 'Name', 'Load', 'BoolOp',
-            'Str', 'Num', 'List', 'Tuple',
-            'Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE', 'Is', 'IsNot', 'In', 'NotIn',
-            'And', 'Or', 'Not',
-            'Call'
-        )
-    ])
-
-    _valid_functions = ('MATCH',)
-
-    def __init__(self, rules, *args, **kwargs):
-        super(SanityASTVisitor, self).__init__(*args, **kwargs)
-
-        self._rules = rules
-
-    def generic_visit(self, node):
-        if not isinstance(node, SanityASTVisitor._valid_classes):
-            raise InvalidASTNodeError(self._rules, node)
-
-        if isinstance(node, _ast.Call) and node.func.id not in SanityASTVisitor._valid_functions:
-            raise UnsupportedASTCallError(self._rules, node)
-
-        super(SanityASTVisitor, self).generic_visit(node)
-
-
-class Rules(object):
-    # pylint: disable=too-few-public-methods
-
-    """
-    Wrap compilation and evaluation of filtering rules.
-
-    :param str rules: Rule is a Python expression that could be evaluated. If rule
-      evaluates into anything but `True`, we consider it as denial.
-    """
-
-    def __init__(self, rules):
-        self._rules = rules
-        self._code = None
-
-    def __repr__(self):
-        return '<Rules: {}>'.format(self._rules)
-
-    def _compile(self):
-        """
-        Compile rule. Parse rule into an AST, perform its sanity checks,
-        and then compile it into executable.
-        """
-
-        try:
-            tree = ast.parse(self._rules, mode='eval')
-
-        except SyntaxError as e:
-            raise RulesSyntaxError(self._rules, e)
-
-        except TypeError as e:
-            raise RulesTypeError(self._rules, e)
-
-        SanityASTVisitor(self).visit(tree)
-
-        try:
-            return compile(tree, '<static-config-file>', 'eval')
-
-        except Exception as e:
-            raise RulesTypeError(self._rules, e)
-
-    def eval(self, our_globals, our_locals):
-        """
-        Evaluate rule. User must provide both `locals` and `globals` dictionaries
-        we use as a context for the rule.
-        """
-
-        if self._code is None:
-            self._code = self._compile()
-
-        # eval is dangerous. This time I hope it's safe-guarded by AST filtering...
-        # pylint: disable=eval-used
-        return eval(self._code, our_globals, our_locals)
 
 
 class TestBatchPlanner(gluetool.Module):
@@ -245,35 +103,15 @@ class TestBatchPlanner(gluetool.Module):
         return mapping
 
     @cached_property
-    def _rules_locals(self):
-        task = self.shared('primary_task')
-
-        def match(pattern, value):
-            return re.match(pattern, value) is not None
-
-        variables = {
-            # constants
-            'BREW_TASK_ID': task.task_id,
-            # build target *can* be None...
-            'BREW_TASK_TARGET': task.target if task.target is not None else '',
-            'BREW_TASK_ISSUER': task.issuer,
-            'NVR': task.nvr,
-            'SCRATCH': task.scratch,
-
-            # functions
-            'MATCH': match
-        }
-
-        log_dict(self.debug, 'locals', variables)
-
-        return variables
-
-    @cached_property
-    def _rules_globals(self):
-        # pylint: disable=no-self-use
+    def _rules_context(self):
+        primary_task = self.shared('primary_task')
 
         return {
-            '__builtins__': None
+            'BUILD_TARGET': primary_task.target,
+            'PRIMARY_TASK': primary_task,
+            'TASKS': self.shared('tasks'),
+            'NVR': primary_task.nvr,
+            'SCRATCH': primary_task.scratch
         }
 
     def _reduce_section(self, commands, is_component=True, default_commands=None, all_commands=None):
@@ -442,10 +280,7 @@ class TestBatchPlanner(gluetool.Module):
                 if set_commands is None or len(set_commands) < 2:
                     raise NoFilteringRulesError(set_name, set_commands)
 
-                rules = Rules(set_commands[0])
-                self.debug('    evaluating rules {}'.format(rules))
-
-                if rules.eval(self._rules_globals, self._rules_locals) is not True:
+                if not self.shared('evaluate_rules', set_commands[0], context=self._rules_context):
                     self.debug('    denied by rules')
                     continue
 
@@ -556,10 +391,7 @@ class TestBatchPlanner(gluetool.Module):
                 self.warn("Section does not contain 'rule' key, ignored", sentry=True)
                 continue
 
-            rules = Rules(section['rule'])
-            self.debug('evaluating rules {}'.format(rules))
-
-            if rules.eval(self._rules_globals, self._rules_locals) is not True:
+            if not self.shared('evaluate_rules', section['rule'], context=self._rules_context):
                 self.debug('denied by rules')
                 continue
 
@@ -607,7 +439,7 @@ class TestBatchPlanner(gluetool.Module):
         :rtype: list(list)
         """
 
-        self.require_shared('primary_task')
+        self.require_shared('primary_task', 'evaluate_rules')
 
         for method in self._methods:
             self.debug("Plan test batch using '{}' method".format(method))

@@ -4,15 +4,15 @@
 
 section:
   set1:
-    - MATCH('dummy-target', BREW_TASK_TARGET)
+    - BUILD_TARGET.match('dummy-target')
     - a command
 
   set2:
-    - MATCH('another-dummy-target', BREW_TASK_TARGET)
+    - BUILD_TARGET.match('another-dummy-target')
     - another command
 
   set3:
-    - MATCH('dummy-target', BREW_TASK_TARGET)
+    - BUILD_TARGET.match('dummy-target')
     - completerly different command
 
   default:
