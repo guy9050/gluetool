@@ -1,12 +1,12 @@
 # pylint: disable=too-many-lines
 
 import errno
+import functools
 import gzip
 import os
 import re
 from time import gmtime, strftime
 from datetime import datetime, timedelta
-from retrying import retry
 
 import novaclient.exceptions
 from novaclient import client
@@ -33,9 +33,8 @@ BOOT_TICK = 10
 
 DEFAULT_START_AFTER_SNAPSHOT_ATTEMPTS = 3
 DEFAULT_RESTORE_SNAPSHOT_ATTEMPTS = 3
+DEFAULT_SHUTDOWN_TIMEOUT = 60
 
-MAX_SERVER_SHUTDOWN = 60
-MAX_IMAGE_ACTIVATION = 60
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
@@ -174,19 +173,28 @@ class OpenstackGuest(NetworkedGuest):
                                    logger=logger,
                                    tick=tick)
 
+    def _get_resource_status(self, resource, rid):
+        status = getattr(self._nova, resource).find(id=rid).status
+
+        self.debug("status of resource '{}' within '{}' is '{}'".format(rid, resource, status))
+
+        return status
+
     def _check_resource_status(self, resource, rid, status):
         """
         Check whether the resource with given ID is in expected state.
 
         param: str resource: Resource type (``images``, ``servers``, etc.)
-        param: unicode id: ID of the resource to check.
+        param: unicode rid: ID of the resource to check.
         param: unicode status: Expected status of the resource. Note the ``unicode`` type.
         """
 
-        obj = getattr(self._nova, resource).find(id=rid)
-        self.debug('{} resource status: {}'.format(resource, obj.status))
-        if obj.status != status:
-            raise GlueError("{} resource has invalid status '{}', expected '{}'".format(resource, obj.status, status))
+        return self._get_resource_status(resource, rid) == status
+
+    def _wait_for_resource_status(self, label, resource, rid, status, timeout, tick):
+        # pylint: disable=too-many-arguments
+        check = functools.partial(self._check_resource_status, resource, rid, status)
+        self.wait(label, check, timeout=timeout, tick=tick)
 
     def _assign_floating_ip(self, floating_ip):
         """
@@ -349,8 +357,9 @@ class OpenstackGuest(NetworkedGuest):
 
         self.debug('shutting down...')
 
-        retry(stop_max_attempt_number=MAX_SERVER_SHUTDOWN,
-              wait_fixed=1000)(self._check_resource_status)('servers', self._instance.id, u'SHUTOFF')
+        self._instance.stop()
+
+        self._wait_shutoff()
 
         self.debug('shut down finished')
 
@@ -361,42 +370,63 @@ class OpenstackGuest(NetworkedGuest):
 
         self.debug('starting...')
 
-        self._bring_alive('starting the instance', self._instance.start,
-                          attempts=self._module.option('start-after-snapshot-attempts'))
+        self._instance.start()
 
-        self.debug('started and alive')
+        self._wait_active()
+
+        self.debug('started')
+
+    def _rebuild(self, image):
+        """
+        Rebuild the instance from an image.
+        """
+
+        self.debug('rebuilding...')
+
+        original_status = self._get_resource_status('servers', self._instance.id)
+
+        self._instance.rebuild(image.resource)
+
+        if original_status == u'ACTIVE':
+            self._wait_active()
+
+        else:
+            self._wait_shutoff()
+
+        self.debug('rebuilt')
+
+    def _wait_active(self):
+        """
+        Wait till OpenStack reports the instance is ``ACTIVE``.
+        """
+
+        self._wait_for_resource_status('instance reports ACTIVE', 'servers', self._instance.id, u'ACTIVE',
+                                       timeout=self._module.option('activation-timeout'), tick=1)
+
+    def _wait_shutoff(self):
+        """
+        Wait till OpenStack reports the instance is ``SHUTOFF``.
+        """
+
+        self._wait_for_resource_status('instance reports SHUTOFF', 'servers', self._instance.id, u'SHUTOFF',
+                                       timeout=self._module.option('shutdown-timeout'), tick=1)
 
     def _wait_alive(self):
         """
-        "Wait alive" helper - we're using the same options when calling guest.wait_alive, let's
-        put the call in a helper method.
-
+        Wait till the instance is alive. That covers several checks, and expects the instance to be ``ACTIVE``.
         """
 
         try:
             # First check the status of the instance - until it's ACTIVE, don't bother
             # to check anything else - our network-based checks *may* succeed even during
             # an instance shutdown process, leading to false positives.
-            def _check_active():
-                try:
-                    self._check_resource_status('servers', self._instance.id, u'ACTIVE')
-
-                except GlueError as exc:
-                    # ignore expected errors - while waiting, different state is fine
-                    if exc.message.startswith('servers resource has invalid status'):
-                        return False
-
-                    # re-raise anything else
-                    raise exc
-
-                return True
-
-            self.wait('"ACTIVE" status', _check_active, timeout=self._module.option('activation-timeout'), tick=1)
+            self._wait_active()
 
             # If the instance is in ACTIVE state, proceed with other checks
             return self.wait_alive(connect_timeout=self._module.option('activation-timeout'), connect_tick=1,
                                    echo_timeout=self._module.option('echo-timeout'), echo_tick=ECHO_TICK,
                                    boot_timeout=self._module.option('boot-timeout'), boot_tick=BOOT_TICK)
+
         except GlueError as exc:
             raise GlueError('Guest failed to become alive: {}'.format(exc.message))
 
@@ -412,27 +442,21 @@ class OpenstackGuest(NetworkedGuest):
         for i in range(0, attempts):
             self.debug("Try action '{}', attempt #{} of {}".format(label, i + 1, attempts))
 
-            actor()
-
             try:
+                actor()
+
                 return self._wait_alive()
 
             except GlueError as exc:
                 self.error('Failed to bring the guest alive in attempt #{}: {}'.format(i + 1, exc.message))
-                self.warn('instance status: {}'.format(self._instance.status))
+                self.warn('instance status: {}'.format(self._get_resource_status('servers', self._instance.id)))
 
                 # If instance status is ACTIVE, it started but some additional check failed. We simply
                 # cannot just run `actor` again because, from the OpenStack's point of view the instance
-                # is already running, and `actor` would probably fail as, for example, cannot "start"
+                # is already running, and `actor` would probably fail as, for example, one cannot "start"
                 # ACTIVE instance. So, stop the instance to give actor leveled field.
-                try:
-                    self._check_resource_status('servers', self._instance.id, u'ACTIVE')
-
-                except GlueError:
-                    # not ACTIVE - ok, just try another attempt
-                    pass
-
-                else:
+                if self._check_resource_status('servers', self._instance.id, u'ACTIVE'):
+                    # ACTIVE - shut down before another attempt
                     self._shutdown()
 
         raise GlueError('Failed to acquire living instance.')
@@ -452,9 +476,6 @@ class OpenstackGuest(NetworkedGuest):
         name = strftime('{}_%Y-%m-%d_%d-%H:%M:%S'.format(self.name), gmtime())
         self.debug("creating image snapshot named '{}'".format(name))
 
-        # stop instance
-        self._instance.stop()
-
         # we need to shutdown the instance before creating snapshot
         self._shutdown()
 
@@ -464,13 +485,14 @@ class OpenstackGuest(NetworkedGuest):
         self._snapshots.append(image)
 
         # we need to wait until the image is ready for usage
-        # note: we are calling here the parametrized retry decorator
-        retry(stop_max_attempt_number=MAX_IMAGE_ACTIVATION,
-              wait_fixed=1000)(self._check_resource_status)('images', image_id, u'ACTIVE')
+        self._wait_for_resource_status('snapshot reports ACTIVE', 'images', image_id, u'ACTIVE',
+                                       timeout=self._module.option('activation-timeout'), tick=1)
+
         self.info("image snapshot '{}' created".format(name))
 
         if start_again is True:
-            self._start()
+            self._bring_alive('starting the instance after snapshot', self._start,
+                              attempts=self._module.option('start-after-snapshot-attempts'))
 
         return image
 
@@ -478,22 +500,24 @@ class OpenstackGuest(NetworkedGuest):
         """
         Rebuilds server with the given snapshot image.
 
-        :param image: Either image name, or an :py:class:`OpenStackImage` instance.
+        :param snapshot: Either image name, or an :py:class:`OpenStackImage` instance.
         :rtype: OpenstackGuest
         :returns: server instance rebuilt from given image.
         """
 
         self.info("rebuilding server with snapshot '{}'".format(snapshot.name))
 
-        def _rebuild():
-            try:
-                self._instance.rebuild(snapshot.resource)
+        self._shutdown()
 
-            except novaclient.exceptions.Conflict as exc:
-                self.warn('Failed to rebuild the instance: {}'.format(exc))
+        def actor():
+            self._rebuild(snapshot)
 
-        self._bring_alive('rebuilding the instance from a snapshot', _rebuild,
+            # _rebuild leaves instance in the original state, SHUTDOWN
+            self._start()
+
+        self._bring_alive('rebuilding the instance', actor,
                           attempts=self._module.option('restore-snapshot-attempts'))
+
         self.info('rebuilt and alive')
 
         return self
@@ -701,9 +725,16 @@ class CIOpenstack(gluetool.Module):
             },
             'boot-timeout': {
                 # pylint: disable=line-too-long
-                'help': 'Wait SECOND for a guest to finish its booting process (default: {})'.format(DEFAULT_BOOT_TIMEOUT),
+                'help': 'Wait SECONDS for a guest to finish its booting process (default: {})'.format(DEFAULT_BOOT_TIMEOUT),
                 'type': int,
                 'default': DEFAULT_BOOT_TIMEOUT,
+                'metavar': 'SECONDS'
+            },
+            'shutdown-timeout': {
+                # pylint: disable=line-too-long
+                'help': 'Wait SECONDS for a guest to finish its shutdown process (default: {})'.format(DEFAULT_SHUTDOWN_TIMEOUT),
+                'type': int,
+                'default': DEFAULT_SHUTDOWN_TIMEOUT,
                 'metavar': 'SECONDS'
             }
         }),
@@ -983,6 +1014,7 @@ class CIOpenstack(gluetool.Module):
 
         for guest in guests:
             # pylint: disable=protected-access
+            # instance is already started by OpenStack, check its status before moving on
             guest._wait_alive()
 
         if self.option('reserve'):
