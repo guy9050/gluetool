@@ -483,7 +483,7 @@ class Koji(gluetool.Module):
     """
 
     required_options = ['url', 'pkgs-url', 'web-url']
-    shared_functions = ('tasks', 'primary_task', 'koji_session')
+    shared_functions = ('tasks', 'primary_task', 'koji_session', 'artifact_context')
 
     def __init__(self, *args, **kwargs):
         super(Koji, self).__init__(*args, **kwargs)
@@ -617,6 +617,24 @@ class Koji(gluetool.Module):
             raise GlueError('No tasks specified, cannot return the primary one')
 
         return self._tasks[0]
+
+    def artifact_context(self):
+        """
+        Provides informations about brew artifact, that are used for rules evaluations.
+        Provides following variables: BUILD_TARGET, PRIMARY_TASK, TASKS, NVR, SCRATCH
+
+        :rtype: dict
+        """
+
+        primary_task = self.primary_task()
+
+        return {
+            'BUILD_TARGET': primary_task.target,
+            'PRIMARY_TASK': primary_task,
+            'TASKS': self.tasks(),
+            'NVR': primary_task.nvr,
+            'SCRATCH': primary_task.scratch
+        }
 
     def sanity(self):
         # make sure that no conflicting options are specified
