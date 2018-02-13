@@ -196,13 +196,11 @@ DATA_FILES = [
             "gluetool_modules/testing/testing_results.py",
             "gluetool_modules/testing/mtf.py",
             "gluetool_modules/testing/beah_result_parser.py",
-            "gluetool_modules/testing/sclrun.py",
             "gluetool_modules/testing/wow.py",
             "gluetool_modules/testing/beah_xunit.py",
             "gluetool_modules/testing/testing_results.moduleinfo",
             "gluetool_modules/testing/mtf.moduleinfo",
             "gluetool_modules/testing/beah_result_parser.moduleinfo",
-            "gluetool_modules/testing/sclrun.moduleinfo",
             "gluetool_modules/testing/wow.moduleinfo",
             "gluetool_modules/testing/beah_xunit.moduleinfo"
         ]
