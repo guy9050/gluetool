@@ -199,11 +199,11 @@ class WorkflowTomorrow(gluetool.Module):
 
             # add '"' to strings containing spaces to prevent bad expansion
             # if command for generating job.xml is shell script
-            command = [('"{}"'.format(option) if ' ' in option and not
-                        (
-                            (option.startswith('"') and option.endswith('"')) or
-                            (option.startswith("'") and option.endswith("'")))
-                        else option) for option in command]
+            # command = [('"{}"'.format(option) if ' ' in option and not
+            #            (
+            #                (option.startswith('"') and option.endswith('"')) or
+            #                (option.startswith("'") and option.endswith("'")))
+            #            else option) for option in command]
 
             #
             # execute
