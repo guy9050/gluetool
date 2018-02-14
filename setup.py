@@ -186,8 +186,8 @@ DATA_FILES = [
     [
         "gluetool_modules/helpers/jenkins",
         [
-            "gluetool_modules/helpers/jenkins/brew_build_name.py",
-            "gluetool_modules/helpers/jenkins/brew_build_name.moduleinfo"
+            "gluetool_modules/helpers/jenkins/jenkins_build_name.py",
+            "gluetool_modules/helpers/jenkins/jenkins_build_name.moduleinfo"
         ]
     ],
     [

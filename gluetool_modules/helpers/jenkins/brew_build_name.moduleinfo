@@ -1,4 +1,0 @@
----
-
-name: brew-build-name
-description: "Set Jenkins build name to details of brew task"

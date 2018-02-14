@@ -1,0 +1,5 @@
+---
+
+name: jenkins-build-name
+aliases: brew-build-name, copr-build-name
+description: "Set Jenkins build name. Name template has to be provided, several variables are provided to the template, namely `THREAD_ID` and those provided by `artifact_context` shared function, if there's such"

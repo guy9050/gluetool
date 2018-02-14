@@ -1,35 +1,29 @@
 import pytest
 
 from mock import MagicMock
-from gluetool_modules.helpers.jenkins.brew_build_name import CIBrewBuildName
+from gluetool_modules.helpers.jenkins.jenkins_build_name import JenkinsBuildName
 from . import create_module, patch_shared, assert_shared
 
 
 @pytest.fixture(name='module')
 def fixture_module():
-    return create_module(CIBrewBuildName)
+    return create_module(JenkinsBuildName)
 
 
 def test_loadable(module):
     ci, _ = module
     # pylint: disable=protected-access
-    python_mod = ci._load_python_module('helpers/jenkins', 'pytest_brew_build_name',
-                                        'gluetool_modules/helpers/jenkins/brew_build_name.py')
+    python_mod = ci._load_python_module('helpers/jenkins', 'pytest_jenkins_build_name',
+                                        'gluetool_modules/helpers/jenkins/jenkins_build_name.py')
 
-    assert hasattr(python_mod, 'CIBrewBuildName')
-
-
-def test_no_brew(module):
-    _, module = module
-
-    assert_shared('primary_task', module.execute)
+    assert hasattr(python_mod, 'JenkinsBuildName')
 
 
 def test_no_jenkins(module, monkeypatch):
     _, module = module
 
     patch_shared(monkeypatch, module, {
-        'primary_task': 'dummy_task'
+        'artifact_context': 'dummy_context'
     })
 
     assert_shared('jenkins', module.execute)
@@ -53,15 +47,19 @@ def test_no_build_url(log, module, monkeypatch):
 
 
 def test_run(log, module, monkeypatch):
-    short_name = 'dummy_short_name'
-    thread_id = 'dummy-thread-id'
+    thread_id = 'dummy_thread_qid'
+    artifact_context = {
+        'FIRST': 'dummy_item',
+        'SECOND': 'another_dummy_item'
+    }
 
     _, module = module
+    module._config['name'] = '{{ THREAD_ID }}:{{ SECOND }}-{{ FIRST }}'
 
     mocked_set_build_name = MagicMock()
 
     patch_shared(monkeypatch, module, {
-        'primary_task': MagicMock(short_name=short_name),
+        'artifact_context': artifact_context,
         'jenkins': MagicMock(set_build_name=mocked_set_build_name),
         'thread_id': thread_id
     })
@@ -69,5 +67,6 @@ def test_run(log, module, monkeypatch):
     monkeypatch.setenv('BUILD_URL', 'dummy_jenkins_url')
 
     module.execute()
-    assert log.records[-1].message == "build name set: '{}:{}'".format(thread_id, short_name)
-    mocked_set_build_name.assert_called_with('{}:{}'.format(thread_id, short_name))
+    name = '{}:{}-{}'.format(thread_id, artifact_context['SECOND'], artifact_context['FIRST'])
+    assert log.records[-1].message == "build name set: '{}'".format(name)
+    mocked_set_build_name.assert_called_with(name)
