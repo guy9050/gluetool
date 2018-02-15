@@ -1,5 +1,0 @@
----
-
-name: koji-dispatcher
-aliases: brew-dispatcher
-description: "Configurable brew dispatcher"
