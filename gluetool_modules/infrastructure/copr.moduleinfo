@@ -1,0 +1,4 @@
+---
+
+name: copr
+description: Provide Copr task details to other modules
