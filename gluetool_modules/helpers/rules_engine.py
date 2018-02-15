@@ -211,14 +211,12 @@ class RulesEngine(gluetool.Module):
                 key: MatchableString(value) if isinstance(value, str) else value for key, value in variables.iteritems()
             }
 
-        custom_globals = {}
         custom_locals = _enhance_strings(context or {})
 
         self.debug('rules: {}'.format(rules))
-        log_dict(self.debug, 'globals', custom_globals)
         log_dict(self.debug, 'locals', custom_locals)
 
-        result = Rules(rules).eval(custom_globals, custom_locals)
+        result = Rules(rules).eval({}, custom_locals)
 
         log_dict(self.debug, 'eval result', result)
 
