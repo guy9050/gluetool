@@ -104,15 +104,7 @@ class TestBatchPlanner(gluetool.Module):
 
     @cached_property
     def _rules_context(self):
-        primary_task = self.shared('primary_task')
-
-        return {
-            'BUILD_TARGET': primary_task.target,
-            'PRIMARY_TASK': primary_task,
-            'TASKS': self.shared('tasks'),
-            'NVR': primary_task.nvr,
-            'SCRATCH': primary_task.scratch
-        }
+        return self.shared('artifact_context')
 
     def _reduce_section(self, commands, is_component=True, default_commands=None, all_commands=None):
         # pylint: disable=too-many-statements
@@ -439,7 +431,7 @@ class TestBatchPlanner(gluetool.Module):
         :rtype: list(list)
         """
 
-        self.require_shared('primary_task', 'evaluate_rules')
+        self.require_shared('primary_task', 'evaluate_rules', 'artifact_context')
 
         for method in self._methods:
             self.debug("Plan test batch using '{}' method".format(method))

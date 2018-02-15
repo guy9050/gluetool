@@ -7,8 +7,6 @@ import gluetool
 import gluetool_modules.helpers.rules_engine
 import gluetool_modules.dispatchers.test_batch_planner
 
-from mock import MagicMock
-
 from . import create_module, patch_shared
 
 
@@ -34,8 +32,13 @@ def fixture_module(monkeypatch):
     module = create_module(gluetool_modules.dispatchers.test_batch_planner.TestBatchPlanner)[1]
 
     patch_shared(monkeypatch, module, {
-        'primary_task': MagicMock(task_id=19, target='dummy-target', issuer='dummy-issuer', nvr='foo-13.17-23.el7',
-                                  scratch=False)
+        'artifact_context': {
+            'BUILD_TARGET': 'dummy-target',
+            'PRIMARY_TASK': 'dummy-primary-task',
+            'TASKS': 'dummy-tasks',
+            'NVR': 'foo-13.17-23.el7',
+            'SCRATCH': False
+            }
     })
 
     rules_engine = gluetool_modules.helpers.rules_engine.RulesEngine(module.glue, 'rules-engine')
