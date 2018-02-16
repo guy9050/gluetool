@@ -2,9 +2,14 @@
 Gather and provide recipients of notifications.
 """
 
+import re
+
 import gluetool
 from gluetool import GlueError
-from gluetool.utils import cached_property, PatternMap
+from gluetool.utils import cached_property, normalize_multistring_option
+from gluetool.log import log_dict
+
+import jinja2
 
 
 def deduplicate(recipients):
@@ -40,10 +45,36 @@ class NotifyRecipients(gluetool.Module):
         Overrides both default and additional recipients. (gluetool.Module) will notify this and only this list
         of recipients.
 
-    It is possible to use "symbolic" recipients, which will be substituted with the actual values. So far these
-    are available:
+    For finer control of recipients on higher levels, one can use ``--recipients-map``, listing sets of actions,
+    recipients and rules to control them.
 
-      - ``{ISSUER}`` - task issuer
+    .. code-block:: yaml
+
+       ---
+
+       # add task issuer and 'foo' as recipients of everything (any build target)
+       - rule: BUILD_TARGET.match('.*'):
+         add-recipients:
+           - '{{ PRIMARY_TASK.issuer }}'
+           - foo
+
+       # add 'baz' as recipient of everything, no rules applied
+       - add-recipients: baz
+
+       # remove 'bar', he does not want to deal with notifications. To remove multiple recipients, just
+       # list them under the remove-recipients key, like those in add-recipients above.
+       - remove-recipients: bar
+
+       # replace 'foo.bar' with 'baz' and 'some other guy'
+       - replace: 'foo\\.bar'
+         with:
+           - baz
+           - some other guy
+
+    Rules (``rule`` key) are optional and if present, they are evaluated by ``rules-engine`` module, possibly
+    leading the module to skip the set if rules disallow them. Possible actions are ``add-recipients``,
+    ``remove-recipient`` and ``replace``. Values are evaluated as Jinja2 templates within the same context
+    as the rules, with an access to primary task, list of all tasks, build target and so on.
     """
 
     name = 'notify-recipients'
@@ -60,9 +91,9 @@ class NotifyRecipients(gluetool.Module):
                 'help': 'If set, it will override all recipient settings - all notifications will go to these people',
                 'metavar': 'NAMES'
             },
-            'mapped-recipients-map': {
+            'recipients-map': {
                 # pylint: disable=line-too-long
-                'help': "Path to a pattern-map file mapping recipients (usually issuers) to another recipients. Use ';' to split multiple recipients.",
+                'help': "File with recipients mapping.",
                 'default': None,
                 'metavar': 'PATH'
             }
@@ -93,55 +124,20 @@ class NotifyRecipients(gluetool.Module):
 
     shared_functions = ['notification_recipients']
 
-    def option_to_recipients(self, name):
-        """
-        Converts comma-separated list of usernames, provided by an option, to a list.
-        Trims white-space from all individual usernames.
-
-        :param str name: option name.
-        :returns: ['foo', 'bar', ...]
-        """
-
-        users = self.option(name)
-
-        if not users:
-            return []
-
-        # Some recipient options can be specified multiple times, in that case
-        # their values are stored as a list of comma-separated lists of usernames.
-        # Joining these string into a single string by a comma is good enough.
-        if isinstance(users, list):
-            users = ','.join(users)
-
-        return [s.strip() for s in users.split(',')]
-
     @cached_property
     def force_recipients(self):
         """
         List of forced recipients.
         """
 
-        return self.option_to_recipients('force-recipients')
+        return normalize_multistring_option(self.option('force-recipients'))
 
     @cached_property
-    def symbolic_recipients(self):
-        """
-        Mapping between symbolic recipients and the actual values.
-        """
+    def recipients_map(self):
+        if not self.option('recipients-map'):
+            return []
 
-        if not self.has_shared('primary_task'):
-            return {}
-
-        return {
-            'ISSUER': self.shared('primary_task').issuer
-        }
-
-    @cached_property
-    def mapped_recipients(self):
-        if not self.option('mapped-recipients-map'):
-            return None
-
-        return PatternMap(self.option('mapped-recipients-map'), logger=self.logger)
+        return gluetool.utils.load_yaml(self.option('recipients-map'), logger=self.logger)
 
     def _recipients_by_result(self, result_type):
         """
@@ -157,15 +153,15 @@ class NotifyRecipients(gluetool.Module):
             self.debug('overriding recipients by force')
             return recipients
 
-        recipients = self.option_to_recipients('{}-notify'.format(result_type))
+        recipients = normalize_multistring_option(self.option('{}-notify'.format(result_type)))
         if recipients:
             self.debug('overriding recipients with absolute notify')
             return recipients
 
         self.debug('using default recipients')
 
-        default_recipients = self.option_to_recipients('{}-default-notify'.format(result_type))
-        add_recipients = self.option_to_recipients('{}-add-notify'.format(result_type))
+        default_recipients = normalize_multistring_option(self.option('{}-default-notify'.format(result_type)))
+        add_recipients = normalize_multistring_option(self.option('{}-add-notify'.format(result_type)))
 
         return default_recipients + add_recipients
 
@@ -174,70 +170,157 @@ class NotifyRecipients(gluetool.Module):
 
         return sum([self._recipients_by_result(result_type) for result_type in self.supported_result_types], [])
 
-    def _replace_symbolic_recipients(self, recipients):
-        processed = []
+    def _prepare_target_recipients(self, target, context):
+        """
+        Prepare "target" recipients - those on the right sides of the equations,
+        those we wish to use as a replacement or even as new recipients. Process
+        them through the templating engine, make a list of them, and so on.
 
-        for recipient in recipients:
-            if recipient[0] != '{' or recipient[-1] != '}':
-                processed.append(recipient)
-                continue
+        :param target: A string or list of strings, recipients to treat.
+        :param dict context: Context to use when rendering templates.
+        :returns: A list of treated recipients.
+        """
 
-            pattern = recipient[1:-1]
-            actual = self.symbolic_recipients.get(pattern, None)
+        # If `target` is a string, it's a single recipient => wrap it by a list
+        # to allow the rest of code to work with just lists.
+        if isinstance(target, str):
+            target = [target]
 
-            if actual is None:
-                self.warn("Cannot replace symbolic recipient '{}'".format(recipient))
-                continue
+        target = [
+            str(jinja2.Template(recipient).render(**context)) for recipient in target
+        ]
 
-            self.debug("replacing '{}' with '{}'".format(recipient, actual))
-            processed.append(actual)
+        log_dict(self.debug, 'prepared target recipients', target)
 
-        return processed
+        return target
 
-    def _replace_mapped_recipients(self, recipients):
-        if not self.mapped_recipients:
-            return recipients
+    def _add_recipients(self, recipients, rules_context, target):
+        """
+        Add more recipients.
 
-        processed = []
+        :param list recipients: Current list of recipients.
+        :param dict rules_context: Context to use for rendering new recipients.
+        :param target: Recipients to add - will be processed by :py:meth:`_prepare_target_recipients`.
+        :returns: Updated list of recipients.
+        """
 
-        for recipient in recipients:
-            try:
-                new_recipients = self.mapped_recipients.match(recipient)
-                if not new_recipients:
-                    raise GlueError("No mapping for '{}'".format(recipient))
+        target = self._prepare_target_recipients(target, rules_context)
 
-                new_recipients = [s.strip() for s in new_recipients.split(';')]
-                self.debug("replacing '{}' with '{}'".format(recipient, ', '.join(new_recipients)))
+        log_dict(self.debug, 'adding recipients', target)
 
-            except GlueError:
-                # ignore fails, they are usualy expected
-                new_recipients = [recipient]
+        return recipients + target
 
-                self.debug("Cannot replace mapped recipient '{}'".format(recipient))
+    def _remove_recipients(self, recipients, rules_context, target):
+        """
+        Remove recipients.
 
-            processed += new_recipients
+        :param list recipients: Current list of recipients.
+        :param dict rules_context: Context to use for rendering recipients we need to remove.
+        :param target: Recipients to remove - will be processed by :py:meth:`_prepare_target_recipients`.
+        :returns: Updated list of recipients.
+        """
 
-        return processed
+        target = self._prepare_target_recipients(target, rules_context)
+
+        log_dict(self.debug, 'removing recipients', target)
+
+        return [
+            recipient for recipient in recipients if recipient not in target
+        ]
+
+    def _replace_recipients(self, recipients, rules_context, source, target):
+        """
+        Replace recipients.
+
+        :param list recipients: Current list of recipients.
+        :param dict rules_context: Context to use for rendering recipients we're manipulating.
+        :param str source: Regexp pattern - matching recipients will be replaced with ``target``.
+        :param target: Recipients to use instead of ``source`` - will be processed by
+            :py:meth:`_prepare_target_recipients`.
+        :returns: Updated list of recipients.
+        """
+
+        if target is None:
+            raise GlueError("Don't know what to use instead of '{}'".format(source))
+
+        target = self._prepare_target_recipients(target, rules_context)
+
+        try:
+            pattern = re.compile(source)
+
+        except re.error as exc:
+            raise GlueError("Cannot compile pattern '{}': {}".format(source, exc))
+
+        def _replace(recipient):
+            # pylint: disable=cell-var-from-loop
+            if not pattern.match(recipient):
+                return [recipient]
+
+            log_dict(self.debug, "replacing '{}' with".format(recipient), target)
+            return target
+
+        # apply _replace to every recipient - replace returns a list of 1 or more recipients,
+        # simply merge them into a single list
+        return sum(map(_replace, recipients), [])
+
+    def _apply_recipients_map(self, recipients):
+        """
+        Walk through the recipients map and apply all requested changes to the list of recipients.
+        """
+
+        for recipients_set in self.recipients_map:
+            log_dict(self.debug, 'recipients set', recipients_set)
+            log_dict(self.debug, 'recipients', recipients)
+
+            # must be prepared again for each recipients set as recipients list changes after each iteration
+            rules_context = {
+                'BUILD_TARGET': self.shared('primary_task').target,
+                'PRIMARY_TASK': self.shared('primary_task'),
+                'TASKS': self.shared('tasks'),
+                'RECIPIENTS': recipients
+            }
+
+            if 'rule' in recipients_set:
+                rules_result = self.shared('evaluate_rules', recipients_set.get('rule', 'False'), context=rules_context)
+
+                if not rules_result:
+                    self.debug('rules does not match, moving on')
+                    continue
+
+            if 'replace' in recipients_set:
+                recipients = self._replace_recipients(recipients, rules_context,
+                                                      recipients_set['replace'], recipients_set.get('with', None))
+
+            if 'add-recipients' in recipients_set:
+                recipients = self._add_recipients(recipients, rules_context, recipients_set['add-recipients'])
+
+            if 'remove-recipients' in recipients_set:
+                recipients = self._remove_recipients(recipients, rules_context, recipients_set['remove-recipients'])
+
+        log_dict(self.debug, 'final recipients', recipients)
+
+        return recipients
 
     def _finalize_recipients(self, recipients):
         """
-        The final step before using recipients. Method substitutes all symbolic recipients
-        with their actual values, removes duplicities, and sorts the list of recipients.
+        The final step before using recipients. Take a list of gathered recipients,
+        and apply a recipient map to it. This action deals with things like symbolic
+        recipients and similar stuff. Duplicities are removed after that, and the
+        final list is sorted as well.
 
         :param list recipients: list of recipients.
         :returns: polished list of recipients.
         """
 
-        symbolic_satisfied = self._replace_symbolic_recipients(recipients)
-        mapped_satisfied = self._replace_mapped_recipients(symbolic_satisfied)
-
-        return polish(mapped_satisfied)
+        return polish(self._apply_recipients_map(recipients))
 
     def notification_recipients(self, result_type=None):
         """
         Create list of recipients, based on options passed for the type of results
         this formatter handles.
         """
+
+        self.require_shared('primary_task', 'tasks')
 
         recipients = self._recipients_overall() if result_type is None else self._recipients_by_result(result_type)
         recipients = self._finalize_recipients(recipients)
