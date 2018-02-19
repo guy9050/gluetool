@@ -88,6 +88,11 @@ class OpenStackImage(object):
 
         return self._resource
 
+    def release(self):
+        self.resource.delete()
+
+        self.debug('released the image')
+
     def download(self, filename=None):
         # This chould be implemented using glanceclient API - calling `glance` is easy and quick
         # but leaks usernames and passwords into the log file. On the other hand, credentials are
@@ -121,6 +126,10 @@ class OpenstackGuest(NetworkedGuest):
     """
 
     ALLOW_DEGRADED = ('cloud-config.service',)
+
+    #
+    # Low-level API, dealing directly with OpenStack resources and objects.
+    #
 
     @staticmethod
     def _acquire_os_resource(resource, logger, tick, func, *args, **kwargs):
@@ -173,6 +182,203 @@ class OpenstackGuest(NetworkedGuest):
                                    logger=logger,
                                    tick=tick)
 
+    def _acquire_name(self):
+        """
+        Acquire a name for this server.
+        """
+
+        name = [
+            self._os_details['name'],
+            self.floating_ip
+        ]
+
+        if 'JOB_NAME' in os.environ:
+            name.append('{}-{}'.format(os.environ['JOB_NAME'], os.environ['BUILD_ID']))
+
+        self._os_name = '-'.join(name)
+
+    def _acquire_floating_ip(self):
+        """
+        Acquire floating IP.
+        """
+
+        self._os_floating_ip = OpenstackGuest._acquire_os_resource('floating IP', self._module.logger, 30,
+                                                                   self._nova.floating_ips.create,
+                                                                   self._os_details['ip_pool_name'])
+
+    def _acquire_nics(self):
+        """
+        Acquire list of networs.
+        """
+
+        if not self._os_details.get('network', None):
+            return
+
+        self._os_nics = [
+            {
+                'net-id': network.id
+            } for network in self._os_details['network']
+        ]
+
+    def _acquire_instance(self, image=None):
+        """
+        Acquire an instance.
+        """
+
+        image = image or self._os_details['image']
+
+        self._os_instance = OpenstackGuest._acquire_os_resource('instance', self._module.logger, 30,
+                                                                self._nova.servers.create,
+                                                                name=self._os_name,
+                                                                flavor=self._os_details['flavor'],
+                                                                image=image.resource,
+                                                                nics=self._os_nics,
+                                                                key_name=self._os_details['key_name'],
+                                                                userdata=self._os_details['user_data'])
+
+    def _release_snapshots(self):
+        """
+        Removes all created snapshots.
+        """
+
+        for image in self._snapshots:
+            image.release()
+
+        if self._snapshots:
+            self.debug('released all {} snapshots'.format(len(self._snapshots)))
+
+        self._snapshots = []
+
+    def _release_floating_ip(self):
+        try:
+            self._os_floating_ip.delete()
+
+            self.debug("released floating IP '{}'".format(self.floating_ip))
+
+        except NotFound:
+            self.debug('associated floating IP already removed', sentry=True)
+
+        self._os_floating_ip = None
+
+    def _release_instance(self):
+        """
+        Release instance back to the pool.
+        """
+
+        # save console log, if possible
+        try:
+            filename = 'console-{}-{}.log.gz'.format(self.name, self.instance_id)
+
+            self.debug("storing console output in '{}'".format(filename))
+
+            console = self._os_instance.get_console_output()
+
+            if console:
+                console = console.encode('utf-8', 'replace')
+
+            else:
+                # Some servers may return empty console output. Observed with rhel-7.1-server-x86_64-released image
+                self.warn('empty console output')
+
+                console = '<Server returned empty console output>'
+
+            with gzip.open(filename, 'wb') as f:
+                f.write(console)
+                f.flush()
+
+        # pylint: disable=broad-except
+        except Exception as exc:
+            self.warn('Failed to store console output in the file: {}'.format(str(exc)), sentry=True)
+
+        try:
+            self.debug('deleting...')
+
+            self._os_instance.delete()
+
+            self.debug('deleted')
+
+        except NotFound:
+            self.warn('Instance already deleted', sentry=True)
+
+        finally:
+            self._os_instance = None
+
+    def _shutdown(self):
+        """
+        Shut down the instance.
+        """
+
+        self.debug('shutting down...')
+
+        self._os_instance.stop()
+
+        self._wait_shutoff()
+
+        self.debug('shut down finished')
+
+    def _start(self):
+        """
+        Start the instance.
+        """
+
+        self.debug('starting...')
+
+        self._os_instance.start()
+
+        self._wait_active()
+
+        self.debug('started')
+
+    def _rebuild(self, image):
+        """
+        Rebuild the instance from an image.
+        """
+
+        self.debug('rebuilding...')
+
+        original_status = self._get_resource_status('servers', self._os_instance.id)
+
+        self._os_instance.rebuild(image.resource)
+
+        if original_status == u'ACTIVE':
+            self._wait_active()
+
+        else:
+            self._wait_shutoff()
+
+        self.debug('rebuilt')
+
+    def _reboot(self, reboot_type='SOFT'):
+        """
+        Reboot the instance.
+
+        :param str reboot_type: Either ``SOFT`` - software level - or ``HARD`` - virtual power cycle.
+        """
+
+        self.debug('rebooting...')
+
+        self._os_instance.reboot(reboot_type)
+
+        self._wait_active()
+
+        self.debug('rebooted')
+
+    def _wait_active(self):
+        """
+        Wait till OpenStack reports the instance is ``ACTIVE``.
+        """
+
+        self._wait_for_resource_status('instance reports ACTIVE', 'servers', self._os_instance.id, u'ACTIVE',
+                                       timeout=self._module.option('activation-timeout'), tick=1)
+
+    def _wait_shutoff(self):
+        """
+        Wait till OpenStack reports the instance is ``SHUTOFF``.
+        """
+
+        self._wait_for_resource_status('instance reports SHUTOFF', 'servers', self._os_instance.id, u'SHUTOFF',
+                                       timeout=self._module.option('shutdown-timeout'), tick=1)
+
     def _get_resource_status(self, resource, rid):
         status = getattr(self._nova, resource).find(id=rid).status
 
@@ -196,87 +402,75 @@ class OpenstackGuest(NetworkedGuest):
         check = functools.partial(self._check_resource_status, resource, rid, status)
         self.wait(label, check, timeout=timeout, tick=tick)
 
-    def _assign_floating_ip(self, floating_ip):
+    def _assign_floating_ip(self):
         """
-        The add_floating_ip returns an instance of novaclient.base.TupleWithMeta
-        https://docs.openstack.org/python-novaclient/latest/reference/api/novaclient.v2.servers.html
+        Assign floating IP.
+        """
 
-        :param nova.novaclient.v2.floating_ips.FloatingIP floating_ip: floating IP to assign
-        :returns: True if floating IP successfully assigned, False otherwise
-        """
-        if isinstance(self._instance.add_floating_ip(floating_ip), novaclient.base.TupleWithMeta):
-            return True
-        return False
+        # The assignment of IP can fail if done too early. So retry if needed to be sure
+        # that we do not hit this. Also retrying should improve a bit situation with shorter
+        # outages happening regularly on Openstack.
+
+        def _assign():
+            """
+            The add_floating_ip returns an instance of novaclient.base.TupleWithMeta
+            https://docs.openstack.org/python-novaclient/latest/reference/api/novaclient.v2.servers.html
+
+            :param nova.novaclient.v2.floating_ips.FloatingIP floating_ip: floating IP to assign
+            :returns: True if floating IP successfully assigned, False otherwise
+            """
+
+            return isinstance(self._os_instance.add_floating_ip(self.floating_ip), novaclient.base.TupleWithMeta)
+
+        OpenstackGuest._acquire_os_resource('IP assignment', self._module.logger, 1,
+                                            _assign)
 
     def __init__(self, module, details=None, instance_id=None):
         self._snapshots = []
+
         self._nova = module.nova
-        details = details or {}
 
-        #
-        # Create a new instance
-        #
+        # this is done by parent's constructor but we need it sooner for our _acquire_* methods
+        self._module = module
+
+        # these are very close to underlying OpenStack resources
+        self._os_name = None
+        self._os_instance = None
+        self._os_floating_ip = None
+        self._os_nics = []
+        self._os_details = details or {}
+
         if instance_id is None:
-            assert details is not None, 'no details passed to OpenstackGuest constructor'
+            self._acquire_floating_ip()
+            self._acquire_name()
+            self._acquire_nics()
+            self._acquire_instance()
 
-            # get an floating IP from a random available pool, tick for 30s before retrying
-            # pylint: disable=line-too-long
-            self._floating_ip = OpenstackGuest._acquire_os_resource('floating IP', module.logger, 30, self._nova.floating_ips.create,
-                                                                    details['ip_pool_name'])
+            self._assign_floating_ip()
 
-            # add additional network if specified
-            nics = [{'net-id': network.id} for network in details['network']] if details.get('network', None) else []
-
-            # create instance name with floating IP and optionally add JOB_NAME and BUILD_ID
-            name = [
-                details['name'],
-                self.floating_ip
-            ]
-            if 'JOB_NAME' in os.environ:
-                name.append('{}-{}'.format(os.environ['JOB_NAME'], os.environ['BUILD_ID']))
-            name = '-'.join(name)
-
-            # complete userdata - use our default
-            # create openstack instance, tick for 30s before retrying
-            # pylint: disable=line-too-long
-            self._instance = OpenstackGuest._acquire_os_resource('instance', module.logger, 30, self._nova.servers.create,
-                                                                 name=name,
-                                                                 flavor=details['flavor'],
-                                                                 image=details['image'],
-                                                                 nics=nics,
-                                                                 key_name=details['key_name'],
-                                                                 userdata=details['user_data'])
-
-            # the assignment of IP can fail if done too early. So retry if needed.
-            # to be sure that we do not hit this. Also retrying should improve a bit
-            # situation with shorter outages happening regularly on Openstack.
-            # pylint: disable=line-too-long
-            OpenstackGuest._acquire_os_resource('IP assignment', module.logger, 1, self._assign_floating_ip, self._floating_ip)  # Ignore PEP8Bear
-
-        #
-        # Intialize from an existing instance
-        #
         else:
-            self._instance = self._nova.servers.find(id=instance_id)
-            self._floating_ip = self._nova.floating_ips.find(instance_id=instance_id)
-            name = self._instance.to_dict()['name']
-            details.update({
+            self._os_details.update({
                 'username': module.option('ssh-user'),
                 'key': module.option('ssh-key')
             })
 
+            self._os_instance = self._nova.servers.find(id=instance_id)
+            self._os_floating_ip = self._nova.floating_ips.find(instance_id=instance_id)
+            self._os_name = self._os_instance.to_dict()['name']
+            self._os_nics = self._acquire_nics()
+
         super(OpenstackGuest, self).__init__(module,
                                              self.floating_ip,
-                                             name=name,
-                                             username=details['username'],
-                                             key=details['key'],
+                                             name=self._os_name,
+                                             username=self._os_details['username'],
+                                             key=self._os_details['key'],
                                              options=DEFAULT_SSH_OPTIONS)
 
     @property
-    def _image(self):
-        assert self._instance is not None
+    def image(self):
+        assert self._os_instance is not None
 
-        img_id = self._instance.image['id']
+        img_id = self._os_instance.image['id']
 
         try:
             return OpenStackImage(self._module, self._nova.images.findall(id=img_id)[0])
@@ -284,132 +478,23 @@ class OpenstackGuest(NetworkedGuest):
         except IndexError:
             raise GlueError("Cannot find image by its ID '{}'".format(img_id))
 
-    def setup(self, variables=None, **kwargs):
-        # pylint: disable=arguments-differ
+    @property
+    def floating_ip(self):
         """
-        Custom setup for Openstack guests. Add a resolvable openstack hostname in case there
-        is none.
+        Property provides associated floating IP address as a string.
 
-        :param dict variables: dictionary with GUEST_HOSTNAME and/or GUEST_DOMAINNAME keys
+        :returns: floating IP address of the guest
         """
-        variables = variables or {}
+        return str(self._os_floating_ip.ip)
 
-        # workaround-openstack-hostname.yaml requires hostname and domainname.
-        # If not set, create ones - some tests may depend on resolvable hostname.
-        if 'GUEST_HOSTNAME' not in variables:
-            variables['GUEST_HOSTNAME'] = re.sub(r'10\.(\d+)\.(\d+)\.(\d+)', r'host-\1-\2-\3', self.floating_ip)
-
-        if 'GUEST_DOMAINNAME' not in variables:
-            variables['GUEST_DOMAINNAME'] = 'host.centralci.eng.rdu2.redhat.com'
-
-        if 'IMAGE_NAME' not in variables:
-            variables['IMAGE_NAME'] = self._image.name
-
-        super(OpenstackGuest, self).setup(variables=variables, **kwargs)
-
-    def destroy(self):
+    @property
+    def instance_id(self):
         """
-        The destroy function makes sure that assigned floating IP is freed, all snapshots are removed
-        and the instance is deleted.
+        Provides instance ID as a string.
+
+        :returns: string representation of instance ID
         """
-
-        # save console log, if possible
-        try:
-            filename = 'console-{}-{}.log.gz'.format(self.name, self.instance_id)
-
-            self.debug("storing console output in '{}'".format(filename))
-
-            console = self._instance.get_console_output()
-
-            if console:
-                console = console.encode('utf-8', 'replace')
-
-            else:
-                # Some servers may return empty console output. Observed with rhel-7.1-server-x86_64-released image
-                self.warn('empty console output')
-
-                console = '<Server returned empty console output>'
-
-            with gzip.open(filename, 'wb') as f:
-                f.write(console)
-                f.flush()
-
-        # pylint: disable=broad-except
-        except Exception as exc:
-            self.warn('Failed to store console output in the file: {}'.format(str(exc)), sentry=True)
-
-        try:
-            self._floating_ip.delete()
-            self.verbose("removed floating IP '{}'".format(self.floating_ip))
-        except NotFound:
-            self.debug('associated floating IP already removed - skipping')
-        self._remove_snapshots()
-        try:
-            self._instance.delete()
-            self.verbose("removed instance '{}'".format(self._instance.name))
-        except NotFound:
-            self.debug('instance already deleted - skipping')
-
-    def _shutdown(self):
-        """
-        Shut down the instance.
-        """
-
-        self.debug('shutting down...')
-
-        self._instance.stop()
-
-        self._wait_shutoff()
-
-        self.debug('shut down finished')
-
-    def _start(self):
-        """
-        Start the instance.
-        """
-
-        self.debug('starting...')
-
-        self._instance.start()
-
-        self._wait_active()
-
-        self.debug('started')
-
-    def _rebuild(self, image):
-        """
-        Rebuild the instance from an image.
-        """
-
-        self.debug('rebuilding...')
-
-        original_status = self._get_resource_status('servers', self._instance.id)
-
-        self._instance.rebuild(image.resource)
-
-        if original_status == u'ACTIVE':
-            self._wait_active()
-
-        else:
-            self._wait_shutoff()
-
-        self.debug('rebuilt')
-
-    def _wait_active(self):
-        """
-        Wait till OpenStack reports the instance is ``ACTIVE``.
-        """
-
-        self._wait_for_resource_status('instance reports ACTIVE', 'servers', self._instance.id, u'ACTIVE',
-                                       timeout=self._module.option('activation-timeout'), tick=1)
-
-    def _wait_shutoff(self):
-        """
-        Wait till OpenStack reports the instance is ``SHUTOFF``.
-        """
-
-        self._wait_for_resource_status('instance reports SHUTOFF', 'servers', self._instance.id, u'SHUTOFF',
-                                       timeout=self._module.option('shutdown-timeout'), tick=1)
+        return str(self._os_instance.id)
 
     def _wait_alive(self):
         """
@@ -449,17 +534,57 @@ class OpenstackGuest(NetworkedGuest):
 
             except GlueError as exc:
                 self.error('Failed to bring the guest alive in attempt #{}: {}'.format(i + 1, exc.message))
-                self.warn('instance status: {}'.format(self._get_resource_status('servers', self._instance.id)))
+                self.warn('instance status: {}'.format(self._get_resource_status('servers', self._os_instance.id)))
 
                 # If instance status is ACTIVE, it started but some additional check failed. We simply
                 # cannot just run `actor` again because, from the OpenStack's point of view the instance
                 # is already running, and `actor` would probably fail as, for example, one cannot "start"
                 # ACTIVE instance. So, stop the instance to give actor leveled field.
-                if self._check_resource_status('servers', self._instance.id, u'ACTIVE'):
+                if self._check_resource_status('servers', self._os_instance.id, u'ACTIVE'):
                     # ACTIVE - shut down before another attempt
                     self._shutdown()
 
         raise GlueError('Failed to acquire living instance.')
+
+    #
+    # "Public" API
+    #
+
+    def supports_snapshots(self):
+        return True
+
+    def setup(self, variables=None, **kwargs):
+        # pylint: disable=arguments-differ
+        """
+        Custom setup for Openstack guests. Add a resolvable openstack hostname in case there
+        is none.
+
+        :param dict variables: dictionary with GUEST_HOSTNAME and/or GUEST_DOMAINNAME keys
+        """
+        variables = variables or {}
+
+        # workaround-openstack-hostname.yaml requires hostname and domainname.
+        # If not set, create ones - some tests may depend on resolvable hostname.
+        if 'GUEST_HOSTNAME' not in variables:
+            variables['GUEST_HOSTNAME'] = re.sub(r'10\.(\d+)\.(\d+)\.(\d+)', r'host-\1-\2-\3', self.floating_ip)
+
+        if 'GUEST_DOMAINNAME' not in variables:
+            variables['GUEST_DOMAINNAME'] = 'host.centralci.eng.rdu2.redhat.com'
+
+        if 'IMAGE_NAME' not in variables:
+            variables['IMAGE_NAME'] = self.image.name
+
+        super(OpenstackGuest, self).setup(variables=variables, **kwargs)
+
+    def destroy(self):
+        """
+        The destroy function makes sure that assigned floating IP is freed, all snapshots are removed
+        and the instance is deleted.
+        """
+
+        self._release_floating_ip()
+        self._release_instance()
+        self._release_snapshots()
 
     def create_snapshot(self, start_again=True):
         """
@@ -480,7 +605,7 @@ class OpenstackGuest(NetworkedGuest):
         self._shutdown()
 
         # create image
-        image_id = self._instance.create_image(name)
+        image_id = self._os_instance.create_image(name)
         image = OpenStackImage(self._module, name)
         self._snapshots.append(image)
 
@@ -507,54 +632,52 @@ class OpenstackGuest(NetworkedGuest):
 
         self.info("rebuilding server with snapshot '{}'".format(snapshot.name))
 
-        self._shutdown()
+        try:
+            self._shutdown()
 
-        def actor():
-            self._rebuild(snapshot)
+        except GlueError as exc:
+            # if it's not a timeout, re-raise
+            if 'failed to pass within given time' not in exc.message:
+                raise
 
-            # _rebuild leaves instance in the original state, SHUTDOWN
-            self._start()
+            # We tried to shutdown the instance, and waiting for SHUTOFF ended up with a timeout.
+            # As shutdown goes through the software - e.g. via initd/systemd - to shut the instance
+            # down - it may be a sign of a totally broken software stack on the instance. As we cannot
+            # force shutdown ("turn power off") - [1] - the only way out is to throw away this instance
+            # and get a new one. Keep things like IP address and name, and avoid the rebuild by using
+            # the snapshot as an initial image.
+            # [1] https://blueprints.launchpad.net/nova/+spec/nova-api-force-stop-server
+            self.warn('failed to shutdown - instance is probably broken beyond repair')
 
-        self._bring_alive('rebuilding the instance', actor,
-                          attempts=self._module.option('restore-snapshot-attempts'))
+            label = 'provisioning replacement'
+
+            def actor():
+                if self._os_instance is not None:
+                    self._release_instance()
+
+                # No need to acquire name, NICs nor IP, these bits don't change. We simply ask for
+                # a new instance with all these bits already acquired.
+                self._acquire_instance(image=snapshot)
+                self._assign_floating_ip()
+
+                # Instance should be started by OS. `_bring_alive`, this function's caller, continues
+                # with `_wait_alive` which is absolutely fine as it first checks for ACTIVE state,
+                # and that's exactly what the instance should have when OS finishes its work.
+
+        else:
+            label = 'rebuilding the instance'
+
+            def actor():
+                self._rebuild(snapshot)
+
+                # _rebuild leaves instance in the original state, SHUTDOWN
+                self._start()
+
+        self._bring_alive(label, actor, attempts=self._module.option('restore-snapshot-attempts'))
 
         self.info('rebuilt and alive')
 
         return self
-
-    def _remove_snapshots(self):
-        """
-        Removes all created snapshots.
-        """
-        count = len(self._snapshots)
-        for image in self._snapshots:
-            image.resource.delete()
-            self.debug("removed image {}".format(image.name))
-
-        if count > 0:
-            self.verbose('removed all {} snapshots'.format(count))
-        self._snapshots = []
-
-    def supports_snapshots(self):
-        return True
-
-    @cached_property
-    def floating_ip(self):
-        """
-        Property provides associated floating IP address as a string.
-
-        :returns: floating IP address of the guest
-        """
-        return str(self._floating_ip.ip)
-
-    @cached_property
-    def instance_id(self):
-        """
-        Provides instance ID as a string.
-
-        :returns: string representation of instance ID
-        """
-        return str(self._instance.id)
 
 
 class CIOpenstack(gluetool.Module):
@@ -994,7 +1117,7 @@ class CIOpenstack(gluetool.Module):
         for _ in range(count):
             details = {
                 'name': name,
-                'image': image.resource,
+                'image': image,
                 'flavor': flavor_ref,
                 'network': network_ref,
                 'key_name': self.option('key-name'),
