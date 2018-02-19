@@ -294,20 +294,9 @@ class Beaker(gluetool.Module):
             return self._reuse_job(self.option('job'))
 
         tasks = self.shared('tasks')
-        primary_task = self.shared('primary_task')
 
         options = [
             '--first-testing-task=/distribution/runtime_tests/verify-nvr-installed'
-        ]
-
-        if 'JOB_NAME' in os.environ and 'BUILD_ID' in os.environ:
-            jenkins_build_id = '{} #{}'.format(os.getenv('JOB_NAME'), os.getenv('BUILD_ID'))
-        else:
-            jenkins_build_id = '<Unknown Jenkins build>'
-
-        options += [
-            '--whiteboard="CI: {}: {}, brew task {}, build target {}"'.format(jenkins_build_id, primary_task.nvr,
-                                                                              primary_task.task_id, primary_task.target)
         ]
 
         # gather builds and tasks
