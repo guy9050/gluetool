@@ -483,7 +483,7 @@ class Koji(gluetool.Module):
     """
 
     required_options = ['url', 'pkgs-url', 'web-url']
-    shared_functions = ('tasks', 'primary_task', 'koji_session', 'artifact_context')
+    shared_functions = ('tasks', 'primary_task', 'koji_session')
 
     def __init__(self, *args, **kwargs):
         super(Koji, self).__init__(*args, **kwargs)
@@ -575,6 +575,10 @@ class Koji(gluetool.Module):
     def koji_session(self):
         return self._session
 
+    def _assert_tasks(self):
+        if not self._tasks:
+            raise GlueError('No tasks specified.')
+
     def tasks(self, task_ids=None, **kwargs):
         """
         Returns a list of current tasks. If ``task_ids`` is set, new set of tasks is created using
@@ -596,10 +600,9 @@ class Koji(gluetool.Module):
         if task_ids:
             self._tasks = [self._task_factory(task_id, **kwargs) for task_id in task_ids]
 
-        if self._tasks:
-            return self._tasks
+        self._assert_tasks()
 
-        raise GlueError('No tasks specified')
+        return self._tasks
 
     def primary_task(self):
         """
@@ -613,14 +616,15 @@ class Koji(gluetool.Module):
 
         self.debug('primary task - current tasks: {}'.format(format_dict(self._tasks)))
 
-        if not self._tasks:
-            raise GlueError('No tasks specified, cannot return the primary one')
+        self._assert_tasks()
 
         return self._tasks[0]
 
-    def artifact_context(self):
+    @property
+    def eval_context(self):
         """
-        Provides informations about brew artifact, that are used for rules evaluations.
+        Provides informations about Koji/Brew artifacts.
+
         Provides following variables: BUILD_TARGET, PRIMARY_TASK, TASKS, NVR, SCRATCH
 
         :rtype: dict
@@ -629,10 +633,13 @@ class Koji(gluetool.Module):
         primary_task = self.primary_task()
 
         return {
+            # common for all artifact providers
             'BUILD_TARGET': primary_task.target,
+            'NVR': primary_task.nvr,
             'PRIMARY_TASK': primary_task,
             'TASKS': self.tasks(),
-            'NVR': primary_task.nvr,
+
+            # Brew/Koji specific
             'SCRATCH': primary_task.scratch
         }
 

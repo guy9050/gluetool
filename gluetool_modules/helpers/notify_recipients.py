@@ -273,12 +273,9 @@ class NotifyRecipients(gluetool.Module):
             log_dict(self.debug, 'recipients', recipients)
 
             # must be prepared again for each recipients set as recipients list changes after each iteration
-            rules_context = {
-                'BUILD_TARGET': self.shared('primary_task').target,
-                'PRIMARY_TASK': self.shared('primary_task'),
-                'TASKS': self.shared('tasks'),
+            rules_context = gluetool.utils.dict_update(self.shared('eval_context'), {
                 'RECIPIENTS': recipients
-            }
+            })
 
             if 'rule' in recipients_set:
                 rules_result = self.shared('evaluate_rules', recipients_set.get('rule', 'False'), context=rules_context)

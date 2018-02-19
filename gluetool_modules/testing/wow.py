@@ -131,12 +131,9 @@ class WorkflowTomorrow(gluetool.Module):
 
             self.debug("constructing options distro '{}'".format(distro))
 
-            rules_context = {
-                'BUILD_TARGET': self.shared('primary_task').target,
-                'PRIMARY_TASK': self.shared('primary_task'),
-                'TASKS': self.shared('tasks'),
+            rules_context = gluetool.utils.dict_update(self.shared('eval_context'), {
                 'DISTRO': distro
-            }
+            })
 
             # Options set by a configuration
             for options_set in self.wow_options_map:

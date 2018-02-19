@@ -102,10 +102,6 @@ class TestBatchPlanner(gluetool.Module):
 
         return mapping
 
-    @cached_property
-    def _rules_context(self):
-        return self.shared('artifact_context')
-
     def _reduce_section(self, commands, is_component=True, default_commands=None, all_commands=None):
         # pylint: disable=too-many-statements
         """
@@ -272,7 +268,7 @@ class TestBatchPlanner(gluetool.Module):
                 if set_commands is None or len(set_commands) < 2:
                     raise NoFilteringRulesError(set_name, set_commands)
 
-                if not self.shared('evaluate_rules', set_commands[0], context=self._rules_context):
+                if not self.shared('evaluate_rules', set_commands[0], context=self.shared('eval_context')):
                     self.debug('    denied by rules')
                     continue
 
@@ -383,7 +379,7 @@ class TestBatchPlanner(gluetool.Module):
                 self.warn("Section does not contain 'rule' key, ignored", sentry=True)
                 continue
 
-            if not self.shared('evaluate_rules', section['rule'], context=self._rules_context):
+            if not self.shared('evaluate_rules', section['rule'], context=self.shared('eval_context')):
                 self.debug('denied by rules')
                 continue
 
@@ -431,7 +427,7 @@ class TestBatchPlanner(gluetool.Module):
         :rtype: list(list)
         """
 
-        self.require_shared('primary_task', 'evaluate_rules', 'artifact_context')
+        self.require_shared('primary_task', 'evaluate_rules', 'eval_context')
 
         for method in self._methods:
             self.debug("Plan test batch using '{}' method".format(method))
