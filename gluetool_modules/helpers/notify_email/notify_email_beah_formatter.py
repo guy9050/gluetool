@@ -138,6 +138,8 @@ class NotifyEmailBeahFormatter(gluetool.Module):
         return fails
 
     def _format_beah_body(self, notify_email, result, message, beaker_matrix_url=None):
+        # options checker does not see options outside of this module, and cannot check through `notify_email` var
+        # pylint: disable=gluetool-unknown-option
         adding_reservation = bool(notify_email.option('add-reservation'))
 
         # list failed tests if there are such

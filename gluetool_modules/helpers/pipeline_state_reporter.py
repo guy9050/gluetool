@@ -95,10 +95,6 @@ class PipelineStateReporter(gluetool.Module):
 
     shared_functions = ('report_pipeline_state',)
 
-    @gluetool.utils.cached_property
-    def categories(self):
-        return [s.strip() for s in self.option('categories').split(',')]
-
     def _artifact_info(self):
         self.require_shared('primary_task')
 
@@ -250,14 +246,6 @@ class PipelineStateReporter(gluetool.Module):
         message = gluetool.utils.Bunch(headers=headers, body=body)
 
         self.shared('publish_bus_messages', message, topic=topic)
-
-    def sanity(self):
-        if not self.option('categories') or not self.option('category'):
-            # both are required, and core will catch at least one of them is missing
-            return
-
-        if self.option('category') not in self.categories:
-            raise gluetool.GlueError("Unknown category '{}'".format(self.option('category')))
 
     def execute(self):
         if self.option('dont-report-running'):
