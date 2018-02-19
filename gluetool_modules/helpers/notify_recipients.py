@@ -6,10 +6,8 @@ import re
 
 import gluetool
 from gluetool import GlueError
-from gluetool.utils import cached_property, normalize_multistring_option
+from gluetool.utils import cached_property, normalize_multistring_option, render_template
 from gluetool.log import log_dict
-
-import jinja2
 
 
 def deduplicate(recipients):
@@ -187,7 +185,7 @@ class NotifyRecipients(gluetool.Module):
             target = [target]
 
         target = [
-            str(jinja2.Template(recipient).render(**context)) for recipient in target
+            render_template(recipient, logger=self.logger, **context) for recipient in target
         ]
 
         log_dict(self.debug, 'prepared target recipients', target)

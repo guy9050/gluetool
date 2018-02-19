@@ -5,14 +5,11 @@ https://docs.google.com/document/d/16L5odC-B4L6iwb9dp8Ry0Xk5Sc49h9KvTHrG86fdfQM/
 """
 
 import base64
-import os
 import zlib
-
-import jinja2
 
 import gluetool
 from gluetool.log import log_dict
-from gluetool.utils import treat_url
+from gluetool.utils import render_template, treat_url
 
 
 STATE_QUEUED = 'queued'
@@ -121,9 +118,9 @@ class PipelineStateReporter(gluetool.Module):
         }
 
     def _run_info(self):
-        build_url = os.getenv('BUILD_URL', None)
+        context = self.shared('eval_context')
 
-        if not build_url:
+        if not context.get('JENKINS_BUILD_URL', None):
             return {
                 'url': None,
                 'log': None,
@@ -131,11 +128,14 @@ class PipelineStateReporter(gluetool.Module):
                 'rebuild': None
             }
 
+        def _render_url(template):
+            return treat_url(render_template(template, logger=self.logger, **context))
+
         return {
-            'url': treat_url(build_url, logger=self.logger),
-            'log': treat_url('{}/console'.format(build_url)),
-            'debug': treat_url('{}/artifact/citool-debug.txt'.format(build_url)),
-            'rebuild': treat_url('{}/rebuild/parameterized'.format(build_url))
+            'url': _render_url('{{ JENKINS_BUILD_URL }}'),
+            'log': _render_url('{{ JENKINS_BUILD_URL }}/console'),
+            'debug': _render_url('{{ JENKINS_BUILD_URL }}/artifact/citool-debug.txt'),
+            'rebuild': _render_url('{{ JENKINS_BUILD_URL }}/rebuild/parameterized')
         }
 
     def _init_message(self, test_category, test_type, thread_id):
@@ -236,7 +236,7 @@ class PipelineStateReporter(gluetool.Module):
             'STATE': state
         })
 
-        topic = gluetool.utils.render_template(jinja2.Template(topic), logger=self.logger, **render_context)
+        topic = gluetool.utils.render_template(topic, logger=self.logger, **render_context)
 
         self.debug("topic: '{}'".format(topic))
         log_dict(self.debug, 'pipeline state headers', headers)

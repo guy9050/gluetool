@@ -1,11 +1,11 @@
 import shlex
 
 import bs4
-import jinja2
 import qe
 
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError
+from gluetool.utils import render_template
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 
@@ -152,7 +152,7 @@ class WorkflowTomorrow(gluetool.Module):
                     continue
 
                 if 'add-options' in options_set:
-                    add_options = jinja2.Template(options_set['add-options']).render(**rules_context)
+                    add_options = render_template(options_set['add-options'], logger=self.logger, **rules_context)
                     gluetool.log.log_blob(self.debug, 'adding options', add_options)
 
                     # simple split() is too dumb: '--foo "bar baz"' => ['--foo', 'bar baz']. shlex is the right tool
@@ -160,7 +160,7 @@ class WorkflowTomorrow(gluetool.Module):
                     command_options += shlex.split(add_options)
 
                 if 'command' in options_set:
-                    command = jinja2.Template(options_set['command']).render(**rules_context)
+                    command = render_template(options_set['command'], logger=self.logger, **rules_context)
                     self.info("using command '{0}' to generate a job xml".format(command))
 
                     # simple split() is too dumb: '--foo "bar baz"' => ['--foo', 'bar baz']. shlex is the right tool

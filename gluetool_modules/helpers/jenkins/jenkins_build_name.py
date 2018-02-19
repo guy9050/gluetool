@@ -1,6 +1,5 @@
 import os
 
-import jinja2
 import gluetool
 
 
@@ -40,7 +39,7 @@ class JenkinsBuildName(gluetool.Module):
         if thread_id is None:
             self.warn('Testing thread ID not found')
 
-        name = gluetool.utils.render_template(jinja2.Template(self.option('name')), logger=self.logger, **context)
+        name = gluetool.utils.render_template(self.option('name'), logger=self.logger, **context)
 
         self.shared('jenkins').set_build_name(name)
         self.info("build name set: '{}'".format(name))
