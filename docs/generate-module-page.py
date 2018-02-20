@@ -67,7 +67,7 @@ def gather_module_data():
     for name, properties in glue.modules.iteritems():
         # These modules are provided by gluetool, therefore they are not easily importable
         # by Sphinx. Skipping them to allow Sphinx to continue with our local modules.
-        if name in ('bash_completion', 'dep-list', 'yaml-pipeline'):
+        if name in ('bash-completion', 'dep-list', 'yaml-pipeline'):
             continue
 
         klass = properties['class'].__name__
