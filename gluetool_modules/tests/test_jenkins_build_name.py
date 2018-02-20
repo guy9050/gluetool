@@ -23,7 +23,7 @@ def test_no_jenkins(module, monkeypatch):
     _, module = module
 
     patch_shared(monkeypatch, module, {
-        'artifact_context': 'dummy_context'
+        'eval_context': 'dummy_context'
     })
 
     assert_shared('jenkins', module.execute)
@@ -48,7 +48,7 @@ def test_no_build_url(log, module, monkeypatch):
 
 def test_run(log, module, monkeypatch):
     thread_id = 'dummy_thread_qid'
-    artifact_context = {
+    eval_context = {
         'FIRST': 'dummy_item',
         'SECOND': 'another_dummy_item'
     }
@@ -59,7 +59,7 @@ def test_run(log, module, monkeypatch):
     mocked_set_build_name = MagicMock()
 
     patch_shared(monkeypatch, module, {
-        'artifact_context': artifact_context,
+        'eval_context': eval_context,
         'jenkins': MagicMock(set_build_name=mocked_set_build_name),
         'thread_id': thread_id
     })
@@ -67,6 +67,6 @@ def test_run(log, module, monkeypatch):
     monkeypatch.setenv('BUILD_URL', 'dummy_jenkins_url')
 
     module.execute()
-    name = '{}:{}-{}'.format(thread_id, artifact_context['SECOND'], artifact_context['FIRST'])
+    name = '{}:{}-{}'.format(thread_id, eval_context['SECOND'], eval_context['FIRST'])
     assert log.records[-1].message == "build name set: '{}'".format(name)
     mocked_set_build_name.assert_called_with(name)

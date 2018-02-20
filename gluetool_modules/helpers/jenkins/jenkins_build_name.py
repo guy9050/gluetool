@@ -30,12 +30,7 @@ class JenkinsBuildName(gluetool.Module):
             self.warn('$BUILD_URL env var not found, was this job started by Jenkins?', sentry=True)
             return
 
-        context = {}
-
-        if self.has_shared('artifact_context'):
-            context.update(self.shared('artifact_context'))
-        else:
-            self.warn('Artifact context not found')
+        context = self.shared('eval_context')
 
         thread_id = self.shared('thread_id')
         context.update({

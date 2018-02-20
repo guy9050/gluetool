@@ -51,8 +51,7 @@ All templates are given following variables:
 
     * ``OS`` - :py:mod:`os` module from Python's standard library
     * ``MODULE`` - instance of ``notify-email`` module which allows access to the whole pipeline
-    * ``PRIMARY_TASK`` - instance of :py:class:`gluetool_modules.infrastructure.koji_fedora.KojiTask`
-      that triggered the pipeline
+    * any other variables, exposed by other modules and available via ``eval_context`` shared function
 
 Some templates are given special extra variables:
 
@@ -264,13 +263,18 @@ class Notify((gluetool.Module)):
 
         self.debug("rendering template from '{}'".format(filename))
 
+        contexts = (
+            self.shared('eval_context'),
+            {
+                'OS': os,
+                'MODULE': self
+            },
+            variables
+        )
+
         return render_template(
             self._template_env.get_template(filename),
-            **gluetool.utils.dict_update(variables, {
-                'OS': os,
-                'MODULE': self,
-                'PRIMARY_TASK': self.task
-            })
+            **gluetool.utils.dict_update(*contexts)
         )
 
     def option_to_mails(self, name):

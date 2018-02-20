@@ -32,7 +32,7 @@ def fixture_module(monkeypatch):
     module = create_module(gluetool_modules.dispatchers.test_batch_planner.TestBatchPlanner)[1]
 
     patch_shared(monkeypatch, module, {
-        'artifact_context': {
+        'eval_context': {
             'BUILD_TARGET': 'dummy-target',
             'PRIMARY_TASK': 'dummy-primary-task',
             'TASKS': 'dummy-tasks',

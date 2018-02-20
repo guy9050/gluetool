@@ -230,11 +230,13 @@ class PipelineStateReporter(gluetool.Module):
             body['reason'] = error_message
             body['issue_url'] = error_url
 
-        topic = gluetool.utils.render_template(jinja2.Template(topic), logger=self.logger, **{
+        render_context = gluetool.utils.dict_update(self.shared('eval_context'), {
             'HEADERS': headers,
             'BODY': body,
             'STATE': state
         })
+
+        topic = gluetool.utils.render_template(jinja2.Template(topic), logger=self.logger, **render_context)
 
         self.debug("topic: '{}'".format(topic))
         log_dict(self.debug, 'pipeline state headers', headers)

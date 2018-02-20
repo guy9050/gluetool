@@ -19,7 +19,7 @@ class Copr(gluetool.Module):
     name = 'copr'
     description = 'Copr'
 
-    shared_functions = ['primary_task', 'tasks', 'artifact_context']
+    shared_functions = ['primary_task', 'tasks']
 
     def __init__(self, *args, **kwargs):
         super(Copr, self).__init__(*args, **kwargs)
@@ -31,9 +31,11 @@ class Copr(gluetool.Module):
     def tasks(self):
         return [self.task]
 
-    def artifact_context(self):
+    @property
+    def eval_context(self):
         """
-        Provides informations about copr artifact, that are used for rules evaluations.
+        Provides informations about copr artifact.
+
         Provides following variables: BUILD_TARGET, PRIMARY_TASK, TASKS, NVR
 
         :rtype: dict
@@ -42,10 +44,11 @@ class Copr(gluetool.Module):
         primary_task = self.primary_task()
 
         return {
+            # common for all artifact providers
             'BUILD_TARGET': primary_task.target,
+            'NVR': primary_task.nvr,
             'PRIMARY_TASK': primary_task,
-            'TASKS': self.tasks(),
-            'NVR': primary_task.nvr
+            'TASKS': self.tasks()
         }
 
     def execute(self):
