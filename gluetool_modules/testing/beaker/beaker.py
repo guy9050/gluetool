@@ -297,7 +297,7 @@ class Beaker(gluetool.Module):
         primary_task = self.shared('primary_task')
 
         options = [
-            '--first-testing-task', '/distribution/runtime_tests/verify-nvr-installed'
+            '--first-testing-task=/distribution/runtime_tests/verify-nvr-installed'
         ]
 
         if 'JOB_NAME' in os.environ and 'BUILD_ID' in os.environ:
@@ -306,9 +306,8 @@ class Beaker(gluetool.Module):
             jenkins_build_id = '<Unknown Jenkins build>'
 
         options += [
-            '--whiteboard',
-            'CI: {}: {}, brew task {}, build target {}'.format(jenkins_build_id, primary_task.nvr,
-                                                               primary_task.task_id, primary_task.target)
+            '--whiteboard="CI: {}: {}, brew task {}, build target {}"'.format(jenkins_build_id, primary_task.nvr,
+                                                                              primary_task.task_id, primary_task.target)
         ]
 
         # gather builds and tasks
@@ -356,15 +355,16 @@ class Beaker(gluetool.Module):
         # by the quotes: <param>="foo bar" <param>="baz" ...
         brew_build_params = ' '.join(['{}="{}"'.format(param, value) for param, value in brew_build_params.iteritems()])
 
+        # this should be '--init-task="{} /....', but it's not a problem for python-based programs (bkr)
+        # and sclrun can handle it too
         options += [
-            '--init-task',
-            '{} /distribution/install/brew-build'.format(brew_build_params)
+            '--init-task={} /distribution/install/brew-build'.format(brew_build_params)
         ]
 
         # we could use --reserve but we must be sure the reservesys is *the last* taskin the recipe
         # users may require their own "last" tasks and --last-task is mightier than mere --reserve.
         if self.option('reserve'):
-            options += ['--last-task', 'RESERVETIME={}h /distribution/reservesys'.format(self.option('reserve-time'))]
+            options += ['--last-task="RESERVETIME={}h /distribution/reservesys"'.format(self.option('reserve-time'))]
         else:
             options += ['--no-reserve']
 
