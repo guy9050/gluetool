@@ -60,7 +60,7 @@ class RulesASTVisitor(ast.NodeTransformer):
 
     _valid_classes = tuple([
         getattr(_ast, node_class) for node_class in (
-            'Expression', 'Expr', 'Compare', 'Name', 'Load', 'BoolOp',
+            'Expression', 'Expr', 'Compare', 'Name', 'Load', 'BoolOp', 'UnaryOp',
             'Str', 'Num', 'List', 'Tuple',
             'Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE', 'Is', 'IsNot', 'In', 'NotIn',
             'And', 'Or', 'Not',

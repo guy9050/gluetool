@@ -88,10 +88,16 @@ def test_compile_error(rule, error_klass, error_message, error_detail):
         '1 == 2', {}, False
     ),
     (
+        "FOO.match('bar')", {'FOO': MatchableString('foo')}, None
+    ),
+    (
         "FOO.match('bar') is None", {'FOO': MatchableString('bar')}, False
     ),
     (
         "FOO.match('bar') is None", {'FOO': MatchableString('foo')}, True
+    ),
+    (
+        "not FOO.match('bar')", {'FOO': MatchableString('bar')}, False
     )
 ])
 def test_eval(rule, context, outcome):
