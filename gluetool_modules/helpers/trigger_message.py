@@ -1,4 +1,3 @@
-import json
 import os
 
 import gluetool
@@ -69,7 +68,7 @@ class TriggerMessage(gluetool.Module):
             if value is None:
                 raise gluetool.GlueError("Environment variable '{}' not set.".format(self.option('env-var')))
 
-            self._message = json.loads(value)
+            self._message = gluetool.utils.from_json(value)
 
         gluetool.log.log_dict(self.debug, 'triggering message', self._message)
 
