@@ -16,19 +16,19 @@ LOGGER = gluetool.log.Logging.create_logger()
 OUTPUT_DIR = 'docs/source'
 
 MOD_TEMPLATE = """
-``{name}``
-{title_underline}
+``{{ name }}``
+{{ title_underline }}
 
-{description}
+{{ description }}
 
-.. automoddesc:: {modpath}.{klass}
+.. automoddesc:: {{ modpath }}.{{ klass }}
    :noindex:
 
 
 Shared functions
 ----------------
 
-{shared_functions}
+{{ shared_functions }}
 
 
 Options
@@ -36,21 +36,21 @@ Options
 
 .. argparse::
    :filename: source/module_parsers.py
-   :func: get_parser_{klass}
-   :prog: {name}
+   :func: get_parser_{{ klass }}
+   :prog: {{ name }}
 """
 
 SHARED_TEMPLATE = """
-.. automethod:: {modpath}.{klass}.{shared_name}
+.. automethod:: {{ modpath }}.{{ klass }}.{{ shared_name }}
    :noindex:
 
 """
 
 ARGS_TEMPLATE = """
 
-def get_parser_{klass}():
-    from {modpath} import {klass}
-    return {klass}._create_args_parser()
+def get_parser_{{ klass }}():
+    from {{ modpath }} import {{ klass }}
+    return {{ klass }}._create_args_parser()
 """
 
 
@@ -129,7 +129,8 @@ def write_module_doc(module_data, output_dir):
     shared_functions = module_data['modclass'].shared_functions
     if shared_functions:
         module_data['shared_functions'] = '\n'.join([
-            SHARED_TEMPLATE.format(shared_name=name, **module_data) for name in shared_functions
+            # pylint: disable=line-too-long
+            gluetool.utils.render_template(SHARED_TEMPLATE, shared_name=name, **module_data) for name in shared_functions
         ])
 
     else:
@@ -147,7 +148,7 @@ def write_args_parser_getters(modules, output_dir):
         f.write('# pylint: disable=invalid-name,protected-access\n')
 
         for module_data in modules:
-            f.write(ARGS_TEMPLATE.format(**module_data))
+            f.write(gluetool.utils.render_template(ARGS_TEMPLATE, **module_data) + '\n')
 
         f.flush()
 
@@ -157,7 +158,7 @@ def write_index_doc(modules, output_dir):
         with open('{}/modules.rst'.format(output_dir), 'w') as g:
             g.write(f.read().format(modules='\n'.join(sorted([
                 # pylint: disable=line-too-long
-                '   ' + gluetool.utils.render_template('{name}: {description} <modules/{name}>', **module_data) for module_data in modules
+                '   {}\n'.format(gluetool.utils.render_template('{{ name }}: {{ description }} <modules/{{ name }}>', **module_data)) for module_data in modules
             ]))))
             g.flush()
 
