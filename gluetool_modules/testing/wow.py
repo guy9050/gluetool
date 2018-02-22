@@ -111,6 +111,8 @@ class WorkflowTomorrow(gluetool.Module):
             for each distro.
         """
 
+        # pylint: disable=too-many-statements
+
         self.info('running workflow-tomorrow to get job description')
 
         self.require_shared('distro', 'evaluate_rules', 'tasks', 'primary_task')
@@ -123,6 +125,12 @@ class WorkflowTomorrow(gluetool.Module):
         task_params = task_params or {}
 
         def _plan_job(distro):
+            # pylint: disable=too-many-statements
+
+            # this is default
+            use_shell = False
+            quote_args = False
+
             command = ['bkr', 'workflow-tomorrow']
             command_options = [
                 '--dry',  # this will make wow to print job description in XML
@@ -159,6 +167,16 @@ class WorkflowTomorrow(gluetool.Module):
                     # to split command-line options, it obeys quoting.
                     command = shlex.split(command)
 
+                if 'use-shell' in options_set:
+                    use_shell = bool(options_set['use-shell'])
+
+                    self.debug('use-shell knob set to {}'.format(use_shell))
+
+                if 'quote-args' in options_set:
+                    quote_args = bool(options_set['quote-args'])
+
+                    self.debug('quote-args knob set to {}'.format(quote_args))
+
             command += command_options
 
             #
@@ -183,29 +201,33 @@ class WorkflowTomorrow(gluetool.Module):
 
             # incorporate changes demanded by user
             for name, value in task_params.iteritems():
-                command += ['--taskparam', '{}={}'.format(name, value)]
+                command += ['--taskparam="{}={}"'.format(name, value)]
 
             # incorporate general test plan if requested
             if self.option('use-general-test-plan'):
                 component = self.shared('primary_task').component
                 try:
-                    command += ['--plan', str(qe.GeneralPlan(component).id)]
+                    command += ['--plan={}'.format(str(qe.GeneralPlan(component).id))]
 
                 except qe.GeneralPlanError:
                     raise GlueError("no general test plan found for '{}'".format(component))
 
-            # add '"' to strings containing spaces to prevent bad expansion
-            # if command for generating job.xml is shell script
-            # command = [('"{}"'.format(option) if ' ' in option and not
-            #            (
-            #                (option.startswith('"') and option.endswith('"')) or
-            #                (option.startswith("'") and option.endswith("'")))
-            #            else option) for option in command]
+            if quote_args is True:
+                # escape apostrophes in strings and adds them around strings with space
+                command = [('"{}"'.format(option.replace('"', r'\"')) if ' ' in option and not
+                            (
+                                (option.startswith('"') and option.endswith('"')) or
+                                (option.startswith("'") and option.endswith("'")))
+                            else option) for option in command]
+
+            if use_shell is True:
+                command = [' '.join(command)]
+                self.debug("joined_command: {}".format(command[0]))
 
             #
             # execute
             try:
-                output = gluetool.utils.run_command(command)
+                output = gluetool.utils.run_command(command, shell=use_shell)
 
                 return bs4.BeautifulSoup(output.stdout, 'xml')
 
