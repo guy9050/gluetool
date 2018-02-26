@@ -70,6 +70,9 @@ class PipelineStateReporter(gluetool.Module):
             },
             'test-type': {
                 'help': "Type of tests provided in this pipeline, e.g. 'tier1', 'rpmdiff-analysis' or 'covscan'."
+            },
+            'artifact-map': {
+                'help': "File with description of items provided as artifact info."
             }
         }),
         ('Tweaks', {
@@ -114,21 +117,36 @@ class PipelineStateReporter(gluetool.Module):
             'PIPELINE_TEST_CATEGORY': self.option('test-category'),
         }
 
+    @gluetool.utils.cached_property
+    def artifact_map(self):
+        if not self.option('artifact-map'):
+            return []
+
+        return gluetool.utils.load_yaml(self.option('artifact-map'), logger=self.logger)
+
     def _artifact_info(self):
-        self.require_shared('primary_task')
+        self.require_shared('evaluate_rules')
 
-        task = self.shared('primary_task')
+        artifact_info = {}
+        context = self.shared('eval_context')
 
-        return {
-            'type': task.ARTIFACT_NAMESPACE,
-            'id': str(task.task_id),
-            'component': task.component,
-            'issuer': task.issuer,
-            'branch': task.branch,
-            'nvr': task.nvr,
-            'scratch': task.scratch,
-            'source': task.source,
-        }
+        for item_set in self.artifact_map:
+
+            if not self.shared('evaluate_rules', item_set.get('rule', None), context=context):
+                continue
+
+            self.debug(item_set.get('rule', None))
+
+            if 'artifact-details' in item_set:
+                artifact_details = item_set.get('artifact-details')
+
+                artifact_info.update({
+                    detail: render_template(value, **context) for detail, value in artifact_details.iteritems()
+                })
+
+                log_dict(self.debug, 'artifact info', artifact_info)
+
+        return artifact_info
 
     def _ci_info(self):
         return {

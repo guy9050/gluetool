@@ -671,6 +671,7 @@ class Koji(gluetool.Module):
 
         return {
             # common for all artifact providers
+            'ARTIFACT_TYPE': primary_task.ARTIFACT_NAMESPACE,
             'BUILD_TARGET': primary_task.target,
             'NVR': primary_task.nvr,
             'PRIMARY_TASK': primary_task,
