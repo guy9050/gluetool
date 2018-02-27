@@ -93,7 +93,7 @@ def test_force_recipients(module):
     # empty list is just an empty list
     ([], []),
     # teplates should be handled
-    (['some {{ FOO }} ', 'or is it {{ FOO }}?'], ['some bar ', 'or is it bar?'])
+    (['some {{ FOO }} ', 'or is it {{ FOO }}?'], ['some bar', 'or is it bar?'])
 ])
 def test_prepare_target_recipients(module, target, expected):
     context = {
