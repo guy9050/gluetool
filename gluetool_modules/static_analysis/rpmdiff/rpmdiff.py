@@ -245,6 +245,7 @@ class CIRpmdiff(gluetool.Module):
                 'scratch': self.task.scratch,
                 'taskid': self.task.task_id
             },
+            'ref_url': '',
             'testcase': {
                 'name': 'dist.rpmdiff.comparison',
                 'ref_url': 'https://url.corp.redhat.com/rpmdiff-in-ci',
