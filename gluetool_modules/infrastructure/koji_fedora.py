@@ -1,3 +1,4 @@
+import collections
 import re
 import koji
 from bs4 import BeautifulSoup
@@ -20,6 +21,14 @@ class NoArtifactsError(SoftGlueError):
         super(NoArtifactsError, self).__init__('No artifacts found for task')
 
         self.task_id = task_id
+
+
+#: Information about task architectures.
+#:
+#: :ivar bool complete: If ``True``, the task was not limited by its issuer to any particular set of architectures.
+#:     ``False`` signals the issuer requested task to build its artifact for specific list of architectures.
+#: :ivar list(str) arches: List of architectures.
+TaskArches = collections.namedtuple('TaskArches', ['complete', 'arches'])
 
 
 class KojiTask(object):
@@ -100,6 +109,19 @@ class KojiTask(object):
             return True
 
         return False
+
+    @cached_property
+    def _children(self):
+        """
+        Return list of children task in raw form, as JSON data returned by Koji API.
+
+        :rtype: list(dict)
+        """
+
+        children = self.session.getTaskChildren(self.task_id, request=False)
+        log_dict(self.debug, 'child tasks', children)
+
+        return children
 
     @cached_property
     def build(self):
@@ -188,6 +210,21 @@ class KojiTask(object):
         if "scratch" in self._task_info_request[2]:
             return self._task_info_request[2]["scratch"]
         return False
+
+    @cached_property
+    def task_arches(self):
+        """
+        Return information about arches the task was building for.
+
+        :rtype: TaskArches
+        """
+
+        arches = self._task_info_request[2].get('arch_override', None)
+
+        if arches is not None:
+            return TaskArches(False, [arch.strip() for arch in arches.split(' ')])
+
+        return TaskArches(True, [child['arch'] for child in self._children if child['method'] == 'buildArch'])
 
     @cached_property
     def url(self):

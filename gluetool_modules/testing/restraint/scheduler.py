@@ -259,7 +259,7 @@ class RestraintScheduler(gluetool.Module):
             gluetool.log.log_blob(self.debug, str(guest), recipe_set.prettify(encoding='utf-8'))
 
     def execute(self):
-        self.require_shared('restraint', 'tasks', 'image')
+        self.require_shared('primary_task', 'restraint', 'tasks', 'image')
 
         tasks = self.shared('tasks')
 
@@ -273,6 +273,11 @@ class RestraintScheduler(gluetool.Module):
                 return []
 
             return shlex.split(opts)
+
+        task_arches = self.shared('primary_task').task_arches
+        if 'x86_64' not in task_arches.arches:
+            # pylint: disable=line-too-long
+            raise GlueError('Task does not have any testable artifact: only x86_64 is supported, task contains {}'.format(', '.join(task_arches.arches)))  # Ignore PEP8Bear
 
         # workflow-tomorrow
         jobs = self._run_wow()
