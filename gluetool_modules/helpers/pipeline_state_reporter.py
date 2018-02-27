@@ -25,7 +25,7 @@ class PipelineStateReporter(gluetool.Module):
     """
     Sends messages reporting the pipeline state.
 
-    (gluetool.Module) sends two messages:
+    The module sends two messages:
 
         * the first when the module is executed, reporting the pipeline just started. Depending
           on the module position in the pipeline, there were definitely actions taken before sending
@@ -34,6 +34,14 @@ class PipelineStateReporter(gluetool.Module):
 
         * the second message is sent when the pipeline is being destroyed. it can contain information
           about the error causing pipeline to crash, or export testing results.
+
+    **Eval context**
+
+    * ``PIPELINE_TEST_TYPE``: Type of tests provided in this pipeline, e.g. 'tier1', 'rpmdiff-analysis', 'covscan',
+      or any other string. The value of this variable is taken from the ``test-type`` option.
+
+    * ``PIPELINE_TEST_CATEGORY``: Category of tests performed in this pipeline. See ``test-category`` option
+      for possible choices.
     """
 
     name = 'pipeline-state-reporter'
@@ -60,11 +68,11 @@ class PipelineStateReporter(gluetool.Module):
         ('Test options', {
             'test-category': {
                 # pylint: disable=line-too-long
-                'help': "Category of tests performed in this thread. One of 'static-analysis', 'functional', 'integration' or 'validation'.",  # Ignore PEP8Bear
+                'help': "Category of tests performed in this pipeline. One of 'static-analysis', 'functional', 'integration' or 'validation'.",  # Ignore PEP8Bear
                 'choices': ['static-analysis', 'functional', 'integration', 'validation']
             },
             'test-type': {
-                'help': "Type of tests provided in this thread, e.g. 'tier1', 'rpmdiff-analysis' or 'covscan'."
+                'help': "Type of tests provided in this pipeline, e.g. 'tier1', 'rpmdiff-analysis' or 'covscan'."
             }
         }),
         ('Tweaks', {
@@ -94,6 +102,20 @@ class PipelineStateReporter(gluetool.Module):
         'bus-topic')
 
     shared_functions = ('report_pipeline_state',)
+
+    @property
+    def eval_context(self):
+        """
+        Provides informations about test type and category to evaluation context.
+
+        :rtype: dict
+        """
+
+        return {
+            # common for all artifact providers
+            'PIPELINE_TEST_TYPE': self.option('test-type'),
+            'PIPELINE_TEST_CATEGORY': self.option('test-category'),
+        }
 
     def _artifact_info(self):
         self.require_shared('primary_task')
