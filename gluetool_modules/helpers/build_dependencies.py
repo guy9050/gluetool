@@ -99,14 +99,7 @@ class BuildDependencies(gluetool.Module):
             self.warn("No builds found for component '{}' and target '{}'".format(component, target))
             return None
 
-        matching_builds = [build for build in builds if build['tag_name'] == target]
-        log_dict(self.debug, 'matching builds', matching_builds)
-
-        if not matching_builds:
-            self.warn("No matching builds found for component '{}' and target '{}'".format(component, target))
-            return None
-
-        return int(matching_builds[0]['task_id'])
+        return int(builds[0]['task_id'])
 
     def _companions_from_koji(self):
         """
