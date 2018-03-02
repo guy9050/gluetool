@@ -3,6 +3,9 @@ import gluetool
 
 class CoprTask(object):
     # pylint: disable=too-few-public-methods
+
+    ARTIFACT_NAMESPACE = 'copr-build'
+
     def __init__(self, message):
         self.status = message['status']
         self.status_int = message['status_int']
@@ -45,6 +48,7 @@ class Copr(gluetool.Module):
 
         return {
             # common for all artifact providers
+            'ARTIFACT_TYPE': primary_task.ARTIFACT_NAMESPACE,
             'BUILD_TARGET': primary_task.target,
             'NVR': primary_task.nvr,
             'PRIMARY_TASK': primary_task,
