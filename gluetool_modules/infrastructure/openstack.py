@@ -15,7 +15,7 @@ from novaclient.exceptions import BadRequest, NotFound, Unauthorized
 import gluetool
 from gluetool import GlueError, GlueCommandError
 from gluetool.log import format_dict
-from gluetool.utils import cached_property, normalize_path
+from gluetool.utils import cached_property, normalize_path, normalize_multistring_option
 from libci.guest import NetworkedGuest
 
 DEFAULT_FLAVOR = 'm1.small'
@@ -425,7 +425,7 @@ class OpenstackGuest(NetworkedGuest):
         OpenstackGuest._acquire_os_resource('IP assignment', self._module.logger, 1,
                                             _assign)
 
-    def __init__(self, module, details=None, instance_id=None):
+    def __init__(self, module, details=None, instance_id=None, allow_degraded=None):
         self._snapshots = []
 
         self._nova = module.nova
@@ -439,6 +439,9 @@ class OpenstackGuest(NetworkedGuest):
         self._os_floating_ip = None
         self._os_nics = []
         self._os_details = details or {}
+
+        # extend list of allowed degraded services with the optional ones
+        OpenstackGuest.ALLOW_DEGRADED += tuple(allow_degraded or [])
 
         if instance_id is None:
             self._acquire_floating_ip()
@@ -862,6 +865,13 @@ class CIOpenstack(gluetool.Module):
             }
         }),
         ('Workarounds', {
+            'allow-degraded': {
+                'help': """
+                        List of additional, comma delimited systemd service names which are allowed to be degraded.
+                        By default only 'cloud-init.service' is allowed. Note that the name of the service needs end
+                        with the '.service' suffix.
+                        """
+            },
             'start-after-snapshot-attempts': {
                 # pylint: disable=line-too-long
                 'help': 'When starting guest after taking its snapshot, try this many times before giving up (default: {})'.format(DEFAULT_START_AFTER_SNAPSHOT_ATTEMPTS),
@@ -997,7 +1007,8 @@ class CIOpenstack(gluetool.Module):
 
         try:
             # init existing Openstack server from instance_id
-            guest = OpenstackGuest(self, instance_id=instance_id)
+            allow_degraded = normalize_multistring_option(self.option('allow-degraded'))
+            guest = OpenstackGuest(self, instance_id=instance_id, allow_degraded=allow_degraded)
         except NotFound:
             self.info("guest '{}' not found (file will be removed)".format(instance_id))
             return True
@@ -1128,7 +1139,8 @@ class CIOpenstack(gluetool.Module):
             }
 
             self.verbose('creating guest with following details\n{}'.format(format_dict(details)))
-            guest = OpenstackGuest(self, details=details)
+            allow_degraded = normalize_multistring_option(self.option('allow-degraded'))
+            guest = OpenstackGuest(self, details=details, allow_degraded=allow_degraded)
 
             self._all.append(guest)
             guests.append(guest)
