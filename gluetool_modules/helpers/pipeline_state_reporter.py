@@ -131,8 +131,7 @@ class PipelineStateReporter(gluetool.Module):
         context = self.shared('eval_context')
 
         for item_set in self.artifact_map:
-
-            if not self.shared('evaluate_rules', item_set.get('rule', None), context=context):
+            if not self.shared('evaluate_rules', item_set.get('rule', 'None'), context=context):
                 continue
 
             self.debug(item_set.get('rule', None))
