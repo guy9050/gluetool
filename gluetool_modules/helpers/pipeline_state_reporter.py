@@ -32,6 +32,34 @@ class PipelineStateReporter(gluetool.Module):
         * the second message is sent when the pipeline is being destroyed. it can contain information
           about the error causing pipeline to crash, or export testing results.
 
+
+    **Artifact details**
+
+    Provided via ``--artifact-map`` option. Supports rules and their evaluation.
+
+    .. code-block:: yaml
+
+       ---
+
+       # no "rule" key defaults to ``True``, meaning "always apply"
+       - artifact-details:
+           type: "{{ ARTIFACT_TYPE }}"
+
+       - rule: ARTIFACT_TYPE == 'foo'
+         artifact-details:
+           id: "{{ PRIMARY_TASK.task_id }}"
+           component: "{{ PRIMARY_TASK.component }}"
+           issuer: "{{ PRIMARY_TASK.issuer }}"
+
+       # Some details may be required to have different type, then use ``eval-as-rule: true`` flag
+       # whose default is ``false``. Artifact details are then evaluated the same way rules are,
+       # yielding possibly other data types than just string.
+       - eval-as-rule: true
+         artifact-details:
+           branch: PRIMARY_TASK.branch or None  # string or None
+           scratch: PRIMARY_TASK.scratch  # boolean
+
+
     **Eval context**
 
     * ``PIPELINE_TEST_TYPE``: Type of tests provided in this pipeline, e.g. 'tier1', 'rpmdiff-analysis', 'covscan',
@@ -131,17 +159,23 @@ class PipelineStateReporter(gluetool.Module):
         context = self.shared('eval_context')
 
         for item_set in self.artifact_map:
-            if not self.shared('evaluate_rules', item_set.get('rule', 'None'), context=context):
+            if not self.shared('evaluate_rules', item_set.get('rule', 'True'), context=context):
+                self.debug('denied by rules')
                 continue
-
-            self.debug(item_set.get('rule', None))
 
             if 'artifact-details' in item_set:
                 artifact_details = item_set.get('artifact-details')
 
-                artifact_info.update({
-                    detail: render_template(value, **context) for detail, value in artifact_details.iteritems()
-                })
+                if item_set.get('eval-as-rule', False):
+                    artifact_info.update({
+                        detail: self.shared('evaluate_rules', value, context=context)
+                        for detail, value in artifact_details.iteritems()
+                    })
+
+                else:
+                    artifact_info.update({
+                        detail: render_template(value, **context) for detail, value in artifact_details.iteritems()
+                    })
 
                 log_dict(self.debug, 'artifact info', artifact_info)
 
