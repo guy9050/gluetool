@@ -61,18 +61,3 @@ dependencies:
         dest: /usr/bin/sclrun
         state: link
       when: BUILDING_DOCKER is defined
-
-    # sclrun in older version
-    - name: Clone RHSCL Apps tools repository in version rhscl-3.0
-      git:
-        repo: git://git.host.prod.eng.bos.redhat.com/RH_Software_Collections
-        dest: /usr/local/sclrun-3.0
-        version: rhscl-3.0
-      when: BUILDING_DOCKER is defined
-
-    - name: Add schedulator 3.0 location to $PATH
-      file:
-        src: /usr/local/sclrun-3.0/Scripts/schedulator/sclrun
-        dest: /usr/bin/sclrun-3.0
-        state: link
-      when: BUILDING_DOCKER is defined
