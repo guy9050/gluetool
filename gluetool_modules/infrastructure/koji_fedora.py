@@ -77,11 +77,11 @@ class KojiTask(object):
         self.session = details['session']
         self.module_name = module_name
 
-        if not self._valid_task():
-            raise NotBuildTaskError(self.task_id)
-
         if wait_timeout:
             wait('waiting for task to be non waiting', self._check_nonwaiting_task, timeout=wait_timeout)
+
+        if not self._valid_task():
+            raise NotBuildTaskError(self.task_id)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.task_id)
