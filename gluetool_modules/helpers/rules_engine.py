@@ -143,8 +143,12 @@ class Rules(object):
             self._code = self._compile()
 
         # eval is dangerous. This time I hope it's safe-guarded by AST filtering...
-        # pylint: disable=eval-used
-        return eval(self._code, our_globals, our_locals)
+        try:
+            # pylint: disable=eval-used
+            return eval(self._code, our_globals, our_locals)
+
+        except NameError as exc:
+            raise gluetool.GlueError('Unknown variable used in rule: {}'.format(exc.message))
 
 
 class RulesEngine(gluetool.Module):
