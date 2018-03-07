@@ -11,7 +11,7 @@ from gluetool.utils import cached_property, dict_update, fetch_url, format_dict,
 
 class NotBuildTaskError(SoftGlueError):
     def __init__(self, task_id):
-        super(NotBuildTaskError, self).__init__('Task is not a valid, finished build task')
+        super(NotBuildTaskError, self).__init__('Task is not a build task')
 
         self.task_id = task_id
 
@@ -77,25 +77,42 @@ class KojiTask(object):
         self.session = details['session']
         self.module_name = module_name
 
+        # first check if the task is valid for our case
+        if not self._valid_task():
+            raise NotBuildTaskError(self.task_id)
+
+        # wait for the task to be non-waiting
         if wait_timeout:
             wait('waiting for task to be non waiting', self._check_nonwaiting_task, timeout=wait_timeout)
 
-        if not self._valid_task():
-            raise NotBuildTaskError(self.task_id)
+        # finally check if task is in CLOSED state
+        if not self._closed_task():
+            raise GlueError("the task with id '{}' is not in CLOSED state".format(self.task_id))
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.task_id)
 
     def _valid_task(self):
         """
-        Verify that the task is a sucessfully finished build task
+        Verify that the task is valid for our case, i.e. method is build.
 
         :returns: True if task is a sucessfully finished build task, False otherwise
         """
-        if self.task_info['state'] != koji.TASK_STATES['CLOSED'] or self.task_info['method'] != 'build':
-            return False
+        if self.task_info['method'] == 'build':
+            return True
 
-        return True
+        return False
+
+    def _closed_task(self):
+        """
+        Verify that the task is closed.
+
+        :returns: True if task is closed, False otherwise
+        """
+        if self.task_info['state'] == koji.TASK_STATES['CLOSED']:
+            return True
+
+        return False
 
     def _check_nonwaiting_task(self):
         """

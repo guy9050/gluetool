@@ -395,7 +395,7 @@ def test_not_valid_build_tasks(module):
     for task in NON_BUILD_TASKS:
         FakeClientSession.fake_key = task
 
-        with pytest.raises(gluetool.GlueError, match=r'Task is not a valid, finished build task'):
+        with pytest.raises(gluetool.GlueError, match=r'Task is not a build task'):
             module.tasks([task])
 
 
