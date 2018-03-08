@@ -116,7 +116,7 @@ build-python-package:
                                                        --extra-vars "GIT_REPO=https://gitlab.cee.redhat.com/baseos-qe/gluetool-modules.git"
                                                        --extra-vars "GIT_VERSION=master" | tee tower_output.log
     # workaround for tower-cli / AWX bug for not returning correct return code from workflow jobs
-    - grep 'failed' tower_output.log && { echo 'tower-cli seems to have failed!'; exit 1; }
+    - grep 'failed' tower_output.log && { echo 'tower-cli seems to have failed!'; exit 1; } || exit 0
 
 # Trigger RPM build
 build-rpm-packages:
@@ -128,7 +128,7 @@ build-rpm-packages:
                                                             --extra-vars "COPR_USERNAME=$COPR_USERNAME"
                                                             --extra-vars "COPR_TOKEN=$COPR_TOKEN"
                                                             --extra-vars "COPR_URL=$COPR_URL" | tee tower_output.log
-    - grep 'failed' tower_output.log && { echo 'tower-cli seems to have failed!'; exit 1; }
+    - grep 'failed' tower_output.log && { echo 'tower-cli seems to have failed!'; exit 1; } || exit 0
 
 # Trigger Docker build
 build-docker-images:
@@ -139,7 +139,7 @@ build-docker-images:
     - tower-cli workflow_job launch -W "$DOCKER_JOB" --monitor --extra-vars "DOCKER_REGISTRY_HOST=$DOCKER_REGISTRY_HOST"
                                                                --extra-vars "DOCKER_REGISTRY_PROJECT=$DOCKER_REGISTRY_PROJECT"
                                                                --extra-vars "DOCKER_REGISTRY_TOKEN=$DOCKER_REGISTRY_TOKEN" | tee tower_output.log
-    - grep 'failed' tower_output.log && { echo 'tower-cli seems to have failed!'; exit 1; }
+    - grep 'failed' tower_output.log && { echo 'tower-cli seems to have failed!'; exit 1; } || exit 0
 
 # Trigger staging deployment
 deploy-to-staging:
@@ -148,7 +148,7 @@ deploy-to-staging:
     - master@baseos-qe/gluetool-modules
   script:
     - tower-cli job launch -J "$DEPLOY_JOB" --monitor | tee tower_output.log
-    - grep 'failed' tower_output.log && { echo 'tower-cli seems to have failed!'; exit 1; }
+    - grep 'failed' tower_output.log && { echo 'tower-cli seems to have failed!'; exit 1; } || exit 0
 
 
 #
