@@ -10,7 +10,7 @@ import bs4
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError, utils
 from gluetool.log import BlobLogger
-from gluetool.utils import run_command, fetch_url
+from gluetool.utils import load_yaml, run_command, fetch_url
 from libci.results import TestResult, publish_result
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
@@ -20,6 +20,13 @@ REQUIRED_COMMANDS = ['bkr', 'beaker-jobwatch', 'tcms-results']
 TCMS_RESULTS_LOCATIONS = ('/bin', '/usr/bin')
 
 DEFAULT_RESERVE_TIME = 24
+
+
+class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
+    def __init__(self, task, installation_logs):
+        super(SUTInstallationFailedError, self).__init__(task, 'SUT installation failed')
+
+        self.installation_logs = installation_logs
 
 
 class BeakerError(PrimaryTaskFingerprintsMixin, GlueError):
@@ -84,6 +91,16 @@ class Beaker(gluetool.Module):
     Needs some else to actualy provide the job XML (e.g. :py:mod:`gluetool_modules.testing.wow.WorkflowTomorrow`),
     then submits this XML to the Beaker, babysits it with ``beaker-jobwatch``, and finally gets a summary
     using ``tcms-results``.
+
+    The option ``--critical-tasks-list`` expects a yaml file with list of tasks which throw a SUT installation soft
+    error. An example is shown below:
+
+    .. code-block:: shell
+
+      $ cat critical_tasks.yaml
+      ---
+      - /distribution/setup
+      - /distribution/install/brew-build
     """
 
     name = 'beaker'
@@ -123,10 +140,26 @@ class Beaker(gluetool.Module):
             'default': DEFAULT_RESERVE_TIME,
             'metavar': 'HOURS',
             'type': int
+        },
+        'critical-tasks-list': {
+            'help': """
+                    Yaml file with tasks which are critical for testing. These usually prepare the SUT
+                    for testing, do not performd actual testing and their failure is considered
+                    as and SUT installation error. Failures in these tasks will cause an soft error.
+
+                    See the module help for an example yaml file for this option.
+                    """
         }
     }
 
     _processed_results = None
+
+    @gluetool.utils.cached_property
+    def critical_tasks(self):
+        if not self.option('critical-tasks-list'):
+            return []
+
+        return load_yaml(self.option('critical-tasks-list'))
 
     def sanity(self):
         # pylint: disable=too-many-statements
@@ -229,7 +262,7 @@ class Beaker(gluetool.Module):
         except GlueCommandError as exc:
             raise GlueError('Failed to re-create the job: {}'.format(exc.output.stderr))
 
-        return [job_id], bs4.BeautifulSoup(output.stdout, 'xml')
+        return [(bs4.BeautifulSoup(output.stdout, 'xml'), [job_id])]
 
     def _submit_job(self, index, job):
         # pylint: disable=no-self-use
@@ -511,6 +544,11 @@ class Beaker(gluetool.Module):
                 if run['bkr_status'] == 'Completed' and run['bkr_result'] == 'Pass':
                     continue
 
+                # in case a SUT task failed, report it as ERROR
+                if task in self.critical_tasks:
+                    self.debug('            We have found a failed critical task!')
+                    return 'ERROR', self._processed_results, matrix_url
+
                 self.debug('            We have our traitor!')
                 return 'FAIL', self._processed_results, matrix_url
 
@@ -540,3 +578,7 @@ class Beaker(gluetool.Module):
         self.info('Result of testing: {}'.format(overall_result))
 
         publish_result(self, BeakerTestResult, overall_result, matrix_url, payload=processed_results)
+
+        # for an SUT error we need to report a soft error
+        if overall_result == 'ERROR':
+            raise SUTInstallationFailedError(self.shared('primary_task'), matrix_url)
