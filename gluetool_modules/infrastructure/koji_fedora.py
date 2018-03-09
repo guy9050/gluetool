@@ -108,6 +108,9 @@ class KojiTask(object):
 
         :returns: True if task is closed, False otherwise
         """
+        # remove the cached task_info
+        del self.task_info
+
         if self.task_info['state'] == koji.TASK_STATES['CLOSED']:
             return True
 
@@ -118,10 +121,10 @@ class KojiTask(object):
         Check if task is non-waiting, i.e. 'waiting: false' in task info.
         :returns: True if task is non-waiting, False otherwise
         """
+        # remove the cached task_info
+        del self.task_info
 
-        # do not use cached task_info here
-        task_info = self.session.getTaskInfo(self.task_id, request=True)
-        if task_info['waiting'] is False:
+        if self.task_info['waiting'] is False:
             return True
 
         return False
