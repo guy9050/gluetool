@@ -26,6 +26,7 @@ FAKE_CLIENT_SESSION = {
                 {}
             ],
             'state': 2,
+            'waiting': False
         },
         'listBuilds': [{
             'build_id': 805705,
@@ -48,7 +49,8 @@ FAKE_CLIENT_SESSION = {
                 'rawhide',
                 {'scratch': True}
             ],
-            'state': 2
+            'state': 2,
+            'waiting': False
         },
         'listTasks': [
             {'id': 18214958},
@@ -70,7 +72,8 @@ FAKE_CLIENT_SESSION = {
                 None,
                 {'scratch': True}
             ],
-            'state': 2
+            'state': 2,
+            'waiting': False
         },
         'listTagged': [
             {'nvr': 'bash-4.4.12-5.fc27'},
@@ -107,6 +110,7 @@ FAKE_CLIENT_SESSION = {
                 {}
             ],
             'state': 2,
+            'waiting': False,
         },
         'listBuilds': [{
             'build_id': 805705,
@@ -132,6 +136,7 @@ FAKE_CLIENT_SESSION = {
                 {}
             ],
             'state': 2,
+            'waiting': False,
         },
         'listBuilds': [{
             'build_id': 805705,
@@ -155,6 +160,7 @@ FAKE_CLIENT_SESSION = {
                 {}
             ],
             'state': 2,
+            'waiting': False,
         },
         'listBuilds': [{
             'build_id': 805705,
@@ -182,6 +188,7 @@ FAKE_CLIENT_SESSION = {
         'getTaskInfo': {
             'method': 'build',
             'state': 2,
+            'waiting': False,
         },
     },
     # request field has not enough items in list
@@ -195,6 +202,7 @@ FAKE_CLIENT_SESSION = {
         'getTaskInfo': {
             'state': 2,
             'method': 'build',
+            'waiting': False,
             'request': [
                 'git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde',
                 {}
@@ -205,7 +213,7 @@ FAKE_CLIENT_SESSION = {
 
 
 # Dictionary of valid tasks and their expected properties
-# Make sure task id can be int or a string
+# Note that the task id can be int or string
 VALID_TASKS = {
     # https://koji.fedoraproject.org/koji/taskinfo?taskID=15869828
     15869828: {

@@ -81,13 +81,12 @@ class KojiTask(object):
         if not self._valid_task():
             raise NotBuildTaskError(self.task_id)
 
-        # wait for the task to be non-waiting
-        if wait_timeout:
-            wait('waiting for task to be non waiting', self._check_nonwaiting_task, timeout=wait_timeout)
+        # wait for the task to be non-waiting and closed
+        wait('waiting for task to be non waiting', self._check_nonwaiting_task, timeout=wait_timeout)
 
-        # finally check if task is in CLOSED state
-        if not self._closed_task():
-            raise GlueError("the task with id '{}' is not in CLOSED state".format(self.task_id))
+        # wait for task to be in CLOSED state
+        # note that this can take some amount of time after it becomes non-waiting
+        wait('waiting for task to be closed', self._check_closed_task, timeout=wait_timeout)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.task_id)
@@ -103,7 +102,7 @@ class KojiTask(object):
 
         return False
 
-    def _closed_task(self):
+    def _check_closed_task(self):
         """
         Verify that the task is closed.
 
@@ -526,8 +525,9 @@ class Koji(gluetool.Module):
             'help': 'Use given build tag.',
         },
         'wait': {
-            'help': 'Wait for given number of seconds for a not finished task',
+            'help': 'Wait timeout for task to become non-waiting and closed',
             'type': int,
+            'default': 60,
         },
     }
 
