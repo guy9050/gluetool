@@ -4,6 +4,7 @@ import pytest
 
 import gluetool
 import gluetool_modules.helpers.ansible
+import libci.guest
 
 from mock import MagicMock
 
@@ -14,117 +15,84 @@ from . import create_module
 def fixture_module():
     # pylint: disable=unused-argument
 
-    return create_module(gluetool_modules.helpers.ansible.Ansible)
+    return create_module(gluetool_modules.helpers.ansible.Ansible)[1]
+
+
+@pytest.fixture(name='local_guest')
+def fixture_local_guest(module):
+    return libci.guest.NetworkedGuest(module, '127.0.0.1', key=MagicMock())
 
 
 def test_sanity(module):
-    _, _ = module
+    pass
 
 
 def test_loadable(module):
-    ci, _ = module
-
     # pylint: disable=protected-access
-    python_mod = ci._load_python_module('helpers/ansible', 'pytest_ansible',
-                                        'gluetool_modules/helpers/ansible.py')
+    python_mod = module.glue._load_python_module('helpers/ansible', 'pytest_ansible',
+                                                 'gluetool_modules/helpers/ansible.py')
 
     assert hasattr(python_mod, 'Ansible')
 
 
 def test_shared(module):
-    ci, _ = module
-
-    assert ci.has_shared('run_playbook')
+    assert module.glue.has_shared('run_playbook')
 
 
-def test_run_playbook(module, tmpdir):
-    _, module = module
+def test_run_playbook(module, local_guest, monkeypatch):
+    mock_output = MagicMock()
+    mock_run_command = MagicMock(return_value=mock_output)
 
-    playbook = tmpdir.join('sanity-playbook.yml')
-    playbook.write("""---
+    monkeypatch.setattr(gluetool.utils, 'run_command', mock_run_command)
 
-- hosts: all
-  remote_user: root
-  connection: local
+    output = module.run_playbook('dummy playbook file', [local_guest])
 
-  tasks:
-    - name: List current dir
-      local_action: command ls -al .
-      register: ls_output
+    assert output is mock_output
 
-    - debug: msg="{{ ls_output.stdout }}"
-""")
-
-    output = module.run_playbook(str(playbook), ['127.0.0.1'])
-    assert isinstance(output, gluetool.utils.ProcessOutput)
-
-    assert output.exit_code == 0
-    assert 'ok=3' in output.stdout
-    assert 'changed=1' in output.stdout
-    assert 'unreachable=0' in output.stdout
-    assert 'failed=0' in output.stdout
-    assert output.stderr == ''
+    mock_run_command.assert_called_once_with([
+        'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key, os.path.abspath('dummy playbook file')
+    ])
 
 
-def test_error(log, module, tmpdir):
-    _, module = module
+def test_error(log, module, local_guest, monkeypatch):
+    # simulate output of failed ansible-playbook run, giving user JSON blob with an error message
+    mock_error = gluetool.GlueCommandError([], output=MagicMock(stdout='fatal: {"msg": "dummy error message"}'))
+    mock_run_command = MagicMock(side_effect=mock_error)
 
-    playbook = tmpdir.join('error-playbook.yml')
-    playbook.write("""---
-
-- hosts: all
-  remote_user: root
-  connection: local
-
-  tasks:
-    - name: Check env FOO_VAR is defined
-      fail:
-        msg: "FOO_VAR variable is not defined"
-      when: FOO_VAR is not defined
-""")
+    monkeypatch.setattr(gluetool.utils, 'run_command', mock_run_command)
 
     with pytest.raises(gluetool.GlueError, message='Failure during Ansible playbook execution. See log for details.'):
-        module.run_playbook(str(playbook), ['127.0.0.1'])
+        module.run_playbook('dummy playbook file', [local_guest])
 
-    assert log.records[-1].message == 'Ansible says: FOO_VAR variable is not defined'
+    assert log.match(message='Ansible says: dummy error message')
 
 
-def test_extra_vars(module, tmpdir):
-    _, module = module
+def test_extra_vars(module, local_guest, monkeypatch):
+    mock_run_command = MagicMock()
 
-    playbook = tmpdir.join('extra-vars-playbook.yml')
-    playbook.write("""---
+    monkeypatch.setattr(gluetool.utils, 'run_command', mock_run_command)
 
-- hosts: all
-  remote_user: root
-  connection: local
-
-  tasks:
-    - name: Check env FOO_VAR is defined
-      fail:
-        msg: "FOO_VAR variable is not defined"
-      when: FOO_VAR is not defined
-
-    - debug: msg="{{ FOO_VAR }}"
-""")
-
-    output = module.run_playbook(str(playbook), ['127.0.0.1'], variables={
-        'FOO_VAR': 'This should appear in Ansible output'
+    module.run_playbook('dummy playbook file', [local_guest], variables={
+        'FOO': 'bar'
     })
 
-    assert '"msg": "This should appear in Ansible output"' in output.stdout
+    mock_run_command.assert_called_once_with([
+        'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key,
+        '--extra-vars', 'FOO="bar"',
+        os.path.abspath('dummy playbook file')
+    ])
 
 
-def test_dryrun(module, monkeypatch):
-    _, module = module
-
+def test_dryrun(module, local_guest, monkeypatch):
     mock_run_command = MagicMock(return_value=None)
 
     monkeypatch.setattr(gluetool.utils, 'run_command', mock_run_command)
-    # pylint: disable=protected-access
-    module.glue._dryrun_level = gluetool.glue.DryRunLevels.DRY
+    monkeypatch.setattr(module.glue, '_dryrun_level', gluetool.glue.DryRunLevels.DRY)
 
-    module.run_playbook('dummy-path', ['dummy-guest'])
+    module.run_playbook('dummy playbook path', [local_guest])
 
-    mock_run_command.assert_called_once_with(['ansible-playbook', '-i', 'dummy-guest,',
-                                              '-C', os.path.join(os.getcwd(), 'dummy-path')])
+    mock_run_command.assert_called_once_with([
+        'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key,
+        '-C',
+        os.path.abspath('dummy playbook path')
+    ])
