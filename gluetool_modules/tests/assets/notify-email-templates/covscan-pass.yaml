@@ -1,4 +1,4 @@
-subject: "[CI] [covscan] [PASSED] dummy-package-1.2.3-79.el7, task 123456, branch fixing-bz17"
+subject: "[CI] [PASSED] dummy-package-1.2.3-79.el7, task 123456, branch fixing-bz17"
 body: |-
   Tested build:   https://brewweb.engineering.redhat.com/brew/taskinfo?taskID=14091309
 
@@ -16,11 +16,13 @@ body: |-
   Covscan wiki:         https://engineering.redhat.com/trac/CoverityScan/wiki/covscan
   Covscan CI Test Plan: https://url.corp.redhat.com/covscan-in-ci
 header: |-
-  Brew task:      123456
-  Build target:   release-candidate
-  Tested package: dummy-package-1.2.3-79.el7
-  Build issuer:   bar@redhat.com
-  Summary:        https://baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/job/ci-covscan/36817/
+  Tested package:    dummy-package-1.2.3-79.el7
+  Result:            PASSED
+
+  Build target:      release-candidate
+  Brew task:         123456
+  Build issuer:      bar@redhat.com
+  Test summary link: https://baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/job/ci-covscan/36817/
 footer: |-
   --
   CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation

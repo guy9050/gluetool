@@ -1,7 +1,5 @@
-subject: "[CI] [RESERVATION] [restraint] [FAIL] dummy-package-1.2.3-79.el7, task 123456, branch fixing-bz17"
+subject: "[CI] [RESERVATION] [FAIL] dummy-package-1.2.3-79.el7, task 123456, branch fixing-bz17"
 body: |-
-  Result:         FAIL
-
   Reserved machine(s) (password: redhat):
 
       ssh root@10.8.246.190
@@ -30,11 +28,13 @@ body: |-
           https://baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/job/ci-openstack/2915/artifact/tmp90tNEr.01/recipes/1/tasks/2/results/1507276892/logs/avc.log
           https://baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/job/ci-openstack/2915/artifact/tmp90tNEr.01/recipes/1/tasks/2/results/1507276892/logs/resultoutputfile.log
 header: |-
-  Brew task:      123456
-  Build target:   release-candidate
-  Tested package: dummy-package-1.2.3-79.el7
-  Build issuer:   bar@redhat.com
-  Summary:        http://baseos-ci.engineering.redhat.com/index.php/b-ci-openstack-2692
+  Tested package:    dummy-package-1.2.3-79.el7
+  Result:            FAIL
+
+  Build target:      release-candidate
+  Brew task:         123456
+  Build issuer:      bar@redhat.com
+  Test summary link: http://baseos-ci.engineering.redhat.com/index.php/b-ci-openstack-2692
 footer: |-
   --
   Troubleshooting Tips: http://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/Troubleshoot

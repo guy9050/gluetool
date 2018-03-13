@@ -1,7 +1,5 @@
-subject: "[CI] [rpmdiff-analysis] [PASSED] dummy-package-1.2.3-79.el7, task 123456, branch fixing-bz17"
+subject: "[CI] [PASSED] dummy-package-1.2.3-79.el7, task 123456, branch fixing-bz17"
 body: |-
-  Result:         PASSED
-
   Jenkins build:  https://baseos-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/job/ci-rpmdiff-analysis/40818/
 
   See RPMdiff run link ^^ for more details. Note that waiving of results is not required until
@@ -14,11 +12,13 @@ body: |-
   https://bugzilla.redhat.com/enter_bug.cgi?product=RPMDiff
 
 header: |-
-  Brew task:      123456
-  Build target:   release-candidate
-  Tested package: dummy-package-1.2.3-79.el7
-  Build issuer:   bar@redhat.com
-  Summary:        https://rpmdiff.engineering.redhat.com/run/151300
+  Tested package:    dummy-package-1.2.3-79.el7
+  Result:            PASSED
+
+  Build target:      release-candidate
+  Brew task:         123456
+  Build issuer:      bar@redhat.com
+  Test summary link: https://rpmdiff.engineering.redhat.com/run/151300
 footer: |-
   --
   RPMdiff CI Test Plan: http://url.corp.redhat.com/rpmdiff-in-ci
