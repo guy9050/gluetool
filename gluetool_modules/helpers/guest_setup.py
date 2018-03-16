@@ -20,11 +20,13 @@ class GuestSetup(gluetool.Module):
 
     shared_functions = ('setup_guest',)
 
-    def setup_guest(self, hosts, **kwargs):
+    def setup_guest(self, guests, **kwargs):
         """
         Setup provided guests using predefined list of Ansible playbooks.
 
-        :param list host: Hosts specification, forming Ansible inventory.
+        Only networked guests, accessible over SSH, are supported.
+
+        :param list(libci.guest.NetworkedGuest) host: Guests to setup.
         :param dict kwargs: Additional arguments which will be passed to
           `run_playbook` shared function of :py:class:`gluetool_modules.helpers.ansible.Ansible`
           module.
@@ -33,6 +35,7 @@ class GuestSetup(gluetool.Module):
         self.require_shared('run_playbook')
 
         for playbook in [playbook.strip() for playbook in self.option('playbooks').split(',')]:
-            self.info("setting the guests '{}' up with '{}'".format(', '.join(hosts), playbook))
+            self.info("setting the guests '{}' up with '{}'".format(', '.join([guest.hostname for guest in guests]),
+                                                                    playbook))
 
-            self.shared('run_playbook', playbook, hosts, **kwargs)
+            self.shared('run_playbook', playbook, guests, **kwargs)

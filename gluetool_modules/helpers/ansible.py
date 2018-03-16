@@ -19,12 +19,12 @@ class Ansible(gluetool.Module):
 
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
-    def run_playbook(self, playbook_path, hosts, variables=None):
+    def run_playbook(self, playbook_path, guests, variables=None):
         """
         Run Ansible playbook.
 
         :param str playbook_path: Path to the playbook.
-        :param list(str) hosts: Specifications of hosts, forming Ansible inventory.
+        :param list(libci.guest.NetworkedGuest) guests: Guests to run playbooks on.
         :param dict variables: If set, represents additional variables that will
           be passed to ``ansible-playbook`` using ``--extra-vars`` option.
         :returns: :py:class:`gluetool.utils.ProcessOutput` instance.
@@ -33,9 +33,13 @@ class Ansible(gluetool.Module):
         playbook_path = gluetool.utils.normalize_path(playbook_path)
         self.debug("running playbook '{}'".format(playbook_path))
 
+        if not all([guest.key == guests[0].key for guest in guests]):
+            raise gluetool.GlueError('SSH key must be the same for all guests')
+
         cmd = [
             'ansible-playbook',
-            '-i', '{},'.format(','.join(hosts))  # note the comma
+            '-i', '{},'.format(','.join([guest.hostname for guest in guests])),  # note the comma
+            '--private-key', guests[0].key
         ]
 
         if variables:
