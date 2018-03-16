@@ -1,18 +1,7 @@
-import os
-import re
 import shlex
-import bs4
 
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
-from libci.sentry import PrimaryTaskFingerprintsMixin
-
-
-class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
-    def __init__(self, task, installation_logs):
-        super(SUTInstallationFailedError, self).__init__(task, 'SUT installation failed')
-
-        self.installation_logs = installation_logs
 
 
 class RestraintScheduler(gluetool.Module):
@@ -25,24 +14,6 @@ class RestraintScheduler(gluetool.Module):
 
     name = 'restraint-scheduler'
     description = 'Prepares "schedule" for runners of restraint.'
-    options = {
-        'install-task-not-build': {
-            'help': 'Try to install SUT using brew task ID as a referrence, instead of the brew build ID.',
-            'action': 'store_true',
-            'default': False
-        },
-        'install-rpms-blacklist': {
-            # pylint: disable=line-too-long
-            'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
-            'type': str,
-            'default': ''
-        },
-        'install-method': {
-            'help': 'Yum method to use for installation (default: ``install``).',
-            'type': str,
-            'default': 'install'
-        }
-    }
 
     shared_functions = ['schedule']
 
@@ -79,96 +50,7 @@ class RestraintScheduler(gluetool.Module):
 
         return self.shared('beaker_job_xml', options=options)
 
-    def _setup_guest(self, tasks, guest):
-        # pylint: disable=no-self-use
-        """
-        Run necessary command to prepare guest for following procedures.
-        """
-
-        guest.info('setting the guest up')
-
-        guest.setup()
-
-        # Install SUT
-        self.info('installing the SUT packages')
-
-        options = {
-            'brew_method': self.option('install-method'),
-            'brew_tasks': [],
-            'brew_builds': [],
-            'brew_server': self.shared('primary_task').ARTIFACT_NAMESPACE,
-            'rpm_blacklist': self.option('install-rpms-blacklist')
-        }
-
-        if self.option('install-task-not-build'):
-            self.debug('asked to install by task ID')
-
-            options['brew_tasks'] = [task.task_id for task in tasks]
-
-        else:
-            for task in tasks:
-                if task.scratch:
-                    self.debug('task {} is a scratch build, using task ID for installation')
-
-                    options['brew_tasks'].append(task.task_id)
-
-                else:
-                    self.debug('task {} is a regular task, using build ID for installation')
-
-                    options['brew_builds'].append(task.build_id)
-
-        options['brew_tasks'] = ' '.join(str(i) for i in options['brew_tasks'])
-        options['brew_builds'] = ' '.join(str(i) for i in options['brew_builds'])
-
-        job_xml = """
-            <job>
-              <recipeSet priority="Normal">
-                <recipe ks_meta="method=http harness='restraint-rhts beakerlib-redhat'" whiteboard="Server">
-                  <task name="/distribution/install/brew-build" role="None">
-                    <params>
-                      <param name="BASEOS_CI" value="true"/>
-                      <param name="METHOD" value="{brew_method}"/>
-                      <param name="TASKS" value="{brew_tasks}"/>
-                      <param name="BUILDS" value="{brew_builds}"/>
-                      <param name="SERVER" value="{brew_server}"/>
-                      <param name="RPM_BLACKLIST" value="{rpm_blacklist}"/>
-                    </params>
-                    <rpm name="test(/distribution/install/brew-build)" path="/mnt/tests/distribution/install/brew-build"/>
-                  </task>
-                  <task name="/distribution/runtime_tests/verify-nvr-installed" role="None">
-                    <params>
-                      <param name="BASEOS_CI" value="true"/>
-                    </params>
-                    <rpm name="test(/distribution/runtime_tests/verify-nvr-installed)" path="/mnt/tests/distribution/runtime_tests/verify-nvr-installed"/>
-                  </task>
-                </recipe>
-              </recipeSet>
-            </job>
-        """.format(**options)
-
-        job = bs4.BeautifulSoup(job_xml, 'xml')
-
-        output = self.shared('restraint', guest, job)
-
-        sut_install_logs = None
-
-        match = re.search(r'Using (\./tmp[a-zA-Z0-9\._]+?) for job run', output.stdout)
-        if match is not None:
-            sut_install_logs = '{}/index.html'.format(match.group(1))
-
-            if 'BUILD_URL' in os.environ:
-                sut_install_logs = utils.treat_url('{}/artifact/{}'.format(os.getenv('BUILD_URL'), sut_install_logs),
-                                                   logger=self.logger)
-
-            self.info('SUT installation logs are in {}'.format(sut_install_logs))
-
-        if output.exit_code != 0:
-            self.debug('restraint exited with invalid exit code {}'.format(output.exit_code))
-
-            raise SUTInstallationFailedError(self.shared('primary_task'),
-                                             '<Not available>' if sut_install_logs is None else sut_install_logs)
-
-    def create_schedule(self, tasks, job_desc, image):
+    def create_schedule(self, job_desc, image):
         """
         Main workhorse - given the job XML, get some guests, and create pairs
         (guest, tasks) for runner to process.
@@ -213,7 +95,7 @@ class RestraintScheduler(gluetool.Module):
             # setup guest
             thread_name = 'setup-guest-{}'.format(guest.name)
             thread = utils.WorkerThread(guest.logger,
-                                        self._setup_guest, fn_args=(tasks, guest,),
+                                        guest.setup,
                                         name=thread_name)
             setup_threads.append(thread)
 
@@ -259,9 +141,7 @@ class RestraintScheduler(gluetool.Module):
             gluetool.log.log_blob(self.debug, str(guest), recipe_set.prettify(encoding='utf-8'))
 
     def execute(self):
-        self.require_shared('primary_task', 'restraint', 'tasks', 'image')
-
-        tasks = self.shared('tasks')
+        self.require_shared('primary_task', 'restraint', 'image')
 
         image = self.shared('image')
         if image is None:
@@ -289,4 +169,4 @@ class RestraintScheduler(gluetool.Module):
 
         self.debug('job as planned by wow:\n{}'.format(job.prettify(encoding='utf-8')))
 
-        self.create_schedule(tasks, job, image)
+        self.create_schedule(job, image)
