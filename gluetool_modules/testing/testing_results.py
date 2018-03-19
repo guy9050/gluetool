@@ -155,11 +155,11 @@ class TestingResults(gluetool.Module):
                         else:
                             result = _default_unserialize(result)
 
+                        gluetool.log.log_dict(self.debug, 'result', result.serialize('json'))
+                        self._results.append(result)
+
                 else:
                     raise gluetool.GlueError("Input format '{}' is not supported".format(input_format))
-
-                gluetool.log.log_dict(self.debug, 'result', result.serialize('json'))
-                self._results.append(result)
 
         except KeyError as e:
             raise gluetool.GlueError('init file is invalid, key {} not found'.format(e))
