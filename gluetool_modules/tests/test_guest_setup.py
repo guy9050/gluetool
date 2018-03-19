@@ -1,11 +1,14 @@
+import os
 import pytest
 
 from mock import MagicMock
 
+import gluetool
 import libci.guest
 import gluetool_modules.helpers.guest_setup
+import gluetool_modules.helpers.rules_engine
 
-from . import create_module, assert_shared
+from . import assert_shared, create_module, patch_shared
 
 
 @pytest.fixture(name='module')
@@ -20,12 +23,32 @@ def fixture_local_guest(module):
     return libci.guest.NetworkedGuest(module, '127.0.0.1', key=MagicMock())
 
 
-def test_sanity(module):
+def test_sanity_shared(module):
     assert module.glue.has_shared('setup_guest') is True
 
 
-def test_missing_ansible_support(module):
-    assert_shared('run_playbook', module.setup_guest, [])
+def test_sanity_no_required_options(module):
+    with pytest.raises(gluetool.GlueError, match=r"^One of the options 'playbooks' or 'playbooks-map' is required"):
+        module.sanity()
+
+
+def test_sanity_both_options(module):
+    module._config['playbooks'] = ['dummy1.yml', 'dummy2.yml']
+    module._config['playbooks-map'] = 'map.yml'
+
+    module.sanity()
+
+
+def test_playbook_map_empty(module):
+    assert module.playbooks_map == []
+
+
+def test_missing_required_shared(module):
+    assert_shared('run_playbook', module.execute)
+
+    module._config['playbooks-map'] = 'map.yml'
+    module.glue._add_shared('run_playbook', module, lambda: None)
+    assert_shared('evaluate_rules', module.execute)
 
 
 def test_setup(log, module, local_guest):
@@ -33,7 +56,7 @@ def test_setup(log, module, local_guest):
     guests = [local_guest, local_guest]
 
     def dummy_run_playbook(_playbook, _guests, **kwargs):
-        expected_playbook = playbooks.pop(0)
+        expected_playbook = os.path.join(os.getcwd(), playbooks.pop(0))
 
         guest_hostnames = ', '.join([guest.hostname for guest in guests])
         assert log.records[-1].message \
@@ -52,3 +75,45 @@ def test_setup(log, module, local_guest):
     module.shared('setup_guest', guests, dummy_option=17)
 
     assert not playbooks
+
+
+def test_playbook_map_guest_setup(module, monkeypatch):
+    module._config['playbooks-map'] = 'map.yml'
+
+    monkeypatch.setattr(module, "_get_playbooks_from_map", lambda: [])
+
+    module.shared('setup_guest', None)
+
+
+def test_playbook_map(module, monkeypatch):
+    module._config['playbooks-map'] = 'map.yml'
+
+    # test default context
+    patch_shared(monkeypatch, module, {
+        'eval_context': {
+            'BUILD_TARGET': 'rhel-7.0-candidate',
+        }
+    })
+
+    rules_engine = gluetool_modules.helpers.rules_engine.RulesEngine(module.glue, 'rules-engine')
+    module.glue.shared_functions['evaluate_rules'] = (rules_engine, rules_engine.evaluate_rules)
+
+    def load_yaml(path, logger):
+        return [
+            {
+                "playbooks": [
+                    "other.yaml"
+                ],
+                "rule": "BUILD_TARGET.match('rhel-6')"
+            },
+            {
+                "playbooks": [
+                    "default.yaml"
+                ],
+                "rule": "BUILD_TARGET.match('rhel-7.0-candidate')"
+            },
+        ]
+
+    monkeypatch.setattr(gluetool.utils, "load_yaml", load_yaml)
+
+    assert module._get_playbooks_from_map() == [os.path.join(os.getcwd(), 'default.yaml')]
