@@ -22,7 +22,7 @@ def create_openstack_build_params(mod, **kwargs):
         'guess_openstack_image_options': 'some guess-openstack-image options',
         'wow_options': 'some w-t options',
         'openstack_options': 'some openstack options',
-        'restraint_scheduler_options': 'some restraint-scheduler options',
+        'install_koji_build_options': 'some install-koji-build options',
         'restraint_runner_options': 'some restraint-runner options'
     }
 
@@ -32,8 +32,8 @@ def create_openstack_build_params(mod, **kwargs):
 
     # pylint: disable=protected-access
     if mod._config.get('install-rpms-blacklist', None):
-        params['restraint_scheduler_options'] = '{} --install-rpms-blacklist={}'.format(
-            params['restraint_scheduler_options'], mod._config['install-rpms-blacklist'])
+        params['install_koji_build_options'] = '{} --install-rpms-blacklist={}'.format(
+            params['install_koji_build_options'], mod._config['install-rpms-blacklist'])
 
     return params
 
