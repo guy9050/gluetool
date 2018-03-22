@@ -31,11 +31,11 @@ import gluetool_modules.testing.restraint.runner
 import gluetool_modules.helpers.notify_email.notify_email_rpmdiff_formatter
 import gluetool_modules.helpers.notify_email.notify_email_covscan_formatter
 import gluetool_modules.helpers.notify_email.notify_email_beah_formatter
+import gluetool_modules.helpers.install_koji_build
 
 import gluetool_modules.build_on_commit.build_on_commit
 import gluetool_modules.infrastructure.koji_fedora
 import gluetool_modules.testing.beaker.beaker
-import gluetool_modules.testing.restraint.scheduler
 import gluetool_modules.testing.wow
 
 from mock import MagicMock
@@ -307,7 +307,7 @@ def fixture_result_modules(request, notify_email, monkeypatch):
         }
     ),
     (
-        gluetool_modules.testing.restraint.scheduler.SUTInstallationFailedError,
+        gluetool_modules.helpers.install_koji_build.SUTInstallationFailedError,
         (None, 'some install logs URL',),
         {},
         asset('SUTInstallationFailedError.yaml'),

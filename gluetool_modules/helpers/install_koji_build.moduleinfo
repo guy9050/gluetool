@@ -1,0 +1,8 @@
+---
+
+name: install-koji-build
+description: >
+Install Koji artifact on given guest using 'restraint' shared function
+and information provided by 'tasks' shared function. Provides 'guest-setup'
+shared function similar as `guest-setup` module does. Both shared function
+are called, in case this module follows `guest-setup` in the pipeline.
