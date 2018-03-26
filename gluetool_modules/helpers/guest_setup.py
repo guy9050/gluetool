@@ -76,7 +76,7 @@ class GuestSetup(gluetool.Module):
             return render_template(playbook, logger=self.logger, **self.shared('eval_context'))
 
         for playbooks_set in self.playbooks_map:
-            gluetool.log.log_dict(self.debug, 'playbooks set', playbooks_set)
+            gluetool.log.log_dict(self.debug, 'evaluating following playbooks set rule', playbooks_set)
 
             if not self.shared('evaluate_rules',
                                playbooks_set.get('rule', 'False'),
