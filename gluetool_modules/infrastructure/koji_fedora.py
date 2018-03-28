@@ -685,13 +685,30 @@ class Koji(gluetool.Module):
 
     @property
     def eval_context(self):
-        """
-        Provides informations about Koji/Brew artifacts.
+        # pylint: disable=unused-variable
+        __content__ = {  # noqa
+            # common for all artifact providers
+            'ARTIFACT_TYPE': """
+                             Type of the artifact, either ``koji-build`` or ``brew-build``.
+                             """,
+            'BUILD_TARGET': """
+                            Build target of the primary task, as known to Koji/Brew.
+                            """,
+            'NVR': """
+                   NVR of the primary task.
+                   """,
+            'PRIMARY_TASK': """
+                            Primary task, represented as ``KojiTask`` or ``BrewTask`` instance.
+                            """,
+            'TASKS': """
+                     List of all tasks known to this module instance.
+                     """,
 
-        Provides following variables: BUILD_TARGET, PRIMARY_TASK, TASKS, NVR, SCRATCH
-
-        :rtype: dict
-        """
+            # Brew/Koji specific
+            'SCRATCH': """
+                       ``True`` if the primary task represents a scratch build, ``False`` otherwise.
+                       """
+        }
 
         primary_task = self.primary_task()
 

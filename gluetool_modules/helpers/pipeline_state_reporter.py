@@ -89,14 +89,6 @@ class PipelineStateReporter(gluetool.Module):
 
        # Final "catch the rest" instruction to set "complete" is not necessary
        # - state: complete
-
-    **Eval context**
-
-    * ``PIPELINE_TEST_TYPE``: Type of tests provided in this pipeline, e.g. 'tier1', 'rpmdiff-analysis', 'covscan',
-      or any other string. The value of this variable is taken from the ``test-type`` option.
-
-    * ``PIPELINE_TEST_CATEGORY``: Category of tests performed in this pipeline. See ``test-category`` option
-      for possible choices.
     """
 
     name = 'pipeline-state-reporter'
@@ -168,11 +160,17 @@ class PipelineStateReporter(gluetool.Module):
 
     @property
     def eval_context(self):
-        """
-        Provides informations about test type and category to evaluation context.
-
-        :rtype: dict
-        """
+        # pylint: disable=unused-variable
+        __content__ = {  # noqa
+            'PIPELINE_TEST_TYPE': """
+                                  Type of tests provided in this pipeline, e.g. ``tier1``, ``rpmdiff-analysis``,
+                                  ``covscan``, or any other string. The value of this variable is taken from the
+                                  ``test-type`` option.
+                                  """,
+            'PIPELINE_TEST_CATEGORY': """
+                                      Category of tests performed in this pipeline. See ``test-category`` option.
+                                      """
+        }
 
         return {
             # common for all artifact providers
