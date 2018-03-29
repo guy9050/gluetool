@@ -76,6 +76,7 @@ class KojiTask(object):
         self.pkgs_url = details['pkgs_url']
         self.session = details['session']
         self.module_name = module_name
+        self.artifact_id = self.task_id
 
         # first check if the task is valid for our case
         if not self._valid_task():
