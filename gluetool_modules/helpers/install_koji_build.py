@@ -70,12 +70,12 @@ class InstallKojiBuild(gluetool.Module):
         else:
             for task in tasks:
                 if task.scratch:
-                    self.debug('task {} is a scratch build, using task ID for installation')
+                    self.debug('task {} is a scratch build, using task ID for installation'.format(task.id))
 
                     options['brew_tasks'].append(task.task_id)
 
                 else:
-                    self.debug('task {} is a regular task, using build ID for installation')
+                    self.debug('task {} is a regular task, using build ID for installation'.format(task.id))
 
                     options['brew_builds'].append(task.build_id)
 
