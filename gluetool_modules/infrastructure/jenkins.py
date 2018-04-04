@@ -34,7 +34,7 @@ class JenkinsProxy(Proxy):
     :param jenkinsapi.jenkins jenkins: Jenkins API connection.
     """
 
-    _CUSTOM_METHODS = ('set_build_name',)
+    _CUSTOM_METHODS = ('set_build_name', 'enable_quiet_mode', 'disable_quiet_mode')
 
     def __init__(self, jenkins, module):
         super(JenkinsProxy, self).__init__(jenkins)
@@ -84,6 +84,25 @@ class JenkinsProxy(Proxy):
 
         module.debug("build name set:\n  name='{}'\n  description='{}'".format(
             name, description))
+
+    def enable_quiet_mode(self):
+        """
+        Enable "quiet" mode - Jenkins will accept triggers and queue builds but it won't start them
+        on slaves.
+        """
+
+        module = object.__getattribute__(self, '_module')
+
+        return module.jenkins_rest('{}/quietDown'.format(module.option('url')))
+
+    def disable_quiet_mode(self):
+        """
+        Disable "quiet" mode - Jenkins will start queued builds.
+        """
+
+        module = object.__getattribute__(self, '_module')
+
+        return module.jenkins_rest('{}/cancelQuietDown'.format(module.option('url')))
 
 
 class CIJenkins(gluetool.Module):
