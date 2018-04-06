@@ -315,8 +315,6 @@ class NotifyRecipients(gluetool.Module):
         this formatter handles.
         """
 
-        self.require_shared('primary_task', 'tasks')
-
         recipients = self._recipients_overall() if result_type is None else self._recipients_by_result(result_type)
         recipients = self._finalize_recipients(recipients)
 
