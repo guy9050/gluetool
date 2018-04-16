@@ -1,2 +1,2 @@
 [build-system]
-requires = ["http://liver3.brq.redhat.com/gluetool/packages/testing/gluetool-1.0-py2-none-any.whl"]
+# requires = ["http://liver3.brq.redhat.com/gluetool/packages/testing/gluetool-1.0-py2-none-any.whl"]
