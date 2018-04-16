@@ -130,8 +130,7 @@ def test_replace_mapped_recipients_error(module, source, target, error_message):
 def test_recipients_map(configured_module, monkeypatch):
     patch_shared(monkeypatch, configured_module, {
         'eval_context': {},
-        'evaluate_rules': False,
-        'primary_task': MagicMock(targe='not-a--dummy-target')
+        'evaluate_rules': False
     })
 
     monkeypatch.setattr(configured_module, '_add_recipients', MagicMock(return_value=[]))
@@ -199,8 +198,7 @@ def test_finalize_recipients(log, configured_module, monkeypatch):
         'eval_context': {
             'PRIMARY_TASK': mock_task,
             'TASKS': [mock_task]
-        },
-        'primary_task': mock_task
+        }
     })
 
     # pylint: disable=protected-access
@@ -234,9 +232,7 @@ def test_notification_recipients_overall(configured_module, monkeypatch, result_
         'eval_context': {
             'PRIMARY_TASK': mock_task,
             'TASKS': [mock_task]
-        },
-        'primary_task': mock_task,
-        'tasks': [mock_task]
+        }
     })
 
     assert configured_module.notification_recipients(result_type=result_type) == expected_recipients
