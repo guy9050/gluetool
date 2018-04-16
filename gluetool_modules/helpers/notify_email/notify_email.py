@@ -386,17 +386,6 @@ class Notify((gluetool.Module)):
 
         return '<Summary URL not available>'
 
-    @utils.cached_property
-    def task(self):
-        if self.has_shared('primary_task'):
-            return self.shared('primary_task')
-
-        self.warn('Unable to get brew task')
-
-        return utils.Bunch(task_id='<Task ID not available>', nvr='<NVR not available>',
-                           owner='<Owner not available>', issuer='<No issuer available>',
-                           branch='<Branch not available>', target='<Build target not available>')
-
     def _format_result(self, result):
         self.debug('result:\n{}'.format(result))
 
