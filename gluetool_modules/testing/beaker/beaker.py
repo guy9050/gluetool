@@ -432,6 +432,11 @@ class Beaker(gluetool.Module):
                     '--end-task={}'.format(task) for task in next_to_last_tasks.iterkeys()
                 ]
 
+        for task in self.critical_tasks:
+            command += [
+                '--critical-task', task
+            ]
+
         self.info("running 'beaker-jobwatch' to babysit the jobs")
 
         try:
