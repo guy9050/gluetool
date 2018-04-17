@@ -43,8 +43,13 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             'help': 'Additional options for ``beaker`` module.',
             'default': ''
         },
+        'brew-build-task-params-options': {
+            'help': 'Additional options for ``brew-build-task-params`` module.',
+            'default': ''
+        },
 
-        # following options passed to beaker module
+
+        # following options passed to brew-build-task-params module
         'install-rpms-blacklist': {
             # pylint: disable=line-too-long
             'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
@@ -62,15 +67,17 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
 
     @cached_property
     def build_params(self):
-        beaker_options = self.option('beaker-options')
+        brew_build_task_params_options = self.option('brew-build-task-params-options')
         install_rpms_blacklist = self.option('install-rpms-blacklist')
         install_method = self.option('install-method')
 
         if install_rpms_blacklist:
-            beaker_options = '{} --install-rpms-blacklist={}'.format(beaker_options, install_rpms_blacklist)
+            brew_build_task_params_options = '{} --install-rpms-blacklist={}'.format(brew_build_task_params_options,
+                                                                                     install_rpms_blacklist)
 
         if install_method:
-            beaker_options = '{} --install-method={}'.format(beaker_options, install_method)
+            brew_build_task_params_options = '{} --install-method={}'.format(brew_build_task_params_options,
+                                                                             install_method)
 
         return dict_update(super(BeakerJob, self).build_params, {
             'build_dependencies_options': self.option('build-dependencies-options'),
@@ -78,5 +85,6 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             'guess_distro_options': self.option('guess-distro-options'),
             'wow_options': self.option('wow-options'),
             'jobwatch_options': self.option('jobwatch-options'),
-            'beaker_options': beaker_options
+            'beaker_options': self.option('beaker-options'),
+            'brew_build_task_params_options': brew_build_task_params_options
         })

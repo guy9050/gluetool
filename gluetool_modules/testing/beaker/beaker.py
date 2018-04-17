@@ -115,22 +115,6 @@ class Beaker(gluetool.Module):
             'metavar': 'ID',
             'type': int
         },
-        'install-rpms-blacklist': {
-            # pylint: disable=line-too-long
-            'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
-            'type': str,
-            'default': ''
-        },
-        'install-method': {
-            'help': 'Yum method to use for installation (default: ``update``).',
-            'type': str,
-            'default': 'update'
-        },
-        'install-task-not-build': {
-            'help': 'Try to install SUT using brew task ID as a referrence, instead of the brew build ID.',
-            'action': 'store_true',
-            'default': False
-        },
         'reserve': {
             'help': 'Do not release machines back to Beaker, keep them reserved',
             'action': 'store_true'
@@ -326,61 +310,23 @@ class Beaker(gluetool.Module):
         if self.option('job'):
             return self._reuse_job(self.option('job'))
 
-        tasks = self.shared('tasks')
-
         options = [
             '--first-testing-task=/distribution/runtime_tests/verify-nvr-installed'
         ]
 
-        # gather builds and tasks
-        brew_build_params = {
-            'BUILDS': [],
-            'TASKS': []
-        }
+        # create options for brew-build task
+        brew_build_task_params = self.shared('brew_build_task_params')
 
-        if self.option('install-task-not-build'):
-            self.debug('asked to install by task ID')
-
-            brew_build_params['TASKS'] = [task.task_id for task in tasks]
-
-        else:
-            for task in tasks:
-                if task.scratch:
-                    self.debug('task {} is a scratch build, using task ID for installation')
-
-                    brew_build_params['TASKS'].append(task.task_id)
-
-                else:
-                    self.debug('task {} is a regular task, using build ID for installation')
-
-                    brew_build_params['BUILDS'].append(task.build_id)
-
-        # remove empty parameters
-        if not brew_build_params['TASKS']:
-            del brew_build_params['TASKS']
-
-        if not brew_build_params['BUILDS']:
-            del brew_build_params['BUILDS']
-
-        # now squash param values into a space-separated strings: <param>: '1 2 3 4 ...'
-        for param, values in brew_build_params.iteritems():
-            brew_build_params[param] = ' '.join([str(i) for i in values])
-
-        # add RPM blacklist - it's already a string...
-        if self.option('install-rpms-blacklist'):
-            brew_build_params['RPM_BLACKLIST'] = self.option('install-rpms-blacklist')
-
-        # ... and a method
-        brew_build_params['METHOD'] = self.option('install-method')
-
-        # and convert params to a space-separated list of params, with values wrapped
+        # and convert them to a space-separated list of params, with values wrapped
         # by the quotes: <param>="foo bar" <param>="baz" ...
-        brew_build_params = ' '.join(['{}="{}"'.format(param, value) for param, value in brew_build_params.iteritems()])
+        brew_build_task_params = ' '.join([
+            '{}="{}"'.format(param, value) for param, value in brew_build_task_params.iteritems()
+        ])
 
         # this should be '--init-task="{} /....', but it's not a problem for python-based programs (bkr)
         # and sclrun can handle it too
         options += [
-            '--init-task={} /distribution/install/brew-build'.format(brew_build_params)
+            '--init-task={} /distribution/install/brew-build'.format(brew_build_task_params)
         ]
 
         # we could use --reserve but we must be sure the reservesys is *the last* taskin the recipe
@@ -560,7 +506,7 @@ class Beaker(gluetool.Module):
         return 'PASS', self._processed_results, matrix_url
 
     def execute(self):
-        self.require_shared('tasks', 'primary_task', 'beaker_job_xml', 'parse_beah_result')
+        self.require_shared('brew_build_task_params', 'tasks', 'primary_task', 'beaker_job_xml', 'parse_beah_result')
 
         def _command_options(name):
             opts = self.option(name)

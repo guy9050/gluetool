@@ -42,15 +42,15 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         'openstack-options': {
             'help': 'Additional options for openstack module.',
         },
-        'install-koji-build-options': {
-            'help': 'Additional options for ``install-koji-build`` module.',
+        'brew-build-task-params-options': {
+            'help': 'Additional options for ``brew-build-task-params`` module.',
             'default': ''
         },
         'restraint-runner-options': {
             'help': 'Additional options for restraint-runner module.'
         },
 
-        # following options are passed to install-koji-build module
+        # following options are passed to brew-build-task-params module
         'install-rpms-blacklist': {
             # pylint: disable=line-too-long
             'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
@@ -68,16 +68,17 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
 
     @cached_property
     def build_params(self):
-        install_koji_build_options = self.option('install-koji-build-options')
+        brew_build_task_params_options = self.option('brew-build-task-params-options')
         install_rpms_blacklist = self.option('install-rpms-blacklist')
         install_method = self.option('install-method')
 
         if install_rpms_blacklist:
-            install_koji_build_options = '{} --install-rpms-blacklist={}'.format(install_koji_build_options,
-                                                                                 install_rpms_blacklist)
+            brew_build_task_params_options = '{} --install-rpms-blacklist={}'.format(brew_build_task_params_options,
+                                                                                     install_rpms_blacklist)
 
         if install_method:
-            install_koji_build_options = '{} --install-method={}'.format(install_koji_build_options, install_method)
+            brew_build_task_params_options = '{} --install-method={}'.format(brew_build_task_params_options,
+                                                                             install_method)
 
         return dict_update(super(OpenStackJob, self).build_params, {
             'build_dependencies_options': self.option('build-dependencies-options'),
@@ -86,6 +87,6 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             'guess_openstack_image_options': self.option('guess-openstack-image-options'),
             'wow_options': self.option('wow-options'),
             'openstack_options': self.option('openstack-options'),
-            'install_koji_build_options': install_koji_build_options,
+            'brew_build_task_params_options': brew_build_task_params_options,
             'restraint_runner_options': self.option('restraint-runner-options')
         })

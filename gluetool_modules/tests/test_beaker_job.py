@@ -19,7 +19,8 @@ def create_beaker_build_params(mod, **kwargs):
         'guess_distro_options': 'some guess-distro options',
         'wow_options': 'some w-t options',
         'jobwatch_options': 'some jobwatch options',
-        'beaker_options': 'some beaker options'
+        'beaker_options': 'some beaker options',
+        'brew_build_task_params_options': 'some brew-build options'
     }
 
     params.update(kwargs)
@@ -28,8 +29,9 @@ def create_beaker_build_params(mod, **kwargs):
 
     # pylint: disable=protected-access
     if mod._config.get('install-rpms-blacklist', None):
-        params['beaker_options'] = '{} --install-rpms-blacklist={}'.format(params['beaker_options'],
-                                                                           mod._config['install-rpms-blacklist'])
+        # pylint: disable=line-too-long
+        params['brew_build_task_params_options'] = '{} --install-rpms-blacklist={}'.format(
+            params['brew_build_task_params_options'], mod._config['install-rpms-blacklist'])
 
     return params
 

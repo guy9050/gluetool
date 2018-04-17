@@ -22,28 +22,9 @@ class InstallKojiBuild(gluetool.Module):
     name = 'install-koji-build'
     description = 'Prepare guests for testing process.'
 
-    options = {
-        'install-task-not-build': {
-            'help': 'Try to install SUT using brew task ID as a referrence, instead of the brew build ID.',
-            'action': 'store_true',
-            'default': False
-        },
-        'install-rpms-blacklist': {
-            # pylint: disable=line-too-long
-            'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
-            'type': str,
-            'default': ''
-        },
-        'install-method': {
-            'help': 'Yum method to use for installation (default: ``install``).',
-            'type': str,
-            'default': 'install'
-        }
-    }
-
     shared_functions = ('setup_guest',)
 
-    def _setup_guest(self, tasks, guest):
+    def _setup_guest(self, guest):
         # pylint: disable=no-self-use
         """
         Run task, which installs brew artifact on SUT
@@ -52,48 +33,22 @@ class InstallKojiBuild(gluetool.Module):
         guest.info('setting the guest up')
 
         # Install SUT
-        self.info('installing the SUT packages')
+        self.info('installing the artifact')
 
-        options = {
-            'brew_method': self.option('install-method'),
-            'brew_tasks': [],
-            'brew_builds': [],
-            'brew_server': self.shared('primary_task').ARTIFACT_NAMESPACE,
-            'rpm_blacklist': self.option('install-rpms-blacklist')
-        }
+        brew_build_task_params = self.shared('brew_build_task_params')
 
-        if self.option('install-task-not-build'):
-            self.debug('asked to install by task ID')
-
-            options['brew_tasks'] = [task.task_id for task in tasks]
-
-        else:
-            for task in tasks:
-                if task.scratch:
-                    self.debug('task {} is a scratch build, using task ID for installation'.format(task.task_id))
-
-                    options['brew_tasks'].append(task.task_id)
-
-                else:
-                    self.debug('task {} is a regular task, using build ID for installation'.format(task.task_id))
-
-                    options['brew_builds'].append(task.build_id)
-
-        options['brew_tasks'] = ' '.join(str(i) for i in options['brew_tasks'])
-        options['brew_builds'] = ' '.join(str(i) for i in options['brew_builds'])
-
-        job_xml = """
+        job_xml = gluetool.utils.render_template("""
             <job>
               <recipeSet priority="Normal">
                 <recipe ks_meta="method=http harness='restraint-rhts beakerlib-redhat'" whiteboard="Server">
                   <task name="/distribution/install/brew-build" role="None">
                     <params>
                       <param name="BASEOS_CI" value="true"/>
-                      <param name="METHOD" value="{brew_method}"/>
-                      <param name="TASKS" value="{brew_tasks}"/>
-                      <param name="BUILDS" value="{brew_builds}"/>
-                      <param name="SERVER" value="{brew_server}"/>
-                      <param name="RPM_BLACKLIST" value="{rpm_blacklist}"/>
+                      <param name="METHOD" value="{{ BREW_BUILD_PARAMS.METHOD }}"/>
+                      <param name="TASKS" value="{{ BREW_BUILD_PARAMS.TASKS }}"/>
+                      <param name="BUILDS" value="{{ BREW_BUILD_PARAMS.BUILDS }}"/>
+                      <param name="SERVER" value="{{ BREW_BUILD_PARAMS.SERVER }}"/>
+                      <param name="RPM_BLACKLIST" value="{{ BREW_BUILD_PARAMS.RPM_BLACKLIST }}"/>
                     </params>
                     <rpm name="test(/distribution/install/brew-build)" path="/mnt/tests/distribution/install/brew-build"/>
                   </task>
@@ -106,7 +61,7 @@ class InstallKojiBuild(gluetool.Module):
                 </recipe>
               </recipeSet>
             </job>
-        """.format(**options)
+        """, BREW_BUILD_PARAMS=brew_build_task_params)
 
         job = bs4.BeautifulSoup(job_xml, 'xml')
 
@@ -131,11 +86,9 @@ class InstallKojiBuild(gluetool.Module):
                                              '<Not available>' if sut_install_logs is None else sut_install_logs)
 
     def setup_guest(self, guests, **kwargs):
-
-        self.require_shared('tasks', 'restraint')
+        self.require_shared('restraint', 'brew_build_task_params')
 
         self.overloaded_shared('setup_guest', guests, **kwargs)
 
-        tasks = self.shared('tasks')
         for guest in guests:
-            self._setup_guest(tasks, guest)
+            self._setup_guest(guest)
