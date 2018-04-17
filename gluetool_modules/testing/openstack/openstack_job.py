@@ -60,7 +60,7 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         'install-method': {
             'help': 'Yum method to use for installation (default: ``install``).',
             'type': str,
-            'default': 'install'
+            'default': 'multi'
         }
     })
 
