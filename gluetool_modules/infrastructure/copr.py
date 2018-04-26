@@ -7,6 +7,7 @@ from rpmUtils.miscutils import splitFilename
 import gluetool
 from gluetool import SoftGlueError
 from gluetool.utils import cached_property
+from gluetool.log import format_dict
 
 
 class NotBuildTaskError(SoftGlueError):
@@ -37,7 +38,7 @@ class CoprTask(object):
         self.builder = message['builder']
         self.owner = message['owner']
         self.issuer = message['submitter']
-        self.artifact_id = str(message)
+        self.artifact_id = format_dict(message)
 
         self.module = module
 
