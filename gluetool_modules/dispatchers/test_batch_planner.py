@@ -391,7 +391,7 @@ class TestBatchPlanner(gluetool.Module):
             return
 
         # Find command sets for the component
-        commands = self._construct_command_sets(matching_config, task.component)
+        commands = self._construct_command_sets(matching_config, task.component_id)
         log_dict(self.debug, 'commands', commands)
 
         final_commands = []
