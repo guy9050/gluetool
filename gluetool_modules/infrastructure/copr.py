@@ -38,7 +38,10 @@ class CoprTask(object):
         self.builder = message['builder']
         self.owner = message['owner']
         self.issuer = message['submitter']
+        self.project = message['copr']
         self.artifact_id = format_dict(message)
+        # this string identifies component in static config file
+        self.component_id = '{}/{}/{}'.format(self.owner, self.project, self.component)
 
         self.module = module
 

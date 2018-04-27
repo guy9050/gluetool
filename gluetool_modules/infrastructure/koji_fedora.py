@@ -82,6 +82,9 @@ class KojiTask(object):
         if not self._valid_task():
             raise NotBuildTaskError(self.task_id)
 
+        # this string identifies component in static config file
+        self.component_id = self.component
+
         # wait for the task to be non-waiting and closed
         wait('waiting for task to be non waiting', self._check_nonwaiting_task, timeout=wait_timeout)
 
