@@ -47,7 +47,7 @@ class CoprTask(object):
 
     @cached_property
     def rpm_urls(self):
-        url = "{}/api_2/build_tasks?build_id={}".format(self.module.option('copr_url'), self.build_id)
+        url = "{}/api_2/build_tasks?build_id={}".format(self.module.option('copr-url'), self.build_id)
 
         build_tasks_json = urlopen(url).read()
         try:
@@ -83,17 +83,17 @@ class Copr(gluetool.Module):
     description = 'Copr'
 
     options = {
-        'copr_url': {
+        'copr-url': {
             'help': 'Url of Copr build server',
             'type': str
         },
-        'init_message': {
+        'init-message': {
             'help': 'Json message sent by copr build system',
             'type': str
         }
     }
 
-    required_options = ('copr_url',)
+    required_options = ('copr-url',)
 
     shared_functions = ['primary_task', 'tasks']
 
@@ -130,9 +130,9 @@ class Copr(gluetool.Module):
 
     def execute(self):
 
-        if self.option('init_message'):
-            self.info("Parameter 'init_message' is used to init copr module.")
-            self.task = CoprTask(gluetool.utils.from_json(self.option('init_message')), self)
+        if self.option('init-message'):
+            self.info("Parameter 'init-message' is used to init copr module.")
+            self.task = CoprTask(gluetool.utils.from_json(self.option('init-message')), self)
 
         else:
             self.require_shared('trigger_message')
