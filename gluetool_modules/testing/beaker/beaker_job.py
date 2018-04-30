@@ -57,9 +57,9 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             'default': ''
         },
         'install-method': {
-            'help': 'Yum method to use for installation (default: ``update``).',
+            'help': 'Yum method to use for installation (default: ``multi``).',
             'type': str,
-            'default': 'update'
+            'default': 'multi'
         }
     })
 
