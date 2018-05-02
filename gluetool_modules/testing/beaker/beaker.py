@@ -520,6 +520,19 @@ class Beaker(gluetool.Module):
         # workflow-tomorrow
         jobs = self._run_wow()
 
+        # Log the initial beaker matrix - it will be logged by beaker-jobwatch later,
+        # but beaker-jobwatch will be running behind a pipe and one or two buffers,
+        # and no amount of flushes can force the pipe to present it sooner then after
+        # a period of waiting for another refresh of jobs it's managing. But it's
+        # useful information.
+        # Pick all job IDs returned by wow invocation, merge them into a single list,
+        # and insert them into a URL.
+
+        # pylint: disable=line-too-long
+        self.info('Initial Beaker matrix: https://beaker.engineering.redhat.com/matrix/?toggle_nacks_on=on&job_ids={}'.format(
+            '+'.join([str(job_id) for job_id in sum([job_ids for _, job_ids in jobs], [])])
+        ))
+
         # beaker-jobwatch
         jobwatch_output = self._run_jobwatch(jobs, jobwatch_options)
 
