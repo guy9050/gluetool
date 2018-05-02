@@ -173,6 +173,9 @@ class RulesEngine(gluetool.Module):
         * ``match(pattern, I=True)``
         * ``search(pattern, I=True)``
 
+    Helper function ``EXISTS`` is provided as well, returning ``True`` when the given
+    variable name exists in the context.
+
     Users of this module would simply specify what objects are available to rules in their
     domain, and then provides these objects when asking ``rules-engine`` (via the shared
     function) to evaluate the rules.
@@ -218,6 +221,8 @@ class RulesEngine(gluetool.Module):
             }
 
         custom_locals = _enhance_strings(context or {})
+
+        custom_locals['EXISTS'] = lambda name: name in custom_locals
 
         self.debug('rules: {}'.format(rules))
         log_dict(self.debug, 'locals', custom_locals)
