@@ -68,7 +68,7 @@ def test_covscan(module, monkeypatch):
     covscan_url = 'dummy_covscan_url'
     overall_results = 'dummy_overall_results'
 
-    mocked_task = MagicMock(nvr=nvr, scratch=True, task_id=task_id, url=brew_url, latest=latest)
+    mocked_task = MagicMock(nvr=nvr, scratch=True, id=task_id, url=brew_url, latest=latest)
     mocked_covscan_result = MagicMock(url=covscan_url, add=[], fixed=[])
     mocked_result = CovscanTestResult(module.glue, overall_results, mocked_covscan_result, mocked_task)
     mocked_publish = MagicMock()
@@ -234,7 +234,7 @@ def functional_testing(test_result, module, monkeypatch):
     target = 'dummy_target'
     result_type = test_result.test_type
 
-    mocked_task = MagicMock(nvr=nvr, scratch=scratch, task_id=task_id, url='dummy_brew_url',
+    mocked_task = MagicMock(nvr=nvr, scratch=scratch, id=task_id, url='dummy_brew_url',
                             latest='dummy_baseline', component=component, target=target)
 
     patch_shared(monkeypatch, module, {

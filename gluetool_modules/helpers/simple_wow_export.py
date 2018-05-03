@@ -48,7 +48,7 @@ class SimpleWowExport(gluetool.Module):
         """
 
         variables = {
-            'BREW_TASK_ID': task.task_id,
+            'BREW_TASK_ID': task.id,
             'BREW_TASK_ISSUER': task.issuer,
             'BREW_TASK_TARGET': task.target,
             'NVR': task.nvr,

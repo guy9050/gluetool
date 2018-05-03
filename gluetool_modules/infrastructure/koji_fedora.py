@@ -41,10 +41,12 @@ class KojiTask(object):
         ``pkgs_url`` - a base URL for the packages location
 
     :param dict details: Instance details, see ``required_instance_keys``
-    :param int task_id: Initialize from given TaskID
+    :param int task_id: Initialize from given Koji task ID.
     :param str module_name: Name of the module, i.e. 'brew' or 'koji'
     :param gluetool.log.ContextLogger logger: logger used for logging
     :param bool wait_timeout: Wait for task to become non-waiting
+
+    :ivar int id: unique ID of the task on the Koji instance.
     """
 
     ARTIFACT_NAMESPACE = 'koji-build'
@@ -70,17 +72,17 @@ class KojiTask(object):
         self.logger = logger or Logging.get_logger()
         logger.connect(self)
 
-        self.task_id = int(task_id)
+        # pylint: disable=invalid-name
+        self.id = int(task_id)
         self.api_url = details['url']
         self.web_url = details['web_url']
         self.pkgs_url = details['pkgs_url']
         self.session = details['session']
         self.module_name = module_name
-        self.artifact_id = self.task_id
 
         # first check if the task is valid for our case
         if not self._valid_task():
-            raise NotBuildTaskError(self.task_id)
+            raise NotBuildTaskError(self.id)
 
         # this string identifies component in static config file
         self.component_id = self.component
@@ -93,7 +95,7 @@ class KojiTask(object):
         wait('waiting for task to be closed', self._check_closed_task, timeout=wait_timeout)
 
     def __repr__(self):
-        return '{}({})'.format(self.__class__.__name__, self.task_id)
+        return '{}({})'.format(self.__class__.__name__, self.id)
 
     def _valid_task(self):
         """
@@ -141,7 +143,7 @@ class KojiTask(object):
         :rtype: list(dict)
         """
 
-        children = self.session.getTaskChildren(self.task_id, request=False)
+        children = self.session.getTaskChildren(self.id, request=False)
         log_dict(self.debug, 'child tasks', children)
 
         return children
@@ -153,7 +155,7 @@ class KojiTask(object):
         """
         if self.scratch:
             return None
-        return self.session.listBuilds(taskID=self.task_id)[0]
+        return self.session.listBuilds(taskID=self.id)[0]
 
     @cached_property
     def build_id(self):
@@ -169,9 +171,9 @@ class KojiTask(object):
         """
         :returns: dictionary with task details
         """
-        task_info = self.session.getTaskInfo(self.task_id, request=True)
+        task_info = self.session.getTaskInfo(self.id, request=True)
         if not task_info:
-            raise GlueError("brew task '{}' not found".format(self.task_id))
+            raise GlueError("brew task '{}' not found".format(self.id))
 
         self.debug('task info:\n{}'.format(format_dict(task_info)))
 
@@ -195,10 +197,10 @@ class KojiTask(object):
     @cached_property
     def _task_info_request(self):
         if 'request' not in self.task_info:
-            raise GlueError("task '{}' has no request field in task info".format(self.task_id))
+            raise GlueError("task '{}' has no request field in task info".format(self.id))
 
         if len(self.task_info["request"]) < 3:
-            raise GlueError("task '{}' has unexpected number of items in request field".format(self.task_id))
+            raise GlueError("task '{}' has unexpected number of items in request field".format(self.id))
 
         return self.task_info["request"]
 
@@ -211,7 +213,7 @@ class KojiTask(object):
             return self._task_info_request[1]
 
         # inform admins about this weird build
-        self.warn("task '{}' build '{}' has no build target".format(self.task_id, self.nvr), sentry=True)
+        self.warn("task '{}' build '{}' has no build target".format(self.id, self.nvr), sentry=True)
 
         return '<no build target available>'
 
@@ -223,7 +225,7 @@ class KojiTask(object):
         if self._task_info_request[0]:
             return self._task_info_request[0]
 
-        raise GlueError("task '{}' has no source defined in the request field".format(self.task_id))
+        raise GlueError("task '{}' has no source defined in the request field".format(self.id))
 
     @cached_property
     def scratch(self):
@@ -254,7 +256,7 @@ class KojiTask(object):
         """
         :returns: URL of task info web page
         """
-        return "{}/taskinfo?taskID={}".format(self.web_url, self.task_id)
+        return "{}/taskinfo?taskID={}".format(self.web_url, self.id)
 
     @cached_property
     def latest(self):
@@ -281,7 +283,7 @@ class KojiTask(object):
         :returns: URL to the source rpm or None if artifacts gone (for scratch build only)
         """
         if self.task_info['state'] != koji.TASK_STATES["CLOSED"]:
-            raise GlueError("Brew task [%s] is not a successfully completed task" % self.task_id)
+            raise GlueError("Brew task [%s] is not a successfully completed task" % self.id)
 
         # For standard (non-scratch) builds, we may fetch an associated build and dig info from it
         if not self.scratch:
@@ -295,7 +297,7 @@ class KojiTask(object):
 
         # For scratch build there is no associated build, so we need to go through all buildArch tasks
         tasks = self.session.listTasks(opts={
-            'parent': self.task_id,
+            'parent': self.id,
             'method': 'buildArch',
             'state': [koji.TASK_STATES['CLOSED']],
             'decode': True
@@ -315,7 +317,7 @@ class KojiTask(object):
             base_path = koji.pathinfo.taskrelpath(task['id'])
             return '/'.join(['{0}/work'.format(self.pkgs_url), base_path, filename])
 
-        raise NoArtifactsError(self.task_id)
+        raise NoArtifactsError(self.id)
 
     @cached_property
     def nvr(self):
@@ -350,7 +352,7 @@ class KojiTask(object):
         """
         :returns: string with human readable task details
         """
-        msg = ["task '{}'".format(self.task_id)]
+        msg = ["task '{}'".format(self.id)]
         if self.scratch:
             msg.append("scratch")
         msg.append("build '{}'".format(self.nvr))
@@ -362,7 +364,7 @@ class KojiTask(object):
         """
         :returns: short version string with task details
         """
-        return "{t.task_id}:{scratch}{t.nvr}".format(t=self, scratch='S:' if self.scratch else '')
+        return "{t.id}:{scratch}{t.nvr}".format(t=self, scratch='S:' if self.scratch else '')
 
     @cached_property
     def destination_tag(self):
