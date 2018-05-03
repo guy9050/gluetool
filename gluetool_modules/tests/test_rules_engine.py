@@ -3,6 +3,7 @@ import types
 
 import pytest
 
+import gluetool
 import gluetool_modules.helpers.rules_engine
 from gluetool_modules.helpers.rules_engine import RulesEngine, Rules, MatchableString, RulesSyntaxError, InvalidASTNodeError
 
@@ -102,3 +103,17 @@ def test_compile_error(rule, error_klass, error_message, error_detail):
 ])
 def test_eval(rule, context, outcome):
     assert Rules(rule).eval({}, context) == outcome
+
+
+def test_unknown_variable(module):
+    with pytest.raises(gluetool.GlueError, match=r"Unknown variable used in rule: name 'foo' is not defined"):
+        module.evaluate_rules('foo')
+
+
+@pytest.mark.parametrize('rule, context, result', [
+    ("EXISTS('foo')",     {}, False,),
+    ("not EXISTS('foo')", {}, True),
+    ("EXISTS('foo')",     {'foo': 17}, True)
+])
+def test_exists(module, rule, context, result):
+    assert module.evaluate_rules(rule, context=context) is result
