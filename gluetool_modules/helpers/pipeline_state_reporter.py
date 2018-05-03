@@ -59,6 +59,36 @@ class PipelineStateReporter(gluetool.Module):
            branch: PRIMARY_TASK.branch or None  # string or None
            scratch: PRIMARY_TASK.scratch  # boolean
 
+    **Final pipeline state**
+
+    Provided via ``--final-state-map`` option, a mapping is used to determine the final state of the pipeline. By
+    default, when exception was raised and failure is being handled, the final result is supposed to be ``error``,
+    but on some occasions user might want to "whitelist" some of the errors.
+
+    Rules are optional, with ``True`` being the default (i.e. no rule means the instruction applies always). The
+    first instruction allowed by its rules wins, no other instructions are inspected.
+
+    If there is no instruction map or no rule matched, the final state is determined easily - if there was an
+    exception, it's ``error``, ``complete`` otherwise.
+
+    Besides the common evaluation context, a ``FAILURE`` variable is available, representing
+    the failure - if any - being the cause of the pipeline doom. If there was no failure, the
+    variable is set to ``None``.
+
+    .. code-block:: yaml
+
+       ---
+
+       # If there is a failure, and it's an exception we want to pretend like nothing happened, set the state.
+       - rules: FAILURE and FAILURE.exc_info and FAILURE.exc_info[0].__name__ in ('ThisIsFineError',)
+         state: complete
+
+       # If there is a soft failure, pretend like nothing happened.
+       - rules: FAILURE and FAILURE.soft
+         state: complete
+
+       # Final "catch the rest" instruction to set "complete" is not necessary
+       # - state: complete
 
     **Eval context**
 
@@ -98,9 +128,14 @@ class PipelineStateReporter(gluetool.Module):
             },
             'test-type': {
                 'help': "Type of tests provided in this pipeline, e.g. 'tier1', 'rpmdiff-analysis' or 'covscan'."
-            },
+            }
+        }),
+        ('Mapping options', {
             'artifact-map': {
                 'help': "File with description of items provided as artifact info."
+            },
+            'final-state-map': {
+                'help': 'Instructions to decide the final state of the pipeline.'
             }
         }),
         ('Tweaks', {
@@ -151,6 +186,13 @@ class PipelineStateReporter(gluetool.Module):
             return []
 
         return gluetool.utils.load_yaml(self.option('artifact-map'), logger=self.logger)
+
+    @gluetool.utils.cached_property
+    def final_state_map(self):
+        if not self.option('final-state-map'):
+            return []
+
+        return gluetool.utils.load_yaml(self.option('final-state-map'), logger=self.logger)
 
     def _artifact_info(self):
         self.require_shared('evaluate_rules')
@@ -274,13 +316,7 @@ class PipelineStateReporter(gluetool.Module):
 
         headers, body = self._init_message(test_category, test_type, thread_id)
 
-        if state == STATE_QUEUED:
-            pass
-
-        elif state == STATE_RUNNING:
-            pass
-
-        elif state == STATE_COMPLETE:
+        if state == STATE_COMPLETE:
             body['system'] = [
                 {
                     'label': label,
@@ -299,9 +335,12 @@ class PipelineStateReporter(gluetool.Module):
             if self.has_shared('notification_recipients'):
                 body['recipients'] = self.shared('notification_recipients')
 
-        elif state == STATE_ERROR:
-            body['reason'] = error_message
-            body['issue_url'] = error_url
+        # Send error properties in any case - despite the final state being e.g. 'complete',
+        # an exception may have been raised and by always reporting the properties we can be
+        # sure even the 'complete' report would be connected with the original issue, and
+        # therefore open to investigation.
+        body['reason'] = error_message
+        body['issue_url'] = error_url
 
         render_context = gluetool.utils.dict_update(self.shared('eval_context'), {
             'HEADERS': headers,
@@ -341,16 +380,48 @@ class PipelineStateReporter(gluetool.Module):
 
         return 'fail'
 
+    def _get_final_state(self, failure):
+        """
+        Read instructions from a file, and find out what the final state of the crrent pipeline
+        should be.
+        """
+
+        context = gluetool.utils.dict_update(self.shared('eval_context'), {
+            'FAILURE': failure
+        })
+
+        for instr in self.final_state_map:
+            log_dict(self.debug, 'final state instruction', instr)
+
+            if not self.shared('evaluate_rules', instr.get('rules', 'True'), context=context):
+                self.debug('denied by rules')
+                continue
+
+            if 'state' not in instr:
+                self.warn('Final state map matched but did not yield any state', sentry=True)
+                continue
+
+            self.debug("final state set to '{}'".format(instr['state']))
+
+            return instr['state']
+
+        return STATE_ERROR if failure else STATE_COMPLETE
+
     def destroy(self, failure=None):
         if failure is not None and isinstance(failure.exc_info[1], SystemExit):
             return
 
         self.info('reporting pipeline final state')
 
-        if failure is None:
-            self.report_pipeline_state(STATE_COMPLETE, test_overall_result=self._get_test_result(),
-                                       test_results=self.shared('results'))
-            return
+        kwargs = {
+            'test_overall_result': self._get_test_result(),
+            'test_results': self.shared('results')
+        }
 
-        self.report_pipeline_state(STATE_ERROR, error_message=str(failure.exc_info[1].message),
-                                   error_url=failure.sentry_event_url)
+        if failure:
+            kwargs.update({
+                'error_message': str(failure.exc_info[1].message),
+                'error_url': failure.sentry_event_url
+            })
+
+        self.report_pipeline_state(self._get_final_state(failure), **kwargs)
