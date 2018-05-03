@@ -14,6 +14,16 @@ class NoTestAvailableError(PrimaryTaskFingerprintsMixin, SoftGlueError):
         super(NoTestAvailableError, self).__init__(task, 'No tests provided for the component')
 
 
+class NoGeneralTestPlanError(PrimaryTaskFingerprintsMixin, SoftGlueError):
+    def __init__(self, task):
+        super(NoGeneralTestPlanError, self).__init__(task, "No general test plan found for '{}'".format(task.component))
+
+
+class GeneralWOWError(PrimaryTaskFingerprintsMixin, GlueError):
+    def __init__(self, task, output):
+        super(GeneralWOWError, self).__init__(task, "Failure during 'wow' execution: {}".format(output.stderr))
+
+
 class WorkflowTomorrow(gluetool.Module):
     """
     Runs ``workflow-tomorrow`` to generate XML description of a Beaker job. Options used in ``wow``
@@ -117,8 +127,10 @@ class WorkflowTomorrow(gluetool.Module):
 
         self.require_shared('distro', 'evaluate_rules', 'tasks', 'primary_task')
 
+        primary_task = self.shared('primary_task')
+
         if not self.option('wow-options') and not self.option('use-general-test-plan'):
-            raise NoTestAvailableError(self.shared('primary_task'))
+            raise NoTestAvailableError(primary_task)
 
         options = options or []
         environment = environment or {}
@@ -205,12 +217,12 @@ class WorkflowTomorrow(gluetool.Module):
 
             # incorporate general test plan if requested
             if self.option('use-general-test-plan'):
-                component = self.shared('primary_task').component
+                component = primary_task.component
                 try:
                     command += ['--plan={}'.format(str(qe.GeneralPlan(component).id))]
 
                 except qe.GeneralPlanError:
-                    raise GlueError("no general test plan found for '{}'".format(component))
+                    raise NoGeneralTestPlanError(primary_task)
 
             if quote_args is True:
                 # escape apostrophes in strings and adds them around strings with space
@@ -234,12 +246,12 @@ class WorkflowTomorrow(gluetool.Module):
             except GlueCommandError as exc:
                 # Check for most common causes, and raise soft error where necessary
                 if 'No relevant tasks found in test plan' in exc.output.stderr:
-                    raise NoTestAvailableError(self.shared('primary_task'))
+                    raise NoTestAvailableError(primary_task)
 
                 if 'No recipe generated (no relevant tasks?)' in exc.output.stderr:
-                    raise NoTestAvailableError(self.shared('primary_task'))
+                    raise NoTestAvailableError(primary_task)
 
-                raise GlueError("Failure during 'wow' execution: {}".format(exc.output.stderr))
+                raise GeneralWOWError(primary_task, exc.output)
 
         # For each distro, construct one wow command/job
         return [_plan_job(distro) for distro in self.shared('distro')]
