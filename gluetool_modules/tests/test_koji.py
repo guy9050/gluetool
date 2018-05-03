@@ -232,7 +232,7 @@ VALID_TASKS = {
         'source': 'git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde',
         'srcrpm': 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/src/bash-4.3.43-4.fc25.src.rpm',
         'target': 'f25-candidate',
-        'task_id': 15869828,
+        'id': 15869828,
         'url': 'https://koji.fedoraproject.org/koji/taskinfo?taskID=15869828',
         'version': '4.3.43',
     },
@@ -252,7 +252,7 @@ VALID_TASKS = {
         'source': 'cli-build/1498396792.492652.jYJCrkUF/bash-4.4.12-5.fc26.src.rpm',
         'srcrpm': 'https://kojipkgs.fedoraproject.org/work/tasks/6985/20166985/bash-4.4.12-5.fc27.src.rpm',
         'target': '<no build target available>',
-        'task_id': 20166983,
+        'id': 20166983,
         'url': 'https://koji.fedoraproject.org/koji/taskinfo?taskID=20166983',
         'version': '4.4.12',
     }
@@ -337,7 +337,7 @@ def fixture_module(monkeypatch):
 
 
 def test_sanity_task_id(module):
-    # sanity tests for various types of valid tasks specified by task_id
+    # sanity tests for various types of valid tasks specified by task id
     for task in VALID_TASKS.iterkeys():
         FakeClientSession.fake_key = task
         module.tasks([task])
@@ -362,7 +362,7 @@ def test_sanity_nvr(module):
     # pylint: disable=protected-access
     module._config = {'nvr': ['bash-4.3.43-4.fc25']}
     module.execute()
-    assert module._tasks[0].task_id == 15869828
+    assert module._tasks[0].id == 15869828
 
 
 def test_sanity_build_id(module):
@@ -371,7 +371,7 @@ def test_sanity_build_id(module):
     # pylint: disable=protected-access
     module._config = {'build-id': [805705]}
     module.execute()
-    assert module._tasks[0].task_id == 15869828
+    assert module._tasks[0].id == 15869828
 
 
 def test_sanity_name_tag(module):
@@ -383,7 +383,7 @@ def test_sanity_name_tag(module):
         'tag': 'f25'
     }
     module.execute()
-    assert module._tasks[0].task_id == 15869828
+    assert module._tasks[0].id == 15869828
 
 
 def test_no_koji_task(module):
@@ -393,7 +393,7 @@ def test_no_koji_task(module):
 
 
 def test_invalid_task_id_type(module):
-    # task_id not convertable to a number
+    # task id not convertable to a number
     with pytest.raises(ValueError):
         module.tasks(['invalid id'])
 

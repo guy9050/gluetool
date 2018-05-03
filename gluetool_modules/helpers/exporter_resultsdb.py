@@ -60,7 +60,7 @@ class CIExporterResultsDB(gluetool.Module):
             'CI_TYPE': 'resultsdb',
             'item': item,
             'scratch': task.scratch,
-            'taskid': task.task_id,
+            'taskid': task.id,
             'testcase': 'dist.covscan',
             'type': 'koji_build_pair'
         }
@@ -71,7 +71,7 @@ class CIExporterResultsDB(gluetool.Module):
                 'newnvr': task.nvr,
                 'oldnvr': result.baseline,
                 'scratch': task.scratch,
-                'taskid': task.task_id,
+                'taskid': task.id,
                 'type': 'koji_build_pair'
             },
             'outcome': result.overall_result,
@@ -134,7 +134,7 @@ class CIExporterResultsDB(gluetool.Module):
         headers = {
             'CI_TYPE': 'ci-metricsdata',
             'component': task.nvr,
-            'taskid': task.task_id,
+            'taskid': task.id,
         }
 
         body = {
@@ -142,7 +142,7 @@ class CIExporterResultsDB(gluetool.Module):
             'trigger': 'brew build',
             'tests': results,
             'base_distro': distro,
-            'brew_task_id': task.task_id,
+            'brew_task_id': task.id,
             # fake job name for legacy reasons
             'job_name': 'ci-{}-brew-{}-2-runtest'.format(task.component, task.target),
             'build_type': os.environ.get('BUILD_TYPE', 'unknown'),

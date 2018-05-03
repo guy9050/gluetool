@@ -65,7 +65,7 @@ def fixture_notify_email(integration_config, monkeypatch):
 
     notify_email.parse_config()
 
-    mock_task = gluetool.utils.Bunch(task_id=123456, nvr='dummy-package-1.2.3-79.el7', owner='foo',
+    mock_task = gluetool.utils.Bunch(id=123456, nvr='dummy-package-1.2.3-79.el7', owner='foo',
                                      issuer='bar', branch='fixing-bz17', target='release-candidate')
 
     patch_shared(monkeypatch, notify_email, {

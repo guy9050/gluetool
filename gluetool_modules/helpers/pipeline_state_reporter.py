@@ -47,7 +47,7 @@ class PipelineStateReporter(gluetool.Module):
 
        - rule: ARTIFACT_TYPE == 'foo'
          artifact-details:
-           id: "{{ PRIMARY_TASK.task_id }}"
+           id: "{{ PRIMARY_TASK.id }}"
            component: "{{ PRIMARY_TASK.component }}"
            issuer: "{{ PRIMARY_TASK.issuer }}"
 

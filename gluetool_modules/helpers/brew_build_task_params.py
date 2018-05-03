@@ -48,17 +48,17 @@ class BrewBuildOptions(gluetool.Module):
         if self.option('install-task-not-build'):
             self.debug('asked to install by task ID')
 
-            tasks = [task.task_id for task in self.shared('tasks')]
+            tasks = [task.id for task in self.shared('tasks')]
 
         else:
             for task in self.shared('tasks'):
                 if task.scratch:
-                    self.debug('task {} is a scratch build, using task ID for installation'.format(task.task_id))
+                    self.debug('task {} is a scratch build, using task ID for installation'.format(task.id))
 
-                    tasks.append(task.task_id)
+                    tasks.append(task.id)
 
                 else:
-                    self.debug('task {} is a regular task, using build ID for installation'.format(task.task_id))
+                    self.debug('task {} is a regular task, using build ID for installation'.format(task.id))
 
                     builds.append(task.build_id)
 

@@ -573,7 +573,7 @@ def fixture_task():
     mocked_task_id.__str__ = tostring
     type(mocked_task).scratch = mocked_scratch
     type(mocked_task).nvr = mocked_nvr
-    type(mocked_task).task_id = mocked_task_id
+    type(mocked_task).id = mocked_task_id
     type(mocked_task).latest = mocked_latest
     type(mocked_task).component = mocked_component
     return mocked_task

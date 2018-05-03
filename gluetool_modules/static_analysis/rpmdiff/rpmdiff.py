@@ -220,7 +220,7 @@ class CIRpmdiff(gluetool.Module):
         :returns: informations about RPMdiff run
         """
         if self.task.scratch:
-            command = self._rpmdiff_cmd + ["schedule", str(self.task.task_id)]
+            command = self._rpmdiff_cmd + ["schedule", str(self.task.id)]
         else:
             command = self._rpmdiff_cmd + ["schedule", self.task.nvr]
 
@@ -243,7 +243,7 @@ class CIRpmdiff(gluetool.Module):
                 'item': self.task.nvr,
                 'type': 'koji_build',
                 'scratch': self.task.scratch,
-                'taskid': self.task.task_id
+                'taskid': self.task.id
             },
             'ref_url': '',
             'testcase': {
@@ -278,7 +278,7 @@ class CIRpmdiff(gluetool.Module):
                 'newnvr': self.task.nvr,
                 'oldnvr': self.task.latest,
                 'scratch': self.task.scratch,
-                'taskid': self.task.task_id
+                'taskid': self.task.id
             },
             'ref_url': runinfo['web_url'],
             'testcase': {
@@ -299,7 +299,7 @@ class CIRpmdiff(gluetool.Module):
                         'newnvr': self.task.nvr,
                         'oldnvr': self.task.latest,
                         'scratch': self.task.scratch,
-                        'taskid': self.task.task_id
+                        'taskid': self.task.id
                     },
                     'ref_url': '{}/{}'.format(runinfo['web_url'], result['test']['test_id']),
                     'testcase': {
@@ -365,7 +365,7 @@ class CIRpmdiff(gluetool.Module):
                 self.info('cowardly refusing to compare same packages')
                 return
 
-        msg = ["running {} for task '{}'".format(test_type, self.task.task_id)]
+        msg = ["running {} for task '{}'".format(test_type, self.task.id)]
         msg += ['compared to {}'.format(self.task.latest)] if test_type == 'comparison' else []
         self.info(' '.join(msg))
 

@@ -33,7 +33,7 @@ class TCMSRun(gluetool.Module):
          add-options: |
            --duplicate
            --id
-           --summary "{{ PRIMARY_TASK.task_id }}: {{ NVR }}{% if PRIMARY_TASK.scratch %} (scratch){% endif %}"
+           --summary "{{ PRIMARY_TASK.id }}: {{ NVR }}{% if PRIMARY_TASK.scratch %} (scratch){% endif %}"
     """
 
     name = 'tcms-run'
