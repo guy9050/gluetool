@@ -115,7 +115,7 @@ class CoprTask(object):
         log_dict(self.module.debug, 'builder live log', builder_live_log)
         rpm_names = re.findall(r'Wrote: /builddir/build/RPMS/(.*\.rpm)', builder_live_log)
 
-        return ['{}/{}'.format(result_dir_url, rpm_name) for rpm_name in rpm_names]
+        return ['{}/{}'.format(self._build_task['result_dir_url'], rpm_name) for rpm_name in rpm_names]
 
     @cached_property
     def task_arches(self):
