@@ -1,4 +1,3 @@
-from urllib2 import urlopen
 import re
 import collections
 import requests
@@ -106,9 +105,14 @@ class CoprTask(object):
 
     @cached_property
     def rpm_urls(self):
-        result_dir_url = self._build_task['result_dir_url']
-        builder_live_log = urlopen('{}/builder-live.log'.format(result_dir_url)).read()
+        result_dir_url = '{}/builder-live.log'.format(self._build_task['result_dir_url'])
+        self.module.debug('result_dir_url: {}'.format(result_dir_url))
+        try:
+            builder_live_log = requests.get(result_dir_url).text
+        except Exception:
+            raise gluetool.GlueError('Unable to get: {}'.format(result_dir_url))
 
+        log_dict(self.module.debug, 'builder live log', builder_live_log)
         rpm_names = re.findall(r'Wrote: /builddir/build/RPMS/(.*\.rpm)', builder_live_log)
 
         return ['{}/{}'.format(result_dir_url, rpm_name) for rpm_name in rpm_names]
