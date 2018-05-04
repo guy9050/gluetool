@@ -85,13 +85,13 @@ class CoprTask(object):
         except Exception:
             raise gluetool.GlueError('Unable to get: {}'.format(build_tasks_info_url))
 
-        log_dict(self.debug, 'build info', build_info)
+        log_dict(self.module.debug, 'build info', build_info)
         self._build = build_info['build']
 
-        log_dict(self.debug, 'project info', project_info)
+        log_dict(self.module.debug, 'project info', project_info)
         self._project = project_info['project']
 
-        log_dict(self.debug, 'build tasks info', build_tasks_info)
+        log_dict(self.module.debug, 'build tasks info', build_tasks_info)
         self._build_task = build_tasks_info['build_task']
 
         self.status = self._build_task['state']
