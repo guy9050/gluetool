@@ -55,7 +55,7 @@ def test_setup(log, module, local_guest):
     playbooks = ['dummy-playbook-1.yml', 'dummy-playbook-2.yml']
     guests = [local_guest, local_guest]
 
-    def dummy_run_playbook(_playbook, _guests, **kwargs):
+    def dummy_run_playbook(_playbook, _guests, variables=None, **kwargs):
         expected_playbook = os.path.join(os.getcwd(), playbooks.pop(0))
 
         guest_hostnames = ', '.join([guest.hostname for guest in guests])
@@ -64,15 +64,22 @@ def test_setup(log, module, local_guest):
 
         assert _playbook == expected_playbook
         assert _guests == guests
+        # key1:val1 is gone because extra-vars option overrides it
+        assert variables == {
+            'key2': 'val2',
+            'key3': 'val3',
+            'key4': 'val4'
+        }
         assert kwargs == {'dummy_option': 17}
 
         return None
 
     # pylint: disable=protected-access
     module._config['playbooks'] = ','.join(playbooks)
+    module._config['extra-vars'] = ['key2=val2,key3=val3', 'key4=val4']
     module.glue._add_shared('run_playbook', module, dummy_run_playbook)
 
-    module.shared('setup_guest', guests, dummy_option=17)
+    module.shared('setup_guest', guests, variables={'key1': 'val1'}, dummy_option=17)
 
     assert not playbooks
 
@@ -80,7 +87,7 @@ def test_setup(log, module, local_guest):
 def test_playbook_map_guest_setup(module, monkeypatch):
     module._config['playbooks-map'] = 'map.yml'
 
-    monkeypatch.setattr(module, "_get_playbooks_from_map", lambda: [])
+    monkeypatch.setattr(module, "_get_details_from_map", lambda: ([], {}))
 
     module.shared('setup_guest', None)
 
@@ -110,10 +117,13 @@ def test_playbook_map(module, monkeypatch):
                 "playbooks": [
                     "default.yaml"
                 ],
+                "extra_vars": {
+                    "key": "value"
+                },
                 "rule": "BUILD_TARGET.match('rhel-7.0-candidate')"
             },
         ]
 
     monkeypatch.setattr(gluetool.utils, "load_yaml", load_yaml)
 
-    assert module._get_playbooks_from_map() == [os.path.join(os.getcwd(), 'default.yaml')]
+    assert module._get_details_from_map() == ([os.path.join(os.getcwd(), 'default.yaml')], {'key': 'value'})
