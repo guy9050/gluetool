@@ -1,12 +1,14 @@
 import collections
 import re
 import koji
+
 from bs4 import BeautifulSoup
+from rpmUtils.miscutils import splitFilename
 
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.log import Logging, log_dict
-from gluetool.utils import cached_property, dict_update, fetch_url, format_dict, wait
+from gluetool.utils import cached_property, dict_update, fetch_url, wait, normalize_multistring_option
 
 
 class NotBuildTaskError(SoftGlueError):
@@ -30,8 +32,27 @@ class NoArtifactsError(SoftGlueError):
 #: :ivar list(str) arches: List of architectures.
 TaskArches = collections.namedtuple('TaskArches', ['complete', 'arches'])
 
+#: Represents ``request`` field of API response on ``getTaskInfo`` query for common build task.
+#:
+#: :ivar str source: source used for the building process.
+#: :ivar str target: target the task built for.
+#: :ivar dict options: additional task options.
+BuildTaskRequest = collections.namedtuple('BuildTaskRequest', ['source', 'target', 'options'])
+
+#: Represents ``request`` field of API response on ``getTaskInfo`` query for ``buildArch`` task.
+#:
+#: :ivar str source: source used for the building process.
+#: :ivar something: some value of unknown purpose.
+#: :ivar str arch: build architecture.
+#: :ivar bool keep_srpm: whether the SRPM was stored among artifacts.
+#: :ivar dict options: additional task options.
+BuildArchTaskRequest = collections.namedtuple('BuildArchTaskRequest',
+                                              ['source', 'something', 'arch', 'keep_srpm', 'options'])
+
 
 class KojiTask(object):
+    # pylint: disable=too-many-public-methods
+
     """
     Provides abstraction of a koji build task, specified by task ID. For initialization
     koji instance details need to be passed via the instance dictionary with the following keys:
@@ -66,9 +87,6 @@ class KojiTask(object):
     def __init__(self, details, task_id, module_name, logger=None, wait_timeout=None):
         self._check_required_instance_keys(details)
 
-        if not isinstance(details['session'], koji.ClientSession):
-            raise GlueError('session is not a koji client session instance')
-
         self.logger = logger or Logging.get_logger()
         logger.connect(self)
 
@@ -83,9 +101,6 @@ class KojiTask(object):
         # first check if the task is valid for our case
         if not self._valid_task():
             raise NotBuildTaskError(self.id)
-
-        # this string identifies component in static config file
-        self.component_id = self.component
 
         # wait for the task to be non-waiting and closed
         wait('waiting for task to be non waiting', self._check_nonwaiting_task, timeout=wait_timeout)
@@ -103,7 +118,7 @@ class KojiTask(object):
 
         :returns: True if task is a sucessfully finished build task, False otherwise
         """
-        if self.task_info['method'] == 'build':
+        if self._task_info['method'] == 'build':
             return True
 
         return False
@@ -115,9 +130,9 @@ class KojiTask(object):
         :returns: True if task is closed, False otherwise
         """
         # remove the cached task_info
-        del self.task_info
+        del self._task_info
 
-        if self.task_info['state'] == koji.TASK_STATES['CLOSED']:
+        if self._task_info['state'] == koji.TASK_STATES['CLOSED']:
             return True
 
         return False
@@ -128,89 +143,140 @@ class KojiTask(object):
         :returns: True if task is non-waiting, False otherwise
         """
         # remove the cached task_info
-        del self.task_info
+        del self._task_info
 
-        if self.task_info['waiting'] is False:
+        if self._task_info['waiting'] is False:
             return True
 
         return False
 
     @cached_property
-    def _children(self):
+    def _subtasks(self):
         """
-        Return list of children task in raw form, as JSON data returned by Koji API.
+        A list of children tasks in raw form, as JSON data returned by Koji API.
 
         :rtype: list(dict)
         """
 
-        children = self.session.getTaskChildren(self.id, request=False)
-        log_dict(self.debug, 'child tasks', children)
+        subtasks = self.session.getTaskChildren(self.id, request=True)
+        log_dict(self.debug, 'subtasks', subtasks)
 
-        return children
-
-    @cached_property
-    def build(self):
-        """
-        :returns: returns build info dictionary for a given standard task or None for scratch
-        """
-        if self.scratch:
-            return None
-        return self.session.listBuilds(taskID=self.id)[0]
+        return subtasks
 
     @cached_property
-    def build_id(self):
+    def _build_arch_subtasks(self):
         """
-        :returns: build id for standard tasks or None for a scratch task
+        A list of children task of ``buildArch`` type, as JSON data returned by Koji API.
+
+        :rtype: list(dict)
         """
-        if self.scratch:
-            return None
-        return self.build['build_id']
+
+        subtasks = [task for task in self._subtasks if task['method'] == 'buildArch']
+
+        log_dict(self.debug, 'buildArch subtasks', subtasks)
+
+        for task in subtasks:
+            KojiTask.swap_request_info(task, BuildArchTaskRequest, 5)
+
+        return subtasks
+
+    @staticmethod
+    def swap_request_info(task_info, klass, nr_fields):
+        """
+        Replace ``request`` key of task info - a JSON structure, returned by API - with
+        an object with properties, representing the content of ``request`` key.
+        """
+
+        request_info = task_info.get('request', None)
+
+        if request_info is None:
+            raise GlueError("Task {} has no request field in task info".format(task_info['id']))
+
+        if len(request_info) < nr_fields:
+            raise GlueError("Task {} has unexpected number of items in request field".format(task_info['id']))
+
+        task_info['request'] = klass(*[request_info[i] for i in range(0, nr_fields)])
 
     @cached_property
-    def task_info(self):
+    def _task_info(self):
         """
-        :returns: dictionary with task details
+        Task info as returned by API.
+
+        :rtype: dict
         """
+
         task_info = self.session.getTaskInfo(self.id, request=True)
-        if not task_info:
-            raise GlueError("brew task '{}' not found".format(self.id))
 
-        self.debug('task info:\n{}'.format(format_dict(task_info)))
+        if not task_info:
+            raise GlueError("Task '{}' not found".format(self.id))
+
+        log_dict(self.debug, 'task info', task_info)
+
+        KojiTask.swap_request_info(task_info, BuildTaskRequest, 3)
 
         return task_info
 
     @cached_property
+    def _build(self):
+        """
+        Build info as returned by API, or ``None`` for scratch builds.
+
+        :rtype: dict
+        """
+
+        if self.scratch:
+            return None
+
+        return self.session.listBuilds(taskID=self.id)[0]
+
+    @cached_property
+    def _task_request(self):
+        return self._task_info['request']
+
+    @cached_property
+    def build_id(self):
+        """
+        Build ID for standard tasks, or ``None`` for scratch builds.
+
+        :rtype: int
+        """
+
+        if self.scratch:
+            return None
+
+        return self._build['build_id']
+
+    @cached_property
     def owner(self):
         """
-        :returns: owner name of task
+        Name of the owner of the task.
+
+        :rtype: str
         """
-        owner_id = self.task_info["owner"]
+
+        owner_id = self._task_info["owner"]
         return self.session.getUser(owner_id)["name"]
 
     @cached_property
     def issuer(self):
         """
-        :returns: issuer of a task (same as owner for Koji)
+        Name of the issuer of the task. The same as :py:attr:`owner`.
+
+        :rtype: str
         """
+
         return self.owner
-
-    @cached_property
-    def _task_info_request(self):
-        if 'request' not in self.task_info:
-            raise GlueError("task '{}' has no request field in task info".format(self.id))
-
-        if len(self.task_info["request"]) < 3:
-            raise GlueError("task '{}' has unexpected number of items in request field".format(self.id))
-
-        return self.task_info["request"]
 
     @cached_property
     def target(self):
         """
-        :returns: build target name
+        Build target name
+
+        :rtype: str
         """
-        if self._task_info_request[1]:
-            return self._task_info_request[1]
+
+        if self._task_request.target:
+            return self._task_request.target
 
         # inform admins about this weird build
         self.warn("task '{}' build '{}' has no build target".format(self.id, self.nvr), sentry=True)
@@ -220,21 +286,25 @@ class KojiTask(object):
     @cached_property
     def source(self):
         """
-        :returns: task's source, e.g. git+https://src.fedoraproject.org/rpms/rust-tokio-proto.git?#b59219
+        Task's source, e.g. git+https://src.fedoraproject.org/rpms/rust-tokio-proto.git?#b59219
+
+        :rtype: str
         """
-        if self._task_info_request[0]:
-            return self._task_info_request[0]
+
+        if self._task_request.source:
+            return self._task_request.source
 
         raise GlueError("task '{}' has no source defined in the request field".format(self.id))
 
     @cached_property
     def scratch(self):
         """
-        :returns: True if task is scratch, False if not
+        Whether the task is a scratch build.
+
+        :rtype: bool
         """
-        if "scratch" in self._task_info_request[2]:
-            return self._task_info_request[2]["scratch"]
-        return False
+
+        return self._task_request.options.get('scratch', False)
 
     @cached_property
     def task_arches(self):
@@ -244,31 +314,39 @@ class KojiTask(object):
         :rtype: TaskArches
         """
 
-        arches = self._task_info_request[2].get('arch_override', None)
+        arches = self._task_request.options.get('arch_override', None)
 
         if arches is not None:
             return TaskArches(False, [arch.strip() for arch in arches.split(' ')])
 
-        return TaskArches(True, [child['arch'] for child in self._children if child['method'] == 'buildArch'])
+        return TaskArches(True, [child['arch'] for child in self._build_arch_subtasks])
 
     @cached_property
     def url(self):
         """
-        :returns: URL of task info web page
+        URL of the task info web page.
+
+        :rtype: str
         """
+
         return "{}/taskinfo?taskID={}".format(self.web_url, self.id)
 
     @cached_property
     def latest(self):
         """
-        :returns: latest released package with the same destination tag or None if not found
+        NVR of the latest released package with the same destination tag, or ``None`` if none found.
+
+        :rtype: str
         """
+
         if self.destination_tag:
             builds = self.session.listTagged(self.destination_tag, None, True, latest=2, package=self.component)
         else:
             builds = self.session.listTagged(self.target, None, True, latest=2, package=self.component)
+
         if self.scratch:
             return builds[0]["nvr"] if builds else None
+
         return builds[1]["nvr"] if builds and len(builds) > 1 else None
 
     @cached_property
@@ -278,103 +356,231 @@ class KojiTask(object):
         return None
 
     @cached_property
+    def artifacts(self):
+        """
+        Artifacts of ``buildArch`` subtasks, in a mapping where subtask IDs are the keys
+        and lists of artifact names are the values.
+
+        :rtype: dict(int, list(str))
+        """
+
+        artifacts = {
+            task['id']: self.session.listTaskOutput(task['id'])
+            for task in self._build_arch_subtasks
+        }
+
+        log_dict(self.debug, 'artifacts', artifacts)
+
+        return artifacts
+
+    @cached_property
+    def has_artifacts(self):
+        """
+        Whether there are artifacts on the server for ``buildArch`` subtasks.
+
+        :rtype: bool
+        """
+
+        return all((bool(subtask_artifacts) for subtask_artifacts in self.artifacts.itervalues()))
+
+    @cached_property
+    def _srcrpm_subtask(self):
+        """
+        Search for SRPM-like artifact in ``buildArch`` subtasks, and if there is such artifact,
+        provide its name and ID of its subtask. If no such artifact exists, both values are ``None``.
+
+        :rtype: tuple(int, str)
+        """
+
+        if not self.has_artifacts:
+            self.debug('task has no artifacts, it is pointless to search them for srpm')
+            return None, None
+
+        for subtask, artifacts in self.artifacts.iteritems():
+            for artifact in artifacts:
+                if not artifact.endswith('.src.rpm'):
+                    continue
+
+                return subtask, artifact
+
+        return None, None
+
+    @cached_property
     def srcrpm(self):
         """
-        :returns: URL to the source rpm or None if artifacts gone (for scratch build only)
+        Source RPM name or ``None`` if it's impossible to find it.
+
+        :rtype: str
         """
-        if self.task_info['state'] != koji.TASK_STATES["CLOSED"]:
-            raise GlueError("Brew task [%s] is not a successfully completed task" % self.id)
+
+        if self._task_info['state'] != koji.TASK_STATES["CLOSED"]:
+            raise GlueError('Task {} is not a successfully completed task'.format(self.id))
 
         # For standard (non-scratch) builds, we may fetch an associated build and dig info from it
         if not self.scratch:
-            return "{}/packages/{}/{}/{}/src/{}.src.rpm".format(
-                self.pkgs_url,
-                self.build['package_name'],
-                self.build['version'],
-                self.build['release'],
-                self.build['nvr']
-            )
+            self.debug('srpm name deduced from build')
+            return '{}.src.rpm'.format(self._build['nvr'])
 
-        # For scratch build there is no associated build, so we need to go through all buildArch tasks
-        tasks = self.session.listTasks(opts={
-            'parent': self.id,
-            'method': 'buildArch',
-            'state': [koji.TASK_STATES['CLOSED']],
-            'decode': True
-        })
+        # Search all known artifacts for SRPM-like files
+        _, srcrpm = self._srcrpm_subtask
 
-        # gather list of files for each (sub-)task. We'll end up with this list:
-        # [(task1, file1), (task1, file2), ..., (taskN, fileM)]
-        tasks_outputs = []
-        for task in tasks:
-            tasks_outputs += [(task, filename) for filename in self.session.listTaskOutput(task['id'])]
+        if srcrpm is not None:
+            self.debug('srpm name deduced from a subtask artifact')
+            return srcrpm
 
-        # find src.rpm in the outputs
-        for task, filename in tasks_outputs:
-            if not filename.endswith('.src.rpm'):
+        # Maybe it's in Source option!
+        source = self._task_request.options.get('Source', None)
+        if source:
+            self.debug('srpm name deduced from task Source option')
+            return source.split('/')[-1].strip()
+
+        # Or in one of the subtasks!
+        for subtask in self._build_arch_subtasks:
+            if not subtask['request'].source:
                 continue
 
-            base_path = koji.pathinfo.taskrelpath(task['id'])
-            return '/'.join(['{0}/work'.format(self.pkgs_url), base_path, filename])
+            self.debug('srpm name deduced from subtask Source option')
+            return subtask['request'].source.split('/')[-1].strip()
 
-        raise NoArtifactsError(self.id)
+        # Nope, no SRPM anywhere.
+        return None
+
+    @cached_property
+    def srcrpm_url(self):
+        """
+        URL of the SRPM (:py:attr:`srcrpm`) or ``None`` if SRPM is not known.
+        """
+
+        if not self.srcrpm:
+            return None
+
+        if not self.scratch:
+            return "{}/packages/{}/{}/{}/src/{}.src.rpm".format(
+                self.pkgs_url,
+                self._build['package_name'],
+                self._build['version'],
+                self._build['release'],
+                self._build['nvr']
+            )
+
+        srcrpm_task, srcrpm = self._srcrpm_subtask
+
+        # we have SRPM name but no parent task, i.e. it's not possible to construct URL
+        if srcrpm_task is None:
+            return None
+
+        base_path = koji.pathinfo.taskrelpath(srcrpm_task)
+
+        return '/'.join(['{0}/work'.format(self.pkgs_url), base_path, srcrpm])
+
+    @cached_property
+    def _split_srcrpm(self):
+        """
+        SRPM name split into its NVREA pieces.
+
+        :raises gluetool.glue.GlueError: when SRPM name is not known.
+        :rtype: tuple(str)
+        """
+
+        if not self.srcrpm:
+            raise GlueError('Cannot find SRPM name')
+
+        return splitFilename(self.srcrpm)
 
     @cached_property
     def nvr(self):
         """
-        :returns: NVR of the build task
+        NVR of the built package.
+
+        :rtype: str
         """
-        return ".".join(self.srcrpm.split("/")[-1].split(".")[:-2])
+
+        name, version, release, _, _ = self._split_srcrpm
+
+        return '-'.join([name, version, release])
 
     @cached_property
     def component(self):
         """
-        :returns: package name of the build task
+        Package name of the built package (``N`` of ``NVR``).
+
+        :rtype: str
         """
-        return "-".join(self.nvr.split("-")[:-2])
+
+        return self._split_srcrpm[0]
 
     @cached_property
     def version(self):
         """
-        :returns: version of the build task
+        Version of the built package (``V`` of ``NVR``).
+
+        :rtype: str
         """
-        return self.nvr.split("-")[-2]
+
+        return self._split_srcrpm[1]
 
     @cached_property
     def release(self):
         """
-        :returns: release of the build task
+        Release of the built package (``R`` of ``NVR``).
+
+        :rtype: str
         """
-        return self.nvr.split("-")[-1]
+
+        return self._split_srcrpm[2]
 
     @cached_property
     def full_name(self):
         """
-        :returns: string with human readable task details
+        String with human readable task details. Used for slightly verbose representation e.g. in logs.
+
+        :rtype: str
         """
-        msg = ["task '{}'".format(self.id)]
+
+        name = [
+            "task '{}'".format(self.id),
+            "build '{}'".format(self.nvr),
+            "target '{}'".format(self.target)
+        ]
+
         if self.scratch:
-            msg.append("scratch")
-        msg.append("build '{}'".format(self.nvr))
-        msg.append("target '{}'".format(self.target))
-        return ' '.join(msg)
+            name.append('(scratch)')
+
+        if not self.has_artifacts:
+            name.append('(no artifacts)')
+
+        return ' '.join(name)
 
     @cached_property
     def short_name(self):
         """
-        :returns: short version string with task details
+        Short version of :py:attr:`full_name``.
+
+        :rtype: str
         """
+
         return "{t.id}:{scratch}{t.nvr}".format(t=self, scratch='S:' if self.scratch else '')
 
     @cached_property
     def destination_tag(self):
         """
-        :returns: build destination tag
+        Build destination tag
         """
+
         try:
             return self.session.getBuildTarget(self.target)["dest_tag_name"]
         except TypeError:
             return None
+
+    @cached_property
+    def component_id(self):
+        """
+        Used by task dispatcher to search their configurations. Identifies the component the task belongs to.
+
+        :rtype: str
+        """
+
+        return self.component
 
 
 class BrewTask(KojiTask):
@@ -459,7 +665,7 @@ class BrewTask(KojiTask):
         """
         :returns: issuer of brew task and in case of build from automation, returns issuer of git commit
         """
-        owner_id = self.task_info["owner"]
+        owner_id = self._task_info["owner"]
         if owner_id not in self.automation_user_ids:
             return self.owner
 
@@ -565,7 +771,6 @@ class Koji(gluetool.Module):
         }, details or {})
 
         task = task_class(details, task_id, self.unique_name, logger=self.logger, wait_timeout=wait_timeout)
-        self.debug('initialized {}'.format(task.full_name))
 
         return task
 
@@ -592,48 +797,49 @@ class Koji(gluetool.Module):
 
         return builds
 
-    def _find_task_ids(self):
+    def _find_task_ids(self, task_ids=None, build_ids=None, nvrs=None, names=None):
         """
-        Tries to find task ID from all supported options.
+        Tries to gather all available task IDs for different given inputs - build IDs, NVRs, package names
+        and actual task IDs as well. Some of these may be unknown to the backend, some of them may not lead
+        to a task ID. This helper method will find as many task IDs as possible.
 
-        :return: task ID
-        :rtype: int or None if no sources specified
+        :param list(int) task_ids: Task IDs
+        :param list(int) build_ids: Build IDs.
+        :param list(str) nvr: Package NVRs.
+        :param list(str) names: Package names. The latest build with a tag - given via module's ``--tag``
+            option - is the possible solution.
+        :rtype: list(int)
+        :return: Gathered task IDs.
         """
 
-        task_ids = []
+        log_dict(self.debug, 'find task IDs - from task IDs', task_ids)
+        log_dict(self.debug, 'find task IDs - from build IDs', build_ids)
+        log_dict(self.debug, 'find task IDs - from NVRs', nvrs)
+        log_dict(self.debug, 'find task IDs - from names', names)
+
+        # Task IDs are easy - just use them as an initial value of the list we want to return.
+        task_ids = task_ids or []
+
+        # Other options represent builds, and from those builds we must extract their tasks. First, let's find
+        # all those builds.
         builds = []
 
-        if self.option('task-id'):
-            task_ids += self.option('task-id')
+        builds += self._objects_to_builds('build', build_ids,
+                                          lambda build_id: [self._session.getBuild(build_id)])
+        builds += self._objects_to_builds('nvr', nvrs,
+                                          lambda nvr: [self._session.getBuild(nvr)])
+        builds += self._objects_to_builds('name', names,
+                                          lambda name: self._session.listTagged(self.option('tag'), package=name))
 
-        if self.option('build-id'):
-            builds += self._objects_to_builds('build', self.option('build-id'),
-                                              lambda build_id: [self._session.getBuild(build_id)])
-
-        if self.option('nvr'):
-            builds += self._objects_to_builds('nvr', self.option('nvr'),
-                                              lambda nvr: [self._session.getBuild(nvr)])
-
-        if self.option('name'):
-            builds += self._objects_to_builds('name', self.option('name'),
-                                              lambda name: self._session.listTagged(self.option('tag'), package=name))
-
-        if builds:
-            for_removal = []
-
-            for build in builds:
-                if 'task_id' in build and build['task_id']:
-                    continue
-
+        # Now extract task IDs.
+        for build in builds:
+            if 'task_id' not in build or not build['task_id']:
                 log_dict(self.debug, 'Build does not provide build ID', build)
-                for_removal.append(build)
+                continue
 
-            for build in for_removal:
-                builds.remove(build)
+            task_ids.append(build['task_id'])
 
-            task_ids += [build['task_id'] for build in builds]
-
-        return task_ids
+        return [int(task_id) for task_id in task_ids]
 
     def koji_session(self):
         return self._session
@@ -642,26 +848,32 @@ class Koji(gluetool.Module):
         if not self._tasks:
             raise GlueError('No tasks specified.')
 
-    def tasks(self, task_ids=None, **kwargs):
+    def tasks(self, task_ids=None, build_ids=None, nvrs=None, names=None, **kwargs):
         """
-        Returns a list of current tasks. If ``task_ids`` is set, new set of tasks is created using
-        the IDs, and becomes new set of current tasks, which is then returned.
+        Returns a list of current tasks. If options are specified, new set of tasks is created using
+        the provided options to find all available tasks, and this set becomes new set of current tasks,
+        which is then returned.
 
         Method either returns non-empty list of tasks, or raises an exception
 
-        :param list(int) task_ids: IDs of the tasks.
+        :param list(int) task_ids: Task IDs
+        :param list(int) build_ids: Build IDs.
+        :param list(str) nvr: Package NVRs.
+        :param list(str) names: Package names. The latest build with a tag - given via module's ``--tag``
+            option - is the possible solution.
         :param dict kwargs: Additional arguments passed to :py:meth:`_task_factory`.
-        :returns: List of task instances.
-        :rtype: list(:py:class:`KojiTask`)
+        :rtype: list(KojiTask)
+        :returns: Current task instances.
         :raises gluetool.glue.GlueError: When there are no tasks.
         """
 
-        task_ids = task_ids or []
-
-        log_dict(self.debug, 'tasks - for IDs', task_ids)
-
-        if task_ids:
-            self._tasks = [self._task_factory(task_id, **kwargs) for task_id in task_ids]
+        # Re-initialize set of current tasks only when any of the options is set.
+        # Otherwise leave it untouched.
+        if any([task_ids, build_ids, nvrs, names]):
+            self._tasks = [
+                self._task_factory(task_id, **kwargs)
+                for task_id in self._find_task_ids(task_ids=task_ids, build_ids=build_ids, nvrs=nvrs, names=names)
+            ]
 
         self._assert_tasks()
 
@@ -677,7 +889,7 @@ class Koji(gluetool.Module):
         :raises gluetool.glue.GlueError: When there are no tasks, therefore not even a primary one.
         """
 
-        self.debug('primary task - current tasks: {}'.format(format_dict(self._tasks)))
+        log_dict(self.debug, 'primary task - current tasks', self._tasks)
 
         self._assert_tasks()
 
@@ -726,12 +938,20 @@ class Koji(gluetool.Module):
         version = self._session.getAPIVersion()
         self.info('connected to {} instance \'{}\' API version {}'.format(self.unique_name, url, version))
 
-        task_ids = self._find_task_ids()
+        task_ids = self._find_task_ids(task_ids=self.option('task-id'),
+                                       build_ids=self.option('build-id'),
+                                       nvrs=normalize_multistring_option(self.option('nvr')),
+                                       names=normalize_multistring_option(self.option('name')))
+
         if task_ids:
-            self.tasks(task_ids, wait_timeout=wait_timeout)
+            self.tasks(task_ids=task_ids, wait_timeout=wait_timeout)
 
         for task in self._tasks:
-            self.info('initialized {}'.format(task.full_name))
+            self.info('initialized task {}'.format(task.full_name))
+
+        for task in self._tasks:
+            if not task.has_artifacts:
+                raise NoArtifactsError(task.id)
 
 
 class Brew(Koji, (gluetool.Module)):

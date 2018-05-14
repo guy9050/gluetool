@@ -190,7 +190,7 @@ class CICovscan(gluetool.Module):
             self.info("Using latest non-scratch build '{}' as baseline".format(baseline))
 
             self.info('Obtaining source RPM from Brew build')
-            srcrpm = urlgrab(self.task.srcrpm)
+            srcrpm = urlgrab(self.task.srcrpm_url)
 
             self.info('Issuing Covscan request')
 

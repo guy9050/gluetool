@@ -1,311 +1,57 @@
 import logging
+import os
 import pytest
 import koji
+import functools
 
 import gluetool
 import gluetool_modules.infrastructure.koji_fedora
 
-from . import create_module
+from mock import MagicMock
+from . import create_module, testing_asset
 
 
-# this dictionary provides minimal data needed fake koji's ClientSession for the tested koji tasks
-FAKE_CLIENT_SESSION = {
-    15869828: {
-        'getBuildTarget': {
-            'dest_tag_name': 'f25-updates-candidate',
-        },
-        'getUser': {
-            'name': 'svashisht',
-        },
-        'getTaskInfo': {
-            'method': 'build',
-            'owner': 3543,
-            'request': [
-                'git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde',
-                'f25-candidate',
-                {}
-            ],
-            'state': 2,
-            'waiting': False
-        },
-        'listBuilds': [{
-            'build_id': 805705,
-            'nvr': 'bash-4.3.43-4.fc25',
-            'package_name': 'bash',
-            'release': '4.fc25',
-            'version': '4.3.43',
-        }],
-        'listTagged': [
-            {'nvr': 'bash-4.3.43-4.fc25'},
-            {'nvr': 'bash-4.3.43-3.fc25'}
-        ],
-    },
-    18214941: {
-        'getTaskInfo': {
-            'method': 'build',
-            'owner': 3823,
-            'request': [
-                'git://pkgs.fedoraproject.org/rpms/setup?#338c72bc4e4fc6fa950f899bf4253b32de1dff60',
-                'rawhide',
-                {'scratch': True}
-            ],
-            'state': 2,
-            'waiting': False
-        },
-        'listTasks': [
-            {'id': 18214958},
-        ],
-        'listTaskOutput': {18214958: []}
-    },
-    20166983: {
-        'getBuildTarget': {
-            'dest_tag_name': 'f27-pending',
-        },
-        'getUser': {
-            'name': 'mvadkert',
-        },
-        'getTaskInfo': {
-            'method': 'build',
-            'owner': 3823,
-            'request': [
-                'cli-build/1498396792.492652.jYJCrkUF/bash-4.4.12-5.fc26.src.rpm',
-                None,
-                {'scratch': True}
-            ],
-            'state': 2,
-            'waiting': False
-        },
-        'listTagged': [
-            {'nvr': 'bash-4.4.12-5.fc27'},
-            {'nvr': 'bash-4.4.12-4.fc27'}
-        ],
-        'listTasks': [
-            {'id': 20166985},
-        ],
-        'listTaskOutput': {
-            20166985: [
-                'bash-4.4.12-5.fc27.src.rpm'
-            ]
-        }
-    },
-    20171466: {
-        'getTaskInfo': {
-            'method': 'runroot',
-            'state': 2
-        },
-    },
-    'bash-4.3.43-4.fc25': {
-        'getBuildTarget': {
-            'dest_tag_name': 'f25-updates-candidate',
-        },
-        'getBuild': {
-            'task_id': 15869828
-        },
-        'getTaskInfo': {
-            'method': 'build',
-            'owner': 3543,
-            'request': [
-                'git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde',
-                'f25-candidate',
-                {}
-            ],
-            'state': 2,
-            'waiting': False,
-        },
-        'listBuilds': [{
-            'build_id': 805705,
-            'nvr': 'bash-4.3.43-4.fc25',
-            'package_name': 'bash',
-            'release': '4.fc25',
-            'version': '4.3.43',
-        }],
-    },
-    '805705': {
-        'getBuildTarget': {
-            'dest_tag_name': 'f25-updates-candidate',
-        },
-        'getBuild': {
-            'task_id': 15869828
-        },
-        'getTaskInfo': {
-            'method': 'build',
-            'owner': 3543,
-            'request': [
-                'git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde',
-                'f25-candidate',
-                {}
-            ],
-            'state': 2,
-            'waiting': False,
-        },
-        'listBuilds': [{
-            'build_id': 805705,
-            'nvr': 'bash-4.3.43-4.fc25',
-            'package_name': 'bash',
-            'release': '4.fc25',
-            'version': '4.3.43',
-        }],
-    },
-    # component by NVR
-    'bash': {
-        'getBuildTarget': {
-            'dest_tag_name': 'f25-updates-candidate',
-        },
-        'getTaskInfo': {
-            'method': 'build',
-            'owner': 3543,
-            'request': [
-                'git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde',
-                'f25-candidate',
-                {}
-            ],
-            'state': 2,
-            'waiting': False,
-        },
-        'listBuilds': [{
-            'build_id': 805705,
-            'nvr': 'bash-4.3.43-4.fc25',
-            'package_name': 'bash',
-            'release': '4.fc25',
-            'version': '4.3.43',
-        }],
-        'listTagged': [{
-            'task_id': 15869828
-        }],
-    },
-    # invalid build
-    705705: {
-        'getBuild': [None]
-    },
-    # missing request field
-    10166983: {
-        'getBuildTarget': {
-            'dest_tag_name': 'f27-pending',
-        },
-        'getUser': {
-            'name': 'mvadkert',
-        },
-        'getTaskInfo': {
-            'method': 'build',
-            'state': 2,
-            'waiting': False,
-        },
-    },
-    # request field has not enough items in list
-    10166985: {
-        'getBuildTarget': {
-            'dest_tag_name': 'f27-pending',
-        },
-        'getUser': {
-            'name': 'mvadkert',
-        },
-        'getTaskInfo': {
-            'state': 2,
-            'method': 'build',
-            'waiting': False,
-            'request': [
-                'git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde',
-                {}
-            ],
-        },
-    },
-}
+class MockClientSession(object):
+    """
+    Mocked Koji session. It is given a source file which provides all necessary responses. The session
+    reads the data, mocks its methods and replies accordingly to queries.
+    """
+
+    def __init__(self, source_file):
+        data = gluetool.utils.load_yaml(source_file)
+
+        assert data, 'Empty mock data provided in {}'.format(source_file)
+
+        def getter(name, *args, **kwargs):
+            assert name in data, "Attempt to use API endpoint '{}' which is not mocked".format(name)
+
+            if args:
+                assert args[0] in data[name], "Attempt to use API endpoint '{}({})' which is not mocked".format(
+                    name, args[0])
+
+                return data[name][args[0]]
+
+            return data[name]
+
+        for method, response in data.iteritems():
+            setattr(self, method, functools.partial(getter, method))
 
 
-# Dictionary of valid tasks and their expected properties
-# Note that the task id can be int or string
-VALID_TASKS = {
-    # https://koji.fedoraproject.org/koji/taskinfo?taskID=15869828
-    15869828: {
-        'build_id': 805705,
-        'component': 'bash',
-        'destination_tag': 'f25-updates-candidate',
-        'full_name': "task '15869828' build 'bash-4.3.43-4.fc25' target 'f25-candidate'",
-        'issuer': 'svashisht',
-        'owner': 'svashisht',
-        'latest': 'bash-4.3.43-3.fc25',
-        'nvr': 'bash-4.3.43-4.fc25',
-        'pkgs_url': 'https://kojipkgs.fedoraproject.org',
-        'release': '4.fc25',
-        'scratch': False,
-        'short_name': '15869828:bash-4.3.43-4.fc25',
-        'source': 'git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde',
-        'srcrpm': 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/src/bash-4.3.43-4.fc25.src.rpm',
-        'target': 'f25-candidate',
-        'id': 15869828,
-        'url': 'https://koji.fedoraproject.org/koji/taskinfo?taskID=15869828',
-        'version': '4.3.43',
-    },
-    20166983: {
-        'build_id': None,
-        'component': 'bash',
-        'destination_tag': 'f27-pending',
-        'full_name': "task '20166983' scratch build 'bash-4.4.12-5.fc27' target '<no build target available>'",
-        'issuer': 'mvadkert',
-        'owner': 'mvadkert',
-        'latest': 'bash-4.4.12-5.fc27',
-        'nvr': 'bash-4.4.12-5.fc27',
-        'pkgs_url': 'https://kojipkgs.fedoraproject.org',
-        'release': '5.fc27',
-        'scratch': True,
-        'short_name': '20166983:S:bash-4.4.12-5.fc27',
-        'source': 'cli-build/1498396792.492652.jYJCrkUF/bash-4.4.12-5.fc26.src.rpm',
-        'srcrpm': 'https://kojipkgs.fedoraproject.org/work/tasks/6985/20166985/bash-4.4.12-5.fc27.src.rpm',
-        'target': '<no build target available>',
-        'id': 20166983,
-        'url': 'https://koji.fedoraproject.org/koji/taskinfo?taskID=20166983',
-        'version': '4.4.12',
-    }
-}
+@pytest.fixture(name='koji_session')
+def fixture_koji_session(request, monkeypatch):
+    # This is a bit complicated. We want parametrize this fixture, which is what indirect=True
+    # does, but that somehow expecteds that all params are given to this fixture, while we want
+    # thise give it just the task ID, and other params, e.g. NVR, are for the test itself.
+    # To overcome that, request.params can be multiple packed params, this fixture will use
+    # just the first one (task ID), return all of them, and test needs to unpack them as necessary.
 
-# invalid non-build tasks
-# runroot, newRepo, appliance, livemedia, image
-NON_BUILD_TASKS = [20171466]
+    task_id = request.param[0] if isinstance(request.param, tuple) else request.param
 
-# scratch builds which have artifacts already gone
-EXPIRED_TASKS = [18214941]
+    session = MockClientSession(testing_asset(os.path.join('koji', '{}.yml'.format(task_id))))
 
+    monkeypatch.setattr(koji, 'ClientSession', MagicMock(return_value=session))
 
-class FakeClientSession(object):
-    def __init__(self, *args, **kwargs):
-        pass
-
-    # pylint: disable=invalid-name,unused-argument
-    @staticmethod
-    def getAPIVersion():
-        return '1'
-
-    # pylint: disable=invalid-name,unused-argument
-    def getBuildTarget(self, *args, **kwargs):
-        return FAKE_CLIENT_SESSION[self.fake_key]['getBuildTarget']
-
-    # pylint: disable=invalid-name,unused-argument
-    def getBuild(self, *args, **kwargs):
-        return FAKE_CLIENT_SESSION[self.fake_key]['getBuild']
-
-    # pylint: disable=invalid-name,unused-argument
-    def getUser(self, *args, **kwargs):
-        return FAKE_CLIENT_SESSION[self.fake_key]['getUser']
-
-    # pylint: disable=invalid-name,unused-argument
-    def getTaskInfo(self, *args, **kwargs):
-        return FAKE_CLIENT_SESSION[self.fake_key]['getTaskInfo']
-
-    # pylint: disable=invalid-name,unused-argument
-    def listBuilds(self, *args, **kwargs):
-        return FAKE_CLIENT_SESSION[self.fake_key]['listBuilds']
-
-    # pylint: disable=invalid-name,unused-argument
-    def listTagged(self, *args, **kwargs):
-        return FAKE_CLIENT_SESSION[self.fake_key]['listTagged']
-
-    # pylint: disable=invalid-name,unused-argument
-    def listTasks(self, *args, **kwargs):
-        return FAKE_CLIENT_SESSION[self.fake_key]['listTasks']
-
-    # pylint: disable=invalid-name,unused-argument
-    def listTaskOutput(self, tid):
-        return FAKE_CLIENT_SESSION[self.fake_key]['listTaskOutput'][tid]
+    return request.param
 
 
 @pytest.fixture(name='module')
@@ -324,125 +70,179 @@ def fixture_module(monkeypatch):
         'web-url': 'https://koji.fedoraproject.org/koji',
     }
 
-    # monkeypatch koji to use FakeClientSession instead of ClientSession
-    monkeypatch.setattr(koji, 'ClientSession', FakeClientSession)
-
     #  make sure the module is loaded without a task specified
     mod.execute()
-
-    # fake a key, used by most of the modules
-    FakeClientSession.fake_key = 15869828
 
     return mod
 
 
-def test_sanity_task_id(module):
-    # sanity tests for various types of valid tasks specified by task id
-    for task in VALID_TASKS.iterkeys():
-        FakeClientSession.fake_key = task
-        module.tasks([task])
-        for prop, val in VALID_TASKS[task].iteritems():
-            # pylint: disable=protected-access
-            assert getattr(module._tasks[0], prop) == val
+def assert_task_attributes(module, task_id):
+    """
+    Assert helper. Given the task ID, it loads expected values of a task from the YAML file,
+    and compares them to actual values of module's primary task.
+    """
+
+    primary_task = module.primary_task()
+
+    expected_attributes = gluetool.utils.load_yaml(testing_asset('koji', 'task-{}.yml'.format(task_id)))
+
+    for name, expected in expected_attributes.iteritems():
+        actual = getattr(primary_task, name)
+        assert actual == expected, "Field '{}' mismatch: {} expected, {} found".format(name, expected, actual)
 
 
-def test_sanity_task_id_cmdline(module):
-    # valid task specified by nvr
-    FakeClientSession.fake_key = 15869828
+@pytest.mark.parametrize('koji_session', [
+    15869828,
+    20166983,
+    16311217
+], indirect=True)
+def test_task_by_id(koji_session, module):
+    """
+    Tasks are specified directly by their IDs.
+    """
+
+    module.tasks([koji_session])
+
+    assert_task_attributes(module, koji_session)
+
+
+@pytest.mark.parametrize('koji_session', [
+    (15869828, False),
+    (20166983, False),
+    (16311217, True)
+], indirect=True)
+def test_task_by_task_id_option(koji_session, module):
+    """
+    Tasks are specified via module's ``--task-id`` option.
+    """
+
+    task_id, has_artifacts = koji_session
+
     # pylint: disable=protected-access
-    module._config.update({'task-id': [15869828]})
-    module.execute()
-    for prop, val in VALID_TASKS[15869828].iteritems():
-        assert getattr(module._tasks[0], prop) == val
+    module._config['task-id'] = [task_id]
+
+    if has_artifacts:
+        module.execute()
+
+    else:
+        with pytest.raises(gluetool_modules.infrastructure.koji_fedora.NoArtifactsError):
+            module.execute()
+
+    assert_task_attributes(module, task_id)
 
 
-def test_sanity_nvr(module):
-    # valid task specified by nvr
-    FakeClientSession.fake_key = 'bash-4.3.43-4.fc25'
+@pytest.mark.parametrize('koji_session', [
+    (15869828, 'bash-4.3.43-4.fc25')
+], indirect=True)
+def test_task_by_nvr_option(koji_session, module):
+    """
+    Tasks are specified via module's ``--nvr`` option.
+    """
+
+    task_id, nvr = koji_session
+
     # pylint: disable=protected-access
-    module._config = {'nvr': ['bash-4.3.43-4.fc25']}
-    module.execute()
-    assert module._tasks[0].id == 15869828
+    module._config['nvr'] = [nvr]
+
+    with pytest.raises(gluetool_modules.infrastructure.koji_fedora.NoArtifactsError):
+        module.execute()
+
+    assert_task_attributes(module, task_id)
 
 
-def test_sanity_build_id(module):
-    # valid task specified by build ID
-    FakeClientSession.fake_key = '805705'
+@pytest.mark.parametrize('koji_session', [
+    (15869828, 805705)
+], indirect=True)
+def test_task_by_build_id_option(koji_session, module):
+    """
+    Tasks are specified via module's ``--build-id`` option.
+    """
+
+    task_id, build_id = koji_session
+
     # pylint: disable=protected-access
-    module._config = {'build-id': [805705]}
-    module.execute()
-    assert module._tasks[0].id == 15869828
+    module._config['build-id'] = [build_id]
+
+    with pytest.raises(gluetool_modules.infrastructure.koji_fedora.NoArtifactsError):
+        module.execute()
+
+    assert_task_attributes(module, task_id)
 
 
-def test_sanity_name_tag(module):
-    # valid task specified by package name and tag
-    FakeClientSession.fake_key = 'bash'
+@pytest.mark.parametrize('koji_session', [
+    (15869828, 'bash', 'f25')
+], indirect=True)
+def test_task_by_name_and_tag_options(koji_session, module):
+    """
+    Tasks are specified via module's ``--name`` and ``--tag`` options.
+    """
+
+    task_id, name, tag = koji_session
+
     # pylint: disable=protected-access
-    module._config = {
-        'name': 'bash',
-        'tag': 'f25'
-    }
-    module.execute()
-    assert module._tasks[0].id == 15869828
+    module._config.update({
+        'name': name,
+        'tag': tag
+    })
+
+    with pytest.raises(gluetool_modules.infrastructure.koji_fedora.NoArtifactsError):
+        module.execute()
+
+    assert_task_attributes(module, task_id)
 
 
 def test_no_koji_task(module):
-    # no koji task specified
-    with pytest.raises(gluetool.GlueError, message='no koji task ID specified'):
+    """
+    Module haven't been told to represent any tasks yet, however someone already asks for them.
+    """
+
+    with pytest.raises(gluetool.GlueError, match=r'No tasks specified\.'):
         module.tasks()
 
 
 def test_invalid_task_id_type(module):
-    # task id not convertable to a number
+    """
+    Invalid task ID passed to the module.
+    """
+
     with pytest.raises(ValueError):
         module.tasks(['invalid id'])
 
 
-def test_not_valid_build_tasks(module):
-    # not finished build tasks
-    for task in NON_BUILD_TASKS:
-        FakeClientSession.fake_key = task
+@pytest.mark.parametrize('koji_session', [
+    20171466
+], indirect=True)
+def test_not_valid_build_tasks(koji_session, module):
+    """
+    Tasks IDs represent tasks that are not valid build tasks.
+    """
 
-        with pytest.raises(gluetool.GlueError, match=r'Task is not a build task'):
-            module.tasks([task])
-
-
-def test_unavailable_artifacts(module):
-    # not finished build tasks
-    for task in EXPIRED_TASKS:
-        FakeClientSession.fake_key = task
-        with pytest.raises(gluetool.GlueError, match=r'No artifacts found for task'):
-            module.tasks([task])
+    with pytest.raises(gluetool.GlueError, match=r'Task is not a build task'):
+        module.tasks([koji_session])
 
 
-def test_missing_name(module):
+def test_missing_name_option(module):
     # pylint: disable=protected-access
-    module._config = {
-        'tag': 'f25',
-    }
+    module._config['tag'] = 'f25'
 
-    match = "You need to specify package name with '--name' option"
-    with pytest.raises(gluetool.GlueError, match=match):
+    with pytest.raises(gluetool.GlueError, match=r"You need to specify package name with '--name' option"):
         module.sanity()
 
 
-def test_missing_tag(module):
+def test_missing_tag_option(module):
     # pylint: disable=protected-access
-    module._config = {
-        'name': ['bash'],
-    }
+    module._config['name'] = 'bash'
 
-    match = "You need to specify 'tag' with package name"
-    with pytest.raises(gluetool.GlueError, match=match):
+    with pytest.raises(gluetool.GlueError, match=r"You need to specify 'tag' with package name"):
         module.sanity()
 
 
-def test_invalid_build(log, module):
+@pytest.mark.parametrize('koji_session', [
+    705705
+], indirect=True)
+def test_invalid_build(koji_session, module, log):
     # pylint: disable=protected-access
-    FakeClientSession.fake_key = 705705
-    module._config = {
-        'build-id': [705705]
-    }
+    module._config['build-id'] = [koji_session]
 
     module.execute()
 
@@ -450,25 +250,17 @@ def test_invalid_build(log, module):
     assert module._tasks == []
 
 
-def test_request_missing(module):
-    # pylint: disable=protected-access
-    FakeClientSession.fake_key = 10166983
-    module._config = {
-        'task-id': [10166983],
-    }
-
-    match = "task '10166983' has no request field in task info"
-    with pytest.raises(gluetool.GlueError, match=match):
-        module.execute()
+@pytest.mark.parametrize('koji_session', [
+    10166983
+], indirect=True)
+def test_request_missing(koji_session, module):
+    with pytest.raises(gluetool.GlueError, match=r'Task 10166983 has no request field in task info'):
+        module.tasks([koji_session])
 
 
-def test_request_length_invalid(module):
-    # pylint: disable=protected-access
-    FakeClientSession.fake_key = 10166985
-    module._config = {
-        'task-id': [10166985],
-    }
-
-    match = "task '10166985' has unexpected number of items in request field"
-    with pytest.raises(gluetool.GlueError, match=match):
-        module.execute()
+@pytest.mark.parametrize('koji_session', [
+    10166985
+], indirect=True)
+def test_request_length_invalid(koji_session, module):
+    with pytest.raises(gluetool.GlueError, match=r'Task 10166985 has unexpected number of items in request field'):
+        module.tasks([10166985])
