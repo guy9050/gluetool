@@ -5,6 +5,7 @@ https://docs.google.com/document/d/16L5odC-B4L6iwb9dp8Ry0Xk5Sc49h9KvTHrG86fdfQM/
 """
 
 import base64
+import datetime
 import zlib
 
 import gluetool
@@ -269,6 +270,8 @@ class PipelineStateReporter(gluetool.Module):
         body['category'] = test_category or self.option('test-category')
         body['label'] = self.option('label')
         body['note'] = self.option('note')
+
+        body['generated_at'] = datetime.datetime.utcnow().isoformat(' ')
 
         if thread_id is not None:
             body['thread_id'] = thread_id
