@@ -159,13 +159,24 @@ class Copr(gluetool.Module):
 
     @property
     def eval_context(self):
-        """
-        Provides information about copr artifact.
-
-        Provides following variables: BUILD_TARGET, PRIMARY_TASK, TASKS, NVR
-
-        :rtype: dict
-        """
+        # pylint: disable=unused-variable
+        __content__ = {  # noqa
+            'ARTIFACT_TYPE': """
+                             Type of the artifact, ``copr-build`` in the case of ``copr`` module.
+                             """,
+            'BUILD_TARGET': """
+                            Build target of the primary task, as known to Koji/Beaker.
+                            """,
+            'NVR': """
+                   NVR of the primary task.
+                   """,
+            'PRIMARY_TASK': """
+                            Primary task, represented as ``CoprTask`` instance.
+                            """,
+            'TASKS': """
+                     List of all tasks known to this module instance.
+                     """
+        }
 
         primary_task = self.primary_task()
 

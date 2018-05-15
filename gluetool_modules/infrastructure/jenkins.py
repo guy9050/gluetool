@@ -111,24 +111,6 @@ class CIJenkins(gluetool.Module):
         https://jenkinsapi.readthedocs.io/en/latest/
 
     You can use the option '--create-jjb-config' to force creation of JJB config file.
-
-
-    **Eval context**
-
-    * ``JENKINS_URL``: URL of the Jenkins server running this module. If it cannot be determined,
-      the value is ``None``. ``JENKINS_URL`` environment variable is the primary source of this
-      information.
-    * ``JENKINS_BUILD_ID``: ID ("number") of the Jenkins build running this module, within its
-      parent job. If it cannot be determined, the value is ``None``. ``BUILD_ID`` environment
-      variable is the primary source of this value.
-    * ``JENKINS_BUILD_URL``: URL of the Jenkins build running this module. If it cannot be determined,
-      the value is ``None``. ``BUILD_URL`` environment variable is the primary source of this value.
-    * ``JENKINS_JOB_NAME``: Name of the Jenkins job the build running this module belongs to. If it
-      cannot be determined, the value is ``None``. ``JOB_NAME`` environment variable is the primary
-      source of this information.
-    * ``JENKINS_JOB_URL``: URL of the Jenkins job the build running this module belongs to. If it
-      cannot be determined, the value is ``None``. ``JOB_URL`` environment variable is the primary
-      source of this information.
     """
 
     name = 'jenkins'
@@ -245,11 +227,34 @@ class CIJenkins(gluetool.Module):
 
     @property
     def eval_context(self):
-        """
-        Variables related to Jenkins and its API and environment.
-
-        :rtype: dict
-        """
+        # pylint: disable=unused-variable
+        __content__ = {  # noqa
+            'JENKINS_URL': """
+                           URL of the Jenkins server running this module. If it cannot be determined,
+                           the value is ``None``. ``JENKINS_URL`` environment variable is the primary
+                           source of this information.
+                           """,
+            'JENKINS_BUILD_ID': """
+                                ID ("number") of the Jenkins build running this module, within its
+                                parent job. If it cannot be determined, the value is ``None``. ``BUILD_ID``
+                                environment variable is the primary source of this value.
+                                """,
+            'JENKINS_BUILD_URL': """
+                                 URL of the Jenkins build running this module. If it cannot be determined,
+                                 the value is ``None``. ``BUILD_URL`` environment variable is the primary source
+                                 of this value.
+                                 """,
+            'JENKINS_JOB_NAME': """
+                                Name of the Jenkins job the build running this module belongs to. If it
+                                cannot be determined, the value is ``None``. ``JOB_NAME`` environment variable
+                                is the primary source of this information.
+                                """,
+            'JENKINS_JOB_URL': """
+                               URL of the Jenkins job the build running this module belongs to. If it
+                               cannot be determined, the value is ``None``. ``JOB_URL`` environment variable
+                               is the primary source of this information.
+                               """
+        }
 
         return {
             'JENKINS_URL': os.getenv('JENKINS_URL', None),
