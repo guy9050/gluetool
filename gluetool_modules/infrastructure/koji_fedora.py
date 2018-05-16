@@ -1,3 +1,5 @@
+# pylint: disable=too-many-lines
+
 import collections
 import re
 import koji
@@ -356,32 +358,73 @@ class KojiTask(object):
         return None
 
     @cached_property
-    def artifacts(self):
+    def task_artifacts(self):
         """
         Artifacts of ``buildArch`` subtasks, in a mapping where subtask IDs are the keys
         and lists of artifact names are the values.
 
+        Usually, this is a mix of logs and RPMs, and gets empty when task's directory
+        on the server is removed.
+
         :rtype: dict(int, list(str))
         """
 
-        artifacts = {
-            task['id']: self.session.listTaskOutput(task['id'])
-            for task in self._build_arch_subtasks
-        }
+        artifacts = {}
 
-        log_dict(self.debug, 'artifacts', artifacts)
+        for task in self._build_arch_subtasks:
+            task_id = task['id']
+
+            task_output = self.session.listTaskOutput(task_id)
+
+            log_dict(self.debug, 'task output of subtask {}'.format(task_id), task_output)
+
+            artifacts[task_id] = task_output
+
+        log_dict(self.debug, 'subtask artifacts', artifacts)
+
+        return artifacts
+
+    @cached_property
+    def build_artifacts(self):
+        """
+        Artifacts of the build, in a mapping where architectures are the keys
+        and lists of artifact names are the values.
+
+        Usualy, the set consists of RPMs only, and makes sense for builds only, since it is
+        not possible to get task RPMs this way.
+
+        :rtype: dict(str, list(str))
+        """
+
+        if self.scratch:
+            return {}
+
+        build_rpms = self.session.listBuildRPMs(self.build_id)
+
+        log_dict(self.debug, 'build RPMs', build_rpms)
+
+        artifacts = collections.defaultdict(list)
+
+        for rpm in build_rpms:
+            artifacts[rpm['arch']].append(rpm)
+
+        log_dict(self.debug, 'build rpms', artifacts)
 
         return artifacts
 
     @cached_property
     def has_artifacts(self):
         """
-        Whether there are artifacts on the server for ``buildArch`` subtasks.
+        Whether there are any artifacts on for the task.
 
         :rtype: bool
         """
 
-        return all((bool(subtask_artifacts) for subtask_artifacts in self.artifacts.itervalues()))
+        has_task_artifacts = [bool(subtask_artifacts) for subtask_artifacts in self.task_artifacts.itervalues()]
+        has_build_artifacts = [bool(arch_artifacts) for arch_artifacts in self.build_artifacts.itervalues()]
+
+        return (has_task_artifacts and all(has_task_artifacts)) \
+            or (has_build_artifacts and all(has_build_artifacts))
 
     @cached_property
     def _srcrpm_subtask(self):
@@ -396,7 +439,7 @@ class KojiTask(object):
             self.debug('task has no artifacts, it is pointless to search them for srpm')
             return None, None
 
-        for subtask, artifacts in self.artifacts.iteritems():
+        for subtask, artifacts in self.task_artifacts.iteritems():
             for artifact in artifacts:
                 if not artifact.endswith('.src.rpm'):
                     continue

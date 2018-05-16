@@ -107,7 +107,7 @@ def test_task_by_id(koji_session, module):
 
 
 @pytest.mark.parametrize('koji_session', [
-    (15869828, False),
+    (15869828, True),
     (20166983, False),
     (16311217, True)
 ], indirect=True)
@@ -144,8 +144,7 @@ def test_task_by_nvr_option(koji_session, module):
     # pylint: disable=protected-access
     module._config['nvr'] = [nvr]
 
-    with pytest.raises(gluetool_modules.infrastructure.koji_fedora.NoArtifactsError):
-        module.execute()
+    module.execute()
 
     assert_task_attributes(module, task_id)
 
@@ -163,8 +162,7 @@ def test_task_by_build_id_option(koji_session, module):
     # pylint: disable=protected-access
     module._config['build-id'] = [build_id]
 
-    with pytest.raises(gluetool_modules.infrastructure.koji_fedora.NoArtifactsError):
-        module.execute()
+    module.execute()
 
     assert_task_attributes(module, task_id)
 
@@ -185,8 +183,7 @@ def test_task_by_name_and_tag_options(koji_session, module):
         'tag': tag
     })
 
-    with pytest.raises(gluetool_modules.infrastructure.koji_fedora.NoArtifactsError):
-        module.execute()
+    module.execute()
 
     assert_task_attributes(module, task_id)
 
