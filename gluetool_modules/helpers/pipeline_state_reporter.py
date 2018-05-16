@@ -401,7 +401,8 @@ class PipelineStateReporter(gluetool.Module):
             context = {
                 'PRIMARY_TASK': self.shared('primary_task')
             }
-        except gluetool.glue.GlueError as e:
+
+        except gluetool.glue.GlueError:
             # if no primary task available yet, render and empty dictionary
             context = {}
 
