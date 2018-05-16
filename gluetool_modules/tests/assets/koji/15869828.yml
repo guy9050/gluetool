@@ -338,3 +338,166 @@ getBuild:
     task_id: 15869828
     volume_name: DEFAULT
     release: 4.fc25
+
+listBuildRPMs:
+  805705:
+    - build_id: 805705
+      nvr: bash-4.3.43-4.fc25
+      name: bash
+      extra:
+      external_repo_id: 0
+      buildtime: 1475223974
+      arch: src
+      id: 8134206
+      epoch:
+      version: 4.3.43
+      metadata_only: false
+      release: 4.fc25
+      buildroot_id: 6546091
+      payloadhash: 65a1a37250ebb4033412f9a97478f8a7
+      external_repo_name: INTERNAL
+      size: 8065870
+    - build_id: 805705
+      nvr: bash-4.3.43-4.fc25
+      name: bash
+      extra:
+      external_repo_id: 0
+      buildtime: 1475224447
+      arch: armv7hl
+      id: 8134207
+      epoch:
+      version: 4.3.43
+      metadata_only: false
+      release: 4.fc25
+      buildroot_id: 6546091
+      payloadhash: 010e8ee35a59f85666fc378099ab16bc
+      external_repo_name: INTERNAL
+      size: 1434826
+    - build_id: 805705
+      nvr: bash-doc-4.3.43-4.fc25
+      name: bash-doc
+      extra:
+      external_repo_id: 0
+      buildtime: 1475224447
+      arch: armv7hl
+      id: 8134208
+      epoch:
+      version: 4.3.43
+      metadata_only: false
+      release: 4.fc25
+      buildroot_id: 6546091
+      payloadhash: 9cc28185a75e05f467fb4ae14acae2e3
+      external_repo_name: INTERNAL
+      size: 1259442
+    - build_id: 805705
+      nvr: bash-debuginfo-4.3.43-4.fc25
+      name: bash-debuginfo
+      extra:
+      external_repo_id: 0
+      buildtime: 1475224447
+      arch: armv7hl
+      id: 8134209
+      epoch:
+      version: 4.3.43
+      metadata_only: false
+      release: 4.fc25
+      buildroot_id: 6546091
+      payloadhash: 1434a0fa6aea19f4c5bbdbf461e58454
+      external_repo_name: INTERNAL
+      size: 1554602
+    - build_id: 805705
+      nvr: bash-4.3.43-4.fc25
+      name: bash
+      extra:
+      external_repo_id: 0
+      buildtime: 1475224092
+      arch: x86_64
+      id: 8134210
+      epoch:
+      version: 4.3.43
+      metadata_only: false
+      release: 4.fc25
+      buildroot_id: 6546090
+      payloadhash: 0d4cc26efc0541fbecae93f86f35763c
+      external_repo_name: INTERNAL
+      size: 1487334
+    - build_id: 805705
+      nvr: bash-debuginfo-4.3.43-4.fc25
+      name: bash-debuginfo
+      extra:
+      external_repo_id: 0
+      buildtime: 1475224092
+      arch: x86_64
+      id: 8134211
+      epoch:
+      version: 4.3.43
+      metadata_only: false
+      release: 4.fc25
+      buildroot_id: 6546090
+      payloadhash: 51acbfe0c610ca7cebfcdb6fbddf06b7
+      external_repo_name: INTERNAL
+      size: 1587742
+    - build_id: 805705
+      nvr: bash-doc-4.3.43-4.fc25
+      name: bash-doc
+      extra:
+      external_repo_id: 0
+      buildtime: 1475224092
+      arch: x86_64
+      id: 8134212
+      epoch:
+      version: 4.3.43
+      metadata_only: false
+      release: 4.fc25
+      buildroot_id: 6546090
+      payloadhash: cd69c0c3561e766f03d3ae57d86f71da
+      external_repo_name: INTERNAL
+      size: 1259394
+    - build_id: 805705
+      nvr: bash-doc-4.3.43-4.fc25
+      name: bash-doc
+      extra:
+      external_repo_id: 0
+      buildtime: 1475224129
+      arch: i686
+      id: 8134213
+      epoch:
+      version: 4.3.43
+      metadata_only: false
+      release: 4.fc25
+      buildroot_id: 6546092
+      payloadhash: 76bc12d00e54c11d1b06da8df844025b
+      external_repo_name: INTERNAL
+      size: 1259426
+    - build_id: 805705
+      nvr: bash-debuginfo-4.3.43-4.fc25
+      name: bash-debuginfo
+      extra:
+      external_repo_id: 0
+      buildtime: 1475224129
+      arch: i686
+      id: 8134214
+      epoch:
+      version: 4.3.43
+      metadata_only: false
+      release: 4.fc25
+      buildroot_id: 6546092
+      payloadhash: 0da76051ce2a3ac5cb6d88d6cc7cc941
+      external_repo_name: INTERNAL
+      size: 1552234
+    - build_id: 805705
+      nvr: bash-4.3.43-4.fc25
+      name: bash
+      extra:
+      external_repo_id: 0
+      buildtime: 1475224129
+      arch: i686
+      id: 8134215
+      epoch:
+      version: 4.3.43
+      metadata_only: false
+      release: 4.fc25
+      buildroot_id: 6546092
+      payloadhash: bda84c28eb7b9f0248ed9e94e7804e0f
+      external_repo_name: INTERNAL
+      size: 1492530
