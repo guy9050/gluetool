@@ -135,7 +135,7 @@ def run(result, log, module, monkeypatch, tmpdir):
     component_name = 'ssh'
     target = 'rhel-7.4-candidate'
 
-    mocked_task = MagicMock(target=target, component=component_name, srcrpm='dummy.src.rpm')
+    mocked_task = MagicMock(target=target, component=component_name, srcrpm_url='dummy.src.rpm')
 
     _, module = module
     module._config['target_pattern'] = enabled_target

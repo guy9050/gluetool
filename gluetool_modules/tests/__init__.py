@@ -1,3 +1,5 @@
+import os.path
+
 import bs4
 
 # pylint: disable=wildcard-import
@@ -13,3 +15,7 @@ def check_loadable(glue, group, path, klass):
 
 def xml(text):
     return bs4.BeautifulSoup(text, 'xml').contents[0]
+
+
+def testing_asset(*pieces):
+    return os.path.join('gluetool_modules', 'tests', 'assets', *pieces)
