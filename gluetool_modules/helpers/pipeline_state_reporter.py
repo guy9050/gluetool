@@ -119,6 +119,15 @@ class PipelineStateReporter(gluetool.Module):
                 'help': "Category of tests performed in this pipeline. One of 'static-analysis', 'functional', 'integration' or 'validation'.",  # Ignore PEP8Bear
                 'choices': ['static-analysis', 'functional', 'integration', 'validation']
             },
+            'test-namespace': {
+                'help':
+                    """
+                    Prefix to be used when constructing result testcase name in ResultsDB. The name is rendered
+                    with these context variables available:
+
+                        PRIMARY_TASK - object with ``primary_task`` shared function if available, None otherwise
+                    """
+            },
             'test-type': {
                 'help': "Type of tests provided in this pipeline, e.g. 'tier1', 'rpmdiff-analysis' or 'covscan'."
             }
@@ -155,7 +164,8 @@ class PipelineStateReporter(gluetool.Module):
 
     required_options = (
         'ci-name', 'ci-team', 'ci-url', 'ci-contact-email', 'ci-contact-irc',
-        'bus-topic')
+        'bus-topic',
+        'test-namespace')
 
     shared_functions = ('report_pipeline_state',)
 
@@ -170,13 +180,18 @@ class PipelineStateReporter(gluetool.Module):
                                   """,
             'PIPELINE_TEST_CATEGORY': """
                                       Category of tests performed in this pipeline. See ``test-category`` option.
-                                      """
+                                      """,
+            'PIPELINE_TEST_NAMESPACE': """
+                                       Test namespace (i.e. prefix) used when constructing ResultsDB testcase name.
+                                       See ``test-namespace`` option.
+                                       """,
         }
 
         return {
             # common for all artifact providers
             'PIPELINE_TEST_TYPE': self.option('test-type'),
             'PIPELINE_TEST_CATEGORY': self.option('test-category'),
+            'PIPELINE_TEST_NAMESPACE': self._get_test_namespace()
         }
 
     @gluetool.utils.cached_property
@@ -252,7 +267,7 @@ class PipelineStateReporter(gluetool.Module):
             'rebuild': _render_url('{{ JENKINS_BUILD_URL }}/rebuild/parameterized')
         }
 
-    def _init_message(self, test_category, test_type, thread_id):
+    def _init_message(self, test_category, test_namespace, test_type, thread_id):
         headers = {}
         body = {}
 
@@ -270,6 +285,7 @@ class PipelineStateReporter(gluetool.Module):
         body['category'] = test_category or self.option('test-category')
         body['label'] = self.option('label')
         body['note'] = self.option('note')
+        body['namespace'] = test_namespace or self._get_test_namespace()
 
         body['generated_at'] = datetime.datetime.utcnow().isoformat(' ')
 
@@ -282,7 +298,8 @@ class PipelineStateReporter(gluetool.Module):
         return headers, body
 
     def report_pipeline_state(self, state, thread_id=None, topic=None,
-                              test_category=None, test_type=None, test_overall_result=None, test_results=None,
+                              test_category=None, test_namespace=None, test_type=None,
+                              test_overall_result=None, test_results=None,
                               distros=None,
                               error_message=None, error_url=None):
         # pylint: disable=too-many-arguments
@@ -295,6 +312,7 @@ class PipelineStateReporter(gluetool.Module):
         :param str state: State of the pipeline.
         :param str topic: Message bus topic to report to. If not set, ``bus-topic`` option is used.
         :param str test_category: Pipeline category - ``functional``, ``static-analysis``, etc.
+        :param str test_namespace: Test namespace, used to construct test case name in ResultsDB.
         :param str test_type: Pipeline type - ``tier1``, ``rpmdiff-analysis``, etc.
         :param str thread_id: The thread ID of the pipeline. If not set, shared function ``thread_id``
             is used to provide the ID.
@@ -315,7 +333,7 @@ class PipelineStateReporter(gluetool.Module):
         distros = distros or []
         topic = topic or self.option('bus-topic')
 
-        headers, body = self._init_message(test_category, test_type, thread_id)
+        headers, body = self._init_message(test_category, test_namespace, test_type, thread_id)
 
         if state == STATE_COMPLETE:
             body['system'] = [
@@ -369,6 +387,27 @@ class PipelineStateReporter(gluetool.Module):
         self.info('reporting pipeline beginning')
 
         self.report_pipeline_state('running')
+
+    def _get_test_namespace(self):
+        """
+        Return a rendered test namespace.
+
+        Note that we cannot use the whole shared context here, as we would endup in a recursion, because this module
+        provides the test namespace in the shared evaluation context as ``PIPELINE_TEST_NAMESPACE``.
+
+        :returns: a rendered test namespace with one variable available in context.
+        """
+        try:
+            context = {
+                'PRIMARY_TASK': self.shared('primary_task')
+            }
+        except gluetool.glue.GlueError as e:
+            # if no primary task available yet, render and empty dictionary
+            context = {}
+
+        return gluetool.utils.render_template(self.option('test-namespace'),
+                                              logger=self.logger,
+                                              **context)
 
     def _get_test_result(self):
         if not self.has_shared('results'):
