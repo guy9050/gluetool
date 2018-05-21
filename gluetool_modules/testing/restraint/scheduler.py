@@ -2,6 +2,28 @@ import shlex
 
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
+from libci.sentry import PrimaryTaskFingerprintsMixin
+
+
+class NoTestableArtifactsError(PrimaryTaskFingerprintsMixin, SoftGlueError):
+    """
+    Raised when the artifact we're given to test contains no usable RPMS we could actually test.
+    E.g. when the artifact was build for arch A only, while our backend can handle just arches
+    B and C.
+
+    .. note::
+
+       Now it's tightly coupled with our OpenStack backend, we cannot use our restraint modules
+       e.g. in Beaker - yet. Hence the explicit list of supported arches in the message.
+    """
+
+    def __init__(self, task):
+        # pylint: disable=line-too-long
+        arches = task.task_arches.arches
+
+        message = 'Task does not have any testable artifact: only x86_64 or noarch are supported, task contains {}'.format(', '.join(arches))  # Ignore PEP8Bear
+
+        super(NoTestableArtifactsError, self).__init__(task, message)
 
 
 class RestraintScheduler(gluetool.Module):
@@ -156,8 +178,7 @@ class RestraintScheduler(gluetool.Module):
 
         task_arches = self.shared('primary_task').task_arches
         if 'x86_64' not in task_arches.arches and 'noarch' not in task_arches.arches:
-            # pylint: disable=line-too-long
-            raise GlueError('Task does not have any testable artifact: only x86_64 or noarch are supported, task contains {}'.format(', '.join(task_arches.arches)))  # Ignore PEP8Bear
+            raise NoTestableArtifactsError(self.shared('primary_task'))
 
         # workflow-tomorrow
         jobs = self._run_wow()
