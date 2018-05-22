@@ -1,0 +1,7 @@
+---
+
+name: install-koji-docker-container
+description: |
+  Install a Docker image from a Koji/Brew task on a given guest using 'restraint' shared function
+  and information provided in the task. Overrides 'guest-setup' shared function, calling the original
+  function (e.g. from 'guest-setup' module) before the image installation.

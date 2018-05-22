@@ -1,0 +1,5 @@
+---
+
+name: wow-artifact-installation-options-koji-docker-image
+description: |
+  Create options for ``workflow-options`` to install the Docker image from a Koji/Brew task.
