@@ -310,24 +310,10 @@ class Beaker(gluetool.Module):
         if self.option('job'):
             return self._reuse_job(self.option('job'))
 
-        options = [
-            '--first-testing-task=/distribution/runtime_tests/verify-nvr-installed'
-        ]
+        options = []
 
-        # create options for brew-build task
-        brew_build_task_params = self.shared('brew_build_task_params')
-
-        # and convert them to a space-separated list of params, with values wrapped
-        # by the quotes: <param>="foo bar" <param>="baz" ...
-        brew_build_task_params = ' '.join([
-            '{}="{}"'.format(param, value) for param, value in brew_build_task_params.iteritems()
-        ])
-
-        # this should be '--init-task="{} /....', but it's not a problem for python-based programs (bkr)
-        # and sclrun can handle it too
-        options += [
-            '--init-task={} /distribution/install/brew-build'.format(brew_build_task_params)
-        ]
+        # add options to install the task
+        options += self.shared('wow_artifact_installation_options')
 
         # we could use --reserve but we must be sure the reservesys is *the last* taskin the recipe
         # users may require their own "last" tasks and --last-task is mightier than mere --reserve.
@@ -506,7 +492,8 @@ class Beaker(gluetool.Module):
         return 'PASS', self._processed_results, matrix_url
 
     def execute(self):
-        self.require_shared('brew_build_task_params', 'tasks', 'primary_task', 'beaker_job_xml', 'parse_beah_result')
+        self.require_shared('wow_artifact_installation_options', 'tasks', 'primary_task', 'beaker_job_xml',
+                            'parse_beah_result')
 
         def _command_options(name):
             opts = self.option(name)

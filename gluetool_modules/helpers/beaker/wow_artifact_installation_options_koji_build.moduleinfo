@@ -1,0 +1,5 @@
+---
+
+name: wow-artifact-installation-options-koji-build
+description: |
+  Create options for ``workflow-options`` to install the Koji/Brew task.
