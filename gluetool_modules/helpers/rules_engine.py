@@ -306,6 +306,9 @@ class RulesEngine(gluetool.Module):
                 continue
 
             for command, argument in instruction.iteritems():
+                if command == 'rule':
+                    continue
+
                 callback = commands.get(command, None)
 
                 if not callback:
