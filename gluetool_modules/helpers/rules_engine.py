@@ -2,7 +2,7 @@ import re
 import ast
 
 import gluetool
-from gluetool import SoftGlueError
+from gluetool import GlueError, SoftGlueError
 from gluetool.log import log_dict
 
 import _ast
@@ -197,7 +197,7 @@ class RulesEngine(gluetool.Module):
         }
     }
 
-    shared_functions = ('evaluate_rules',)
+    shared_functions = ('evaluate_rules', 'evaluate_instructions')
 
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
@@ -232,6 +232,96 @@ class RulesEngine(gluetool.Module):
         log_dict(self.debug, 'eval result', result)
 
         return result
+
+    # pylint: disable=too-many-arguments
+    def evaluate_instructions(self, instructions, commands, context=None,
+                              default_rule='True',
+                              stop_at_first_hit=False,
+                              ignore_unhandled_commands=False):
+        """
+        Evaluate "instructions", using given callbacks to perform commands ordered by instructions.
+
+        An instruction is a simple dictionary with arbitrary keys, "commands". If there is a key named ``rule``, it
+        is evaluated and when the result is false-ish, the instruction is skipped.
+
+        .. code-block:: yaml
+
+           - rule:
+             <command #1>: ...
+             <command #2>: ...
+
+        Instructions are inspected in order they are given by the caller, and unless denied by the optional rule,
+        the instruction commands are looked up in the ``commands`` mapping, and found callbacks are called,
+        with the current instruction, command, its value and a context rules-engine used to evaluate instruction
+        rule as arguments.
+
+        .. code-block:: yaml
+
+           - rule: True
+             log: some dummy message
+
+        .. code-block:: python
+
+           def foo(self, instruction, command, argument, context):
+               self.info(argument)
+
+           self.shared('evaluate_instructions', <instructions loaded from a file>, {'log': foo})
+
+        ``foo`` callback will be called like this:
+
+        .. code-block:: python
+
+           foo(instruction, 'log', 'some dummy message', context_used_by_rules_engine)
+
+        :param list(dict) instructions: List of instructions to follow.
+        :param dict(str, callable(dict, str, object, dict)) commands: Mapping between command names and their
+            callbacks.
+        :param context: Provider of context for rules and templating services. Either a dictionary or a callable
+            returning a dictionary. If callable is provided, it will be called before each instruction to
+            refresh the context.
+        :param str default_rule: If there's no rule in the instruction, this will be used. For example, use ``False``
+            to skip instructions without rules.
+        :param bool stop_at_first_hit: If set, first command callback returning ``True`` will cause the function
+            to skip remaining commands and start with the next instruction.
+        :param bool ignore_unhandled_commands: If set, commands without any callbacks will be ignored. otherwise,
+            an exception will be raised.
+        """
+
+        # If we don't have a context, get one from the core.
+        if context is None:
+            context = self.shared('eval_context')
+
+        # For the sake of simplicity, the loop over instructions will always call context_getter. It's either
+        # callable given by caller, or a simple anonymous function returning a dictionary - either the one
+        # given by caller or the default from above.
+        context_getter = context if callable(context) else lambda: context
+
+        for instruction in instructions:
+            loop_context = context_getter()
+
+            log_dict(self.debug, 'instruction', instruction)
+
+            if not self.shared('evaluate_rules', instruction.get('rule', default_rule), context=loop_context):
+                self.debug('denied by rules')
+                continue
+
+            for command, argument in instruction.iteritems():
+                callback = commands.get(command, None)
+
+                if not callback:
+                    msg = "No callback for command '{}'".format(command)
+
+                    if ignore_unhandled_commands:
+                        self.warn(msg)
+                        continue
+
+                    raise GlueError(msg)
+
+                result = callback(instruction, command, argument, loop_context)
+
+                if result is True and stop_at_first_hit:
+                    self.debug('command handled and we should stop at first hit')
+                    break
 
     def execute(self):
         if not self.option('rules'):

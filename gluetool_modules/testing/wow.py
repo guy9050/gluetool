@@ -5,7 +5,7 @@ import qe
 
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError
-from gluetool.utils import render_template
+from gluetool.utils import Command, render_template
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 
@@ -22,6 +22,44 @@ class NoGeneralTestPlanError(PrimaryTaskFingerprintsMixin, SoftGlueError):
 class GeneralWOWError(PrimaryTaskFingerprintsMixin, GlueError):
     def __init__(self, task, output):
         super(GeneralWOWError, self).__init__(task, "Failure during 'wow' execution: {}".format(output.stderr))
+
+
+class WowCommand(Command):
+    # Following methods are exposed to ``evaluate_instructions`` shared function
+    # as command callbacks.
+    def add_options(self, instruction, command, argument, context):
+        # pylint: disable=unused-argument
+
+        options = render_template(argument, logger=self.logger, **context)
+        gluetool.log.log_blob(self.debug, 'adding options', options)
+
+        # simple split() is too dumb: '--foo "bar baz"' => ['--foo', 'bar baz']. shlex is the right tool
+        # to split command-line options, it obeys quoting.
+        self.options += shlex.split(options)
+
+    def set_command(self, instruction, command, argument, context):
+        # pylint: disable=unused-argument
+
+        command = render_template(argument, logger=self.logger, **context)
+        self.debug("using command '{0}' to generate a job xml".format(command))
+
+        # simple split() is too dumb: '--foo "bar baz"' => ['--foo', 'bar baz']. shlex is the right tool
+        # to split command-line options, it obeys quoting.
+        self.executable = shlex.split(command)
+
+    def set_use_shell(self, instruction, command, argument, context):
+        # pylint: disable=unused-argument
+
+        self.use_shell = bool(argument)
+
+        self.debug('use-shell knob set to {}'.format(self.use_shell))
+
+    def set_quote_args(self, instruction, command, argument, context):
+        # pylint: disable=unused-argument
+
+        self.quote_args = bool(argument)
+
+        self.debug('quote-args knob set to {}'.format(self.quote_args))
 
 
 class WorkflowTomorrow(gluetool.Module):
@@ -125,76 +163,40 @@ class WorkflowTomorrow(gluetool.Module):
 
         self.info('running workflow-tomorrow to get job description')
 
-        self.require_shared('distro', 'evaluate_rules', 'tasks', 'primary_task')
+        self.require_shared('distro', 'evaluate_instructions', 'tasks', 'primary_task')
 
         primary_task = self.shared('primary_task')
 
         if not self.option('wow-options') and not self.option('use-general-test-plan'):
             raise NoTestAvailableError(primary_task)
 
-        options = options or []
-        environment = environment or {}
-        task_params = task_params or {}
-
         def _plan_job(distro):
             # pylint: disable=too-many-statements
 
-            # this is default
-            use_shell = False
-            quote_args = False
-
-            command = ['bkr', 'workflow-tomorrow']
-            command_options = [
-                '--dry',  # this will make wow to print job description in XML
-                '--decision'  # show desicions about including/not including task in the job
-            ] + options
-
             self.debug("constructing options distro '{}'".format(distro))
 
-            rules_context = gluetool.utils.dict_update(self.shared('eval_context'), {
+            context = gluetool.utils.dict_update(self.shared('eval_context'), {
                 'DISTRO': distro
             })
 
-            # Options set by a configuration
-            for options_set in self.wow_options_map:
-                gluetool.log.log_dict(self.debug, 'options set', options_set)
+            command = WowCommand(['bkr', 'workflow-tomorrow'], [
+                '--dry',  # this will make wow to print job description in XML
+                '--decision'  # show desicions about including/not including task in the job
+            ] + (options or []), logger=self.logger)
 
-                if not self.shared('evaluate_rules', options_set.get('rule', 'False'), context=rules_context):
-                    self.debug('rule does not match, moving on')
-                    continue
+            instruction_commands = {
+                'add-options': command.add_options,
+                'command': command.set_command,
+                'use-shell': command.set_use_shell,
+                'quote-args': command.set_quote_args
+            }
 
-                if 'add-options' in options_set:
-                    add_options = render_template(options_set['add-options'], logger=self.logger, **rules_context)
-                    gluetool.log.log_blob(self.debug, 'adding options', add_options)
-
-                    # simple split() is too dumb: '--foo "bar baz"' => ['--foo', 'bar baz']. shlex is the right tool
-                    # to split command-line options, it obeys quoting.
-                    command_options += shlex.split(add_options)
-
-                if 'command' in options_set:
-                    command = render_template(options_set['command'], logger=self.logger, **rules_context)
-                    self.info("using command '{0}' to generate a job xml".format(command))
-
-                    # simple split() is too dumb: '--foo "bar baz"' => ['--foo', 'bar baz']. shlex is the right tool
-                    # to split command-line options, it obeys quoting.
-                    command = shlex.split(command)
-
-                if 'use-shell' in options_set:
-                    use_shell = bool(options_set['use-shell'])
-
-                    self.debug('use-shell knob set to {}'.format(use_shell))
-
-                if 'quote-args' in options_set:
-                    quote_args = bool(options_set['quote-args'])
-
-                    self.debug('quote-args knob set to {}'.format(quote_args))
-
-            command += command_options
+            self.shared('evaluate_instructions', self.wow_options_map, instruction_commands, context=context)
 
             #
             # add options specified on command-line
             if self.option('wow-options'):
-                command += shlex.split(self.option('wow-options'))
+                command.options += shlex.split(self.option('wow-options'))
 
             #
             # add environment if available
@@ -204,42 +206,30 @@ class WorkflowTomorrow(gluetool.Module):
                 _environment['product'] = self.shared('product')
 
             # incorporate changes demanded by user
-            _environment.update(environment)
+            _environment.update(environment or {})
 
-            command += [
+            command.options += [
                 '--environment',
                 ' && '.join(['{}={}'.format(k, v) for k, v in _environment.iteritems()])
             ] if _environment else []
 
             # incorporate changes demanded by user
-            for name, value in task_params.iteritems():
-                command += ['--taskparam="{}={}"'.format(name, value)]
+            if task_params:
+                for name, value in task_params.iteritems():
+                    command.options += ['--taskparam="{}={}"'.format(name, value)]
 
             # incorporate general test plan if requested
             if self.option('use-general-test-plan'):
                 component = primary_task.component
+
                 try:
-                    command += ['--plan={}'.format(str(qe.GeneralPlan(component).id))]
+                    command.options += ['--plan={}'.format(str(qe.GeneralPlan(component).id))]
 
                 except qe.GeneralPlanError:
                     raise NoGeneralTestPlanError(primary_task)
 
-            if quote_args is True:
-                # escape apostrophes in strings and adds them around strings with space
-                command = [('"{}"'.format(option.replace('"', r'\"')) if ' ' in option and not
-                            (
-                                (option.startswith('"') and option.endswith('"')) or
-                                (option.startswith("'") and option.endswith("'")))
-                            else option) for option in command]
-
-            if use_shell is True:
-                command = [' '.join(command)]
-                self.debug("joined_command: {}".format(command[0]))
-
-            #
-            # execute
             try:
-                output = gluetool.utils.run_command(command, shell=use_shell)
+                output = command.run()
 
                 return bs4.BeautifulSoup(output.stdout, 'xml')
 

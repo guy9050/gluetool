@@ -209,31 +209,30 @@ class PipelineStateReporter(gluetool.Module):
         return gluetool.utils.load_yaml(self.option('final-state-map'), logger=self.logger)
 
     def _artifact_info(self):
-        self.require_shared('evaluate_rules')
+        self.require_shared('evaluate_instructions', 'evaluate_rules')
 
         artifact_info = {}
-        context = self.shared('eval_context')
 
-        for item_set in self.artifact_map:
-            if not self.shared('evaluate_rules', item_set.get('rule', 'True'), context=context):
-                self.debug('denied by rules')
-                continue
+        # callback for artifact_map instructions, applies changes to artifact_info
+        def _add_artifact_details(instruction, command, argument, context):
+            # pylint: disable=unused-argument
 
-            if 'artifact-details' in item_set:
-                artifact_details = item_set.get('artifact-details')
+            if instruction.get('eval-as-rule', False):
+                artifact_info.update({
+                    detail: self.shared('evaluate_rules', value, context=context)
+                    for detail, value in argument.iteritems()
+                })
 
-                if item_set.get('eval-as-rule', False):
-                    artifact_info.update({
-                        detail: self.shared('evaluate_rules', value, context=context)
-                        for detail, value in artifact_details.iteritems()
-                    })
+            else:
+                artifact_info.update({
+                    detail: render_template(value, **context) for detail, value in argument.iteritems()
+                })
 
-                else:
-                    artifact_info.update({
-                        detail: render_template(value, **context) for detail, value in artifact_details.iteritems()
-                    })
+            log_dict(self.debug, 'artifact info', artifact_info)
 
-                log_dict(self.debug, 'artifact info', artifact_info)
+        self.shared('evaluate_instructions', self.artifact_map, {
+            'artifact-details': _add_artifact_details
+        })
 
         return artifact_info
 
