@@ -213,8 +213,8 @@ class PipelineStateReporter(gluetool.Module):
 
         artifact_info = {}
 
-        # callback for artifact_map instructions, applies changes to artifact_info
-        def _add_artifact_details(instruction, command, argument, context):
+        # callback for 'artifact-details' command in artifact_map instructions, applies changes to artifact_info
+        def _artifact_details_callback(instruction, command, argument, context):
             # pylint: disable=unused-argument
 
             if instruction.get('eval-as-rule', False):
@@ -230,8 +230,16 @@ class PipelineStateReporter(gluetool.Module):
 
             log_dict(self.debug, 'artifact info', artifact_info)
 
+        # callback for 'eval-as-rule' command in atifact_map instructions - it does nothing, this command
+        # is handled by _artifact_details callback, but we must provide it anyway to make rules-engine happy.
+        def _eval_as_rule_callback(instruction, command, argument, context):
+            # pylint: disable=unused-argument
+
+            pass
+
         self.shared('evaluate_instructions', self.artifact_map, {
-            'artifact-details': _add_artifact_details
+            'artifact-details': _artifact_details_callback,
+            'eval-as-rule': _eval_as_rule_callback
         })
 
         return artifact_info
