@@ -84,8 +84,13 @@ def _data_files(category_slug):
 
 # List of module categories, aka. subdirectories of gluetool_modules.
 CATEGORIES = [
-    'build_on_commit', 'database', 'dispatchers', 'helpers', 'helpers/jenkins', 'helpers/notify_email',
-    'infrastructure', 'provision', 'static_analysis', 'static_analysis/covscan', 'static_analysis/rpmdiff',
+    'build_on_commit',
+    'database',
+    'dispatchers',
+    'helpers', 'helpers/jenkins', 'helpers/notify_email', 'helpers/beaker',
+    'infrastructure',
+    'provision',
+    'static_analysis', 'static_analysis/covscan', 'static_analysis/rpmdiff',
     'testing', 'testing/beaker', 'testing/openstack', 'testing/restraint'
 ]
 
