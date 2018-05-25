@@ -214,6 +214,8 @@ def test_not_valid_build_tasks(koji_session, module):
     Tasks IDs represent tasks that are not valid build tasks.
     """
 
+    module._config['valid-methods'] = ['build']
+
     with pytest.raises(gluetool.GlueError, match=r'Task is not a build task'):
         module.tasks([koji_session])
 

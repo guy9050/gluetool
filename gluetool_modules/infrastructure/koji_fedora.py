@@ -65,7 +65,7 @@ class KojiTask(object):
 
     :param dict details: Instance details, see ``required_instance_keys``
     :param int task_id: Initialize from given Koji task ID.
-    :param str module_name: Name of the module, i.e. 'brew' or 'koji'
+    :param module: Module that created this task instance.
     :param gluetool.log.ContextLogger logger: logger used for logging
     :param bool wait_timeout: Wait for task to become non-waiting
 
@@ -86,11 +86,13 @@ class KojiTask(object):
             raise GlueError('instance details do not contain all required keys')
 
     # pylint: disable=too-many-arguments
-    def __init__(self, details, task_id, module_name, logger=None, wait_timeout=None):
+    def __init__(self, details, task_id, module, logger=None, wait_timeout=None):
         self._check_required_instance_keys(details)
 
         self.logger = logger or Logging.get_logger()
         logger.connect(self)
+
+        self._module = module
 
         # pylint: disable=invalid-name
         self.id = int(task_id)
@@ -98,10 +100,9 @@ class KojiTask(object):
         self.web_url = details['web_url']
         self.pkgs_url = details['pkgs_url']
         self.session = details['session']
-        self.module_name = module_name
 
         # first check if the task is valid for our case
-        if not self._valid_task():
+        if not self._is_valid:
             raise NotBuildTaskError(self.id)
 
         # wait for the task to be non-waiting and closed
@@ -114,16 +115,35 @@ class KojiTask(object):
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.id)
 
-    def _valid_task(self):
+    @cached_property
+    def _is_valid(self):
         """
-        Verify that the task is valid for our case, i.e. method is build.
+        Verify the task is valid by checking its ``method`` attribute. List of values that are considered
+        `valid` is provided by the user via ``--valid-methods`` option of the module, and generaly limits
+        what tasks the pipeline deals with, e.g. it is designed to run tests on Docker images, therefore
+        disallows any other method than ``buildContainer``. If there is no specific list of valid methods,
+        all methods are considered valid.
 
-        :returns: True if task is a sucessfully finished build task, False otherwise
+        :rtype: bool
         """
-        if self._task_info['method'] == 'build':
+
+        # pylint: disable=protected-access
+
+        if not self._module._valid_methods:
             return True
 
-        return False
+        return self._task_info['method'] in self._module._valid_methods
+
+    def _flush_task_info(self):
+        """
+        Remove cached task info we got from API. Handle the case when such info does not yet exist.
+        """
+
+        try:
+            del self._task_info
+
+        except AttributeError:
+            pass
 
     def _check_closed_task(self):
         """
@@ -131,26 +151,20 @@ class KojiTask(object):
 
         :returns: True if task is closed, False otherwise
         """
-        # remove the cached task_info
-        del self._task_info
 
-        if self._task_info['state'] == koji.TASK_STATES['CLOSED']:
-            return True
+        self._flush_task_info()
 
-        return False
+        return self._task_info['state'] == koji.TASK_STATES['CLOSED']
 
     def _check_nonwaiting_task(self):
         """
         Check if task is non-waiting, i.e. 'waiting: false' in task info.
         :returns: True if task is non-waiting, False otherwise
         """
-        # remove the cached task_info
-        del self._task_info
 
-        if self._task_info['waiting'] is False:
-            return True
+        self._flush_task_info()
 
-        return False
+        return self._task_info['waiting'] is not True
 
     @cached_property
     def _subtasks(self):
@@ -229,11 +243,51 @@ class KojiTask(object):
         if self.scratch:
             return None
 
-        return self.session.listBuilds(taskID=self.id)[0]
+        builds = self.session.listBuilds(taskID=self.id)
+        log_dict(self.debug, 'builds for task ID {}'.format(self.id), builds)
+
+        if not builds:
+            return None
+
+        return builds[0]
+
+    @cached_property
+    def _result(self):
+        """
+        Task result info as returned by API.
+
+        :rtype: dict
+        """
+
+        result = self.session.getTaskResult(self.id)
+
+        log_dict(self.debug, 'task result', result)
+
+        return result
 
     @cached_property
     def _task_request(self):
         return self._task_info['request']
+
+    @cached_property
+    def has_build(self):
+        """
+        Whether there is a build for this task.
+
+        If there is a ``self.build_id``, then we have a build. ``self.build_id`` is extracted from ``self._build``,
+        therefore we can inject ``self._build`` - like Brew's ``buildContainer`` tasks do - and this will work
+        like a charm.
+        """
+
+        return self.build_id is not None
+
+    @cached_property
+    def is_build_task(self):
+        """
+        Whether this task is a "build" task, i.e. building common RPMs.
+        """
+
+        return self._task_info['method'] == 'build'
 
     @cached_property
     def build_id(self):
@@ -243,7 +297,7 @@ class KojiTask(object):
         :rtype: int
         """
 
-        if self.scratch:
+        if not self._build:
             return None
 
         return self._build['build_id']
@@ -396,7 +450,7 @@ class KojiTask(object):
         :rtype: dict(str, list(str))
         """
 
-        if self.scratch:
+        if not self.has_build:
             return {}
 
         build_rpms = self.session.listBuildRPMs(self.build_id)
@@ -411,6 +465,22 @@ class KojiTask(object):
         log_dict(self.debug, 'build rpms', artifacts)
 
         return artifacts
+
+    @cached_property
+    def build_archives(self):
+        """
+        A list of archives of the build.
+
+        :rtype: list(dict)
+        """
+
+        if not self.has_build:
+            return []
+
+        archives = self.session.listArchives(buildID=self.build_id)
+        log_dict(self.debug, 'build archives', archives)
+
+        return archives
 
     @cached_property
     def has_artifacts(self):
@@ -459,8 +529,12 @@ class KojiTask(object):
         if self._task_info['state'] != koji.TASK_STATES["CLOSED"]:
             raise GlueError('Task {} is not a successfully completed task'.format(self.id))
 
+        # "build container" tasks have no SRPM
+        if not self.is_build_task:
+            return None
+
         # For standard (non-scratch) builds, we may fetch an associated build and dig info from it
-        if not self.scratch:
+        if self.has_build:
             self.debug('srpm name deduced from build')
             return '{}.src.rpm'.format(self._build['nvr'])
 
@@ -538,9 +612,12 @@ class KojiTask(object):
         :rtype: str
         """
 
-        name, version, release, _, _ = self._split_srcrpm
+        if self.is_build_task:
+            name, version, release, _, _ = self._split_srcrpm
 
-        return '-'.join([name, version, release])
+            return '-'.join([name, version, release])
+
+        raise GlueError('Cannot deduce NVR for task {}'.format(self.id))
 
     @cached_property
     def component(self):
@@ -550,7 +627,10 @@ class KojiTask(object):
         :rtype: str
         """
 
-        return self._split_srcrpm[0]
+        if self.is_build_task:
+            return self._split_srcrpm[0]
+
+        raise GlueError('Cannot find component info for task {}'.format(self.id))
 
     @cached_property
     def version(self):
@@ -560,7 +640,10 @@ class KojiTask(object):
         :rtype: str
         """
 
-        return self._split_srcrpm[1]
+        if self.is_build_task:
+            return self._split_srcrpm[1]
+
+        raise GlueError('Cannot find version info for task {}'.format(self.id))
 
     @cached_property
     def release(self):
@@ -570,7 +653,10 @@ class KojiTask(object):
         :rtype: str
         """
 
-        return self._split_srcrpm[2]
+        if self.is_build_task:
+            return self._split_srcrpm[2]
+
+        raise GlueError('Cannot find release info for task {}'.format(self.id))
 
     @cached_property
     def full_name(self):
@@ -641,7 +727,7 @@ class BrewTask(KojiTask):
 
     :param dict instance: Instance details, see ``required_instance_keys``
     :param int task_id: Initialize from given TaskID
-    :param str module_name: Name of the module, i.e. 'brew' or 'koji'
+    :param module: Module that created this task instance.
     :param gluetool.log.ContextLogger logger: logger used for logging
     :param bool wait_timeout: Wait for task to become non-waiting
     """
@@ -659,21 +745,63 @@ class BrewTask(KojiTask):
             raise GlueError('instance details do not contain all required keys')
 
     # pylint: disable=too-many-arguments
-    def __init__(self, details, task_id, module_name, logger=None, wait_timeout=None):
-        super(BrewTask, self).__init__(details, task_id, module_name, logger, wait_timeout)
+    def __init__(self, details, task_id, module, logger=None, wait_timeout=None):
+        super(BrewTask, self).__init__(details, task_id, module, logger, wait_timeout)
+
         self.automation_user_ids = details['automation_user_ids']
         self.dist_git_commit_urls = details['dist_git_commit_urls']
+
+        if self.is_build_container_task:
+            if not self._result or 'koji_builds' not in self._result or not self._result['koji_builds']:
+                raise GlueError('Container task {} does not have a result'.format(self.id))
+
+            self._build = self.session.getBuild(int(self._result['koji_builds'][0]))
+            log_dict(self.debug, 'build for task ID {}'.format(self.id), self._build)
+
+    @cached_property
+    def is_build_container_task(self):
+        return self._task_info['method'] == 'buildContainer'
+
+    @cached_property
+    def has_artifacts(self):
+        """
+        Whether there are any artifacts on for the task.
+
+        :rtype: bool
+        """
+
+        if self.is_build_container_task:
+            return bool(self.build_archives)
+
+        return super(BrewTask, self).has_artifacts
+
+    @cached_property
+    def source_members(self):
+        """
+        Return :py:attr:`source` attribute split into its pieces, a component and a GIT commit hash.
+
+        :rtype: tuple(str, str)
+        """
+
+        try:
+            git_hash = re.search("#[^']*", self.source).group()[1:]
+            component = re.search("/rpms/[^#?]*", self.source).group()[6:]
+
+            return component, git_hash
+
+        # pylint: disable=bare-except
+        except:
+            return None, None
 
     @cached_property
     def _parsed_commit_html(self):
         """
         :returns: BeatifulSoup4 parsed html from cgit for given component and commit hash
         """
-        # get git commit hash and component name
-        try:
-            git_hash = re.search("#[^']*", self.source).group()[1:]
-            component = re.search("/rpms/[^?]*", self.source).group()[6:]
-        except AttributeError:
+
+        component, git_hash = self.source_members
+
+        if not component or not git_hash:
             return None
 
         # get git commit html
@@ -688,6 +816,76 @@ class BrewTask(KojiTask):
                 self.warn("Failed to fetch commit info from '{}'".format(url))
 
         return None
+
+    @cached_property
+    def nvr(self):
+        """
+        NVR of the built package.
+
+        :rtype: str
+        """
+
+        if self.is_build_container_task:
+            if self.has_build:
+                return self._build['nvr']
+
+            return '-'.join([self.component, self.version, self.release])
+
+        return super(BrewTask, self).nvr
+
+    @cached_property
+    def component(self):
+        """
+        Package name of the built package (``N`` of ``NVR``).
+
+        :rtype: str
+        """
+
+        if self.is_build_container_task:
+            if self.has_build:
+                return self._build['package_name']
+
+            component, _ = self.source_members
+
+            if component:
+                return component
+
+        return super(BrewTask, self).component
+
+    @cached_property
+    def version(self):
+        """
+        Version of the built package (``V`` of ``NVR``).
+
+        :rtype: str
+        """
+
+        if self.is_build_container_task:
+            if self.has_build:
+                return self._build['version']
+
+            # there is no such field in task info, just in build info :/
+
+        return super(BrewTask, self).version
+
+    @cached_property
+    def release(self):
+        """
+        Release of the built package (``R`` of ``NVR``).
+
+        :rtype: str
+        """
+
+        if self.is_build_container_task:
+            if self.has_build:
+                return self._build['release']
+
+            release = self._task_request.options.get('release', None)
+
+            if release:
+                return release
+
+        return super(BrewTask, self).release
 
     @cached_property
     def branch(self):
@@ -782,11 +980,20 @@ class Koji(gluetool.Module):
         'tag': {
             'help': 'Use given build tag.',
         },
+        'valid-methods': {
+            'help': """
+                    List of task methods that are considered valid, e.g. ``build`` or ``buildContainer``
+                    (Default: any method is considered valid).
+                    """,
+            'metavar': 'METHOD1,METHOD2,...',
+            'action': 'append',
+            'default': []
+        },
         'wait': {
             'help': 'Wait timeout for task to become non-waiting and closed',
             'type': int,
             'default': 60,
-        },
+        }
     }
 
     options_note = """
@@ -803,6 +1010,10 @@ class Koji(gluetool.Module):
         self._session = None
         self._tasks = []
 
+    @cached_property
+    def _valid_methods(self):
+        return gluetool.utils.normalize_multistring_option(self.option('valid-methods'))
+
     def _task_factory(self, task_id, wait_timeout=None, details=None, task_class=None):
         task_class = task_class or KojiTask
 
@@ -813,7 +1024,7 @@ class Koji(gluetool.Module):
             'web_url': self.option('web-url'),
         }, details or {})
 
-        task = task_class(details, task_id, self.unique_name, logger=self.logger, wait_timeout=wait_timeout)
+        task = task_class(details, task_id, self, logger=self.logger, wait_timeout=wait_timeout)
 
         return task
 
