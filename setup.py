@@ -171,6 +171,7 @@ if __name__ == '__main__':
                   'tests',
                   'dispatchers',
                   'helpers',
+                  'helpers.beaker',
                   'helpers.jenkins',
                   'helpers.notify_email',
                   'infrastructure',
