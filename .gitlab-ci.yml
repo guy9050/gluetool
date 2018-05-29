@@ -2,10 +2,10 @@
 
 stages:
   - test
-    #  - build-python
-    #  - build-rpm
-    #  - build-docker
-    #  - deploy-staging
+  - build-python
+  - build-rpm
+  - build-docker
+  - deploy-staging
   - accessories
 
 
@@ -107,7 +107,8 @@ generate-docs:
 build-python-package:
   stage: build-python
   only:
-    - master@baseos-qe/gluetool-modules
+    - there-is-no-such-branch
+    #    - master@baseos-qe/gluetool-modules
   script:
     - tower-cli job launch -J "$PUBLISH_JOB" --monitor --extra-vars "DEVPI_INDEX=$DEVPI_INDEX"
                                                        --extra-vars "DEVPI_USERNAME=$DEVPI_USERNAME"
@@ -122,7 +123,8 @@ build-python-package:
 build-rpm-packages:
   stage: build-rpm
   only:
-    - master@baseos-qe/gluetool-modules
+    - there-is-no-such-branch
+      #- master@baseos-qe/gluetool-modules
   script:
     - tower-cli workflow_job launch -W "$RPM_JOB" --monitor --extra-vars "COPR_LOGIN=$COPR_LOGIN"
                                                             --extra-vars "COPR_USERNAME=$COPR_USERNAME"
@@ -134,7 +136,8 @@ build-rpm-packages:
 build-docker-images:
   stage: build-docker
   only:
-    - master@baseos-qe/gluetool-modules
+    - there-is-no-such-branch
+      #- master@baseos-qe/gluetool-modules
   script:
     - tower-cli workflow_job launch -W "$DOCKER_JOB" --monitor --extra-vars "DOCKER_REGISTRY_HOST=$DOCKER_REGISTRY_HOST"
                                                                --extra-vars "DOCKER_REGISTRY_PROJECT=$DOCKER_REGISTRY_PROJECT"
@@ -145,7 +148,8 @@ build-docker-images:
 deploy-to-staging:
   stage: deploy-staging
   only:
-    - master@baseos-qe/gluetool-modules
+    - there-is-no-such-branch
+      #- master@baseos-qe/gluetool-modules
   script:
     - tower-cli job launch -J "$DEPLOY_JOB" --monitor | tee tower_output.log
     - grep 'failed' tower_output.log && { echo 'tower-cli seems to have failed!'; exit 1; } || exit 0
