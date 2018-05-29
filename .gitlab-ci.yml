@@ -2,10 +2,10 @@
 
 stages:
   - test
-  - build-python
-  - build-rpm
-  - build-docker
-  - deploy-staging
+    #  - build-python
+    #  - build-rpm
+    #  - build-docker
+    #  - deploy-staging
   - accessories
 
 
