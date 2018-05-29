@@ -892,6 +892,14 @@ class BrewTask(KojiTask):
         """
         :returns: git branches of brew task or None if branch could not be found
         """
+
+        # Docker image builds provide this in task' options. If it's not there, just fall back to the old way.
+        if self.is_build_container_task:
+            git_branch = self._task_request.options.get('git_branch', None)
+
+            if git_branch:
+                return git_branch
+
         if self._parsed_commit_html is None:
             return None
 
