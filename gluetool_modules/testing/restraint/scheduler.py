@@ -37,9 +37,24 @@ class RestraintScheduler(gluetool.Module):
     name = 'restraint-scheduler'
     description = 'Prepares "schedule" for runners of restraint.'
 
+    options = {
+        'unsupported-arches': {
+            'help': 'List of arches not supported by system pool.',
+            'metavar': 'ARCH1[,ARCH2...]',
+            'default': [],
+            'action': 'append'
+        }
+    }
+
+    required_options = ('unsupported-arches',)
+
     shared_functions = ['schedule']
 
     _schedule = None
+
+    @utils.cached_property
+    def unsupported_arches(self):
+        return utils.normalize_multistring_option(self.option('unsupported-arches'))
 
     def schedule(self):
         """
@@ -65,9 +80,27 @@ class RestraintScheduler(gluetool.Module):
             '--single',  # ignore multihost tests
             '--no-reserve',  # don't reserve hosts
             '--hardware-skip',  # ignore tasks with specific hardware requirements
-            '--arch', 'x86_64',  # limit to x86_64, we're dealing with openstack - I know :(
             '--restraint',
             '--suppress-install-task'
+        ]
+
+        # To limit to just supported architectures, using --arch=foo would work fine
+        # until the testing runs into an artifact with incomplete set of arches, with
+        # foo present. Configuration would try to limit recipe sets to just those arches
+        # present, add --arch=foo. The scheduler would try to limit arches even more,
+        # to supported ones only, adding another --arch=foo, which would make wow construct
+        # *two* same recipeSets for arch foo, possibly leading to provisioning two boxes
+        # for this arch, running the exactly same set of tasks.
+        #
+        # On the other hand, multiple --no-arch=not-foo seem to be harmless, therefore we
+        # could try this approach instead. So, user must provide a list of arches not
+        # supported by the backing pool, and we add --no-arch for each of them, letting wow
+        # know we cannot run any tasks relevant just on those arches. It *still* may lead
+        # to multiple recipeSets: e.g. if our backend supports x86_64, it supports i686
+        # out of the box as well, and wow may split i686-only tasks to a separate box. But
+        # this is not that harmful as the original issue.
+        options += [
+            '--no-arch={}'.format(arch) for arch in self.unsupported_arches
         ]
 
         return self.shared('beaker_job_xml', options=options)
