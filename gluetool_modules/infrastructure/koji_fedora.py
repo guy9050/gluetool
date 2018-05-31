@@ -10,7 +10,7 @@ from rpmUtils.miscutils import splitFilename
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.log import Logging, log_dict
-from gluetool.utils import cached_property, dict_update, fetch_url, wait, normalize_multistring_option
+from gluetool.utils import cached_property, dict_update, fetch_url, wait, normalize_multistring_option, render_template
 
 
 class NotBuildTaskError(SoftGlueError):
@@ -935,6 +935,55 @@ class BrewTask(KojiTask):
         """
         return re.sub(".*rhel-(\\d+).*", "\\1", self.target)
 
+    @cached_property
+    def task_arches(self):
+        """
+        Return information about arches the task was building for.
+
+        :rtype: TaskArches
+        """
+
+        if self.is_build_container_task:
+            arches = []
+
+            for archive in self.build_archives:
+                if archive['btype'] != 'image':
+                    continue
+
+                arches.append(archive['extra']['image']['arch'])
+
+            return TaskArches(False, arches)
+
+        return super(BrewTask, self).task_arches
+
+    @cached_property
+    def build_archives(self):
+        """
+        A list of archives of the build.
+
+        Overriding parent method to enhance image archives with image URL.
+
+        :rtype: list(dict)
+        """
+
+        archives = super(BrewTask, self).build_archives
+
+        if self.is_build_container_task:
+            context = dict_update(self._module.shared('eval_context'), {
+                'MODULE': self._module,
+                'TASK': self
+            })
+
+            for archive in archives:
+                if archive.get('btype', None) != 'image':
+                    continue
+
+                archive['image_url'] = render_template(self._module.option('docker-image-url-template'),
+                                                       logger=self.logger,
+                                                       ARCHIVE=archive, **context)
+
+        return archives
+
 
 class Koji(gluetool.Module):
     """
@@ -1252,10 +1301,18 @@ class Brew(Koji, (gluetool.Module)):
         },
         'dist-git-commit-urls': {
             'help': 'List of comma delimited dist git commit urls used for resolving of issuer from commit'
+        },
+        'docker-image-url-template': {
+            'help': """
+                    Template for constructing URL of a Docker image. It is given a task (``TASK``)
+                    and an archive (``ARCHIVE``) describing the image, as returned by the Koji API.
+                    """
         }
     })
 
-    required_options = Koji.required_options + ['automation-user-ids', 'dist-git-commit-urls']
+    required_options = Koji.required_options + [
+        'automation-user-ids', 'dist-git-commit-urls', 'docker-image-url-template'
+    ]
 
     def _task_factory(self, task_id, wait_timeout=None, details=None, task_class=None):
         # options checker does not handle multiple modules in the same file correctly, therefore it
