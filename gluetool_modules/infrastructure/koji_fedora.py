@@ -752,11 +752,15 @@ class BrewTask(KojiTask):
         self.dist_git_commit_urls = details['dist_git_commit_urls']
 
         if self.is_build_container_task:
-            if not self._result or 'koji_builds' not in self._result or not self._result['koji_builds']:
+            if not self._result:
                 raise GlueError('Container task {} does not have a result'.format(self.id))
 
-            self._build = self.session.getBuild(int(self._result['koji_builds'][0]))
-            log_dict(self.debug, 'build for task ID {}'.format(self.id), self._build)
+            if 'koji_builds' not in self._result or not self._result['koji_builds']:
+                self.warn('Container task {} does not have a build assigned'.format(self.id))
+
+            else:
+                self._build = self.session.getBuild(int(self._result['koji_builds'][0]))
+                log_dict(self.debug, 'build for task ID {}'.format(self.id), self._build)
 
     @cached_property
     def is_build_container_task(self):
@@ -771,7 +775,7 @@ class BrewTask(KojiTask):
         """
 
         if self.is_build_container_task:
-            return bool(self.build_archives)
+            return bool(self.build_archives) or (self.image_repositories)
 
         return super(BrewTask, self).has_artifacts
 
@@ -865,6 +869,7 @@ class BrewTask(KojiTask):
                 return self._build['version']
 
             # there is no such field in task info, just in build info :/
+            return '<unknown version>'
 
         return super(BrewTask, self).version
 
@@ -884,6 +889,9 @@ class BrewTask(KojiTask):
 
             if release:
                 return release
+
+            # Without build or request, there's no other place to look in :/
+            return '<unknown release>'
 
         return super(BrewTask, self).release
 
@@ -983,6 +991,24 @@ class BrewTask(KojiTask):
                                                        ARCHIVE=archive, **context)
 
         return archives
+
+    @cached_property
+    def image_repositories(self):
+        """
+        A list of Docker image repositories build by the task.
+
+        :rtype: list(str)
+        """
+
+        if not self._result:
+            return []
+
+        if 'repositories' not in self._result:
+            return []
+
+        log_dict(self.debug, 'image repositories', self._result['repositories'])
+
+        return self._result['repositories']
 
 
 class Koji(gluetool.Module):
