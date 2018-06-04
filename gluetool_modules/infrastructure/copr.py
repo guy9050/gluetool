@@ -98,7 +98,7 @@ class CoprTask(object):
         self.target = task_id.chroot_name
         self.nvr = '{}-{}'.format(self._build['package_name'], self._build['package_version'])
         self.owner = self._project['owner']
-        self.issuer = self._build.get('submitter', '<unknown issuer>')
+        self.issuer = self._build.get('submitter', 'UNKNOWN-ISSUER')
         self.project = self._project['name']
         # this string identifies component in static config file
         self.component_id = '{}/{}/{}'.format(self.owner, self.project, self.component)
