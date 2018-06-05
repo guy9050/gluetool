@@ -425,7 +425,7 @@ class OpenstackGuest(NetworkedGuest):
         OpenstackGuest._acquire_os_resource('IP assignment', self._module.logger, 1,
                                             _assign)
 
-    def __init__(self, module, details=None, instance_id=None, allow_degraded=None):
+    def __init__(self, module, details=None, instance_id=None, allow_degraded=None, **kwargs):
         self._snapshots = []
 
         self._nova = module.nova
@@ -467,7 +467,8 @@ class OpenstackGuest(NetworkedGuest):
                                              name=self._os_name,
                                              username=self._os_details['username'],
                                              key=self._os_details['key'],
-                                             options=DEFAULT_SSH_OPTIONS)
+                                             options=DEFAULT_SSH_OPTIONS,
+                                             **kwargs)
 
     @property
     def image(self):
@@ -819,6 +820,11 @@ class CIOpenstack(gluetool.Module):
                         """
             }
         }),
+        ('Tenant options', {
+            'arch': {
+                'help': 'Architecture of instances provided by the tenant'
+            }
+        }),
         ('Glance options', {
             'glance.auth-url': {
                 'help': 'Glance AUTH URL',
@@ -889,7 +895,8 @@ class CIOpenstack(gluetool.Module):
 
     required_options = (
         'auth-url', 'password', 'project-name', 'username', 'ssh-key', 'ip-pool-name',
-        'glance.auth-url', 'glance.project-id', 'glance.username', 'glance.password'
+        'glance.auth-url', 'glance.project-id', 'glance.username', 'glance.password',
+        'arch'
     )
     shared_functions = ('openstack', 'provision')
 
@@ -1140,7 +1147,7 @@ class CIOpenstack(gluetool.Module):
 
             self.verbose('creating guest with following details\n{}'.format(format_dict(details)))
             allow_degraded = normalize_multistring_option(self.option('allow-degraded'))
-            guest = OpenstackGuest(self, details=details, allow_degraded=allow_degraded)
+            guest = OpenstackGuest(self, details=details, allow_degraded=allow_degraded, arch=self.option('arch'))
 
             self._all.append(guest)
             guests.append(guest)
