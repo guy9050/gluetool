@@ -190,16 +190,8 @@ class RestraintRunner(gluetool.Module):
 
         # pylint: disable=no-self-use
 
-        # results are stored in a temporary directory which is logged on the first
-        # line of restraint's output
-        header_line = output.split('\n')[0].strip()
-        if not header_line.startswith('Using ./tmp'):
-            raise gluetool.GlueError('Don\'t know where to find restraint results')
-
-        job_dir = os.path.join('.', header_line.split(' ')[1].strip())
-
         # XML produced by restraint
-        with open(os.path.join(job_dir, 'job.xml'), 'r') as f:
+        with open(os.path.join(output.directory, 'job.xml'), 'r') as f:
             self.debug('XML produced by restraint lies in {}'.format(f.name))
 
             job_results = bs4.BeautifulSoup(f.read(), 'xml')
@@ -209,11 +201,11 @@ class RestraintRunner(gluetool.Module):
 
         if 'BUILD_URL' in os.environ:
             def artifact_path(s):
-                return '{}/artifact/{}/{}'.format(os.getenv('BUILD_URL'), job_dir, s)
+                return '{}/artifact/{}/{}'.format(os.getenv('BUILD_URL'), output.directory, s)
 
         else:
             def artifact_path(s):
-                path = gluetool.utils.normalize_path('{}/{}'.format(job_dir, s))
+                path = gluetool.utils.normalize_path('{}/{}'.format(output.directory, s))
 
                 return 'file://localhost/{}'.format(path)
 
@@ -223,7 +215,7 @@ class RestraintRunner(gluetool.Module):
 
             journal_log = task_results.logs.find_all('log', filename='journal.xml')
             if journal_log:
-                with open(os.path.join(job_dir, journal_log[0]['path']), 'r') as f:
+                with open(os.path.join(output.directory, journal_log[0]['path']), 'r') as f:
                     self.debug('Journal lies in {}'.format(f.name))
 
                     journal = bs4.BeautifulSoup(f.read(), 'xml').BEAKER_TEST
@@ -286,6 +278,8 @@ class RestraintRunner(gluetool.Module):
         # bad happened - 'restraint' shared function returns restraint's output even if its exit status
         # was non-zero. Take a snapshot, if asked to do so, and re-raise the exception.
         try:
+            # We should add rename_dir_to and label but it's not clear what should be the name. Probably something
+            # with index of the job. Future patch :)
             output = self.shared('restraint', guest, job)
 
         except gluetool.GlueError as exc:
@@ -293,20 +287,22 @@ class RestraintRunner(gluetool.Module):
 
             raise exc
 
-        log_blob(self.info, 'Task set output', output.stdout)
+        log_blob(self.info, 'Task set output', output.execution_output.stdout)
 
         # Find out what is the result - restraint returned back to us, and even with a non-zero
         # exit status, there should be a result to pick up.
-        result = self._gather_task_set_results(guest, output.stdout)
+        result = self._gather_task_set_results(guest, output)
         log_dict(self.debug, 'task set result', result)
 
+        exit_code = output.execution_output.exit_code
+
         # A zero exit status? Fine!
-        if output.exit_code == 0:
+        if exit_code == 0:
             return result
 
-        self.debug('restraint exited with invalid exit code {}'.format(output.exit_code))
+        self.debug('restraint exited with invalid exit code {}'.format(exit_code))
 
-        if output.exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_RESULT_ERROR:
+        if exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_RESULT_ERROR:
             # "One or more tasks failed" error - this is a good, well behaving error.
             # We can safely move on and return results we got from restraint.
             self.info('restraint reports: One or more tasks failed')
@@ -324,7 +320,7 @@ class RestraintRunner(gluetool.Module):
 
         # Restraint failed, and no better option was enabled => raise an exception.
         raise gluetool.GlueError('restraint command exited with return code {}: {}'.format(
-            output.exit_code, output.stderr))
+            exit_code, output.execution_output.stderr))
 
     def _run_recipe_set_isolated(self, guest, recipe_set):
         """
