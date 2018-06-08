@@ -51,6 +51,13 @@ BuildTaskRequest = collections.namedtuple('BuildTaskRequest', ['source', 'target
 BuildArchTaskRequest = collections.namedtuple('BuildArchTaskRequest',
                                               ['source', 'something', 'arch', 'keep_srpm', 'options'])
 
+#: Represents an image repository
+#:
+#: :ivar str arch: Image architecture.
+#: :ivar str url: Repository URL.
+#: :ivar list(str) alternatives: Other URLs leading to the same image as ``url``.
+ImageRepository = collections.namedtuple('ImageRepository', ['arch', 'url', 'alternatives'])
+
 
 class KojiTask(object):
     # pylint: disable=too-many-public-methods
@@ -788,8 +795,10 @@ class BrewTask(KojiTask):
         """
 
         try:
+            namespace = 'containers' if self.is_build_container_task else 'rpms'
+
             git_hash = re.search("#[^']*", self.source).group()[1:]
-            component = re.search("/rpms/[^#?]*", self.source).group()[6:]
+            component = re.search("/{}/([^#?]*)".format(namespace), self.source).group(1)
 
             return component, git_hash
 
@@ -869,7 +878,7 @@ class BrewTask(KojiTask):
                 return self._build['version']
 
             # there is no such field in task info, just in build info :/
-            return '<unknown version>'
+            return 'UNKNOWN-VERSION'
 
         return super(BrewTask, self).version
 
@@ -891,7 +900,7 @@ class BrewTask(KojiTask):
                 return release
 
             # Without build or request, there's no other place to look in :/
-            return '<unknown release>'
+            return 'UNKNOWN-RELEASE'
 
         return super(BrewTask, self).release
 
@@ -954,11 +963,20 @@ class BrewTask(KojiTask):
         if self.is_build_container_task:
             arches = []
 
-            for archive in self.build_archives:
-                if archive['btype'] != 'image':
-                    continue
+            if self.has_build:
+                for archive in self.build_archives:
+                    if archive['btype'] != 'image':
+                        continue
 
-                arches.append(archive['extra']['image']['arch'])
+                    arches.append(archive['extra']['image']['arch'])
+
+            else:
+                # This is workaround for Brew deficiency: the image architecture is *not* mentioned anywhere
+                # in Brew API responses. For regular builds, it's in build info, for scratch builds - nowhere :/
+                # Only relevant source is the actual image itself...
+                arches = [
+                    repository.arch for repository in self.image_repositories
+                ]
 
             return TaskArches(False, arches)
 
@@ -997,7 +1015,7 @@ class BrewTask(KojiTask):
         """
         A list of Docker image repositories build by the task.
 
-        :rtype: list(str)
+        :rtype: list(dict)
         """
 
         if not self._result:
@@ -1006,9 +1024,81 @@ class BrewTask(KojiTask):
         if 'repositories' not in self._result:
             return []
 
-        log_dict(self.debug, 'image repositories', self._result['repositories'])
+        log_dict(self.debug, 'raw image repositories', self._result['repositories'])
 
-        return self._result['repositories']
+        # Task provides usually more than one repository, and often some of them lead to the same image.
+        # We want to provide our users list of unique repositories (images). To do that, we have to check
+        # each repository, find out what is the ID of the image, and group them by their corresponding images.
+        # By checking the image manifest, we get access to image architecture as well - this is important,
+        # there is no other place to get this info from for scratch container builds, it's not in Brew task
+        # info nor result.
+
+        images = {}
+
+        for repository_url in self._result['repositories']:
+            # split repository URL into parts
+            match = re.match('(.*?)/(.*?):(.*)$', repository_url)
+            if match is None:
+                self.warn("Cannot decypher repository URL '{}'".format(repository_url), sentry=True)
+                continue
+
+            netloc, image_name, reference = match.groups()
+
+            manifest_url = 'http://{}/v2/{}/manifests/{}'.format(netloc, image_name, reference)
+            self.debug("manifest URL: '{}'".format(manifest_url))
+
+            # manifest = requests.get(manifest_url).json()
+            _, content = gluetool.utils.fetch_url(manifest_url, logger=self.logger)
+            manifest = gluetool.utils.from_json(content)
+
+            log_dict(self.debug, '{} manifest'.format(repository_url), manifest)
+
+            # With v2 manifests, we'd just look up image ID. With v1, there's no such field, but different URLs,
+            # leadign to the same image, should have same FS layers.
+            image_id = tuple([
+                layer['blobSum'] for layer in manifest['fsLayers']
+            ])
+
+            image_arch = manifest['architecture']
+
+            # translate arch from dockerish to our world
+            if image_arch == 'amd64':
+                image_arch = 'x86_64'
+
+            if image_id in images:
+                # We've already seen this image
+                image = images[image_id]
+
+            else:
+                # First time seeing this image
+                image = images[image_id] = {
+                    'arch': image_arch,
+                    'repositories': []
+                }
+
+            if image['arch'] != image_arch:
+                # This should not happen. URLs leading to the same image should have the same architecture.
+                # If it happens, must investigate.
+                raise GlueError('Mismatching repository architectures')
+
+            image['repositories'].append(repository_url)
+
+        # Now, we must find the most specific URL for each image - under `repositories` key, there's a list
+        # of URLs leading to the same image. Pretty naive but quite successfull method could be finding the
+        # longest one - whatever the image name might be, the longest URL should have a timestamp-like value
+        # at the end, which would make it longer than any other.
+
+        # And we're still returning "repositories", not "images" - above, we've been gathering images, to deal
+        # with different URLs leading to the same image, but we want to return them as repositories, as these
+        # are the task artifacts.
+        repositories = [
+            ImageRepository(image['arch'], max(image['repositories'], key=len), image['repositories'])
+            for image in images.itervalues()  # noqa
+        ]
+
+        log_dict(self.debug, 'image repositories', repositories)
+
+        return repositories
 
 
 class Koji(gluetool.Module):

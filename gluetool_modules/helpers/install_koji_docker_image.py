@@ -34,12 +34,35 @@ class InstallKojiDockerImage(gluetool.Module):
 
         guest.info('installing the Docker image')
 
-        # Find image archives, we'll grab the first one when constructing final XML
-        image_archives = [archive for archive in self.shared('primary_task').build_archives
-                          if archive['btype'] == 'image']
+        task = self.shared('primary_task')
 
-        if not image_archives:
-            raise GlueError('No "image" archive in task {}'.format(self.shared('primary_task').id))
+        archive_url = ''
+        registry_url = ''
+
+        # Need to finish: we have to chose the correct architecture. Right now, there is just
+        # x86_64, and we're not propagating this information correctly - probably guest should
+        # know what architecture it provides, and the code bellow would use it to pick correct
+        # image.
+
+        # If there is a build, there should be an archive in that build, with a link to
+        # tar & gzipped image.
+        if task.has_build:
+            # Find image archives, we'll grab the first one when constructing final XML
+            image_archives = [
+                archive for archive in task.build_archives if archive['btype'] == 'image'
+            ]
+
+            if not image_archives:
+                raise GlueError('No "image" archive in task {}'.format(task.id))
+
+            archive_url = image_archives[0]['image_url']
+
+        else:
+            # Otherwise, take one of the repositories, and use its URL.
+            if not task.image_repositories:
+                raise GlueError('No image repositories in task {}'.format(task.id))
+
+            registry_url = task.image_repositories[0].url
 
         # One day, when we start using wow to construct this job, the params below would be injected
         # by wow-options map. Until then, we have to specify them here *and* in the wow-options map...
@@ -62,8 +85,9 @@ class InstallKojiDockerImage(gluetool.Module):
                   <task name="/examples/sandbox/emachado/install-docker-image" role="None">
                     <params>
                       <param name="BASEOS_CI" value="true"/>
-                      <param name="IMAGE_URL" value="{{ ARCHIVE['image_url'] }}"/>
-                      <param name="IMAGE_NAME" value="{{ PRIMARY_TASK.nvr }}"/>
+                      <param name="IMAGE_ARCHIVE_URL" value="{{ ARCHIVE_URL }}"/>
+                      <param name="IMAGE_REGISTRY_URL" value="{{ REGISTRY_URL }}"/>
+                      <param name="IMAGE_NAME" value="{{ PRIMARY_TASK.nvr | lower }}"/>
                     </params>
                     <rpm name="test(/examples/sandbox/emachado/install-docker-image)" path="/mnt/tests/examples/sandbox/emachado/install-docker-image"/>
                   </task>
@@ -79,7 +103,7 @@ class InstallKojiDockerImage(gluetool.Module):
                 </recipe>
               </recipeSet>
             </job>
-        """, ARCHIVE=image_archives[0], **self.shared('eval_context'))
+        """, ARCHIVE_URL=archive_url, REGISTRY_URL=registry_url, **self.shared('eval_context'))
 
         job = bs4.BeautifulSoup(job_xml, 'xml')
 

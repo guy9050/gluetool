@@ -24,14 +24,38 @@ class WowArtifactIntallationOptionsKojiDockerImage(gluetool.Module):
 
         task = self.shared('primary_task')
 
-        image_archives = [archive for archive in task.build_archives if archive['btype'] == 'image']
+        # Need to finish: we have to chose the correct architecture. Right now, we have just
+        # a single archive or registry URL, and we have to somehow tell Beaker boxes "you are
+        # going to install *this* image" - I have no idea how to do that :/ Not enough information
+        # in URLs to allow e.g. $(arch) trick.
 
-        if not image_archives:
-            raise gluetool.GlueError('No "image" archive in task {}'.format(self.shared('primary_task').id))
+        archive_url = ''
+        registry_url = ''
+
+        # If there is a build, there should be an archive in that build, with a link to
+        # tar & gzipped image.
+        if task.has_build:
+            # Find image archives, we'll grab the first one when constructing final XML
+            image_archives = [
+                archive for archive in task.build_archives if archive['btype'] == 'image'
+            ]
+
+            if not image_archives:
+                raise gluetool.GlueError('No "image" archive in task {}'.format(task.id))
+
+            archive_url = image_archives[0]['image_url']
+
+        else:
+            # Otherwise, take one of the repositories, and use its URL.
+            if not task.image_repositories:
+                raise gluetool.GlueError('No image repositories in task {}'.format(task.id))
+
+            registry_url = task.image_repositories[0].url
 
         install_docker_image_params = ' '.join([
             '{}="{}"'.format(param, value) for param, value in {
-                'IMAGE_URL': image_archives[0]['image_url']
+                'IMAGE_ARCHIVE_URL': archive_url,
+                'IMAGE_REGISTRY_URL': registry_url
             }.iteritems()
         ])
 
