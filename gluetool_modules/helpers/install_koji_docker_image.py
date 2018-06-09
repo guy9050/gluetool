@@ -1,5 +1,3 @@
-import bs4
-
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from libci.sentry import PrimaryTaskFingerprintsMixin
@@ -62,53 +60,35 @@ class InstallKojiDockerImage(gluetool.Module):
 
             registry_url = task.image_repositories[0].url
 
-        # One day, when we start using wow to construct this job, the params below would be injected
-        # by wow-options map. Until then, we have to specify them here *and* in the wow-options map...
-        job_xml = gluetool.utils.render_template("""
-            <job>
-              <recipeSet priority="Normal">
-                <recipe ks_meta="method=http harness='restraint-rhts beakerlib-redhat'" whiteboard="Server">
-                  <task name="/tools/toolchain-common/Install/configure-extras-repo" role="None">
-                    <params>
-                      <param name="BASEOS_CI" value="true"/>
-                    </params>
-                    <rpm name="test(/tools/toolchain-common/Install/configure-extras-repo)" path="/mnt/tests/tools/toolchain-common/Install/configure-extras-repo"/>
-                  </task>
-                  <task name="/examples/sandbox/emachado/enable-docker" role="None">
-                    <params>
-                      <param name="BASEOS_CI" value="true"/>
-                    </params>
-                    <rpm name="test(/examples/sandbox/emachado/enable-docker)" path="/mnt/tests/examples/sandbox/emachado/enable-docker"/>
-                  </task>
-                  <task name="/examples/sandbox/emachado/install-docker-image" role="None">
-                    <params>
-                      <param name="BASEOS_CI" value="true"/>
-                      <param name="IMAGE_ARCHIVE_URL" value="{{ ARCHIVE_URL }}"/>
-                      <param name="IMAGE_REGISTRY_URL" value="{{ REGISTRY_URL }}"/>
-                      <param name="IMAGE_NAME" value="{{ PRIMARY_TASK.nvr | lower }}"/>
-                    </params>
-                    <rpm name="test(/examples/sandbox/emachado/install-docker-image)" path="/mnt/tests/examples/sandbox/emachado/install-docker-image"/>
-                  </task>
-                  <task name="/examples/sandbox/emachado/install-docker-test-config" role="None">
-                    <params>
-                      <param name="BASEOS_CI" value="true"/>
-                      <param name="IMAGE_COMPONENT" value="{{ PRIMARY_TASK.component }}"/>
-                      <param name="IMAGE_BRANCH" value="{{ PRIMARY_TASK.branch }}"/>
-                      <param name="IMAGE_TEST_CONFIG" value="/{{ PRIMARY_TASK.nvr }}.yml"/>
-                      <param name="IMAGE_ARCH" value="{{ PRIMARY_TASK.task_arches.arches[0] }}" />
-                      <param name="IMAGE_VERSION" value="{{ PRIMARY_TASK.version }}"/>
-                      <param name="IMAGE_RELEASE" value="{{ PRIMARY_TASK.release }}"/>
-                    </params>
-                    <rpm name="test(/examples/sandbox/emachado/install-docker-test-config)" path="/mnt/tests/examples/sandbox/emachado/install-docker-test-config"/>
-                  </task>
-                </recipe>
-              </recipeSet>
-            </job>
-        """, ARCHIVE_URL=archive_url, REGISTRY_URL=registry_url, **self.shared('eval_context'))
+        source_options = 'IMAGE_ARCHIVE_URL={} IMAGE_REGISTRY_URL={}'.format(archive_url, registry_url)
 
-        job = bs4.BeautifulSoup(job_xml, 'xml')
+        # This belongs to some sort of config file... But setting source options
+        # is probably a bit too complicated for config file, and it's better to arget it
+        # to just a single task instead of using --taskparam & setting them globally.
+        job_xmls = self.shared('beaker_job_xml', body_options=[
+            '--task=/tools/toolchain-common/Install/configure-extras-repo',
+            '--task=/examples/sandbox/emachado/enable-docker',
+            '--task={} /examples/sandbox/emachado/install-docker-image'.format(source_options),
+            '--task=/examples/sandbox/emachado/install-docker-test-config'
+        ], options=[
+            # These seem to be important for restraint - probably moving to wow-options-map is the right way,
+            # if we could tell we're putting together a recipe for restraint instead of Beaker.
+            '--single',
+            '--no-reserve',
+            '--restraint',
+            '--suppress-install-task',
+            '--arch', guest.arch
+        ])
 
-        output = self.shared('restraint', guest, job,
+        # This is probably not true in general, but our Docker pipelines - in both beaker and openstack - deal
+        # with just a single Beaker distro. To avoid any weird errors later, check number of XMLs, but it would
+        # be nice to check how hard is this assumption.
+        if len(job_xmls) != 1:
+            raise gluetool.GlueError('Unexpected number of job XML descriptions')
+
+        job_xml = job_xmls[0]
+
+        output = self.shared('restraint', guest, job_xml,
                              rename_dir_to='artifact-installation-{}'.format(guest.name),
                              label='Artifact installation logs are in')
 

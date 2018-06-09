@@ -1,5 +1,3 @@
-import bs4
-
 import gluetool
 from gluetool import SoftGlueError
 from libci.sentry import PrimaryTaskFingerprintsMixin
@@ -35,35 +33,35 @@ class InstallKojiBuild(gluetool.Module):
 
         brew_build_task_params = self.shared('brew_build_task_params')
 
-        job_xml = gluetool.utils.render_template("""
-            <job>
-              <recipeSet priority="Normal">
-                <recipe ks_meta="method=http harness='restraint-rhts beakerlib-redhat'" whiteboard="Server">
-                  <task name="/distribution/install/brew-build" role="None">
-                    <params>
-                      <param name="BASEOS_CI" value="true"/>
-                      <param name="METHOD" value="{{ BREW_BUILD_PARAMS.METHOD }}"/>
-                      <param name="TASKS" value="{{ BREW_BUILD_PARAMS.TASKS }}"/>
-                      <param name="BUILDS" value="{{ BREW_BUILD_PARAMS.BUILDS }}"/>
-                      <param name="SERVER" value="{{ BREW_BUILD_PARAMS.SERVER }}"/>
-                      <param name="RPM_BLACKLIST" value="{{ BREW_BUILD_PARAMS.RPM_BLACKLIST }}"/>
-                    </params>
-                    <rpm name="test(/distribution/install/brew-build)" path="/mnt/tests/distribution/install/brew-build"/>
-                  </task>
-                  <task name="/distribution/runtime_tests/verify-nvr-installed" role="None">
-                    <params>
-                      <param name="BASEOS_CI" value="true"/>
-                    </params>
-                    <rpm name="test(/distribution/runtime_tests/verify-nvr-installed)" path="/mnt/tests/distribution/runtime_tests/verify-nvr-installed"/>
-                  </task>
-                </recipe>
-              </recipeSet>
-            </job>
-        """, BREW_BUILD_PARAMS=brew_build_task_params)
+        brew_build_task_params = ' '.join([
+            '{}="{}"'.format(param, value) for param, value in self.shared('brew_build_task_params')
+        ])
 
-        job = bs4.BeautifulSoup(job_xml, 'xml')
+        # This belongs to some sort of config file... But setting source options
+        # is probably a bit too complicated for config file, and it's better to target it
+        # to just a single task instead of using --taskparam & setting them globally.
+        job_xmls = self.shared('beaker_job_xml', body_options=[
+            '--task={} /distribution/install/brew-build'.format(brew_build_task_params),
+            '--task=/distribution/runtime_tests/verify-nvr-installed'
+        ], options=[
+            # These seem to be important for restraint - probably moving to wow-options-map is the right way,
+            # if we could tell we're putting together a recipe for restraint instead of Beaker.
+            '--single',
+            '--no-reserve',
+            '--restraint',
+            '--suppress-install-task',
+            '--arch', guest.arch
+        ])
 
-        output = self.shared('restraint', guest, job,
+        # This is probably not true in general, but our Docker pipelines - in both beaker and openstack - deal
+        # with just a single Beaker distro. To avoid any weird errors later, check number of XMLs, but it would
+        # be nice to check how hard is this assumption.
+        if len(job_xmls) != 1:
+            raise gluetool.GlueError('Unexpected number of job XML descriptions')
+
+        job_xml = job_xmls[0]
+
+        output = self.shared('restraint', guest, job_xml,
                              rename_dir_to='artifact-installation-{}'.format(guest.name),
                              label='Artifact installation logs are in')
 
