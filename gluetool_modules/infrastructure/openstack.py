@@ -15,7 +15,7 @@ from novaclient.exceptions import BadRequest, NotFound, Unauthorized
 import gluetool
 from gluetool import GlueError, GlueCommandError
 from gluetool.log import format_dict
-from gluetool.utils import cached_property, normalize_path, normalize_multistring_option
+from gluetool.utils import cached_property, normalize_path, load_yaml, dict_update
 from libci.guest import NetworkedGuest
 
 DEFAULT_FLAVOR = 'm1.small'
@@ -125,7 +125,43 @@ class OpenstackGuest(NetworkedGuest):
     Implements Openstack Network Guest with snapshots support.
     """
 
-    ALLOW_DEGRADED = ('cloud-config.service',)
+    def _is_allowed_degraded(self, service):
+        context = dict_update(self._module.shared('eval_context'), {
+            'SERVICE': service
+        })
+
+        # placeholder for callbacks to propagate their decisions
+        result = {
+            'decision': False
+        }
+
+        # callback for `pattern` command
+        def _pattern(instruction, command, argument, context):
+            # pylint: disable=unused-argument
+
+            # either a single pattern or a list of patterns
+            patterns = [argument] if isinstance(argument, str) else argument
+
+            result['decision'] = any(re.match(pattern, service) for pattern in patterns)
+
+            return True
+
+        # callback for `allow-any` command
+        def _allow_any(instruction, command, argument, context):
+            # pylint: disable=unused-argument
+
+            result['decision'] = argument.lower() in ('yes', 'true')
+
+            return True
+
+        # First allowed by rules decides - therefore all callbacks return True to signal
+        # they act on the given instruction.
+        self._module.shared('evaluate_instructions', self._module.degraded_services_map, {
+            'pattern': _pattern,
+            'allow-any': _allow_any
+        }, context=context, stop_at_first_hit=True)
+
+        return result['decision']
 
     #
     # Low-level API, dealing directly with OpenStack resources and objects.
@@ -425,7 +461,7 @@ class OpenstackGuest(NetworkedGuest):
         OpenstackGuest._acquire_os_resource('IP assignment', self._module.logger, 1,
                                             _assign)
 
-    def __init__(self, module, details=None, instance_id=None, allow_degraded=None, **kwargs):
+    def __init__(self, module, details=None, instance_id=None, **kwargs):
         self._snapshots = []
 
         self._nova = module.nova
@@ -439,9 +475,6 @@ class OpenstackGuest(NetworkedGuest):
         self._os_floating_ip = None
         self._os_nics = []
         self._os_details = details or {}
-
-        # extend list of allowed degraded services with the optional ones
-        OpenstackGuest.ALLOW_DEGRADED += tuple(allow_degraded or [])
 
         if instance_id is None:
             self._acquire_floating_ip()
@@ -871,12 +904,8 @@ class CIOpenstack(gluetool.Module):
             }
         }),
         ('Workarounds', {
-            'allow-degraded': {
-                'help': """
-                        List of additional, comma delimited systemd service names which are allowed to be degraded.
-                        By default only 'cloud-init.service' is allowed. Note that the name of the service needs end
-                        with the '.service' suffix.
-                        """
+            'degraded-services-map': {
+                'help': 'Mapping of services which are allowed to be degraded while checking boot process status.'
             },
             'start-after-snapshot-attempts': {
                 # pylint: disable=line-too-long
@@ -921,6 +950,13 @@ class CIOpenstack(gluetool.Module):
 
         self.debug('userdata:\n{}'.format(user_data))
         return user_data
+
+    @cached_property
+    def degraded_services_map(self):
+        if not self.option('degraded-services-map'):
+            return []
+
+        return load_yaml(self.option('degraded-services-map'), logger=self.logger)
 
     def _resource_not_found(self, resource, name, name_attr='name'):
         available = sorted([getattr(item, name_attr) for item in getattr(self.nova, resource).list()])
@@ -1014,8 +1050,7 @@ class CIOpenstack(gluetool.Module):
 
         try:
             # init existing Openstack server from instance_id
-            allow_degraded = normalize_multistring_option(self.option('allow-degraded'))
-            guest = OpenstackGuest(self, instance_id=instance_id, allow_degraded=allow_degraded)
+            guest = OpenstackGuest(self, instance_id=instance_id)
         except NotFound:
             self.info("guest '{}' not found (file will be removed)".format(instance_id))
             return True
@@ -1146,8 +1181,7 @@ class CIOpenstack(gluetool.Module):
             }
 
             self.verbose('creating guest with following details\n{}'.format(format_dict(details)))
-            allow_degraded = normalize_multistring_option(self.option('allow-degraded'))
-            guest = OpenstackGuest(self, details=details, allow_degraded=allow_degraded, arch=self.option('arch'))
+            guest = OpenstackGuest(self, details=details, arch=self.option('arch'))
 
             self._all.append(guest)
             guests.append(guest)
