@@ -97,6 +97,9 @@ class InstallKojiDockerImage(gluetool.Module):
                       <param name="IMAGE_COMPONENT" value="{{ PRIMARY_TASK.component }}"/>
                       <param name="IMAGE_BRANCH" value="{{ PRIMARY_TASK.branch }}"/>
                       <param name="IMAGE_TEST_CONFIG" value="/{{ PRIMARY_TASK.nvr }}.yml"/>
+                      <param name="IMAGE_ARCH" value="{{ PRIMARY_TASK.task_arches.arches[0] }}" />
+                      <param name="IMAGE_VERSION" value="{{ PRIMARY_TASK.version }}"/>
+                      <param name="IMAGE_RELEASE" value="{{ PRIMARY_TASK.release }}"/>
                     </params>
                     <rpm name="test(/examples/sandbox/emachado/install-docker-test-config)" path="/mnt/tests/examples/sandbox/emachado/install-docker-test-config"/>
                   </task>
