@@ -103,7 +103,7 @@ class Message(object):
     # pylint: disable=too-few-public-methods
 
     def __init__(self, module, subject=None, header=None, footer=None, body=None, recipients=None, cc=None,
-                 sender=None):
+                 sender=None, reply_to=None):
         # pylint: disable=too-many-arguments
         self._module = module
 
@@ -115,6 +115,7 @@ class Message(object):
         # pylint: disable=invalid-name
         self.cc = cc or []
         self.sender = sender or self._module.option('sender')
+        self.reply_to = reply_to or self._module.option('reply-to')
 
     def send(self):
         if not self.subject:
@@ -132,10 +133,14 @@ class Message(object):
         msg['To'] = ', '.join(self.recipients)
         msg['Cc'] = ', '.join(self.cc)
 
+        if self.reply_to:
+            msg.add_header('Reply-To', self.reply_to)
+
         self._module.debug("Recipients: '{}'".format(', '.join(self.recipients)))
         self._module.debug("Bcc: '{}'".format(', '.join(self.cc)))
         self._module.debug("Sender: '{}'".format(self.sender))
         self._module.debug("Subject: '{}'".format(self.subject))
+        self._module.debug("Reply-To: '{}'".format(self.reply_to))
         log_blob(self._module.debug, 'Content', content)
 
         if not self._module.dryrun_allows('Sending the notification'):
@@ -177,6 +182,10 @@ class Notify((gluetool.Module)):
             },
             'sender': {
                 'help': 'E-mail of the sender.'
+            },
+            'reply-to': {
+                'help': 'If set, it will be used as a Reply-To header of every outgoing e-mail.',
+                'default': None
             },
             'email-map': {
                 'help': 'Pattern map for recipient => e-mail translation.',
