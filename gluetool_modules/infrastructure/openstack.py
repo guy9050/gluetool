@@ -142,7 +142,8 @@ class OpenstackGuest(NetworkedGuest):
             # either a single pattern or a list of patterns
             patterns = [argument] if isinstance(argument, str) else argument
 
-            result['decision'] = any(re.match(pattern, service) for pattern in patterns)
+            if any(re.match(pattern, service) for pattern in patterns):
+                result['decision'] = True
 
             return True
 
@@ -150,7 +151,8 @@ class OpenstackGuest(NetworkedGuest):
         def _allow_any(instruction, command, argument, context):
             # pylint: disable=unused-argument
 
-            result['decision'] = argument.lower() in ('yes', 'true')
+            if argument.lower() in ('yes', 'true'):
+                result['decision'] = True
 
             return True
 
