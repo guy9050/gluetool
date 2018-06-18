@@ -14,7 +14,7 @@ from novaclient.exceptions import BadRequest, NotFound, Unauthorized
 
 import gluetool
 from gluetool import GlueError, GlueCommandError
-from gluetool.log import format_dict
+from gluetool.log import format_dict, log_dict
 from gluetool.utils import cached_property, normalize_path, load_yaml, dict_update
 from libci.guest import NetworkedGuest
 
@@ -126,6 +126,8 @@ class OpenstackGuest(NetworkedGuest):
     """
 
     def _is_allowed_degraded(self, service):
+        self.debug("service '{}' is degraded, check whether it's allowed".format(service))
+
         context = dict_update(self._module.shared('eval_context'), {
             'SERVICE': service
         })
@@ -142,7 +144,12 @@ class OpenstackGuest(NetworkedGuest):
             # either a single pattern or a list of patterns
             patterns = [argument] if isinstance(argument, str) else argument
 
+            self.debug('current decision: {}'.format(result['decision']))
+            log_dict(self.debug, "matching service '{}' with patterns", patterns)
+
             if any(re.match(pattern, service) for pattern in patterns):
+                self.debug("matched, service '{}' is allowed".format(service))
+
                 result['decision'] = True
 
             return True
@@ -151,7 +158,12 @@ class OpenstackGuest(NetworkedGuest):
         def _allow_any(instruction, command, argument, context):
             # pylint: disable=unused-argument
 
+            self.debug('current decision: {}'.format(result['decision']))
+            self.debug("matchig service '{}' with allow-any '{}'".format(service, argument))
+
             if argument.lower() in ('yes', 'true'):
+                self.debug("matched, service '{}' is allowed".format(service))
+
                 result['decision'] = True
 
             return True
@@ -163,6 +175,7 @@ class OpenstackGuest(NetworkedGuest):
             'allow-any': _allow_any
         }, context=context, stop_at_first_hit=True)
 
+        self.debug("final decision for service '{}' is {}".format(service, result['decision']))
         return result['decision']
 
     #
