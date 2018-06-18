@@ -1,9 +1,7 @@
-import os
-import re
 import bs4
 
 import gluetool
-from gluetool import utils, SoftGlueError
+from gluetool import SoftGlueError
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 
@@ -65,25 +63,14 @@ class InstallKojiBuild(gluetool.Module):
 
         job = bs4.BeautifulSoup(job_xml, 'xml')
 
-        output = self.shared('restraint', guest, job)
+        output = self.shared('restraint', guest, job,
+                             rename_dir_to='artifact-installation-{}'.format(guest.name),
+                             label='Artifact installation logs are in')
 
-        sut_install_logs = None
+        if output.execution_output.exit_code != 0:
+            self.debug('restraint exited with invalid exit code {}'.format(output.execution_output.exit_code))
 
-        match = re.search(r'Using (\./tmp[a-zA-Z0-9\._]+?) for job run', output.stdout)
-        if match is not None:
-            sut_install_logs = '{}/index.html'.format(match.group(1))
-
-            if 'BUILD_URL' in os.environ:
-                sut_install_logs = utils.treat_url('{}/artifact/{}'.format(os.getenv('BUILD_URL'), sut_install_logs),
-                                                   logger=self.logger)
-
-            self.info('SUT installation logs are in {}'.format(sut_install_logs))
-
-        if output.exit_code != 0:
-            self.debug('restraint exited with invalid exit code {}'.format(output.exit_code))
-
-            raise SUTInstallationFailedError(self.shared('primary_task'),
-                                             '<Not available>' if sut_install_logs is None else sut_install_logs)
+            raise SUTInstallationFailedError(self.shared('primary_task'), output.index_location)
 
     def setup_guest(self, guests, **kwargs):
         self.require_shared('restraint', 'brew_build_task_params')
