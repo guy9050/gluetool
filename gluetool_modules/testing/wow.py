@@ -5,6 +5,7 @@ import qe
 
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError
+from gluetool.log import log_dict
 from gluetool.utils import Command, render_template
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
@@ -138,20 +139,30 @@ class WorkflowTomorrow(gluetool.Module):
 
         return gluetool.utils.load_yaml(self.option('wow-options-map'), logger=self.logger)
 
-    def beaker_job_xml(self, options=None, environment=None, task_params=None):
+    def beaker_job_xml(self, body_options=None, options=None, environment=None, task_params=None):
         """
-        Run workflow-tomorrow to create beaker job XML.
+        Run ``workflow-tomorrow`` utility to create a Bbeaker job XML.
 
-        It does not take care about any SUT installation, it's up to the caller to provide
-        necessary options.
+        .. warning::
 
-        ``workflow-tomorrow`` options are selected from ``wow-options-map`` based on what rules are
-        matched given the context this modules is running in (distros, arches, and so on).
+           This module's job is to call ``workflow-tomorrow``, pass it given options, and return
+           any XML ``workflow-tomorrow`` produced. It does not care about the options, it will not
+           insert any tasks to install artifact under the test - it's up to the caller to use
+           the module with such options.
+
+        Final ``workflow-tomorrow`` options are constructed from several sources, primary ones being
+        one of ``body_options`` parameter and ``wow-options`` option. These represent the main "body"
+        of tasks to test the artifact - or do perform any other task caller wanted to achieve - and
+        are coupled with options specified by ``wow-options-map`` mapping and by ``options`` parameter.
 
         Caller can control what environmental variables are passed to his tasks with ``task_params`` parameter.
         Each `key/value` pair is passed to ``workflow-tomorrow`` via ``--taskparam="<key>=<value>"`` option.
 
-        :param list options: additional options for ``workflow-tomorrow``.
+        :param list body_options: main options, usually representing a test plan or a list of tasks
+            to wrap by "paperwork" elements. If not set, ``wow-options`` option is used. Even an empty
+            list has more priority than ``wow-options`` option.
+        :param list options: additional options for ``workflow-tomorrow``, for finer tuning of job build from
+            "body" options.
         :param dict environment: if set, it will be passed to the tests via ``--environment`` option.
         :param dict task_params: if set, params will be passed to the tests via multiple
             ``--taskparam`` options.
@@ -167,7 +178,14 @@ class WorkflowTomorrow(gluetool.Module):
 
         primary_task = self.shared('primary_task')
 
-        if not self.option('wow-options') and not self.option('use-general-test-plan'):
+        log_dict(self.debug, 'body options', body_options)
+        log_dict(self.debug, 'wow options', self.option('wow-options'))
+        log_dict(self.debug, 'general test plan', self.option('use-general-test-plan'))
+        log_dict(self.debug, 'options', options)
+        log_dict(self.debug, 'environment', environment)
+        log_dict(self.debug, 'task params', task_params)
+
+        if not body_options and not self.option('wow-options') and not self.option('use-general-test-plan'):
             raise NoTestAvailableError(primary_task)
 
         def _plan_job(distro):
@@ -182,7 +200,31 @@ class WorkflowTomorrow(gluetool.Module):
             command = WowCommand(['bkr', 'workflow-tomorrow'], [
                 '--dry',  # this will make wow to print job description in XML
                 '--decision'  # show desicions about including/not including task in the job
-            ] + (options or []), logger=self.logger)
+            ], logger=self.logger)
+
+            #
+            # add body options
+            if body_options is not None:
+                command.options += body_options
+
+            else:
+                if self.option('wow-options'):
+                    command.options += shlex.split(self.option('wow-options'))
+
+                # incorporate general test plan if requested
+                if self.option('use-general-test-plan'):
+                    component = primary_task.component
+
+                    try:
+                        command.options += ['--plan={}'.format(str(qe.GeneralPlan(component).id))]
+
+                    except qe.GeneralPlanError:
+                        raise NoGeneralTestPlanError(primary_task)
+
+            #
+            # add additional options
+            if options:
+                command.options += options
 
             instruction_commands = {
                 'add-options': command.add_options,
@@ -192,11 +234,6 @@ class WorkflowTomorrow(gluetool.Module):
             }
 
             self.shared('evaluate_instructions', self.wow_options_map, instruction_commands, context=context)
-
-            #
-            # add options specified on command-line
-            if self.option('wow-options'):
-                command.options += shlex.split(self.option('wow-options'))
 
             #
             # add environment if available
@@ -217,16 +254,6 @@ class WorkflowTomorrow(gluetool.Module):
             if task_params:
                 for name, value in task_params.iteritems():
                     command.options += ['--taskparam="{}={}"'.format(name, value)]
-
-            # incorporate general test plan if requested
-            if self.option('use-general-test-plan'):
-                component = primary_task.component
-
-                try:
-                    command.options += ['--plan={}'.format(str(qe.GeneralPlan(component).id))]
-
-                except qe.GeneralPlanError:
-                    raise NoGeneralTestPlanError(primary_task)
 
             try:
                 output = command.run()
