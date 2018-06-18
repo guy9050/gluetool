@@ -34,7 +34,7 @@ class InstallKojiBuild(gluetool.Module):
         brew_build_task_params = self.shared('brew_build_task_params')
 
         brew_build_task_params = ' '.join([
-            '{}="{}"'.format(param, value) for param, value in self.shared('brew_build_task_params')
+            '{}="{}"'.format(param, value) for param, value in self.shared('brew_build_task_params').iteritems()
         ])
 
         # This belongs to some sort of config file... But setting source options
