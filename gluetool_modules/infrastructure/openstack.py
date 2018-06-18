@@ -145,7 +145,7 @@ class OpenstackGuest(NetworkedGuest):
             patterns = [argument] if isinstance(argument, str) else argument
 
             self.debug('current decision: {}'.format(result['decision']))
-            log_dict(self.debug, "matching service '{}' with patterns", patterns)
+            log_dict(self.debug, "matching service '{}' with patterns".format(service), patterns)
 
             if any(re.match(pattern, service) for pattern in patterns):
                 self.debug("matched, service '{}' is allowed".format(service))
