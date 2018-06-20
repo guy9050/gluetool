@@ -56,7 +56,8 @@ BuildArchTaskRequest = collections.namedtuple('BuildArchTaskRequest',
 #: :ivar str arch: Image architecture.
 #: :ivar str url: Repository URL.
 #: :ivar list(str) alternatives: Other URLs leading to the same image as ``url``.
-ImageRepository = collections.namedtuple('ImageRepository', ['arch', 'url', 'alternatives'])
+#: :ivar dict manifest: Manifest describing the image in the repository.
+ImageRepository = collections.namedtuple('ImageRepository', ['arch', 'url', 'alternatives', 'manifest'])
 
 
 class KojiTask(object):
@@ -874,10 +875,25 @@ class BrewTask(KojiTask):
         """
 
         if self.is_build_container_task:
+            # if there's a build, the versions should be there
             if self.has_build:
                 return self._build['version']
 
-            # there is no such field in task info, just in build info :/
+            # It's not there? Ah, we have to inspect manifests, it might be there. So much work :/
+            # It should be the same in all repositories - it's the same image, with the same metadata.
+            # Just check all manifests we have.
+            for i, repository in enumerate(self.image_repositories):
+                for j, entry in enumerate(repository.manifest.get('history', [])):
+                    data = gluetool.utils.from_json(entry.get('v1Compatibility', '{}'))
+                    log_dict(self.debug, 'repository #{}, history entry #{}'.format(i, j), data)
+
+                    version = data.get('config', {}).get('Labels', {}).get('version', None)
+                    self.debug("version extracted: '{}'".format(version))
+
+                    if version:
+                        return version
+
+            # Nope, no idea where else to look for release...
             return 'UNKNOWN-VERSION'
 
         return super(BrewTask, self).version
@@ -891,15 +907,31 @@ class BrewTask(KojiTask):
         """
 
         if self.is_build_container_task:
+            # if there's a build, the release should be there
             if self.has_build:
                 return self._build['release']
 
+            # ok, it might be in task request!
             release = self._task_request.options.get('release', None)
 
             if release:
                 return release
 
-            # Without build or request, there's no other place to look in :/
+            # It's not there? Ah, we have to inspect manifests, it might be there. So much work :/
+            # It should be the same in all repositories - it's the same image, with the same metadata.
+            # Just check all manifests we have
+            for i, repository in enumerate(self.image_repositories):
+                for j, entry in enumerate(repository.manifest.get('history', [])):
+                    data = gluetool.utils.from_json(entry.get('v1Compatibility', '{}'))
+                    log_dict(self.debug, 'repository #{}, history entry #{}'.format(i, j), data)
+
+                    release = data.get('config', {}).get('Labels', {}).get('release', None)
+                    self.debug("release extracted: '{}'".format(release))
+
+                    if release:
+                        return release
+
+            # Nope, no idea where else to look for release...
             return 'UNKNOWN-RELEASE'
 
         return super(BrewTask, self).release
@@ -1054,7 +1086,7 @@ class BrewTask(KojiTask):
             log_dict(self.debug, '{} manifest'.format(repository_url), manifest)
 
             # With v2 manifests, we'd just look up image ID. With v1, there's no such field, but different URLs,
-            # leadign to the same image, should have same FS layers.
+            # leading to the same image, should have same FS layers.
             image_id = tuple([
                 layer['blobSum'] for layer in manifest['fsLayers']
             ])
@@ -1073,7 +1105,10 @@ class BrewTask(KojiTask):
                 # First time seeing this image
                 image = images[image_id] = {
                     'arch': image_arch,
-                    'repositories': []
+                    # there can be multiple "repositories", URLs leading to this image
+                    'repositories': [],
+                    # they should provide the same manifest though - no list then, just store the first one
+                    'manifest': manifest
                 }
 
             if image['arch'] != image_arch:
@@ -1092,7 +1127,8 @@ class BrewTask(KojiTask):
         # with different URLs leading to the same image, but we want to return them as repositories, as these
         # are the task artifacts.
         repositories = [
-            ImageRepository(image['arch'], max(image['repositories'], key=len), image['repositories'])
+            # pylint: disable=line-too-long
+            ImageRepository(image['arch'], max(image['repositories'], key=len), image['repositories'], image['manifest'])  # noqa
             for image in images.itervalues()  # noqa
         ]
 
