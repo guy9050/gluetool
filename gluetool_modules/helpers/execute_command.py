@@ -23,6 +23,11 @@ class ExecuteCommand(gluetool.Module):
             'type': str,
             'action': 'append',
             'default': []
+        },
+        'on-destroy': {
+            'help': 'Execute commands when destroying the module, not when executing it.',
+            'action': 'store_true',
+            'default': False
         }
     }
 
@@ -33,7 +38,7 @@ class ExecuteCommand(gluetool.Module):
         if self.option('command') and self.option('script'):
             raise gluetool.GlueError("You have to use just one of `--command` or `--script`")
 
-    def execute(self):
+    def _execute_commands(self, context_extra=None):
         commands = []
 
         if self.option('command'):
@@ -48,7 +53,10 @@ class ExecuteCommand(gluetool.Module):
 
                 commands += script_commands
 
-        context = self.shared('eval_context')
+        context = gluetool.utils.dict_update(
+            self.shared('eval_context'),
+            context_extra or {}
+        )
 
         for command in commands:
             original_command = command
@@ -71,3 +79,17 @@ class ExecuteCommand(gluetool.Module):
 
             if output.exit_code != 0:
                 raise gluetool.GlueError("Command '{}' exited with non-zero exit code".format(original_command))
+
+    def execute(self):
+        if self.option('on-destroy') is True:
+            return
+
+        self._execute_commands()
+
+    def destroy(self, failure=None):
+        if self.option('on-destroy') is not True:
+            return
+
+        self._execute_commands(context_extra={
+            'FAILURE': failure
+        })
