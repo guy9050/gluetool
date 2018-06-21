@@ -8,6 +8,8 @@ import re
 from time import gmtime, strftime
 from datetime import datetime, timedelta
 
+import six
+
 import novaclient.exceptions
 from novaclient import client
 from novaclient.exceptions import BadRequest, NotFound, Unauthorized
@@ -837,6 +839,10 @@ class CIOpenstack(gluetool.Module):
                 'help': "Setup guests after provisioning them. See 'guest-setup' module",
                 'action': 'store_true'
             },
+            'remove-all': {
+                'help': 'DANGEROUS: Remove all instances and floating IPs',
+                'action': 'store_true',
+            },
             'reserve': {
                 'help': 'Creates reservation records and keeps the instance(s) provisioned',
                 'action': 'store_true',
@@ -1279,6 +1285,20 @@ class CIOpenstack(gluetool.Module):
         self.info("connected to '{}' with user '{}', project '{}'".format(auth_url,
                                                                           username,
                                                                           project_name))
+
+        if self.option('remove-all'):
+            self.info('This will remove all instances and floating IPs! Do you really want to continue? Type YES now.')
+            if six.moves.input() == 'YES':
+                # remove all instances
+                for server in self.nova.servers.list():
+                    self.info("removing instance '{}'".format(server.name))
+                    server.delete()
+                # remove all floating ips
+                for floating_ip in self.nova.floating_ips.list():
+                    self.info("removing ip '{}'".format(floating_ip.ip))
+                    floating_ip.delete()
+            else:
+                self.info('cowardly skipping removal of all resources')
 
         # check if key name valid
         self.nova.keypairs.find(name=key_name)
