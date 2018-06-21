@@ -794,17 +794,39 @@ class BrewTask(KojiTask):
         :rtype: tuple(str, str)
         """
 
-        try:
-            namespace = 'containers' if self.is_build_container_task else 'rpms'
+        # It might be worth moving this into a config file, it's way too dependant on Brew internals
 
-            git_hash = re.search("#[^']*", self.source).group()[1:]
-            component = re.search("/{}/([^#?]*)".format(namespace), self.source).group(1)
+        def _split(namespace):
+            try:
+                git_hash = re.search("#[^']*", self.source).group()[1:]
+                component = re.search("/{}/([^#?]*)".format(namespace), self.source).group(1)
 
-            return component, git_hash
+                return component, git_hash
 
-        # pylint: disable=bare-except
-        except:
-            return None, None
+            except AttributeError:
+                return None, None
+
+        self.debug("source '{}'".format(self.source))
+
+        component, git_hash = None, None
+
+        # docker containers are usualy under "containers" namespace
+        if self.is_build_container_task:
+            component, git_hash = _split('containers')
+
+        log_dict(self.debug, 'source members after "containers" namespace split attempt', [
+            component, git_hash
+        ])
+
+        # but, some containers still reside under "rpms", like the common components
+        if component is None and git_hash is None:
+            component, git_hash = _split('rpms')
+
+        log_dict(self.debug, 'source members after "rpms" namespace split attempt', [
+            component, git_hash
+        ])
+
+        return component, git_hash
 
     @cached_property
     def _parsed_commit_html(self):
