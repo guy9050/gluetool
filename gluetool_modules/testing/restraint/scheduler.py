@@ -21,7 +21,7 @@ class NoTestableArtifactsError(PrimaryTaskFingerprintsMixin, SoftGlueError):
         # pylint: disable=line-too-long
         arches = task.task_arches.arches
 
-        message = 'Task does not have any testable artifact: only x86_64 or noarch are supported, task contains {}'.format(', '.join(arches))  # Ignore PEP8Bear
+        message = 'Task does not have any testable artifact - {} arches are not supported'.format(', '.join(arches))
 
         super(NoTestableArtifactsError, self).__init__(task, message)
 
@@ -209,8 +209,20 @@ class RestraintScheduler(gluetool.Module):
 
             return shlex.split(opts)
 
-        task_arches = self.shared('primary_task').task_arches
-        if 'x86_64' not in task_arches.arches and 'noarch' not in task_arches.arches:
+        # Remove any artifact arch that's also on an "unsupported arches" list. If no arch remains,
+        # we have nothing to test.
+        artifact_arches = self.shared('primary_task').task_arches.arches
+
+        gluetool.log.log_dict(self.debug, 'artifact arches', artifact_arches)
+        gluetool.log.log_dict(self.debug, 'unsupported arches', self.unsupported_arches)
+
+        valid_arches = [
+            arch for arch in artifact_arches if arch not in self.unsupported_arches
+        ]
+
+        gluetool.log.log_dict(self.debug, 'valid artifact arches', valid_arches)
+
+        if not valid_arches:
             raise NoTestableArtifactsError(self.shared('primary_task'))
 
         # workflow-tomorrow
