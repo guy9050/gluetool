@@ -4,7 +4,7 @@ load-plugins = gluetool.pylint
 [BASIC]
 max-branches=20
 max-attributes=15
-good-names=_,c,e,f,g,i,p,s,ci
+good-names=_,c,e,f,g,i,j,p,s,ci
 defining-attr-methods=__init__,sanity
 generated-members=debug,verbose,info,warn,error,exception
 max-line-length=120
