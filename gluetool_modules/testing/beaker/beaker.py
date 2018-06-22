@@ -1,6 +1,5 @@
 import json
 import os
-import shlex
 import sys
 import urlparse
 import imp
@@ -107,9 +106,6 @@ class Beaker(gluetool.Module):
     description = 'Runs tests on Beaker boxes.'
 
     options = {
-        'jobwatch-options': {
-            'help': 'Additional options for beaker-jobwatch'
-        },
         'job': {
             'help': 'Instead of creating a new run, inspect the existing job ID.',
             'metavar': 'ID',
@@ -315,10 +311,17 @@ class Beaker(gluetool.Module):
         # add options to install the task
         options += self.shared('wow_artifact_installation_options')
 
-        # we could use --reserve but we must be sure the reservesys is *the last* taskin the recipe
-        # users may require their own "last" tasks and --last-task is mightier than mere --reserve.
+        # We could use --reserve but we must be sure the reservesys is *the last* task in the recipe
+        # - users may require their own "last" tasks and --last-task is mightier than mere --reserve.
+        # We're also adding a "padding" task: beaker-jobwatch can handle just a single end-task, and
+        # obviously it cannot be /distribution/reservesys (jobwatch would wait till the end of reservation).
+        # The last task before the reservesys must be the same, so we could tell jobwatch to quit
+        # when it reaches this task in all recipes.
         if self.option('reserve'):
-            options += ['--last-task="RESERVETIME={}h /distribution/reservesys"'.format(self.option('reserve-time'))]
+            options += [
+                '--last-task="/distribution/utils/dummy"',
+                '--last-task="RESERVETIME={}h /distribution/reservesys"'.format(self.option('reserve-time'))
+            ]
         else:
             options += ['--no-reserve']
 
@@ -327,111 +330,31 @@ class Beaker(gluetool.Module):
                                                                                         options=options))
         ]
 
-    def _run_jobwatch(self, jobs, options):
+    def _run_jobwatch(self, jobs):
         """
         Start beaker-jobwatch, to baby-sit our jobs, and wait for its completion.
 
         :param list(tuple(element, list(int))) jobs: List of pairs ``(job XML, [Beaker job ID #1,
             Beaker job ID #2, ...])``
-        :param list options: additional options, usualy coming from jobwatch-options option.
-        :returns: gluetool.utils.ProcessOutput with the output of beaker-jobwatch.
+        :rtype: tuple(gluetool.utils.ProcessOutput, str)
+        :returns: output of ``beaker_jobwatch`` shared function: ``beaker-jobwatch`` output
+            (:py:class:`gluetool.utils.ProcessOutput` instance) and the final Beaker matrix URL.
         """
 
-        command = [
-            'beaker-jobwatch',
-            '--skip-broken-machines'
-        ] + options
+        return self.shared('beaker_jobwatch',
+                           sum([job_ids for _, job_ids in jobs], []),
+                           end_task='/distribution/utils/dummy' if self.option('reserve') else None,
+                           critical_tasks=self.critical_tasks)
 
-        for _, job_ids in jobs:
-            command += [
-                '--job={}'.format(job_id) for job_id in job_ids
-            ]
-
-        if self.option('reserve'):
-            next_to_last_tasks = {}
-
-            for job, _ in jobs:
-                for recipe_set in job.find_all('recipeSet'):
-                    for recipe in recipe_set.find_all('recipe'):
-                        next_to_last_tasks[recipe.find_all('task')[-2]['name']] = True
-
-                if len(next_to_last_tasks) > 1:
-                    self.warn('Multiple next-to-last tasks:\n{}'.format('\n'.join(next_to_last_tasks.keys())))
-                    self.warn('Multiple next-to-last tasks detected, beaker-jobwatch may not check them correctly',
-                              sentry=True)
-
-                command += [
-                    '--end-task={}'.format(task) for task in next_to_last_tasks.iterkeys()
-                ]
-
-        for task in self.critical_tasks:
-            command += [
-                '--critical-task', task
-            ]
-
-        self.info("running 'beaker-jobwatch' to babysit the jobs")
-
-        try:
-            output = run_command(command, inspect=True)
-
-        except GlueCommandError as exc:
-            # if beaker-jobwatch run unsuccessfuly, it exits with retcode 2
-            # this most probably means that the jobs aborted
-            if exc.output.exit_code == 2:
-                matrix_url = self._get_matrix_url(exc.output.stdout)
-                raise BeakerJobwatchError(self.shared('primary_task'), matrix_url)
-
-            raise BeakerError(self.shared('primary_task'),
-                              "Failure during 'jobwatch' execution: {}".format(exc.output.stderr))
-
-        return output
-
-    def _get_matrix_url(self, jobwatch_log):
-        """
-        Returns beaker matrix url parsed from beaker-jobwatch's output.
-
-        :param str jobwatch_log: Output of beaker-jobwatch.
-        :returns: matrix url as a string
-        :raises: GlueError if output is invalid, matrix url not found or not finished
-        """
-        # beaker-jobwatch output usually looks like this:
-        #
-        # Broken: 0
-        # Running:   0/1
-        # Completed: 1/1
-        # 	TJ#1739067
-        # https://beaker.engineering.redhat.com/matrix/?toggle_nacks_on=on&job_ids=1739067
-        # duration: 3:39:03.805050
-        # finished successfully
-
-        jobwatch_log = jobwatch_log.strip().split('\n')
-
-        if len(jobwatch_log) < 3:
-            raise BeakerError(self.shared('primary_task'), 'jobwatch output is unexpectedly short')
-
-        if not jobwatch_log[-3].startswith('https://beaker.engineering.redhat.com/matrix/'):
-            raise BeakerError(self.shared('primary_task'), 'Could not find beaker matrix URL in jobwatch output')
-
-        self.info(jobwatch_log[-1].strip())
-        if jobwatch_log[-1].strip() not in ['finished successfully', 'finished unsuccessfully']:
-            raise BeakerError(self.shared('primary_task'), 'beaker-jobwatch does not report completion')
-
-        self.info('beaker-jobwatch finished')
-
-        # matrix url is always on the 3rd line from the end
-        return jobwatch_log[-3].strip()
-
-    def _process_jobs(self, jobwatch_log):
+    def _process_jobs(self, matrix_url):
         """
         Tries to parse beaker-jobwatch output, and looks for list of beaker
         jobs. It then inspects these jobs, using tcms-results, to gather
         a summary for other interested parties.
 
-        :param str jobwatch_log: Output of beaker-jobwatch.
+        :param str matrix_url: Beaker matrix URL, used to extract all relevant Beaker jobs.
         :returns: tuple of three items: string result, dict with processed results, beaker matrix URL
         """
-
-        matrix_url = self._get_matrix_url(jobwatch_log)
 
         parsed_matrix_url = urlparse.urlparse(matrix_url)
         parsed_query = urlparse.parse_qs(parsed_matrix_url.query)
@@ -489,20 +412,11 @@ class Beaker(gluetool.Module):
                 self.debug('            We have our traitor!')
                 return 'FAIL', self._processed_results, matrix_url
 
-        return 'PASS', self._processed_results, matrix_url
+        return 'PASS', self._processed_results
 
     def execute(self):
         self.require_shared('wow_artifact_installation_options', 'tasks', 'primary_task', 'beaker_job_xml',
-                            'parse_beah_result')
-
-        def _command_options(name):
-            opts = self.option(name)
-            if opts is None or not opts:
-                return []
-
-            return shlex.split(opts)
-
-        jobwatch_options = _command_options('jobwatch-options')
+                            'parse_beah_result', 'beaker_jobwatch')
 
         # workflow-tomorrow
         jobs = self._run_wow()
@@ -521,10 +435,10 @@ class Beaker(gluetool.Module):
         ))
 
         # beaker-jobwatch
-        jobwatch_output = self._run_jobwatch(jobs, jobwatch_options)
+        _, matrix_url = self._run_jobwatch(jobs)
 
         # evaluate jobs
-        overall_result, processed_results, matrix_url = self._process_jobs(jobwatch_output.stdout)
+        overall_result, processed_results = self._process_jobs(matrix_url)
 
         self.info('Result of testing: {}'.format(overall_result))
 

@@ -1,13 +1,14 @@
 import shlex
 
 import bs4
-import qe
 
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError
 from gluetool.log import log_dict
 from gluetool.utils import Command, render_template
 from libci.sentry import PrimaryTaskFingerprintsMixin
+
+import qe
 
 
 class NoTestAvailableError(PrimaryTaskFingerprintsMixin, SoftGlueError):

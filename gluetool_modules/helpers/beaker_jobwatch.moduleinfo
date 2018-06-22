@@ -1,0 +1,14 @@
+---
+
+name: beaker-jobwatch
+description: Runs beaker-jobwatch to babysit given Beaker jobs.
+
+dependencies:
+  repo:
+    # for qa-tools-workstation
+    - name: qa-tools
+      description: qa-tools repository
+      baseurl: http://liver.brq.redhat.com/repo-testing/
+
+  yum:
+    - qa-tools-workstation
