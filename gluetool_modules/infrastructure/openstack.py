@@ -948,7 +948,7 @@ class CIOpenstack(gluetool.Module):
         'glance.auth-url', 'glance.project-id', 'glance.username', 'glance.password',
         'arch'
     )
-    shared_functions = ('openstack', 'provision')
+    shared_functions = ('openstack', 'provision', 'provisioner_capabilities')
 
     # connection handler
     nova = None
@@ -1237,6 +1237,23 @@ class CIOpenstack(gluetool.Module):
         :param str image: image to use (default: see above)
         :param str flavor: flavor to use for the instance (default: ``{default_flavor}``)
         """.format(default_name=DEFAULT_NAME, default_flavor=DEFAULT_FLAVOR)
+
+    def provisioner_capabilities(self):
+        """
+        Return description of OpenStack provisioner capabilities.
+
+        Supported capabilities:
+
+            * `available-arches` - list of architectures OpenStack could provision. Defined by ``--arch`` option.
+
+        :rtype: dict
+        """
+
+        return {
+            'available-arches': [
+                self.option('arch')
+            ]
+        }
 
     def destroy(self, failure=None):
         if not self._all:
