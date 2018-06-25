@@ -51,7 +51,9 @@ class InstallKojiBuild(gluetool.Module):
             '--restraint',
             '--suppress-install-task',
             '--arch', guest.arch
-        ])
+        ], extra_context={
+            'PHASE': 'artifact-installation'
+        })
 
         # This is probably not true in general, but our Docker pipelines - in both beaker and openstack - deal
         # with just a single Beaker distro. To avoid any weird errors later, check number of XMLs, but it would
