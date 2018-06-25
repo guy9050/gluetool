@@ -407,10 +407,10 @@ class Beaker(gluetool.Module):
                 # in case a SUT task failed, report it as ERROR
                 if task in self.critical_tasks:
                     self.debug('            We have found a failed critical task!')
-                    return 'ERROR', self._processed_results, matrix_url
+                    return 'ERROR', self._processed_results
 
                 self.debug('            We have our traitor!')
-                return 'FAIL', self._processed_results, matrix_url
+                return 'FAIL', self._processed_results
 
         return 'PASS', self._processed_results
 
