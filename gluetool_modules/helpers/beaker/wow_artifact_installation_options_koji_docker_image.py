@@ -62,6 +62,7 @@ class WowArtifactIntallationOptionsKojiDockerImage(gluetool.Module):
         options = [
             '--init-task=/tools/toolchain-common/Install/configure-extras-repo',
             '--init-task=/examples/sandbox/emachado/enable-docker',
+            '--init-task=/examples/sandbox/emachado/remove-docker-images',
             '--init-task={} /examples/sandbox/emachado/install-docker-image'.format(install_docker_image_params),
             '--init-task=/examples/sandbox/emachado/install-docker-test-config'
         ]

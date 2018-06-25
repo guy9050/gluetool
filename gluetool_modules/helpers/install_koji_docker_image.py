@@ -35,21 +35,17 @@ class InstallKojiDockerImage(gluetool.Module):
         archive_url = ''
         registry_url = ''
 
-        # Need to finish: we have to chose the correct architecture. Right now, there is just
-        # x86_64, and we're not propagating this information correctly - probably guest should
-        # know what architecture it provides, and the code bellow would use it to pick correct
-        # image.
-
         # If there is a build, there should be an archive in that build, with a link to
         # tar & gzipped image.
         if task.has_build:
             # Find image archives, we'll grab the first one when constructing final XML
             image_archives = [
-                archive for archive in task.build_archives if archive['btype'] == 'image'
+                archive for archive in task.build_archives
+                if archive['btype'] == 'image' and archive['extra']['image']['arch'] == guest.arch
             ]
 
             if not image_archives:
-                raise GlueError('No "image" archive in task {}'.format(task.id))
+                raise GlueError('No compatible "image" archive in task {}'.format(task.id))
 
             archive_url = image_archives[0]['image_url']
 
@@ -68,6 +64,7 @@ class InstallKojiDockerImage(gluetool.Module):
         job_xmls = self.shared('beaker_job_xml', body_options=[
             '--task=/tools/toolchain-common/Install/configure-extras-repo',
             '--task=/examples/sandbox/emachado/enable-docker',
+            '--task=/examples/sandbox/emachado/remove-docker-images',
             '--task={} /examples/sandbox/emachado/install-docker-image'.format(source_options),
             '--task=/examples/sandbox/emachado/install-docker-test-config'
         ], options=[
@@ -77,8 +74,13 @@ class InstallKojiDockerImage(gluetool.Module):
             '--no-reserve',
             '--restraint',
             '--suppress-install-task',
-            '--arch', guest.arch
-        ])
+        ] + [
+            '--no-arch={}'.format(no_arch) for no_arch in task.task_arches.arches if no_arch != guest.arch
+        ] + [
+            '--arch={}'.format(guest.arch)
+        ], extra_context={
+            'GUEST': guest
+        })
 
         # This is probably not true in general, but our Docker pipelines - in both beaker and openstack - deal
         # with just a single Beaker distro. To avoid any weird errors later, check number of XMLs, but it would
@@ -87,6 +89,8 @@ class InstallKojiDockerImage(gluetool.Module):
             raise gluetool.GlueError('Unexpected number of job XML descriptions')
 
         job_xml = job_xmls[0]
+
+        gluetool.log.log_xml(self.debug, 'artifact installation job', job_xml)
 
         output = self.shared('restraint', guest, job_xml,
                              rename_dir_to='artifact-installation-{}'.format(guest.name),
