@@ -140,7 +140,8 @@ class WorkflowTomorrow(gluetool.Module):
 
         return gluetool.utils.load_yaml(self.option('wow-options-map'), logger=self.logger)
 
-    def beaker_job_xml(self, body_options=None, options=None, environment=None, task_params=None):
+    # pylint: disable=too-many-arguments
+    def beaker_job_xml(self, body_options=None, options=None, environment=None, task_params=None, extra_context=None):
         """
         Run ``workflow-tomorrow`` utility to create a Bbeaker job XML.
 
@@ -167,6 +168,7 @@ class WorkflowTomorrow(gluetool.Module):
         :param dict environment: if set, it will be passed to the tests via ``--environment`` option.
         :param dict task_params: if set, params will be passed to the tests via multiple
             ``--taskparam`` options.
+        :param dict extra_context: if set, content is added to the context available to options map rules.
         :returns: List of elements representing Beaker jobs designed by ``workflow-tomorrow``, one
             for each distro.
         """
@@ -185,18 +187,25 @@ class WorkflowTomorrow(gluetool.Module):
         log_dict(self.debug, 'options', options)
         log_dict(self.debug, 'environment', environment)
         log_dict(self.debug, 'task params', task_params)
+        log_dict(self.debug, 'extra context', extra_context)
 
         if not body_options and not self.option('wow-options') and not self.option('use-general-test-plan'):
             raise NoTestAvailableError(primary_task)
+
+        extra_context = extra_context or {}
 
         def _plan_job(distro):
             # pylint: disable=too-many-statements
 
             self.debug("constructing options distro '{}'".format(distro))
 
-            context = gluetool.utils.dict_update(self.shared('eval_context'), {
-                'DISTRO': distro
-            })
+            context = gluetool.utils.dict_update(
+                self.shared('eval_context'),
+                {
+                    'DISTRO': distro
+                },
+                extra_context
+            )
 
             command = WowCommand(['bkr', 'workflow-tomorrow'], [
                 '--dry',  # this will make wow to print job description in XML
