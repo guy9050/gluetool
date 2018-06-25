@@ -2,6 +2,7 @@ import shlex
 
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
+from gluetool.log import log_dict
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 
@@ -38,6 +39,14 @@ class RestraintScheduler(gluetool.Module):
     description = 'Prepares "schedule" for runners of restraint.'
 
     options = {
+        'arch-compatibility-map': {
+            'help': """
+                    Mapping between artifact arches and the actual arches we can use to test them (e.g. i686
+                    can be tested on both x86_64 and i686 boxes.
+                    """,
+            'metavar': 'FILE',
+            'default': None
+        },
         'unsupported-arches': {
             'help': 'List of arches not supported by system pool.',
             'metavar': 'ARCH1[,ARCH2...]',
@@ -55,6 +64,13 @@ class RestraintScheduler(gluetool.Module):
     @utils.cached_property
     def unsupported_arches(self):
         return utils.normalize_multistring_option(self.option('unsupported-arches'))
+
+    @utils.cached_property
+    def arch_compatibility_map(self):
+        if not self.option('arch-compatibility-map'):
+            return {}
+
+        return utils.load_yaml(self.option('arch-compatibility-map'), logger=self.logger)
 
     def schedule(self):
         """
@@ -99,6 +115,12 @@ class RestraintScheduler(gluetool.Module):
         # to multiple recipeSets: e.g. if our backend supports x86_64, it supports i686
         # out of the box as well, and wow may split i686-only tasks to a separate box. But
         # this is not that harmful as the original issue.
+        #
+        # This is far from ideal - in the ideal world, scheduler should not have its own
+        # list of unsupported, it should rely on provisioner features (what arches it can
+        # and cannot schedule); but that would require each provisioner to report not just
+        # supported arches, but unsupported as well, being aware of *all* existing arches,
+        # which smells weird :/ Needs a bit of thinking.
         options += [
             '--no-arch={}'.format(arch) for arch in self.unsupported_arches
         ]
@@ -124,6 +146,10 @@ class RestraintScheduler(gluetool.Module):
 
         if guests is None:
             raise GlueError('No guests found. Did you run a guests provider module, e.g. openstack?')
+
+        log_dict(self.debug, 'guests', guests)
+        log_dict(self.debug, 'recipe_sets', recipe_sets)
+
         assert len(guests) == len(recipe_sets)
 
         # there are tags that make not much sense for restraint - we'll filter them out
@@ -213,14 +239,28 @@ class RestraintScheduler(gluetool.Module):
         # we have nothing to test.
         artifact_arches = self.shared('primary_task').task_arches.arches
 
-        gluetool.log.log_dict(self.debug, 'artifact arches', artifact_arches)
-        gluetool.log.log_dict(self.debug, 'unsupported arches', self.unsupported_arches)
+        provisioner_capabilities = self.shared('provisioner_capabilities')
+        log_dict(self.debug, 'provisioner capabilities', provisioner_capabilities)
 
-        valid_arches = [
-            arch for arch in artifact_arches if arch not in self.unsupported_arches
-        ]
+        supported_arches = provisioner_capabilities.get('available-arches', []) if provisioner_capabilities else []
 
-        gluetool.log.log_dict(self.debug, 'valid artifact arches', valid_arches)
+        log_dict(self.debug, 'artifact arches', artifact_arches)
+        log_dict(self.debug, 'supported arches', supported_arches)
+
+        valid_arches = []
+        for arch in artifact_arches:
+            # artifact arch is supported
+            if arch in supported_arches:
+                valid_arches.append(arch)
+                continue
+
+            compatible_arches = self.arch_compatibility_map.get(arch, [])
+
+            # there is an supported arch compatible with artifact arch
+            if any([compatible_arch in supported_arches for compatible_arch in compatible_arches]):
+                valid_arches.append(arch)
+
+        log_dict(self.debug, 'valid artifact arches', valid_arches)
 
         if not valid_arches:
             raise NoTestableArtifactsError(self.shared('primary_task'))
