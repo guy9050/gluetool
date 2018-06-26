@@ -20,7 +20,7 @@ def fixture_module():
 
 @pytest.fixture(name='local_guest')
 def fixture_local_guest(module):
-    return libci.guest.NetworkedGuest(module, '127.0.0.1', key=MagicMock())
+    return libci.guest.NetworkedGuest(module, '127.0.0.1', key='dummy_key')
 
 
 def test_sanity(module):
@@ -41,25 +41,28 @@ def test_shared(module):
 
 def test_run_playbook(module, local_guest, monkeypatch):
     mock_output = MagicMock()
-    mock_run_command = MagicMock(return_value=mock_output)
 
-    monkeypatch.setattr(gluetool.utils, 'run_command', mock_run_command)
+    mock_command_init = MagicMock(return_value=None)
+    mock_command_run = MagicMock(return_value=mock_output)
+
+    monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
+    monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
     output = module.run_playbook('dummy playbook file', [local_guest])
 
     assert output is mock_output
 
-    mock_run_command.assert_called_once_with([
+    mock_command_init.assert_called_once_with([
         'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key, os.path.abspath('dummy playbook file')
-    ])
+    ], logger=module.logger)
 
 
 def test_error(log, module, local_guest, monkeypatch):
     # simulate output of failed ansible-playbook run, giving user JSON blob with an error message
     mock_error = gluetool.GlueCommandError([], output=MagicMock(stdout='fatal: {"msg": "dummy error message"}'))
-    mock_run_command = MagicMock(side_effect=mock_error)
+    mock_command_run = MagicMock(side_effect=mock_error)
 
-    monkeypatch.setattr(gluetool.utils, 'run_command', mock_run_command)
+    monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
     with pytest.raises(gluetool.GlueError, message='Failure during Ansible playbook execution. See log for details.'):
         module.run_playbook('dummy playbook file', [local_guest])
@@ -68,31 +71,40 @@ def test_error(log, module, local_guest, monkeypatch):
 
 
 def test_extra_vars(module, local_guest, monkeypatch):
-    mock_run_command = MagicMock()
+    mock_command_init = MagicMock(return_value=None)
+    mock_command_run = MagicMock()
 
-    monkeypatch.setattr(gluetool.utils, 'run_command', mock_run_command)
-
+    monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
+    monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
     module.run_playbook('dummy playbook file', [local_guest], variables={
         'FOO': 'bar'
     })
 
-    mock_run_command.assert_called_once_with([
+    mock_command_init.assert_called_once_with([
         'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key,
         '--extra-vars', 'FOO="bar"',
         os.path.abspath('dummy playbook file')
-    ])
+    ], logger=module.logger)
+
+    mock_command_run.assert_called_once_with()
 
 
 def test_dryrun(module, local_guest, monkeypatch):
-    mock_run_command = MagicMock(return_value=None)
 
-    monkeypatch.setattr(gluetool.utils, 'run_command', mock_run_command)
+    mock_command_init = MagicMock(return_value=None)
+    mock_command_run = MagicMock()
+
+    monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
+    monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
+
     monkeypatch.setattr(module.glue, '_dryrun_level', gluetool.glue.DryRunLevels.DRY)
 
     module.run_playbook('dummy playbook path', [local_guest])
 
-    mock_run_command.assert_called_once_with([
+    mock_command_init.assert_called_once_with([
         'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key,
         '-C',
         os.path.abspath('dummy playbook path')
-    ])
+    ], logger=module.logger)
+
+    mock_command_run.assert_called_once_with()
