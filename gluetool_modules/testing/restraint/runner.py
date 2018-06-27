@@ -7,8 +7,9 @@ import enum
 import bs4
 
 import gluetool
+from gluetool import GlueError
 from gluetool.log import log_blob, log_dict
-from gluetool.utils import new_xml_element, IncompatibleOptionsError, normalize_bool_option
+from gluetool.utils import new_xml_element, IncompatibleOptionsError, normalize_bool_option, render_template
 from libci.results import TestResult, publish_result
 
 
@@ -87,6 +88,15 @@ class RestraintRunner(gluetool.Module):
                     """,
             'default': 'no',
             'metavar': 'yes|no'
+        },
+        'results-directory-template': {
+            'help': """
+                    If set, directories created by ``restraint`` are renamed using this template. Common eval
+                    context is available, with addition of ``GUEST``.
+
+                    Not compatible with ``--parallelize-task-sets`` and ``--use-snapshots``.
+                    """,
+            'default': None
         }
     }
 
@@ -280,7 +290,23 @@ class RestraintRunner(gluetool.Module):
         try:
             # We should add rename_dir_to and label but it's not clear what should be the name. Probably something
             # with index of the job. Future patch :)
-            output = self.shared('restraint', guest, job)
+
+            # For now, use simple template, which is disable when parallelization is enabled.
+            rename_dir_to = None
+            if self.option('results-directory-template'):
+                context = gluetool.utils.dict_update(
+                    self.shared('eval_context'),
+                    {
+                        'GUEST': guest
+                    }
+                )
+
+                rename_dir_to = render_template(self.option('results-directory-template'),
+                                                logger=self.logger,
+                                                **context)
+
+            output = self.shared('restraint', guest, job,
+                                 rename_dir_to=rename_dir_to)
 
         except gluetool.GlueError as exc:
             download_snapshot()
@@ -452,6 +478,9 @@ class RestraintRunner(gluetool.Module):
         return 'PASS'
 
     def sanity(self):
+        if self.option('results-directory-template') and (self.parallelize_task_sets or self.use_snapshots):
+            raise GlueError('Cannot use --results-directory-template with --parallelize-task-sets or --use-snapshots.')
+
         if self.parallelize_recipe_sets:
             self.info('Will run recipe sets in parallel')
 
