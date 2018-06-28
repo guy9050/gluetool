@@ -7,10 +7,10 @@ Environment
 Before moving on to the actual setup, there are few important notes:
 
 -  **The only supported and (sort of tested) way of installation and
-   using ``citool`` is a separate virtual environment!** It may be
-   possible to install ``citool`` directly somewhere into your system
-   but we don't recommend that, we don't use it that way, and we don't
-   know what kind of hell you might run into. Please, stick with
+   using ``citool`` is a separate virtual environment!** It is possible
+   to install ``citool`` & modules somewhere into your system but we don't
+   recommend that, we don't use it that way when developing things, and we
+   don't know what kind of hell you might run into. Please, stick with
    ``virtualenv``.
 
 -  The tested distributions (as in "we're using these") are either
@@ -22,18 +22,17 @@ Before moving on to the actual setup, there are few important notes:
 Requirements
 ------------
 
-To begin digging into ``citool`` sources, there are few requirements:
+To begin digging into sources, there are few requirements:
 
 -  ``virtualenv`` utility
 
 -  ``ansible-playbook``
 
 -  system packages - it is either impossible or impractical to use their
-   Python counterpart, or they are required to build a Python package
-   required by ``citool``. In some cases, on recent Fedora (26+) for
-   example, it's been shown for some packages their ``compat-*`` variant
-   might be needed. See the optional ``Bootstrap system environment``
-   step bellow.
+   Python counterpart, or they are required to build a Python package. In
+   some cases, on recent Fedora (26+) for example, it's been shown for some
+   packages their ``compat-*`` variant might be needed. See the optional
+   ``Bootstrap system environment`` step bellow.
 
 Installation
 ------------
@@ -69,55 +68,94 @@ Following steps are necessary to install requirements when installing
     virtualenv -p /usr/bin/python2.7 <virtualenv-dir>
     . <virtualenv-dir>/bin/activate
 
-2. Clone ``citool`` repository - your working copy
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+2. Install ``gluetool``
+~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-    git clone github:<your username>/<your fork name>
-    cd citool
+   git clone https://github.com/gluetool/gluetool.git gluetool
+   pushd gluetool && python setup.py develop && popd
+
 
 3. Install ``citool``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-    /usr/bin/ansible-playbook ./install.yml
+    git clone git@gitlab.cee.redhat.com:baseos-qe/citool.git citool
+    pushd citool && python setup.py develop && popd
 
-**Be warned:** read the messages reported by this step - ``install.yml``
+4. Clone ``gluetool-modules``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+
+   git clone git@gitlab.cee.redhat.com:baseos-qe/gluetool-modules.git gluetool-modules
+
+5. Install requirements
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+
+   pushd gluetool-modules && /usr/bin/ansible-playbook ./inject-extra-requirements.yml && popd
+
+**Be warned:** read the messages reported by this step - ``inject-extra-requirements.yml``
 playbook checks for necessary system packages, and reports any missing
 pieces. **It does not install them!** - we don't want to mess up your
 system setup, as we try to stay inside our little own virtualenv, but
 the playbook will try to provide hints on what packages might solve the
 issue.
 
-4. (optional) Activate Bash completion
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+6. Install ``gluetool-modules``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-    python bash_completion.py
-    mv citool $VIRTUAL_ENV/bin/citool-bash-completition
-    echo "source $VIRTUAL_ENV/bin/citool-bash-completition" >> $VIRTUAL_ENV/bin/activate
+   pushd gluetool-modules && python setup.py develop && popd
 
-5. Re-activate virtualenv
+
+7. Re-activate virtualenv
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Since step #1 your ``citool`` virtualenv is active, but ``citool``'s
-installation made some changes to the ``activate`` script, therefore
-it's necessary to re-activate the virtualenv before actually doing stuff
-with ``citool``:
+Since step #1 your virtualenv is active, but installation made some changes to the ``activate`` script, therefore
+it's necessary to re-activate the virtualenv before actually doing stuff:
 
 .. code-block:: bash
 
     deactivate
     . <virtualenv-dir>/bin/activate
 
-6. Add configuration
+8. Add configuration
 ~~~~~~~~~~~~~~~~~~~~~~
 
 ``citool`` looks for its configuration in ``~/.citool.d``. Add configuration
-for the modules according to your preference.
+for the modules according to your preference:
+
+.. code-block:: bash
+
+   git clone -b production https://gitlab.cee.redhat.com/baseos-qe/citool-config ~/.citool.d
+
+9. Add local configuration (optional)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A configuration you cloned from remote repository in step #8 is often tailored for other task (e.g. CI) while providing reasonable functionality when used locally. To tweak things for you, you can create a local configuration ``citool`` looks for configuration files in its working directory as well, i.e. when running from your ``gluetool-modules`` clone, it looks for ``.gluetool.d`` (or ``.citool.d`` directory).
+
+.. code-block:: bash
+
+   pushd gluetool-modules
+   mkdir .gluetool.d
+   cat << EOF > > .gluetool.d/gluetool
+   [default]
+   output = citool-debug.txt
+   colors = yes
+   module-path = <location of your gluetool clone>/gluetool_modules, ./gluetool_modules
+   EOF
+   popd
+
+
+9. Test ``citool``
+~~~~~~~~~~~~~~~~~~
 
 Now every time you activate your new virtualenv, you should be able to
 run ``citool``:
@@ -129,6 +167,14 @@ run ``citool``:
 
     optional arguments:
     ...
+
+
+.. code-block:: bash
+
+   citool -l
+   ... pile of modules ...
+
+
 
 Test suites
 -----------
