@@ -884,7 +884,14 @@ class BrewTask(KojiTask):
             component, _ = self.source_members
 
             if component:
-                return component
+                # Source repository is named 'foo-bar', but the component name - as known to Brew and Bugzilla - is
+                # actually foo-bar-container. Add the suffix.
+                # This is not necessary when there's a build (which means non-scratch tasks), in that case we're
+                # using build's package_name as the source, and that's correct already.
+
+                # This is another good candidate for a mapping file - insert task, let configuration
+                # yield the component.
+                return '{}-containers'.format(component)
 
         return super(BrewTask, self).component
 
