@@ -7,8 +7,7 @@ import tempfile
 
 import gluetool
 from gluetool.log import log_xml, ContextAdapter
-from gluetool.utils import Bunch
-
+from gluetool.utils import Bunch, Command
 
 DEFAULT_RESTRAINT_PORT = 8081
 
@@ -162,10 +161,12 @@ class Restraint(gluetool.Module):
                         stream_handler.buff.append(c)
 
             try:
-                output = gluetool.utils.run_command(restraint_command + [
+                cmd = Command(restraint_command + [
                     '--host', '1={}@{}'.format(guest.username, self._guest_restraint_address(guest, port=port)),
                     '--job', f.name
-                ], logger=guest.logger, inspect=True, inspect_callback=output_streamer)
+                ], logger=guest.logger)
+
+                output = cmd.run(inspect=True, inspect_callback=output_streamer)
 
             except gluetool.GlueCommandError as exc:
                 output = exc.output

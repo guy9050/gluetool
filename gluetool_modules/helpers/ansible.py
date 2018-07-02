@@ -1,6 +1,7 @@
 import json
 
 import gluetool
+from gluetool.utils import Command
 
 
 class Ansible(gluetool.Module):
@@ -58,7 +59,7 @@ class Ansible(gluetool.Module):
         cmd += [playbook_path]
 
         try:
-            return gluetool.utils.run_command(cmd)
+            return Command(cmd, logger=self.logger).run()
 
         except gluetool.GlueCommandError as e:
             self.error('Failure during ansible playbook execution')
