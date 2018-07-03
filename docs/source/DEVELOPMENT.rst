@@ -145,7 +145,7 @@ A configuration you cloned from remote repository in step #8 is often tailored f
 
    pushd gluetool-modules
    mkdir .gluetool.d
-   cat << EOF > > .gluetool.d/gluetool
+   cat << EOF > .gluetool.d/gluetool
    [default]
    output = citool-debug.txt
    colors = yes
