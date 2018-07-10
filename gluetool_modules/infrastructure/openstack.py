@@ -96,7 +96,7 @@ class OpenStackImage(object):
         self.debug('released the image')
 
     def download(self, filename=None):
-        # This chould be implemented using glanceclient API - calling `glance` is easy and quick
+        # This could be implemented using glanceclient API - calling `glance` is easy and quick
         # but leaks usernames and passwords into the log file. On the other hand, credentials are
         # in the log aready because gluetool logs every option of the module...
 
@@ -104,13 +104,20 @@ class OpenStackImage(object):
 
         self.debug("downloading image '{}' into '{}'".format(self.name, filename))
 
+        glance_options = {}
+        for option in ['auth-url', 'project-name', 'username', 'password']:
+            if self.module.option('glance.' + option):
+                glance_options[option] = self.module.option('glance.' + option)
+            else:
+                glance_options[option] = self.module.option(option)
+
         try:
             gluetool.utils.run_command([
                 'glance',
-                '--os-auth-url', self.module.option('glance.auth-url'),
-                '--os-project-id', self.module.option('glance.project-id'),
-                '--os-username', self.module.option('glance.username'),
-                '--os-password', self.module.option('glance.password'),
+                '--os-auth-url', glance_options['auth-url'],
+                '--os-project-name', glance_options['project-name'],
+                '--os-username', glance_options['username'],
+                '--os-password', glance_options['password'],
                 'image-download',
                 '--file', filename,
                 str(self.resource.id)
@@ -881,18 +888,18 @@ class CIOpenstack(gluetool.Module):
         }),
         ('Glance options', {
             'glance.auth-url': {
-                'help': 'Glance AUTH URL',
+                'help': 'Glance AUTH URL (default: same as "auth-url" option)',
                 'metavar': 'URL'
             },
-            'glance.project-id': {
-                'help': 'Glance project ID',
-                'metavar': 'ID'
+            'glance.project-name': {
+                'help': 'Glance project name (default: same as "project-name" option)',
+                'metavar': 'NAME'
             },
             'glance.username': {
-                'help': 'Glance username'
+                'help': 'Glance username (default: same as "username" option)'
             },
             'glance.password': {
-                'help': 'Glance password'
+                'help': 'Glance password (default: same as "password" option)'
             }
         }),
         ('Timeouts', {
@@ -945,7 +952,6 @@ class CIOpenstack(gluetool.Module):
 
     required_options = (
         'auth-url', 'password', 'project-name', 'username', 'ssh-key', 'ip-pool-name',
-        'glance.auth-url', 'glance.project-id', 'glance.username', 'glance.password',
         'arch'
     )
     shared_functions = ('openstack', 'provision', 'provisioner_capabilities')
