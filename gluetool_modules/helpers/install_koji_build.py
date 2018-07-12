@@ -42,7 +42,8 @@ class InstallKojiBuild(gluetool.Module):
         # to just a single task instead of using --taskparam & setting them globally.
         job_xmls = self.shared('beaker_job_xml', body_options=[
             '--task={} /distribution/install/brew-build'.format(brew_build_task_params),
-            '--task=/distribution/runtime_tests/verify-nvr-installed'
+            '--task=/distribution/runtime_tests/verify-nvr-installed',
+            '--task=/distribution/collect_repos'
         ], options=[
             # These seem to be important for restraint - probably moving to wow-options-map is the right way,
             # if we could tell we're putting together a recipe for restraint instead of Beaker.
