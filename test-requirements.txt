@@ -1,5 +1,6 @@
 flake8==3.4.1
 yamllint==1.9.0
+pylint==1.9.2
 pytest-pylint==0.7.1
 pytest-flake8==0.8.1
 pytest-cov==2.5.1
