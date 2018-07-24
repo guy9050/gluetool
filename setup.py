@@ -27,6 +27,7 @@ DESCRIPTION = 'Gluetool & Citool modules'
 
 INSTALL_REQUIRES = [
     "ansible==2.4.2.0",
+    "composeci",  # composetest
     "cmd2==0.8.6",
     "beautifulsoup4==4.5.3",
     "python-dateutil==2.6.1",
@@ -35,6 +36,7 @@ INSTALL_REQUIRES = [
     "enum34==1.1.6",
     "jenkins-job-builder==1.6.2",
     "jenkinsapi==0.3.3",
+    "koji",  # composetest
     "mako==1.0.6",
     # available over external URL => dependency_links => they does not seem to work when installing via pip :/
     #    "mysql-connector-python==2.0.4",
@@ -58,6 +60,8 @@ INSTALL_REQUIRES = [
 ]
 
 DEPENDENCY_LINKS = [
+    "git+https://gitlab.cee.redhat.com/bkabrda/composeci.git#egg=composeci-9876543210",  # composetest
+    "https://releases.pagure.org/koji/koji-1.16.0.tar.bz2#egg=koji-9876543210",  # composetest
     # pylint: disable=line-too-long
     #    "http://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-2.0.4.zip#md5=3df394d89300db95163f17c843ef49df&egg=mysql-connector-python-2.0.4"  # Ignore PEP8Bear
 ]
@@ -92,7 +96,7 @@ CATEGORIES = [
     'infrastructure',
     'provision',
     'static_analysis', 'static_analysis/covscan', 'static_analysis/rpmdiff',
-    'testing', 'testing/beaker', 'testing/openstack', 'testing/restraint'
+    'testing', 'testing/beaker', 'testing/composetest', 'testing/openstack', 'testing/restraint'
 ]
 
 DATA_FILES = [
