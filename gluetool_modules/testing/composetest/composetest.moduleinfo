@@ -1,0 +1,15 @@
+---
+
+name: composetest
+description: "Tests various parts of the compose process."
+dependencies:
+  repo:
+    - name: 'rel-eng'
+      description: RCMTOOLS repository
+      baseurl: http://download-ipv4.eng.brq.redhat.com/rel-eng/RCMTOOLS/latest-RCMTOOLS-2-RHEL-7/compose/Server/$basearch/os
+      exclude: kobo kobo-rpmlib kobo-client
+  yum:
+    - brewkoji
+  pip:
+    - https://releases.pagure.org/koji/koji-1.16.0.tar.bz2
+    - git+https://gitlab.cee.redhat.com/bkabrda/composeci.git
