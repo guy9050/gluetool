@@ -171,6 +171,7 @@ if __name__ == '__main__':
               'gluetool_modules.{}'.format(subpackage) for subpackage in [
                   'testing',
                   'testing.beaker',
+                  'testing.composetest',
                   'testing.restraint',
                   'testing.openstack',
                   'tests',
