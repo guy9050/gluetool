@@ -30,6 +30,26 @@ dependencies:
     # of "rpm-py-installer" package. Let's see how that's going to work, hence not removing these possibly no
     # longer needed tasks.
 
+    # Needed for rpm-py-installer
+    - name: "BuildRequires: add rpm-devel"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^BuildRequires: rpm-devel"
+        line: "# added by 'koji-fedora' module\nBuildRequires: rpm-devel\n"
+        state: present
+        insertbefore: "^# TASK: GLOBAL-BEFORE-DESCRIPTION"
+      when: BUILDING_SPECFILE is defined
+
+    # Needed for rpm-py-installer
+    - name: "Requires: add rpm-devel"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^Requires: rpm-devel"
+        line: "# added by 'koji-fedora' module\nRequires: rpm-devel\n"
+        state: present
+        insertbefore: "^# TASK: GLOBAL-BEFORE-DESCRIPTION"
+      when: BUILDING_SPECFILE is defined
+
     #- name: "%post: inject system koji package into virtualenv"
     #  lineinfile:
     #    dest: "{{ SPECFILE }}"
