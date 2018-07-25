@@ -29,11 +29,20 @@ dependencies:
     - qa-tools-workstation
 
   ansible_tasks:
-    - name: "Requires: add krb5-devel to install pykerberos"
+    - name: "Requires: krb5-devel because of krb5.h"
       lineinfile:
         dest: "{{ SPECFILE }}"
         regexp: "^Requires: krb5-devel"
         line: "# added by 'wow' module\nRequires: krb5-devel\n"
+        state: present
+        insertbefore: "^# TASK: GLOBAL-BEFORE-DESCRIPTION"
+      when: BUILDING_SPECFILE is defined
+
+    - name: "BuildRequires: krb5-devel because of krb5.h"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^BuildRequires: krb5-devel"
+        line: "# added by 'wow' module\nBuildRequires: krb5-devel\n"
         state: present
         insertbefore: "^# TASK: GLOBAL-BEFORE-DESCRIPTION"
       when: BUILDING_SPECFILE is defined
