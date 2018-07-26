@@ -10,6 +10,7 @@ dependencies:
       exclude: kobo kobo-rpmlib kobo-client
   yum:
     - brewkoji
+    - mock
   pip:
     - https://releases.pagure.org/koji/koji-1.16.0.tar.bz2
     - git+https://gitlab.cee.redhat.com/bkabrda/composeci.git
