@@ -38,6 +38,15 @@ getTaskInfo:
     completion_ts: 1526459330.65915
     arch: noarch
     method: build
+  6935377:
+    request:
+      - cli-build/1526458933.094723.gjtyjVKt/flex-2.5.37-3.el7_3.src.rpm
+      - rhel-7.3-z-candidate
+      - scratch: true
+    waiting: false
+    state: 2
+    id: 6935377
+    method: build
 
 getTaskChildren:
   16311217:
@@ -241,6 +250,16 @@ getTaskChildren:
       completion_ts: 1526459134.233
       arch: x86_64
       method: buildArch
+  6935377:
+    - weight: 2.002386748125
+      id: 6935377
+      method: buildArch
+      request:
+      - cli-build/1526458933.094723.gjtyjVKt/flex-2.5.37-3.el7.src.rpm
+      - 9867
+      - x86_64
+      - false
+      - repo_id: 2501209
 
 listTaskOutput:
   16311218:
@@ -308,6 +327,15 @@ listTaskOutput:
     - flex-devel-2.5.37-3.el7_3.s390x.rpm
     - flex-2.5.37-3.el7_3.s390x.rpm
   16311225:
+    - root.log
+    - build.log
+    - state.log
+    - mock_output.log
+    - flex-debuginfo-2.5.37-3.el7_3.x86_64.rpm
+    - flex-doc-2.5.37-3.el7_3.x86_64.rpm
+    - flex-2.5.37-3.el7_3.x86_64.rpm
+    - flex-devel-2.5.37-3.el7_3.x86_64.rpm
+  6935377:
     - root.log
     - build.log
     - state.log

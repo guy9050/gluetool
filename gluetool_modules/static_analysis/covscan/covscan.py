@@ -9,7 +9,8 @@ import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.glue import DryRunLevels
 from gluetool.log import log_blob, format_dict
-from gluetool.utils import cached_property, run_command, check_for_commands, GlueCommandError, dict_update, Bunch
+from gluetool.utils import cached_property, Command, check_for_commands, GlueCommandError, dict_update, Bunch, \
+    PatternMap
 from libci.results import TestResult, publish_result
 
 REQUIRED_CMDS = ['covscan']
@@ -107,9 +108,8 @@ class CovscanResult(object):
         return fixed_defects
 
     def status_failed(self):
-        # convert task id to string because of run_command
         command = ['covscan', 'task-info', str(self.task_id)]
-        process_output = run_command(command)
+        process_output = Command(command, logger=self.module.logger).run()
         match = re.search('state_label = (.*)\n', process_output.stdout)
 
         if match is None:
@@ -129,6 +129,17 @@ class CICovscan(gluetool.Module):
 
     This module schedules a Covscan task, waits until it is finished and reports
     results in results shared function.
+
+    config-map
+    ==========
+
+    .. code-block:: yaml
+
+        ---
+
+        - '(?:rhel|RHEL)-([67]).[0-9]+(?:-z)?-candidate|rhel-(7).1-ppc64le(?:-z)?-candidate':
+            - 'rhel-\1-x86_64'
+            - 'rhel-\1-x86_64-basescan'
     """
 
     name = 'covscan'
@@ -145,22 +156,30 @@ class CICovscan(gluetool.Module):
         },
         'target_pattern': {
             'help': 'A comma separated list of regexes, which define enabled targets'
+        },
+        'config-map': {
+            'help': 'Path to a file with ``target`` => ``target_config``, ``baseline_config`` patterns.',
+            'metavar': 'FILE'
         }
     }
 
     def sanity(self):
         check_for_commands(REQUIRED_CMDS)
 
-    def version_diff_build(self, srpm, baseline, config, baseconfig):
+    def version_diff_build(self, target, baseline, config, base_config):
         handle, task_id_filename = tempfile.mkstemp()
         try:
             os.close(handle)
 
-            command = ['covscan', 'version-diff-build', '--config', config, '--base-config', baseconfig,
-                       '--base-brew-build', baseline, '--srpm', srpm, '--task-id-file', task_id_filename]
+            command = ['covscan', 'version-diff-build',
+                       '--config', config,
+                       '--base-config', base_config,
+                       '--srpm', target,
+                       '--base-srpm', baseline,
+                       '--task-id-file', task_id_filename]
 
             try:
-                run_command(command)
+                Command(command, logger=self.logger).run()
             except GlueCommandError as exc:
                 raise GlueError("Failure during 'covscan' execution: {}".format(exc.output.stderr))
 
@@ -182,26 +201,36 @@ class CICovscan(gluetool.Module):
             raise GlueError('Can not run covscan dryrun without task-id parameter')
 
         if not covscan_result:
-            baseline = self.task.latest
+            target = self.task
+            baseline = self.task.latest_released
 
             if not baseline:
                 raise NoCovscanBaselineFoundError()
 
-            self.info("Using latest non-scratch build '{}' as baseline".format(baseline))
+            self.info("Using '{}' (build task id: {}) as target".format(target.nvr, target.id))
+            self.info("Using '{}' (build task id: {}) as baseline".format(baseline.nvr, baseline.id))
 
-            self.info('Obtaining source RPM from Brew build')
-            srcrpm = urlgrab(self.task.srcrpm_url)
+            self.info('Obtaining source RPMs')
+            target_srpm = urlgrab(target.srcrpm_url)
+            baseline_srpm = urlgrab(baseline.srcrpm_url)
+
+            self.info('Looking for covscan configuration in {}'.format(self.option('config-map')))
+            configs = PatternMap(self.option('config-map'), logger=self.logger).match(self.task.target, multiple=True)
+
+            if len(configs) != 2:
+                raise GlueError('Mapping file does not provide exactly two configurations for this target')
+
+            target_config = configs[0]
+            baseline_config = configs[1]
 
             self.info('Issuing Covscan request')
 
-            config = 'rhel-{0}-x86_64'.format(self.task.rhel)
-            base_config = 'rhel-{0}-x86_64-basescan'.format(self.task.rhel)
-
             try:
-                covscan_result = self.version_diff_build(srcrpm, baseline, config, base_config)
+                covscan_result = self.version_diff_build(target_srpm, baseline_srpm, target_config, baseline_config)
             finally:
                 self.debug('Removing the downloaded source RPM')
-                os.unlink(srcrpm)
+                os.unlink(target_srpm)
+                os.unlink(baseline_srpm)
 
         self.info('Covscan task url: {0}'.format(covscan_result.url))
 
@@ -226,7 +255,6 @@ class CICovscan(gluetool.Module):
     def execute(self):
         self.require_shared('primary_task')
 
-        # get a brew task instance
         self.task = self.shared('primary_task')
 
         blacklist = self.option('blacklist')

@@ -9,7 +9,7 @@ from gluetool.glue import DryRunLevels
 import gluetool_modules.static_analysis.covscan.covscan
 from gluetool_modules.static_analysis.covscan.covscan import CICovscan, CovscanResult, \
     CovscanFailedError, NoCovscanBaselineFoundError
-from . import create_module, patch_shared, assert_shared
+from . import create_module, patch_shared, assert_shared, testing_asset
 
 ADDED_PASS = """
 {
@@ -135,10 +135,21 @@ def run(result, log, module, monkeypatch, tmpdir):
     component_name = 'ssh'
     target = 'rhel-7.4-candidate'
 
-    mocked_task = MagicMock(target=target, component=component_name, srcrpm_url='dummy.src.rpm')
+    baseline_config = testing_asset('covscan', 'example-config-map.yml')
 
-    _, module = module
+    mocked_baseline = MagicMock(target=target, component=component_name, srcrpm_url='dummy_baseline.src.rpm')
+    mocked_task = MagicMock(target=target,
+                            component=component_name,
+                            srcrpm_url='dummy_target.src.rpm',
+                            latest_released=mocked_baseline)
+
+    # _, module = module
     module._config['target_pattern'] = enabled_target
+
+    module._config.update({
+        'target_pattern': enabled_target,
+        'config-map': str(baseline_config)
+    })
 
     def mocked_urlopen(url):
         if 'added' in url or 'fixed' in url:
@@ -153,12 +164,20 @@ def run(result, log, module, monkeypatch, tmpdir):
         else:
             return ''
 
-    def mocked_run_command(cmd):
-        if cmd[1] == 'version-diff-build':
-            with open(cmd[-1], 'w') as outfile:
-                outfile.write('1234')
-        elif cmd[1] == 'task-info':
-            return MagicMock(stdout=TASK_INFO_PASS)
+    class MockedCommand(object):
+
+        def __init__(self, command, *args, **kwargs):
+            self.cmd = command
+
+        def run(self):
+            if self.cmd[1] == 'version-diff-build':
+                with open(self.cmd[-1], 'w') as outfile:
+                    outfile.write('1234')
+            elif self.cmd[1] == 'task-info':
+                if result in ['PASSED', 'FAILED']:
+                    return MagicMock(stdout=TASK_INFO_PASS)
+                if result in ['FAIL']:
+                    return MagicMock(stdout=TASK_INFO_FAIL)
 
     def mocked_grabber(url):
         if 'rpm' in url:
@@ -172,21 +191,25 @@ def run(result, log, module, monkeypatch, tmpdir):
         'primary_task': mocked_task
     })
 
+    monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan, 'Command', MockedCommand)
     monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan, 'urlgrab', mocked_grabber)
-    monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan, 'run_command', mocked_run_command)
     monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan, 'urlopen', mocked_urlopen)
 
     module.execute()
 
+
+def test_pass_run(log, module, monkeypatch, tmpdir):
+    _, module = module
+    result = 'PASSED'
+    run(result, log, module, monkeypatch, tmpdir)
     assert log.match(message='Result of testing: {}'.format(result))
 
 
-def test_pass_run(log, module, monkeypatch, tmpdir):
-    run('PASSED', log, module, monkeypatch, tmpdir)
-
-
 def test_fail_run(log, module, monkeypatch, tmpdir):
-    run('FAILED', log, module, monkeypatch, tmpdir)
+    _, module = module
+    result = 'FAILED'
+    run(result, log, module, monkeypatch, tmpdir)
+    assert log.match(message='Result of testing: {}'.format(result))
 
 
 def test_run_command_error(module, monkeypatch):
@@ -197,7 +220,7 @@ def test_run_command_error(module, monkeypatch):
     def mocked_run_command(cmd):
         raise gluetool.GlueCommandError(cmd, output)
 
-    monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan, 'run_command', mocked_run_command)
+    monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan.Command, 'run', mocked_run_command)
 
     with pytest.raises(gluetool.GlueError, match=r"^Failure during 'covscan' execution"):
         module.version_diff_build('srpm', 'baseline', 'config', 'baseconfig')
@@ -223,7 +246,7 @@ def test_invalid_json(monkeypatch, tmpdir):
 def test_no_baseline(module):
     _, module = module
 
-    module.task = MagicMock(latest=None)
+    module.task = MagicMock(latest_released=None)
 
     with pytest.raises(NoCovscanBaselineFoundError):
         module.scan()
@@ -258,66 +281,19 @@ def test_fetch_fixed(monkeypatch, tmpdir):
     assert result.fixed == ''
 
 
-def test_covscan_fail(module, monkeypatch):
+def test_covscan_fail(log, module, monkeypatch, tmpdir):
     _, module = module
 
-    def mocked_grabber(cmd):
-        # pylint: disable=unused-argument
-        file_name = 'dummy_file.rpm'
-        with open(file_name, 'w') as outfile:
-            outfile.write('')
-        return os.path.abspath(file_name)
-
-    def mocked_run_command(cmd):
-        if cmd[1] == 'version-diff-build':
-            with open(cmd[-1], 'w') as outfile:
-                outfile.write('1234')
-        elif cmd[1] == 'task-info':
-            return MagicMock(stdout=TASK_INFO_FAIL)
-
-    monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan, 'urlgrab', mocked_grabber)
-    monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan, 'run_command', mocked_run_command)
-
-    module.task = MagicMock(latest='baseline', destination_tag='destiantion_tag', rhel='rhel', srpm='srpm')
-
     with pytest.raises(CovscanFailedError):
-        module.scan()
-
-
-def general_dry_run(log, module, monkeypatch, tmpdir):
-
-    def mocked_urlopen(url):
-        # pylint: disable=unused-argument
-        file_name = 'dummy_file.html'
-        outfile = tmpdir.join(file_name)
-        outfile.write(ADDED_PASS)
-        return outfile
-
-    def mocked_grabber(cmd):
-        # pylint: disable=unused-argument
-        pass
-
-    def mocked_run_command(cmd):
-        if cmd[1] == 'version-diff-build':
-            with open(cmd[-1], 'w') as outfile:
-                outfile.write('1234')
-        elif cmd[1] == 'task-info':
-            return MagicMock(stdout=TASK_INFO_PASS)
-
-    monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan, 'urlopen', mocked_urlopen)
-    monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan, 'urlgrab', mocked_grabber)
-    monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan, 'run_command', mocked_run_command)
-
-    module.scan()
-
-    assert log.match(message='Skipping covscan testing, using existing Covscan task id 1234')
+        run('FAIL', log, module, monkeypatch, tmpdir)
 
 
 def test_only_task_id(log, module, monkeypatch, tmpdir):
     _, module = module
     module._config['task-id'] = '1234'
 
-    general_dry_run(log, module, monkeypatch, tmpdir)
+    run('PASSED', log, module, monkeypatch, tmpdir)
+    assert log.match(message='Skipping covscan testing, using existing Covscan task id 1234')
 
 
 def test_dry_run_with_task_id(log, module, monkeypatch, tmpdir):
@@ -325,7 +301,8 @@ def test_dry_run_with_task_id(log, module, monkeypatch, tmpdir):
     ci._dryrun_level = DryRunLevels.DRY
     module._config['task-id'] = '1234'
 
-    general_dry_run(log, module, monkeypatch, tmpdir)
+    run('PASSED', log, module, monkeypatch, tmpdir)
+    assert log.match(message='Skipping covscan testing, using existing Covscan task id 1234')
 
 
 def test_dry_run_without_taskid(module):

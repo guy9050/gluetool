@@ -396,6 +396,26 @@ class KojiTask(object):
         return "{}/taskinfo?taskID={}".format(self.web_url, self.id)
 
     @cached_property
+    def latest_released(self):
+        """
+        Returns task of the latest released package with the same destination tag as returned by API,
+        or ``None`` if none found.
+
+        :rtype: :py:class:`KojiTask`
+        """
+        if self.destination_tag:
+            builds = self.session.listTagged(self.destination_tag, None, True, latest=2, package=self.component)
+        else:
+            builds = self.session.listTagged(self.target, None, True, latest=2, package=self.component)
+
+        if self.scratch:
+            build = builds[0] if builds else None
+        else:
+            build = builds[1] if builds and len(builds) > 1 else None
+
+        return self._module.task_factory(build['task_id']) if build else None
+
+    @cached_property
     def latest(self):
         """
         NVR of the latest released package with the same destination tag, or ``None`` if none found.
@@ -403,15 +423,7 @@ class KojiTask(object):
         :rtype: str
         """
 
-        if self.destination_tag:
-            builds = self.session.listTagged(self.destination_tag, None, True, latest=2, package=self.component)
-        else:
-            builds = self.session.listTagged(self.target, None, True, latest=2, package=self.component)
-
-        if self.scratch:
-            return builds[0]["nvr"] if builds else None
-
-        return builds[1]["nvr"] if builds and len(builds) > 1 else None
+        return self.latest_released.nvr
 
     @cached_property
     def branch(self):
@@ -1255,7 +1267,7 @@ class Koji(gluetool.Module):
     def _valid_methods(self):
         return gluetool.utils.normalize_multistring_option(self.option('valid-methods'))
 
-    def _task_factory(self, task_id, wait_timeout=None, details=None, task_class=None):
+    def task_factory(self, task_id, wait_timeout=None, details=None, task_class=None):
         task_class = task_class or KojiTask
 
         details = dict_update({
@@ -1356,7 +1368,7 @@ class Koji(gluetool.Module):
         :param list(str) nvr: Package NVRs.
         :param list(str) names: Package names. The latest build with a tag - given via module's ``--tag``
             option - is the possible solution.
-        :param dict kwargs: Additional arguments passed to :py:meth:`_task_factory`.
+        :param dict kwargs: Additional arguments passed to :py:meth:`task_factory`.
         :rtype: list(KojiTask)
         :returns: Current task instances.
         :raises gluetool.glue.GlueError: When there are no tasks.
@@ -1366,7 +1378,7 @@ class Koji(gluetool.Module):
         # Otherwise leave it untouched.
         if any([task_ids, build_ids, nvrs, names]):
             self._tasks = [
-                self._task_factory(task_id, **kwargs)
+                self.task_factory(task_id, **kwargs)
                 for task_id in self._find_task_ids(task_ids=task_ids, build_ids=build_ids, nvrs=nvrs, names=names)
             ]
 
@@ -1500,7 +1512,7 @@ class Brew(Koji, (gluetool.Module)):
         'automation-user-ids', 'dist-git-commit-urls', 'docker-image-url-template'
     ]
 
-    def _task_factory(self, task_id, wait_timeout=None, details=None, task_class=None):
+    def task_factory(self, task_id, wait_timeout=None, details=None, task_class=None):
         # options checker does not handle multiple modules in the same file correctly, therefore it
         # raises "false" negative for the following use of parent's class options
         # pylint: disable=gluetool-unknown-option
@@ -1509,5 +1521,5 @@ class Brew(Koji, (gluetool.Module)):
             'dist_git_commit_urls': [url.strip() for url in self.option('dist-git-commit-urls').split(',')]
         }, details or {})
 
-        return super(Brew, self)._task_factory(task_id, details=details, task_class=BrewTask,
-                                               wait_timeout=wait_timeout)
+        return super(Brew, self).task_factory(task_id, details=details, task_class=BrewTask,
+                                              wait_timeout=wait_timeout)
