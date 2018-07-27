@@ -316,7 +316,7 @@ class OpenstackGuest(NetworkedGuest):
             self.debug("released floating IP '{}'".format(self.floating_ip))
 
         except NotFound:
-            self.debug('associated floating IP already removed', sentry=True)
+            self.warn('associated floating IP already removed', sentry=True)
 
         self._os_floating_ip = None
 
