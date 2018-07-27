@@ -20,6 +20,10 @@ BOOT_TICK = 10
 
 StaticGuestDefinition = collections.namedtuple('StaticGuestDefinition', ('fqdn', 'arch'))
 
+#: Beaker provisioner capabilities.
+#: Follows :doc:`Provisioner Capabilities Protocol </protocols/provisioner-capabilities>`.
+ProvisionerCapabilities = collections.namedtuple('ProvisionerCapabilities', ['available_arches'])
+
 
 class BeakerGuest(NetworkedGuest):
     """
@@ -185,19 +189,14 @@ class BeakerProvisioner(gluetool.Module):
         """
         Return description of Beaker provisioner capabilities.
 
-        Supported capabilities:
-
-            * `available-arches` - list of architectures Beaker could provision. Defined by architectures
-              of guests given by `--static-guest`` options.
-
-        :rtype: dict
+        Follows :doc:`Provisioner Capabilities Protocol </protocols/provisioner-capabilities>`.
         """
 
-        return {
-            'available-arches': [
+        return ProvisionerCapabilities(
+            available_arches=[
                 guest.arch for guest in self.static_guests
             ]
-        }
+        )
 
     def provision(self, **kwargs):
         # pylint: disable=unused-argument

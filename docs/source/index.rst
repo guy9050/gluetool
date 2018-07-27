@@ -22,6 +22,7 @@ Table of contents
    howto-modules
    howto-tests
    howto-docs
+   protocols/protocols
    DEVELOPMENT
 
 

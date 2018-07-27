@@ -1,5 +1,6 @@
 # pylint: disable=too-many-lines
 
+import collections
 import errno
 import functools
 import gzip
@@ -39,6 +40,11 @@ DEFAULT_SHUTDOWN_TIMEOUT = 60
 
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
+
+
+#: OpenStack provisioner capabilities.
+#: Follows :doc:`Provisioner Capabilities Protocol </protocols/provisioner-capabilities>`.
+ProvisionerCapabilities = collections.namedtuple('ProvisionerCapabilities', ['available_arches'])
 
 
 class OpenStackImage(object):
@@ -1248,18 +1254,14 @@ class CIOpenstack(gluetool.Module):
         """
         Return description of OpenStack provisioner capabilities.
 
-        Supported capabilities:
-
-            * `available-arches` - list of architectures OpenStack could provision. Defined by ``--arch`` option.
-
-        :rtype: dict
+        Follows :doc:`Provisioner Capabilities Protocol </protocols/provisioner-capabilities>`.
         """
 
-        return {
-            'available-arches': [
+        return ProvisionerCapabilities(
+            available_arches=[
                 self.option('arch')
             ]
-        }
+        )
 
     def destroy(self, failure=None):
         if not self._all:

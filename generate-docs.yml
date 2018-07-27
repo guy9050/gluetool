@@ -11,6 +11,8 @@
       - source/howto-docs.rst
       - source/howto-modules.rst
       - source/index.rst
+      - source/protocols/protocols.rst
+      - source/protocols/provisioner-capabilities.rst
       - source/DEVELOPMENT.rst
     base_files:
       - source/conf.py
@@ -30,6 +32,7 @@
         - "{{ generate_dir }}/"
         - "{{ generate_dir }}/source/"
         - "{{ generate_dir }}/source/modules/"
+        - "{{ generate_dir }}/source/protocols/"
 
     - name: "Clean doc in '{{ generate_dir }}'"
       shell: rm -rf {{ generate_dir }}/{{ item }}
