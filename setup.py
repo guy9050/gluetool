@@ -41,6 +41,7 @@ INSTALL_REQUIRES = [
     "docker-pycreds==0.3.0",  # docker
     "enum34==1.1.6",
     'futures==3.2.0; python_version == "2.7"',  # restraint-scheduler
+    "inotify==0.2.10",  # sti
     "jenkins-job-builder==1.6.2",
     "jenkinsapi==0.3.3",
     "jq==0.1.6",
