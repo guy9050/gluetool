@@ -13,3 +13,4 @@ Known protocols
    :maxdepth: 1
 
    provisioner-capabilities
+   testing-environment

@@ -1167,7 +1167,9 @@ class CIOpenstack(gluetool.Module):
 
         return OpenStackImage.factory(self, image)
 
-    def provision(self, count=1, name=DEFAULT_NAME, image=None, flavor=None):
+    def provision(self, environment, count=1, name=DEFAULT_NAME, image=None, flavor=None, **kwargs):
+        # pylint: disable=too-many-arguments,unused-argument
+
         assert count >= 1, 'count needs to >= 1'
 
         image = self._provision_image(image)
@@ -1243,6 +1245,14 @@ class CIOpenstack(gluetool.Module):
             - command-line option ``--image``
             - configuration file, ``image`` option
             - ``openstack_image`` shared function
+
+        :param tuple environment: description of the envronment caller wants to provision.
+            Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
+
+            .. warning::
+
+               Currently, this parameter is ignored. It has been introduced this early to decouple
+               users of this module, and its actual use will follow in the near future.
 
         :param int count: number of openstack guests to create
         :param str name: box name (default: {default_name})
