@@ -39,9 +39,9 @@ class ComposeTest(gluetool.Module):
         # for now we just pass x86_64 as the only arch
         # 'arches': {
         # },
-        'cachefile': {
-            'help': 'Path to a cachefile of a previous run of this tool',
-            'default': '/tmp/composeci-cachefile',
+        'db-url': {
+            'help': 'SQLAlchemy compatbile DB URL',
+            'default': 'sqlite:////tmp/composeci.db',
         },
     }
 
@@ -72,7 +72,8 @@ class ComposeTest(gluetool.Module):
                 'Unknown trigger {} from topic {}'.format(trigger, msg['topic'])
             )
 
-        cmd = ['composeci', 'test-buildinstall', '--package', package]
+        cmd = ['composeci', '--db-url', self.option('db-url'), 'test-buildinstall',
+               '--package', package]
         for opt in self.options:
             value = self.option(opt)
             if opt == 'tag-configuration':
@@ -81,6 +82,8 @@ class ComposeTest(gluetool.Module):
                     raise gluetool.GlueError(
                         'Only allowed to run composeci for tag configuration "rhel-8.0"'
                     )
+            elif opt == 'db-url':
+                pass  # skip db-url here
             cmd.extend(['--{opt}'.format(opt=opt), value])
 
         try:
