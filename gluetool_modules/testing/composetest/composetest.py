@@ -46,16 +46,16 @@ class ComposeTest(gluetool.Module):
         # 'arches': {
         # },
         'db-url': {
-            'help': 'SQLAlchemy compatbile DB URL',
+            'help': 'SQLAlchemy compatbile DB URL (default: %(default)s).',
             'default': 'sqlite:////tmp/composeci.db',
         },
         'no-trigger-event': {
-            'help': 'Use when this run is not triggered by a specific event',
+            'help': 'Use when this run is not triggered by a specific event (default: %(default)s).',
             'action': 'store_true',
             'default': False,
         },
         'diff-log-file': {
-            'help': 'File to log informative diffs for use in notification emails',
+            'help': 'File to log informative diffs for use in notification emails (default: %(default)s).',
             'default': 'composetest-difflog',
         },
     }

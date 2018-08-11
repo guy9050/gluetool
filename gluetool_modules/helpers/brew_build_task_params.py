@@ -15,20 +15,25 @@ class BrewBuildOptions(gluetool.Module):
 
     options = {
         'install-task-not-build': {
-            'help': 'Try to install SUT using brew task ID as a referrence, instead of the brew build ID.',
+            'help': """
+                    Try to install SUT using brew task ID as a referrence, instead of the brew build ID
+                    (default: %(default)s).
+                    """,
             'action': 'store_true',
-            'default': False
+            'default': 'no'
         },
         'install-rpms-blacklist': {
-            # pylint: disable=line-too-long
-            'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
+            'help': """
+                    Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will
+                    **not** be installed (default: %(default)s).
+                    """,
             'type': str,
             'default': ''
         },
         'install-method': {
-            'help': 'Yum method to use for installation (default: ``install``).',
+            'help': 'Yum method to use for installation (default: %(default)s).',
             'type': str,
-            'default': 'install'
+            'default': 'multi'
         }
     }
 
@@ -45,7 +50,7 @@ class BrewBuildOptions(gluetool.Module):
         tasks = []
         builds = []
 
-        if self.option('install-task-not-build'):
+        if gluetool.utils.normalize_bool_option(self.option('install-task-not-build')):
             self.debug('asked to install by task ID')
 
             tasks = [task.id for task in self.shared('tasks')]

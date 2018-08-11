@@ -41,18 +41,24 @@ class TCMSRun(gluetool.Module):
 
     options = {
         'tcms-run-options-map': {
-            'help': 'Mapping file with system-wide options for ``tcms-run``. Supports rules & templates.',
+            'help': """
+                    Mapping file with system-wide options for ``tcms-run``.
+                    Supports rules & templates (default: %(default)s).
+                    """,
             'default': None
         },
         'tcms-run-options': {
             'help': 'Additional options for ``tcms-run``, e.g. ``--plan``.'
         },
         'tcms-results-options-map': {
-            'help': 'Mapping file with system-wide options for ``tcms-results``. Supports rules & templates.',
+            'help': """
+                    Mapping file with system-wide options for ``tcms-results``.
+                    Supports rules & templates (default: %(default)s).
+                    """,
             'default': None
         },
         'tcms-results-options': {
-            'help': 'Additional options for ``tcms-results``, e.g. ``--no-avc``.',
+            'help': 'Additional options for ``tcms-results``, e.g. ``--no-avc`` (default: %(default)s).',
             'default': ''
         }
     }

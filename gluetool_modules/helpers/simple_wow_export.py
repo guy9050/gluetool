@@ -21,12 +21,11 @@ class SimpleWowExport(gluetool.Module):
 
     options = {
         'log': {
-            'help': 'Name of the log file. Default is {}'.format(
-                DEFAULT_LOG_FILE),
+            'help': 'Name of the log file (default: %(default)s).',
             'default': DEFAULT_LOG_FILE
         },
         'template': {
-            'help': 'Record template. See module source for all available fields.',
+            'help': 'Record template. See module source for all available fields (default: %(default)s).',
             'default': DEFAULT_TEMPLATE
         }
     }

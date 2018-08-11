@@ -116,7 +116,7 @@ class Beaker(gluetool.Module):
             'action': 'store_true'
         },
         'reserve-time': {
-            'help': 'Reservation time in hours (default: {})'.format(DEFAULT_RESERVE_TIME),
+            'help': 'Reservation time in hours (default: %(default)s)',
             'default': DEFAULT_RESERVE_TIME,
             'metavar': 'HOURS',
             'type': int

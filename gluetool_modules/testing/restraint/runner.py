@@ -61,29 +61,31 @@ class RestraintRunner(gluetool.Module):
 
     options = {
         'use-snapshots': {
-            'help': 'Enable or disable use of snapshots (if supported by guests) (default: no)',
+            'help': 'Enable or disable use of snapshots (if supported by guests) (default: %(default)s)',
             'default': 'no',
             'metavar': 'yes|no'
         },
         'parallelize-recipe-sets': {
-            'help': 'Enable or disable parallelization of recipe sets (default: no)',
+            'help': 'Enable or disable parallelization of recipe sets (default: %(default)s)',
             'default': 'no',
             'metavar': 'yes|no'
         },
         'parallelize-task-sets': {
-            'help': 'Enable or disable parallelization of test sets (default: no)',
+            'help': 'Enable or disable parallelization of test sets (default: %(default)s)',
             'default': 'no',
             'metavar': 'yes|no'
         },
         'on-error-snapshot': {
-            'help': 'If set, on crash of restraint take a snapshot of the guest and download it (default: no).',
+            # pylint: disable=line-too-long
+            'help': 'If set, on crash of restraint take a snapshot of the guest and download it (default: %(default)s).',
             'default': 'no',
             'metavar': 'yes|no'
         },
         'on-error-continue': {
             'help': """
-                    If set, on crash of restraint continue with another test case (default: no). Be aware
-                    that you probably wish to use ``--use-snapshots`` as well, as crashed restraint might
+                    If set, on crash of restraint continue with another test case (default: %(default)s).
+
+                    Be aware that you probably wish to use ``--use-snapshots`` as well, as crashed restraint might
                     have left the SUT in a very bad state.
                     """,
             'default': 'no',
@@ -92,7 +94,7 @@ class RestraintRunner(gluetool.Module):
         'results-directory-template': {
             'help': """
                     If set, directories created by ``restraint`` are renamed using this template. Common eval
-                    context is available, with addition of ``GUEST``.
+                    context is available, with addition of ``GUEST`` (default: %(default)s).
 
                     Not compatible with ``--parallelize-task-sets`` and ``--use-snapshots``.
                     """,

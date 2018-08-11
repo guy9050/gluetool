@@ -804,10 +804,12 @@ class CIOpenstack(gluetool.Module):
 
     name = 'openstack'
     description = 'Provides Openstack guests'
+
+    # pylint: disable=gluetool-option-has-no-default
     options = [
         ('Common options', {
             'api-version': {
-                'help': 'API version (default: 2)',
+                'help': 'API version (default: %(default)s)',
                 'default': '2'
             },
             'auth-url': {
@@ -822,7 +824,7 @@ class CIOpenstack(gluetool.Module):
                 'action': 'store_true',
             },
             'flavor': {
-                'help': 'Default flavor of machines (default: {})'.format(DEFAULT_FLAVOR),
+                'help': 'Default flavor of machines (default: %(default)s)',
                 'default': DEFAULT_FLAVOR,
             },
             'image': {
@@ -866,12 +868,12 @@ class CIOpenstack(gluetool.Module):
                 'action': 'store_true',
             },
             'reserve-directory': {
-                'help': 'Reservation records directory (default: {})'.format(DEFAULT_RESERVE_DIR),
+                'help': 'Reservation records directory (default: %(default)s)',
                 'metavar': 'PATH',
                 'default': DEFAULT_RESERVE_DIR,
             },
             'reserve-time': {
-                'help': 'Reservation time in hours (default: {})'.format(DEFAULT_RESERVE_TIME),
+                'help': 'Reservation time in hours (default: %(default)s)',
                 'default': DEFAULT_RESERVE_TIME,
                 'metavar': 'HOURS',
                 'type': int,
@@ -899,18 +901,18 @@ class CIOpenstack(gluetool.Module):
         }),
         ('Glance options', {
             'glance.auth-url': {
-                'help': 'Glance AUTH URL (default: same as "auth-url" option)',
+                'help': 'Glance AUTH URL (default: value of ``--auth-url`` option)',
                 'metavar': 'URL'
             },
             'glance.project-name': {
-                'help': 'Glance project name (default: same as "project-name" option)',
+                'help': 'Glance project name (default: value of ``--project-name`` option)',
                 'metavar': 'NAME'
             },
             'glance.username': {
-                'help': 'Glance username (default: same as "username" option)'
+                'help': 'Glance username (default: value of ``--username`` option)'
             },
             'glance.password': {
-                'help': 'Glance password (default: same as "password" option)'
+                'help': 'Glance password (default: value of ``--password`` option)'
             }
         }),
         ('Timeouts', {
@@ -922,27 +924,27 @@ class CIOpenstack(gluetool.Module):
             },
             'activation-timeout': {
                 # pylint: disable=line-too-long
-                'help': 'Wait SECOND for a guest to become reachable over network (default: {})'.format(DEFAULT_ACTIVATION_TIMEOUT),
+                'help': 'Wait SECOND for a guest to become reachable over network (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_ACTIVATION_TIMEOUT,
                 'metavar': 'SECONDS'
             },
             'echo-timeout': {
-                'help': 'Wait SECOND for a guest shell to become available (default: {})'.format(DEFAULT_ECHO_TIMEOUT),
+                'help': 'Wait SECOND for a guest shell to become available (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_ECHO_TIMEOUT,
                 'metavar': 'SECONDS'
             },
             'boot-timeout': {
                 # pylint: disable=line-too-long
-                'help': 'Wait SECONDS for a guest to finish its booting process (default: {})'.format(DEFAULT_BOOT_TIMEOUT),
+                'help': 'Wait SECONDS for a guest to finish its booting process (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_BOOT_TIMEOUT,
                 'metavar': 'SECONDS'
             },
             'shutdown-timeout': {
                 # pylint: disable=line-too-long
-                'help': 'Wait SECONDS for a guest to finish its shutdown process (default: {})'.format(DEFAULT_SHUTDOWN_TIMEOUT),
+                'help': 'Wait SECONDS for a guest to finish its shutdown process (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_SHUTDOWN_TIMEOUT,
                 'metavar': 'SECONDS'
@@ -954,13 +956,13 @@ class CIOpenstack(gluetool.Module):
             },
             'start-after-snapshot-attempts': {
                 # pylint: disable=line-too-long
-                'help': 'When starting guest after taking its snapshot, try this many times before giving up (default: {})'.format(DEFAULT_START_AFTER_SNAPSHOT_ATTEMPTS),
+                'help': 'When starting guest after taking its snapshot, try this many times before giving up (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_START_AFTER_SNAPSHOT_ATTEMPTS
             },
             'restore-snapshot-attempts': {
                 # pylint: disable=line-too-long
-                'help': 'When rebuilding guest to restore a snapshot, try this many times before giving up (default: {})'.format(DEFAULT_RESTORE_SNAPSHOT_ATTEMPTS),
+                'help': 'When rebuilding guest to restore a snapshot, try this many times before giving up (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_RESTORE_SNAPSHOT_ATTEMPTS
             }

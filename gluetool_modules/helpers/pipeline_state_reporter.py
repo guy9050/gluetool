@@ -142,19 +142,19 @@ class PipelineStateReporter(gluetool.Module):
         }),
         ('Tweaks', {
             'label': {
-                'help': 'Custom pipeline label, distinguishing the pipelines of the same type.',
+                'help': 'Custom pipeline label, distinguishing the pipelines of the same type (default: %(default)s).',
                 'default': None
             },
             'note': {
-                'help': 'Custom, arbitrary note or comment.',
+                'help': 'Custom, arbitrary note or comment (default: %(default)s).',
                 'default': None
             }
         }),
         ('General options', {
             'dont-report-running': {
-                'help': "Do not send out a 'running' message automatically.",
+                'help': "Do not send out a 'running' message automatically (default: %(default)s).",
                 'action': 'store_true',
-                'default': False
+                'default': 'no'
             },
             'bus-topic': {
                 'help': 'Topic of the messages sent to the message bus.'

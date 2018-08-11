@@ -140,22 +140,22 @@ class BusListener(gluetool.Module):
             'help': 'Password to use to connect to the message bus.'
         },
         'host': {
-            'help': 'Message bus host (default: {}).'.format(DEFAULT_BUS_HOST),
+            'help': 'Message bus host (default: %(default)s).',
             'default': DEFAULT_BUS_HOST
         },
         'port': {
-            'help': 'Message bus port (default: {}).'.format(DEFAULT_BUS_PORT),
+            'help': 'Message bus port (default: %(default)s).',
             'default': DEFAULT_BUS_PORT,
             'type': int
         },
         'selector': {
-            'help': 'JMS selector for filtering messages. Can be used multiple times.',
+            'help': 'JMS selector for filtering messages. Can be used multiple times (default: none).',
             'dest': 'selectors',
             'action': 'append',
             'default': []
         },
         'destination': {
-            'help': 'Message bus topic/subscription (default: {}).'.format(DEFAULT_DESTINATION),
+            'help': 'Message bus topic/subscription (default: %(default)s).',
             'default': DEFAULT_DESTINATION
         },
         'queue-directory': {

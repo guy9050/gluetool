@@ -192,7 +192,7 @@ class RulesEngine(gluetool.Module):
 
     options = {
         'rules': {
-            'help': 'Rules to evaluate when module is executed. Used for testing.',
+            'help': 'Rules to evaluate when module is executed. Used for testing (default: %(default)s).',
             'default': None
         }
     }

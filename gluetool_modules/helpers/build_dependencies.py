@@ -23,19 +23,22 @@ class BuildDependencies(gluetool.Module):
 
     options = {
         'method': {
-            'help': 'What method to use for dependencies lookup.',
+            'help': 'What method to use for dependencies lookup (default: %(default)s).',
             'choices': ('companions-from-koji',),
             'default': None,
             'metavar': 'METHOD'
         },
         'companions': {
-            'help': 'List of additional components to look for.',
+            'help': 'List of additional components to look for (default: none).',
             'action': 'append',
             'default': [],
             'metavar': 'COMPONENT1,...'
         },
         'companion-target-fallback-map': {
-            'help': 'When there is not build for given build target, try another target as well.',
+            'help': """
+                    When there is not build for given build target, try another target as well
+                    (default: %(default)s).
+                    """,
             'metavar': 'FILE',
             'default': None
         }

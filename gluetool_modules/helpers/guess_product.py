@@ -19,7 +19,7 @@ class GuessProduct(gluetool.Module):
 
     options = {
         'method': {
-            'help': 'What method to use for product "guessing".',
+            'help': 'What method to use for product "guessing" (default: %(default)s).',
             'choices': ('target-autodetection', 'force'),
             'default': 'target-autodetection'
         },

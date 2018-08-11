@@ -26,6 +26,7 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
 
     job_name = 'ci-beaker'
 
+    # pylint: disable=gluetool-option-hard-default
     options = dict_update({}, libci.dispatch_job.DispatchJenkinsJobMixin.options, {
         'build-dependencies-options': {
             'help': 'Additional options for ``build-dependencies-options`` module.'
@@ -45,11 +46,11 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             'help': 'Additional options for ``beaker-jobwatch``.'
         },
         'beaker-options': {
-            'help': 'Additional options for ``beaker`` module.',
+            'help': 'Additional options for ``beaker`` module (default: %(default)s).',
             'default': ''
         },
         'brew-build-task-params-options': {
-            'help': 'Additional options for ``brew-build-task-params`` module.',
+            'help': 'Additional options for ``brew-build-task-params`` module (default: %(default)s).',
             'default': ''
         },
         'wow-options-separator': {
@@ -67,12 +68,15 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         # following options passed to brew-build-task-params module
         'install-rpms-blacklist': {
             # pylint: disable=line-too-long
-            'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
+            'help': """
+                    Regexp pattern (compatible with ``egrep``) - when installing build, matching packages
+                    will **not** be installed (default: %(default)s).
+                    """,
             'type': str,
             'default': ''
         },
         'install-method': {
-            'help': 'Yum method to use for installation (default: ``multi``).',
+            'help': 'Yum method to use for installation (default: %(default)s).',
             'type': str,
             'default': 'multi'
         }

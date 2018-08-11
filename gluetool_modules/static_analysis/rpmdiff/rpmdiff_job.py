@@ -21,6 +21,8 @@ class RpmdiffJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     name = 'rpmdiff-job'
     description = 'Job module dispatching RPMdiff analysis and comparison pipeline.'
 
+    # DispatchJenkinsJobMixin.options contain hard defaults
+    # pylint: disable=gluetool-option-hard-default
     options = gluetool.utils.dict_update({}, libci.dispatch_job.DispatchJenkinsJobMixin.options, {
         'type': {
             'help': 'Test type: analysis or comparison',

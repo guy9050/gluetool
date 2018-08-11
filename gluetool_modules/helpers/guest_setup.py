@@ -48,7 +48,7 @@ class GuestSetup(gluetool.Module):
                     Comma-separated list of KEY=VALUE variables passed to ``run-playbook``
                     shared function. This option overrides mapped gathered from the mapping file
                     specified via the ``--playbooks-map`` option and also the shared function
-                    variables argument.
+                    variables argument (default: none).
                     """,
             'action': 'append',
             'default': []
@@ -56,13 +56,13 @@ class GuestSetup(gluetool.Module):
         'playbooks': {
             'help': """
                     Comma-separated list of Ansible playbooks to execute on guests,
-                    overrides mapped values from ``--playbooks-map`` option.
+                    overrides mapped values from ``--playbooks-map`` option (default: none).
                     """,
             'action': 'append',
             'default': []
         },
         'playbooks-map': {
-            'help': 'Path to a file with preconfigured ``--playbooks`` options.',
+            'help': 'Path to a file with preconfigured ``--playbooks`` options (default: %(default)s).',
             'default': None,
             'metavar': 'FILE'
         }

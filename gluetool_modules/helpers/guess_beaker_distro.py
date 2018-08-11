@@ -34,22 +34,26 @@ class CIGuessBeakerDistro(gluetool.Module):
 
     options = {
         'method': {
-            'help': 'What method to use for distro "guessing"',
+            'help': 'What method to use for distro "guessing" (default: %(default)s).',
             'default': 'target-autodetection'
         },
         'distro': {
-            'help': 'Distro specification, to help your method with guessing',
+            'help': 'Distro specification, to help your method with guessing (default: none).',
             'action': 'append',
             'default': []
         },
         'nightly-listing': {
-            'help': """URL where list of nightly composes lies, in a form of web server's
-directory listing. Default is {}""".format(DEFAULT_NIGHTLY_LISTING),
+            'help': """
+                    URL where list of nightly composes lies, in a form of web server's
+                    directory listing (default: %(default)s).
+                    """,
             'default': DEFAULT_NIGHTLY_LISTING
         },
         'bu-listing': {
-            'help': """URL where list of batch update composes lies, in a form of web server's
-directory listing. Default is {}""".format(DEFAULT_BU_LISTING),
+            'help': """
+                    URL where list of batch update composes lies, in a form of web server's
+                    directory listing (default: %(default)s).
+                    """,
             'default': DEFAULT_BU_LISTING
         },
         'pattern-map': {

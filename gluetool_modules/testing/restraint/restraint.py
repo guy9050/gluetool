@@ -43,19 +43,17 @@ class Restraint(gluetool.Module):
 
     options = {
         'restraint-options': {
-            'help': 'Additional restraint options.',
+            'help': 'Additional restraint options (default: %(default)s).',
             'default': None
         },
         'restraintd-start-timeout': {
-            # pylint: disable=line-too-long
-            'help': 'Wait SECONDS for restraintd to start and listen (default: {})'.format(DEFAULT_RESTRAINTD_START_TIMEOUT),
+            'help': 'Wait SECONDS for restraintd to start and listen (default: %(default)s)',
             'type': int,
             'default': DEFAULT_RESTRAINTD_START_TIMEOUT,
             'metavar': 'SECONDS'
         },
         'restraintd-start-timeout-tick': {
-            # pylint: disable=line-too-long
-            'help': 'To pass ``restraintd-start-timeout``, check every SECONDS (default: {})'.format(DEFAULT_RESTRAINTD_START_TIMEOUT_TICK),
+            'help': 'To pass ``restraintd-start-timeout``, check every SECONDS (default: %(default)s)',
             'type': int,
             'default': DEFAULT_RESTRAINTD_START_TIMEOUT_TICK,
             'metavar': 'SECONDS'

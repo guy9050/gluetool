@@ -47,7 +47,7 @@ class Semaphore(gluetool.Module):
     options = [
         ('Common options', {
             'instructions-map': {
-                'help': 'List of rules and actions to take',
+                'help': 'List of rules and actions to take (default: none)',
                 'action': 'append',
                 'default': []
             }

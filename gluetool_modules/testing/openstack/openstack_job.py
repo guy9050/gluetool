@@ -26,6 +26,8 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
 
     job_name = 'ci-openstack'
 
+    # DispatchJenkinsJobMixin.options contain hard defaults
+    # pylint: disable=gluetool-option-hard-default
     options = dict_update({}, libci.dispatch_job.DispatchJenkinsJobMixin.options, {
         'build-dependencies-options': {
             'help': 'Additional options for ``build-dependencies-options`` module.'
@@ -48,7 +50,7 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             'help': 'Additional options for openstack module.',
         },
         'brew-build-task-params-options': {
-            'help': 'Additional options for ``brew-build-task-params`` module.',
+            'help': 'Additional options for ``brew-build-task-params`` module (default: %(default)s).',
             'default': ''
         },
         'restraint-runner-options': {
@@ -69,12 +71,15 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         # following options are passed to brew-build-task-params module
         'install-rpms-blacklist': {
             # pylint: disable=line-too-long
-            'help': 'Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will not be installed.',
+            'help': """
+                    Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will
+                    **not** be installed (default: %(default)s).
+                    """,
             'type': str,
             'default': ''
         },
         'install-method': {
-            'help': 'Yum method to use for installation (default: ``install``).',
+            'help': 'Yum method to use for installation (default: %(default)s).',
             'type': str,
             'default': 'multi'
         }

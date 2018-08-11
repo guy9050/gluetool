@@ -42,13 +42,13 @@ class TestingThread(gluetool.Module):
             'type': str
         },
         'id-length': {
-            'help': 'Number of hash characters used as a thread ID',
+            'help': 'Number of hash characters used as a thread ID (default: %(default)s).',
             'metavar': 'NUMBER',
             'type': int,
             'default': 12
         },
         'id-file': {
-            'help': 'If set, module will store the ID in this file (default: {}).'.format(DEFAULT_ID_FILE),
+            'help': 'If set, module will store the ID in this file (default: %(default)s).',
             'metavar': 'PATH',
             'default': DEFAULT_ID_FILE
         }

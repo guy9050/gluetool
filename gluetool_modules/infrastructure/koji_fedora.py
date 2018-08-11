@@ -1194,24 +1194,27 @@ class Koji(gluetool.Module):
             'help': 'Koji instance web ui URL',
         },
         'task-id': {
-            'help': 'Initialize from task ID.',
+            'help': 'Initialize from task ID (default: none).',
             'action': 'append',
             'default': [],
             'type': int
         },
         'build-id': {
-            'help': 'Initialize from build ID.',
+            'help': 'Initialize from build ID (default: none).',
             'action': 'append',
             'default': [],
             'type': int
         },
         'name': {
-            'help': 'Initialize from package name, by choosing latest tagged build (requires ``--tag``).',
+            'help': """
+                    Initialize from package name, by choosing latest tagged build (requires ``--tag``)
+                    (default: none).
+                    """,
             'action': 'append',
             'default': []
         },
         'nvr': {
-            'help': 'Initialize from package NVR.',
+            'help': 'Initialize from package NVR (default: none).',
             'action': 'append',
             'default': []
         },
@@ -1221,14 +1224,14 @@ class Koji(gluetool.Module):
         'valid-methods': {
             'help': """
                     List of task methods that are considered valid, e.g. ``build`` or ``buildContainer``
-                    (Default: any method is considered valid).
+                    (default: none, i.e. any method is considered valid).
                     """,
             'metavar': 'METHOD1,METHOD2,...',
             'action': 'append',
             'default': []
         },
         'wait': {
-            'help': 'Wait timeout for task to become non-waiting and closed',
+            'help': 'Wait timeout for task to become non-waiting and closed (default: %(default)s)',
             'type': int,
             'default': 60,
         }
@@ -1476,6 +1479,8 @@ class Brew(Koji, (gluetool.Module)):
     name = 'brew'
     description = 'Provide Brew task details to other modules'
 
+    # Koji.options contain hard defaults
+    # pylint: disable=gluetool-option-hard-default
     options = dict_update({}, Koji.options, {
         'automation-user-ids': {
             'help': 'List of comma delimited user IDs that trigger resolving of issuer from dist git commit instead'
