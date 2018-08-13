@@ -83,7 +83,7 @@ class ComposeTest(gluetool.Module):
                         'Only allowed to run composeci for tag configuration "rhel-8.0"'
                     )
             elif opt == 'db-url':
-                pass  # skip db-url here
+                continue  # skip db-url here
             cmd.extend(['--{opt}'.format(opt=opt), value])
 
         try:
