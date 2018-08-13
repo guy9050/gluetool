@@ -242,7 +242,7 @@ class RestraintScheduler(gluetool.Module):
         provisioner_capabilities = self.shared('provisioner_capabilities')
         log_dict(self.debug, 'provisioner capabilities', provisioner_capabilities)
 
-        supported_arches = provisioner_capabilities.get('available-arches', []) if provisioner_capabilities else []
+        supported_arches = provisioner_capabilities.available_arches if provisioner_capabilities else []
 
         log_dict(self.debug, 'artifact arches', artifact_arches)
         log_dict(self.debug, 'supported arches', supported_arches)
