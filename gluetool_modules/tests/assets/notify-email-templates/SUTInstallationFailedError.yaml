@@ -9,4 +9,5 @@ body: |-
 
   Installation logs: some install logs URL
 
-  Please, get in touch with component's QE and/or CI stuff to find out how to resolve this situation.
+  If you are not sure about the root cause of this issue, contact the CI stuff on #baseosci
+  IRC channel, who will help you out analyzing and resolving this issue.
