@@ -203,6 +203,7 @@ Tox creates (and caches) virtualenv for its test runs, and uses them for
 running the tests. It integrates multiple different types of test (you
 can see them by running ``tox -l``).
 
+
 Documentation
 -------------
 
@@ -214,3 +215,35 @@ update your local copy, run these commands:
     ansible-playbook ./generate-docs.yaml
 
 Then you can read generated docs by opening ``docs/build/html/index.html``.
+
+
+Troubleshooting
+---------------
+
+Issues with pycurl
+~~~~~~~~~~~~~~~~~~
+
+In case you encounter tracebacks when importing pycurl, similar to this one:
+
+.. note::
+
+    ImportError: pycurl: libcurl link-time ssl backend (openssl) is different from compile-time ssl backend (nss)
+
+This is caused by mismatch of the SSL library which libcurl package is compiled against and pycurl module's compile time library. To resolve, make sure that your PYCURL_SSL_LIBRARY environment variable is correctly set. In case if your libcurl package requires "libnss*.so" library, the value should be "nss". In case it requires "libssl*.so" library, the value should be "openssl":
+
+.. code-block:: bash
+
+    rpm -qR libcurl
+    env | grep PYCURL_SSL_LIBRARY
+
+Note that this environment variable is added to the virtualenv activate script in step 5. of this guide. To reinstall pycurl use these commands:
+
+.. code-block:: bash
+
+    pip uninstall pycurl; pip install --no-cache-dir pycurl
+
+To verify that your pycurl works, use this command:
+
+.. code-block:: bash
+
+    python -c "import pycurl"
