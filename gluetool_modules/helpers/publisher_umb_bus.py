@@ -1,4 +1,7 @@
+import collections
 import copy
+import itertools
+import time
 
 import gluetool
 from gluetool.utils import normalize_path
@@ -12,19 +15,25 @@ DEFAULT_GLOBAL_TIMEOUT = 120
 DEFAULT_CONNECT_TIMEOUT = 30
 DEFAULT_SENDABLE_TIMEOUT = 30
 
+DEFAULT_ON_AUTH_ERROR_RETRIES = 3
+DEFAULT_ON_AUTH_ERROR_DELAY = 0.5
+
+
+UMBErrorDescription = collections.namedtuple('UMBErrorDescription', ('name', 'description'))
+
 
 class ContainerAdapter(gluetool.log.ContextAdapter):
     def __init__(self, logger, handler):
-        super(ContainerAdapter, self).__init__(logger, {'ctx_container_url': (100, handler.url)})
+        super(ContainerAdapter, self).__init__(logger, {'ctx_container_url': (100, handler.topic)})
 
 
 class TestHandler(proton.handlers.MessagingHandler):
-    def __init__(self, module, url, messages, topic, *args, **kwargs):
+    def __init__(self, module, urls, messages, topic, *args, **kwargs):
         super(TestHandler, self).__init__(*args, **kwargs)
 
         self._module = module
 
-        self.url = url
+        self.urls = urls
         self.messages = messages
         self.topic = topic
         self.pending = {}
@@ -34,6 +43,8 @@ class TestHandler(proton.handlers.MessagingHandler):
 
         self._step_timeout = None
         self._global_timeout = None
+
+        self.error = None
 
     def _set_timeout(self, container, name, delay, label):
         attr = '_{}_timeout'.format(name)
@@ -72,6 +83,8 @@ class TestHandler(proton.handlers.MessagingHandler):
     def on_start(self, event):
         self.debug('on_start: {}'.format(event))
 
+        self.error = None
+
         event.container.connected = False
         ssl = proton.SSLDomain(proton.SSLDomain.MODE_CLIENT)
 
@@ -82,7 +95,7 @@ class TestHandler(proton.handlers.MessagingHandler):
         ssl.set_credentials(certificate, certificate, None)
         ssl.set_trusted_ca_db(broker_ca)
         ssl.set_peer_authentication(proton.SSLDomain.VERIFY_PEER)
-        conn = event.container.connect(url=self.url, reconnect=False, ssl_domain=ssl)
+        conn = event.container.connect(urls=self.urls, ssl_domain=ssl)
 
         event.container.create_sender(conn, target=self.topic)
 
@@ -172,6 +185,11 @@ class TestHandler(proton.handlers.MessagingHandler):
     def on_link_error(self, event):
         self.debug('on_link_error: {}'.format(event))
 
+        self.error = UMBErrorDescription(
+            name=event.link.remote_condition.name,
+            description=event.link.remote_condition.description
+        )
+
         self.warn('link error: {}'.format(event.link.remote_condition.name))
         self.warn(event.link.remote_condition.description)
 
@@ -219,6 +237,24 @@ class UMBPublisher((gluetool.Module)):
                 'help': 'Wait at max N second before giving up on the whole publishing action (default: {}).'.format(DEFAULT_GLOBAL_TIMEOUT),  # Ignore PEP8Bear
                 'type': int,
                 'default': DEFAULT_GLOBAL_TIMEOUT
+            },
+            'on-auth-error-retries': {
+                'help': """
+                        When broker responds with an auth error, try to connect and repeat procedure
+                        for the same message N times (default: %(default)s).
+                        """,
+                'type': int,
+                'metavar': 'N',
+                'default': DEFAULT_ON_AUTH_ERROR_RETRIES
+            },
+            'on-auth-error-delay': {
+                'help': """
+                        Delay between each retry of ``--on-auth-error-retries`` should be N seconds
+                        (default: %(default)s).
+                        """,
+                'type': float,
+                'metavar': 'N',
+                'default': DEFAULT_ON_AUTH_ERROR_DELAY
             }
         })
     ]
@@ -264,24 +300,38 @@ class UMBPublisher((gluetool.Module)):
         if not self.isolatedrun_allows('Connecting to message bus'):
             isolated_run = True
 
-        self.info('Publishing {} messages on the UMB'.format(messages_count))
+        handler = TestHandler(self, self._environment['urls'], messages, topic)
+        container = proton.reactor.Container(handler)
 
-        for i, url in enumerate(self._environment['urls'], 1):
-            self.debug("Creating a container for broker #{}: '{}'".format(i, url))
+        if not isolated_run:
+            for i in itertools.count(start=1):
+                self.info('Publishing {} messages on the UMB, attempt #{}'.format(messages_count, i))
 
-            container = proton.reactor.Container(TestHandler(self, url, messages, topic))
+                container.run()
 
-            if isolated_run:
-                continue
+                # Everything went fine (probably) because handler signals no error
+                if handler.error is None:
+                    break
 
-            container.run()
+                # Handle specific errors
+                if handler.error.name == 'amqp:unauthorized-access':
+                    self.warn('Broker responded with unauthorized-access error.')
 
-            if not messages:
-                self.info('{} messages successfully sent'.format(messages_count))
+                    if i == self.option('on-auth-error-retries') + 1:
+                        self.warn('Ran out of allowed retry attempts on unauthorized-access, giving up on message bus')
+                        break
+
+                    time.sleep(self.option('on-auth-error-delay'))
+                    continue
+
+                # Here comes future handling of other errors, should we need it.
+                # ...
+
+                # When we get here, there was an error and it was not handled. Give up.
                 break
 
-            self.warn('Failed to sent out all messages via broker #{}: {} remaining. Will try another broker.'.format(
-                i, len(messages)))
+        if not messages:
+            self.info('{} messages successfully sent'.format(messages_count))
 
         if messages and not isolated_run:
             raise gluetool.GlueError('Could not send all the messages, {} remained.'.format(len(messages)))
