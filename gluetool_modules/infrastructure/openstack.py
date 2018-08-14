@@ -27,6 +27,7 @@ DEFAULT_RESERVE_DIR = '~/openstack-reservations'
 DEFAULT_REMOTE_RESERVE_FILE = '~/.openstack-reservation'
 DEFAULT_RESERVE_TIME = 24
 
+DEFAULT_ACQUIRE_TIMEOUT = 240
 DEFAULT_ACTIVATION_TIMEOUT = 240
 ACTIVATION_TICK = 5
 DEFAULT_ECHO_TIMEOUT = 240
@@ -198,7 +199,7 @@ class OpenstackGuest(NetworkedGuest):
     #
 
     @staticmethod
-    def _acquire_os_resource(resource, logger, tick, func, *args, **kwargs):
+    def _acquire_os_resource(resource, logger, timeout, tick, func, *args, **kwargs):
         """
         Acquire a resource from OpenStack. If there are quotas in play, this method will handle
         "quota exceeded" responses, and will wait till the resource becomes available.
@@ -246,6 +247,7 @@ class OpenstackGuest(NetworkedGuest):
         return gluetool.utils.wait('acquire {} from OpenStack'.format(resource),
                                    _ask,
                                    logger=logger,
+                                   timeout=timeout,
                                    tick=tick)
 
     def _acquire_name(self):
@@ -268,7 +270,8 @@ class OpenstackGuest(NetworkedGuest):
         Acquire floating IP.
         """
 
-        self._os_floating_ip = OpenstackGuest._acquire_os_resource('floating IP', self._module.logger, 30,
+        self._os_floating_ip = OpenstackGuest._acquire_os_resource('floating IP', self._module.logger,
+                                                                   self._module.option('acquire-timeout'), 30,
                                                                    self._nova.floating_ips.create,
                                                                    self._os_details['ip_pool_name'])
 
@@ -293,7 +296,8 @@ class OpenstackGuest(NetworkedGuest):
 
         image = image or self._os_details['image']
 
-        self._os_instance = OpenstackGuest._acquire_os_resource('instance', self._module.logger, 30,
+        self._os_instance = OpenstackGuest._acquire_os_resource('instance', self._module.logger,
+                                                                self._module.option('acquire-timeout'), 30,
                                                                 self._nova.servers.create,
                                                                 name=self._os_name,
                                                                 flavor=self._os_details['flavor'],
@@ -488,7 +492,8 @@ class OpenstackGuest(NetworkedGuest):
 
             return isinstance(self._os_instance.add_floating_ip(self.floating_ip), novaclient.base.TupleWithMeta)
 
-        OpenstackGuest._acquire_os_resource('IP assignment', self._module.logger, 1,
+        OpenstackGuest._acquire_os_resource('IP assignment', self._module.logger,
+                                            self._module.option('acquire-timeout'), 1,
                                             _assign)
 
     def __init__(self, module, details=None, instance_id=None, **kwargs):
@@ -909,6 +914,12 @@ class CIOpenstack(gluetool.Module):
             }
         }),
         ('Timeouts', {
+            'acquire-timeout': {
+                'help': 'Wait SECONDS for a guest to become acquire over network (default: %(default)s).',
+                'type': int,
+                'default': DEFAULT_ACQUIRE_TIMEOUT,
+                'metavar': 'SECONDS'
+            },
             'activation-timeout': {
                 # pylint: disable=line-too-long
                 'help': 'Wait SECOND for a guest to become reachable over network (default: {})'.format(DEFAULT_ACTIVATION_TIMEOUT),
