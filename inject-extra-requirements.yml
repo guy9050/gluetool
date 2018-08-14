@@ -124,6 +124,17 @@
     #
     # Modify `activate` script to set additional variables
     #
+    - name: "Detect libcurl dependecies library"
+      command: rpm -qR libcurl
+      args:
+        warn: false
+      register: libcurl_deps
+
+    - name: "Set pycurl_ssl_library to openssl if libcurl compiled against libssl.so"
+      set_fact:
+        pycurl_ssl_library: "openssl"
+      when: libcurl_deps.stdout.find("libssl.so")
+
     - name: "Force PycURL to use chosen library: '{{ pycurl_ssl_library }}'"
       lineinfile:
         dest: "{{ virtualenv_path }}/bin/activate"
