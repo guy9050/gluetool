@@ -3,7 +3,7 @@ import shlex
 
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
-from gluetool.log import log_dict, log_xml
+from gluetool.log import log_dict, log_xml, format_xml
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 
@@ -148,7 +148,7 @@ class RestraintScheduler(gluetool.Module):
 
         log_xml(self.debug, 'full job description', job_desc)
 
-        self._schedule = []
+        schedule = []
 
         recipe_sets = job_desc.find_all('recipeSet')
 
@@ -194,6 +194,8 @@ class RestraintScheduler(gluetool.Module):
 
             log_xml(self.debug, 'final recipe set #{}'.format(i), recipe_set)
 
+            schedule.append((guest, recipe_set))
+
             # setup guest
             thread_name = 'setup-guest-{}'.format(guest.name)
             thread = utils.WorkerThread(guest.logger,
@@ -238,9 +240,12 @@ class RestraintScheduler(gluetool.Module):
             # Ok, no custom exception, maybe just some Python ones - kill the pipeline.
             raise GlueError('At least one guest setup failed')
 
-        log_dict(self.debug, 'Final schedule', self._schedule)
+        self.debug('Schedule:')
 
-        return self._schedule
+        for guest, recipe_set in schedule:
+            gluetool.log.log_blob(self.debug, str(guest), format_xml(recipe_set))
+
+        return schedule
 
     def execute(self):
         self.require_shared('primary_task', 'restraint')
@@ -285,11 +290,9 @@ class RestraintScheduler(gluetool.Module):
         # workflow-tomorrow
         jobs = self._run_wow()
 
-        if len(jobs) > 1:
-            raise GlueError('Multiple planned wow jobs are not supported')
+        self._schedule = []
 
-        job = jobs[0]
+        for i, job in enumerate(jobs):
+            log_xml(self.debug, 'job #{} as planned by wow'.format(i), job)
 
-        self.debug('job as planned by wow:\n{}'.format(job.prettify(encoding='utf-8')))
-
-        self.create_schedule(job)
+            self._schedule += self.create_schedule(job)
