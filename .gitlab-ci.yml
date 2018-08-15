@@ -2,7 +2,6 @@
 
 stages:
   - test
-  - build-python
   - build-rpm
   - build-docker
   - deploy-staging
@@ -13,10 +12,6 @@ variables:
   SSH_OPTIONS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i http-space.key"
   DOCS_SPACE: "mprchlik@liver3.lab.eng.brq.redhat.com:/home/mprchlik/webspace/testing/docs/gluetool-modules"
   COVERAGE_SPACE: "mprchlik@liver3.lab.eng.brq.redhat.com:/home/mprchlik/webspace/testing/coverage/gluetool-modules"
-  PUBLISH_JOB: "20"  # [BaseOS CI] Publish Python package
-  RPM_JOB: "24"  # [BaseOS CI] Build RPM packages
-  DOCKER_JOB: "31"  # [BaseOS CI] Build Docker images
-  DEPLOY_JOB: "10"  # [BaseOS CI] [staging] [deploy] Tooling
 
   # This one keeps popping up again and again and again... It works locally while tox is not
   # psssing this variable to its command... That should not work at all :/
@@ -103,56 +98,45 @@ generate-docs:
 # BUILD steps
 #
 
-# Upload package to devpi
-build-python-package:
-  stage: build-python
-  only:
-    - there-is-no-such-branch
-    #    - master@baseos-qe/gluetool-modules
-  script:
-    - tower-cli job launch -J "$PUBLISH_JOB" --monitor --extra-vars "DEVPI_INDEX=$DEVPI_INDEX"
-                                                       --extra-vars "DEVPI_USERNAME=$DEVPI_USERNAME"
-                                                       --extra-vars "DEVPI_PASSWORD=$DEVPI_PASSWORD"
-                                                       --extra-vars "DEVPI_URL=$DEVPI_URL"
-                                                       --extra-vars "GIT_REPO=https://gitlab.cee.redhat.com/baseos-qe/gluetool-modules.git"
-                                                       --extra-vars "GIT_VERSION=master" | tee tower_output.log
-    # workaround for tower-cli / AWX bug for not returning correct return code from workflow jobs
-    - grep 'failed' tower_output.log && { echo 'tower-cli seems to have failed!'; exit 1; } || exit 0
-
 # Trigger RPM build
 build-rpm-packages:
   stage: build-rpm
   only:
-    - there-is-no-such-branch
-      #- master@baseos-qe/gluetool-modules
+    - master@baseos-qe/gluetool-modules
   script:
-    - tower-cli workflow_job launch -W "$RPM_JOB" --monitor --extra-vars "COPR_LOGIN=$COPR_LOGIN"
-                                                            --extra-vars "COPR_USERNAME=$COPR_USERNAME"
-                                                            --extra-vars "COPR_TOKEN=$COPR_TOKEN"
-                                                            --extra-vars "COPR_URL=$COPR_URL" | tee tower_output.log
-    - grep 'failed' tower_output.log && { echo 'tower-cli seems to have failed!'; exit 1; } || exit 0
+    - tower-cli job launch --monitor -J "[BaseOS CI] [build] [rpm] citool-modules-full"
+
+build-rpm-packages-devel:
+  stage: build-rpm
+  only:
+    - devel@baseos-qe/gluetool-modules
+  script:
+    - tower-cli job launch --monitor -J "[BaseOS CI] [build] [rpm] citool-modules-full-devel"
 
 # Trigger Docker build
 build-docker-images:
   stage: build-docker
   only:
-    - there-is-no-such-branch
-      #- master@baseos-qe/gluetool-modules
+    - master@baseos-qe/gluetool-modules
   script:
-    - tower-cli workflow_job launch -W "$DOCKER_JOB" --monitor --extra-vars "DOCKER_REGISTRY_HOST=$DOCKER_REGISTRY_HOST"
-                                                               --extra-vars "DOCKER_REGISTRY_PROJECT=$DOCKER_REGISTRY_PROJECT"
-                                                               --extra-vars "DOCKER_REGISTRY_TOKEN=$DOCKER_REGISTRY_TOKEN" | tee tower_output.log
-    - grep 'failed' tower_output.log && { echo 'tower-cli seems to have failed!'; exit 1; } || exit 0
+    - tower-cli workflow_job launch --monitor -W "[BaseOS CI] [build] [docker] Production chain" | tee tower_output.log
+    - grep 'failed' tower_output.log && { echo 'At least one of subtasks failed!'; exit 1; } || exit 0
+
+build-docker-images-devel:
+  stage: build-docker
+  only:
+    - devel@baseos-qe/gluetool-modules
+  script:
+    - tower-cli workflow_job launch --monitor -W "[BaseOS CI] [build] [docker] Devel chain" | tee tower_output.log
+    - grep 'failed' tower_output.log && { echo 'At least one of subtasks failed!'; exit 1; } || exit 0
 
 # Trigger staging deployment
 deploy-to-staging:
   stage: deploy-staging
   only:
-    - there-is-no-such-branch
-      #- master@baseos-qe/gluetool-modules
+    - devel@baseos-qe/gluetool-modules
   script:
-    - tower-cli job launch -J "$DEPLOY_JOB" --monitor | tee tower_output.log
-    - grep 'failed' tower_output.log && { echo 'tower-cli seems to have failed!'; exit 1; } || exit 0
+    - tower-cli job launch --monitor -J "[BaseOS CI] [deploy] [stage] Image"
 
 
 #
