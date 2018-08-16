@@ -68,16 +68,20 @@ class TestHandler(proton.handlers.MessagingHandler):
         task.cancel()
         setattr(self, attr, None)
 
-    def _stop(self, event):
-        self.debug('  stopping container: {}'.format(event))
+    def _stop(self, event, stop_container=True, stop_connection=True):
+        self.debug('  stop because of: {}'.format(event))
 
         self._cancel_timeout('step')
         self._cancel_timeout('global')
 
-        if event.container:
+        if event.container and stop_container:
+            self.debug('  stopping container!')
+
             event.container.stop()
 
-        if event.connection:
+        if event.connection and stop_connection:
+            self.debug('  stopping connection!')
+
             event.connection.close()
 
     def on_start(self, event):
@@ -182,23 +186,39 @@ class TestHandler(proton.handlers.MessagingHandler):
 
         self.update_pending(event)
 
+    def _handle_connection_error(self, event_name, message, event, **kwargs):
+        self.debug('{}: {}'.format(event_name, event))
+
+        self.warn('network error: {}'.format(message))
+
+        if event.link:
+            self.error = UMBErrorDescription(
+                name=event.link.remote_condition.name,
+                description=event.link.remote_condition.description
+            )
+
+        if self.error:
+            self.warn('{}: {}'.format(self.error.name, self.error.description))
+
+        self._stop(event, **kwargs)
+
+    def on_connection_error(self, event):
+        self._handle_connection_error('on_connection_error', 'connection error', event)
+
     def on_link_error(self, event):
-        self.debug('on_link_error: {}'.format(event))
+        self._handle_connection_error('on_link_error', 'link error', event)
 
-        self.error = UMBErrorDescription(
-            name=event.link.remote_condition.name,
-            description=event.link.remote_condition.description
-        )
+    def on_session_error(self, event):
+        self._handle_connection_error('on_session_error', 'session error', event)
 
-        self.warn('link error: {}'.format(event.link.remote_condition.name))
-        self.warn(event.link.remote_condition.description)
-
-        self._stop(event)
+    def on_transport_error(self, event):
+        self._handle_connection_error('on_transport_error', 'transport error', event,
+                                      stop_container=False,
+                                      stop_connection=(event.transport.condition.name in self.fatal_conditions))
 
     def on_transport_tail_closed(self, event):
-        self.debug('on_transport_tail_closed: {}'.format(event))
-
-        self._stop(event)
+        self._handle_connection_error('on_transport_tail_closed', 'transport error', event,
+                                      stop_container=False, stop_connection=False)
 
 
 class UMBPublisher((gluetool.Module)):
