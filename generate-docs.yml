@@ -13,6 +13,7 @@
       - source/index.rst
       - source/protocols/protocols.rst
       - source/protocols/provisioner-capabilities.rst
+      - source/protocols/testing-environment.rst
       - source/DEVELOPMENT.rst
     base_files:
       - source/conf.py

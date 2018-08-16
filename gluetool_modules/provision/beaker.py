@@ -198,7 +198,7 @@ class BeakerProvisioner(gluetool.Module):
             ]
         )
 
-    def provision(self, **kwargs):
+    def provision(self, environment, **kwargs):
         # pylint: disable=unused-argument
 
         ssh_options = normalize_multistring_option(self.option('ssh-options'))

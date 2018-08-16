@@ -1,9 +1,19 @@
+import collections
 import shlex
 
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
-from gluetool.log import log_dict
+from gluetool.log import log_dict, log_xml
 from libci.sentry import PrimaryTaskFingerprintsMixin
+
+
+#: Testing environment description.
+#:
+#: Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
+TestingEnvironment = collections.namedtuple('TestingEnvironment', [
+    'distro',
+    'arch'
+])
 
 
 class NoTestableArtifactsError(PrimaryTaskFingerprintsMixin, SoftGlueError):
@@ -127,13 +137,16 @@ class RestraintScheduler(gluetool.Module):
 
         return self.shared('beaker_job_xml', options=options)
 
-    def create_schedule(self, job_desc, image):
+    def create_schedule(self, job_desc):
         """
-        Main workhorse - given the job XML, get some guests, and create pairs
-        (guest, tasks) for runner to process.
+        Main workhorse - given the job XML, get necessary guests and assign recipe sets to these guests.
+
+        :param xml job_desc: Job XML description.
         """
 
-        gluetool.log.log_blob(self.debug, 'full job description', job_desc.prettify(encoding='utf-8'))
+        self.require_shared('provision')
+
+        log_xml(self.debug, 'full job description', job_desc)
 
         self._schedule = []
 
@@ -141,16 +154,26 @@ class RestraintScheduler(gluetool.Module):
 
         self.info('job contains {} recipe sets, asking for guests'.format(len(recipe_sets)))
 
-        # get corresponding number of guests
-        guests = self.shared('provision', count=len(recipe_sets), image=image)
+        for i, recipe_set in enumerate(recipe_sets):
+            # From each recipe, extract distro and architecture, and construct testing environment description.
+            # That will be passed to the provisioning modules. This module does not have to know it.
 
-        if guests is None:
-            raise GlueError('No guests found. Did you run a guests provider module, e.g. openstack?')
+            testing_env = TestingEnvironment(
+                distro=recipe_set.find('distroRequires').find('distro_name')['value'],
+                arch=recipe_set.find('distroRequires').find('distro_arch')['value']
+            )
 
-        log_dict(self.debug, 'guests', guests)
-        log_dict(self.debug, 'recipe_sets', recipe_sets)
+            log_xml(self.debug, 'recipe set #{}'.format(i), recipe_set)
+            log_dict(self.debug, 'testing environment #{}'.format(i), testing_env)
 
-        assert len(guests) == len(recipe_sets)
+            guests = self.shared('provision', testing_env, count=1)
+
+            if not guests:
+                raise GlueError('No guests provisioned.')
+
+            self._schedule.append((guests[0], recipe_set))
+
+        log_dict(self.debug, 'schedule', self._schedule)
 
         # there are tags that make not much sense for restraint - we'll filter them out
         def _remove_tags(recipe_set, name):
@@ -161,17 +184,15 @@ class RestraintScheduler(gluetool.Module):
 
         setup_threads = []
 
-        for guest, recipe_set in zip(guests, recipe_sets):
-            self.debug('guest: {}'.format(str(guest)))
-            self.debug('recipe set:\n{}'.format(recipe_set.prettify(encoding='utf-8')))
+        for i, (guest, recipe_set) in enumerate(self._schedule):
+            self.debug('guest #{}: {}'.format(i, guest))
+            log_xml(self.debug, 'recipe set #{}'.format(i), recipe_set)
 
             # remove tags we want to filter out
             for tag in ('distroRequires', 'hostRequires', 'repos', 'partitions'):
                 _remove_tags(recipe_set, tag)
 
-            self.debug('final recipe set:\n{}'.format(recipe_set.prettify(encoding='utf-8')))
-
-            self._schedule.append((guest, recipe_set))
+            log_xml(self.debug, 'final recipe set #{}'.format(i), recipe_set)
 
             # setup guest
             thread_name = 'setup-guest-{}'.format(guest.name)
@@ -217,16 +238,12 @@ class RestraintScheduler(gluetool.Module):
             # Ok, no custom exception, maybe just some Python ones - kill the pipeline.
             raise GlueError('At least one guest setup failed')
 
-        self.debug('Schedule:')
-        for guest, recipe_set in self._schedule:
-            gluetool.log.log_blob(self.debug, str(guest), recipe_set.prettify(encoding='utf-8'))
+        log_dict(self.debug, 'Final schedule', self._schedule)
+
+        return self._schedule
 
     def execute(self):
-        self.require_shared('primary_task', 'restraint', 'image')
-
-        image = self.shared('image')
-        if image is None:
-            raise GlueError('No image found.')
+        self.require_shared('primary_task', 'restraint')
 
         def _command_options(name):
             opts = self.option(name)
@@ -275,4 +292,4 @@ class RestraintScheduler(gluetool.Module):
 
         self.debug('job as planned by wow:\n{}'.format(job.prettify(encoding='utf-8')))
 
-        self.create_schedule(job, image)
+        self.create_schedule(job)
