@@ -3,6 +3,9 @@ from gluetool.utils import cached_property, dict_update
 import libci.dispatch_job
 
 
+DEFAULT_WOW_OPTIONS_SEPARATOR = '#-#-#-#-#'
+
+
 class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     """
     Jenkins job module dispatching Beaker-based testing pipeline, as defined in ``ci-beaker.yaml`` file.
@@ -34,7 +37,9 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             'help': 'Additional options for ``guess-distro`` module.'
         },
         'wow-options': {
-            'help': 'Additional options for ``workflow-tomorrow``.'
+            'help': 'Additional options for ``workflow-tomorrow``.',
+            'action': 'append',
+            'default': []
         },
         'jobwatch-options': {
             'help': 'Additional options for ``beaker-jobwatch``.'
@@ -47,7 +52,17 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             'help': 'Additional options for ``brew-build-task-params`` module.',
             'default': ''
         },
-
+        'wow-options-separator': {
+            'help': """
+                    Due to technical limitations of Jenkins, when jobs want to pass multiple ``--wow-options``
+                    instances to this module, it is necessary to encode them into a single string. To tell them
+                    apart, this SEPARATOR string is used (default: %(default)s).
+                    """,
+            'metavar': 'SEPARATOR',
+            'type': str,
+            'action': 'store',
+            'default': DEFAULT_WOW_OPTIONS_SEPARATOR
+        },
 
         # following options passed to brew-build-task-params module
         'install-rpms-blacklist': {
@@ -79,11 +94,13 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             brew_build_task_params_options = '{} --install-method={}'.format(brew_build_task_params_options,
                                                                              install_method)
 
+        wow_options = self.option('wow-options-separator').join(self.option('wow-options'))
+
         return dict_update(super(BeakerJob, self).build_params, {
             'build_dependencies_options': self.option('build-dependencies-options'),
             'guess_product_options': self.option('guess-product-options'),
             'guess_distro_options': self.option('guess-distro-options'),
-            'wow_options': self.option('wow-options'),
+            'wow_options': wow_options,
             'jobwatch_options': self.option('jobwatch-options'),
             'beaker_options': self.option('beaker-options'),
             'brew_build_task_params_options': brew_build_task_params_options

@@ -20,7 +20,10 @@ def create_openstack_build_params(mod, **kwargs):
         'guess_product_options': 'some guess-product options',
         'guess_beaker_distro_options': 'some guess-distro options',
         'guess_openstack_image_options': 'some guess-openstack-image options',
-        'wow_options': 'some w-t options',
+        'wow_options': [
+            'some w-t options',
+            'other w-t options'
+        ],
         'openstack_options': 'some openstack options',
         'restraint_runner_options': 'some restraint-runner options',
         'brew_build_task_params_options': 'some brew-build options'
@@ -34,6 +37,9 @@ def create_openstack_build_params(mod, **kwargs):
     if mod._config.get('install-rpms-blacklist', None):
         params['brew_build_task_params_options'] = '{} --install-rpms-blacklist={}'.format(
             params['brew_build_task_params_options'], mod._config['install-rpms-blacklist'])
+
+    params['wow_options'] = gluetool_modules.testing.openstack.openstack_job.DEFAULT_WOW_OPTIONS_SEPARATOR.join(
+        params['wow_options'])
 
     return params
 
@@ -61,7 +67,11 @@ def test_build_params(module_with_primary_task, rpm_blacklist):
     mod = module_with_primary_task
 
     # pylint: disable=protected-access
-    mod._config['install-rpms-blacklist'] = rpm_blacklist
+    mod._config.update({
+        'install-rpms-blacklist': rpm_blacklist,
+        'wow-options-separator': gluetool_modules.testing.beaker.beaker_job.DEFAULT_WOW_OPTIONS_SEPARATOR
+    })
+
     expected_params = create_openstack_build_params(mod)
 
     assert mod.build_params == expected_params

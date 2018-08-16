@@ -3,6 +3,9 @@ from gluetool.utils import cached_property, dict_update
 import libci.dispatch_job
 
 
+DEFAULT_WOW_OPTIONS_SEPARATOR = '#-#-#-#-#'
+
+
 class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     """
     Jenkins job module dispatching OpenStack-based testing pipeline, as defined in ``ci-openstack.yaml`` file.
@@ -37,7 +40,9 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             'help': 'Additional options for guess-openstack-image module.'
         },
         'wow-options': {
-            'help': 'Additional options for workflow-tomorrow.'
+            'help': 'Additional options for workflow-tomorrow.',
+            'action': 'append',
+            'default': []
         },
         'openstack-options': {
             'help': 'Additional options for openstack module.',
@@ -48,6 +53,17 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         },
         'restraint-runner-options': {
             'help': 'Additional options for restraint-runner module.'
+        },
+        'wow-options-separator': {
+            'help': """
+                    Due to technical limitations of Jenkins, when jobs want to pass multiple ``--wow-options``
+                    instances to this module, it is necessary to encode them into a single string. To tell them
+                    apart, this SEPARATOR string is used (default: %(default)s).
+                    """,
+            'metavar': 'SEPARATOR',
+            'type': str,
+            'action': 'store',
+            'default': DEFAULT_WOW_OPTIONS_SEPARATOR
         },
 
         # following options are passed to brew-build-task-params module
@@ -80,12 +96,14 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             brew_build_task_params_options = '{} --install-method={}'.format(brew_build_task_params_options,
                                                                              install_method)
 
+        wow_options = self.option('wow-options-separator').join(self.option('wow-options'))
+
         return dict_update(super(OpenStackJob, self).build_params, {
             'build_dependencies_options': self.option('build-dependencies-options'),
             'guess_product_options': self.option('guess-product-options'),
             'guess_beaker_distro_options': self.option('guess-beaker-distro-options'),
             'guess_openstack_image_options': self.option('guess-openstack-image-options'),
-            'wow_options': self.option('wow-options'),
+            'wow_options': wow_options,
             'openstack_options': self.option('openstack-options'),
             'brew_build_task_params_options': brew_build_task_params_options,
             'restraint_runner_options': self.option('restraint-runner-options')
