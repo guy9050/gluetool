@@ -424,9 +424,9 @@ class PipelineStateReporter(gluetool.Module):
         results = self.shared('results')
 
         if all([result.overall_result.lower() in ('pass', 'passed') for result in results]):
-            return 'pass'
+            return 'passed'
 
-        return 'fail'
+        return 'failed'
 
     def _get_final_state(self, failure):
         """
