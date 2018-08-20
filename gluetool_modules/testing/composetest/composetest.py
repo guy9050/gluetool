@@ -43,6 +43,11 @@ class ComposeTest(gluetool.Module):
             'help': 'SQLAlchemy compatbile DB URL',
             'default': 'sqlite:////tmp/composeci.db',
         },
+        'no-trigger-event': {
+            'help': 'Use when this run is not triggered by a specific event',
+            'action': 'store_true',
+            'default': False,
+        },
     }
 
     def _publish_results(self, cmd_res):
@@ -50,30 +55,32 @@ class ComposeTest(gluetool.Module):
         libci.results.publish_result(self, ComposeTestResult, overall_result)
 
     def execute(self):
-        self.require_shared('trigger_message')
-        msg = self.shared('trigger_message')
-        # We listen to:
-        # * /topic/VirtualTopic.eng.brew.build.> (package builds)
-        # * /topic/VirtualTopic.eng.brew.package.> (tag actions, e.g. blocking pkg from tag)
-        # so trigger will either be build or package
-        trigger = msg['topic'].split('.')[-2].lower()
-        tag_configuration = ''
-        package = ''
+        package = None
+        tag_configuration = 'rhel-8.0'  # we'll need to change this when we support more tag configs
 
-        if trigger == 'build':
-            self.require_shared('primary_task')
-            package = self.shared('primary_task').nvr
-            tag_configuration = 'rhel-8.0'  # we'll need to change this when we support more tag configs
-        elif trigger == 'package':
-            package = msg['headers']['package']
-            tag_configuration = msg['headers']['tag']
-        else:
-            raise gluetool.GlueError(
-                'Unknown trigger {} from topic {}'.format(trigger, msg['topic'])
-            )
+        if self.option('no-trigger-event') is False:
+            self.require_shared('trigger_message')
+            msg = self.shared('trigger_message')
+            # We listen to:
+            # * /topic/VirtualTopic.eng.brew.build.> (package builds)
+            # * /topic/VirtualTopic.eng.brew.package.> (tag actions, e.g. blocking pkg from tag)
+            # so trigger will either be build or package
+            trigger = msg['topic'].split('.')[-2].lower()
 
-        cmd = ['composeci', '--db-url', self.option('db-url'), 'test-buildinstall',
-               '--package', package]
+            if trigger == 'build':
+                self.require_shared('primary_task')
+                package = self.shared('primary_task').nvr
+            elif trigger == 'package':
+                package = msg['headers']['package']
+                tag_configuration = msg['headers']['tag']
+            else:
+                raise gluetool.GlueError(
+                    'Unknown trigger {} from topic {}'.format(trigger, msg['topic'])
+                )
+
+        cmd = ['composeci', '--db-url', self.option('db-url'), 'test-buildinstall']
+        if package is not None:
+            cmd.extend(['--package', package])
         for opt in self.options:
             value = self.option(opt)
             if opt == 'tag-configuration':
@@ -82,7 +89,7 @@ class ComposeTest(gluetool.Module):
                     raise gluetool.GlueError(
                         'Only allowed to run composeci for tag configuration "rhel-8.0"'
                     )
-            elif opt == 'db-url':
+            elif opt in ['db-url', 'no-trigger-event']:
                 continue  # skip db-url here
             cmd.extend(['--{opt}'.format(opt=opt), value])
 
