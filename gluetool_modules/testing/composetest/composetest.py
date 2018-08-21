@@ -1,3 +1,5 @@
+import os
+
 import gluetool
 import libci.results
 
@@ -14,10 +16,14 @@ COMPOSECI_EXIT_CODES = {
 class ComposeTestResult(libci.results.TestResult):
     """ ComposeTest test result data container """
 
-    def __init__(self, glue, overall_result, **kwargs):
+    # pylint: disable-msg=too-many-arguments
+    def __init__(self, glue, overall_result, tag_configuration, difflog, output_end, **kwargs):
         super(ComposeTestResult, self).__init__(
             glue, 'composetest', overall_result, **kwargs
         )
+        self.difflog = difflog
+        self.output_end = output_end
+        self.tag_configuration = tag_configuration
 
 
 class ComposeTest(gluetool.Module):
@@ -48,11 +54,29 @@ class ComposeTest(gluetool.Module):
             'action': 'store_true',
             'default': False,
         },
+        'diff-log-file': {
+            'help': 'File to log informative diffs for use in notification emails',
+            'default': 'composetest-difflog',
+        },
     }
 
-    def _publish_results(self, cmd_res):
+    def _get_difflog(self):
+        dlf = self.option('diff-log-file')
+        if os.path.exists(dlf):
+            with open(dlf) as f:
+                return f.read()
+        return 'Diffs logfile was not generated'
+
+    def _publish_results(self, cmd_res, tag_configuration, difflog, output_end):
         overall_result = COMPOSECI_EXIT_CODES.get(cmd_res.exit_code, {}).get('status', 'FAILED')
-        libci.results.publish_result(self, ComposeTestResult, overall_result)
+        libci.results.publish_result(
+            self,
+            ComposeTestResult,
+            overall_result=overall_result,
+            tag_configuration=tag_configuration,
+            difflog=difflog,
+            output_end=output_end,
+        )
 
     def execute(self):
         package = None
@@ -97,6 +121,7 @@ class ComposeTest(gluetool.Module):
             res = gluetool.utils.Command(cmd).run(inspect=True)
         except gluetool.GlueCommandError as exc:
             res = exc.output
+        stderr_end = '\n'.join(res.stderr.splitlines()[-30:])
 
         result = 'success'
         if res.exit_code != 0:
@@ -105,4 +130,9 @@ class ComposeTest(gluetool.Module):
                 desc=COMPOSECI_EXIT_CODES.get(res.exit_code, {}).get('msg', 'unknown exit code')
             )
         self.info('result: {}'.format(result))
-        self._publish_results(res)
+        self._publish_results(
+            res,
+            tag_configuration=tag_configuration,
+            difflog=self._get_difflog(),
+            output_end=stderr_end
+        )
