@@ -1,0 +1,4 @@
+---
+
+name: notify-email-composetest-formatter
+description: Notification module - e-mail formatting of ComposeTest results
