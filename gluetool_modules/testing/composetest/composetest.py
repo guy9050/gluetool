@@ -80,7 +80,7 @@ class ComposeTest(gluetool.Module):
 
     def execute(self):
         package = None
-        tag_configuration = 'rhel-8.0'  # we'll need to change this when we support more tag configs
+        tag_configuration = 'rhel-8.0.0'
 
         if self.option('no-trigger-event') is False:
             self.require_shared('trigger_message')
@@ -109,10 +109,6 @@ class ComposeTest(gluetool.Module):
             value = self.option(opt)
             if opt == 'tag-configuration':
                 value = value or tag_configuration
-                if value != 'rhel-8.0':
-                    raise gluetool.GlueError(
-                        'Only allowed to run composeci for tag configuration "rhel-8.0"'
-                    )
             elif opt in ['db-url', 'no-trigger-event']:
                 continue  # skip db-url here
             cmd.extend(['--{opt}'.format(opt=opt), value])
