@@ -143,7 +143,7 @@ class Copr(gluetool.Module):
         }
     }
 
-    required_options = ('copr-url',)
+    required_options = ('copr-url', 'task-id')
 
     shared_functions = ['primary_task', 'tasks']
 
@@ -190,17 +190,7 @@ class Copr(gluetool.Module):
         }
 
     def execute(self):
-        if self.option('task-id'):
-            self.info("Option 'task-id' is used to init copr module.")
-            build_id, chroot_name = [s.strip() for s in self.option('task-id').split(':')]
-
-        else:
-            self.require_shared('trigger_message')
-            self.info("Shared function 'trigger_message' is used to init copr module.")
-            message = self.shared('trigger_message')
-
-            build_id = message['build']
-            chroot_name = message['chroot']
+        build_id, chroot_name = [s.strip() for s in self.option('task-id').split(':')]
 
         self.debug('build_id: {}'.format(build_id))
         self.debug('chroot_name {}'.format(chroot_name))
