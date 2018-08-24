@@ -11,6 +11,9 @@ from libci.sentry import PrimaryTaskFingerprintsMixin
 import qe
 
 
+DEFAULT_WOW_OPTIONS_SEPARATOR = '#-#-#-#-#'
+
+
 class NoTestAvailableError(PrimaryTaskFingerprintsMixin, SoftGlueError):
     def __init__(self, task):
         super(NoTestAvailableError, self).__init__(task, 'No tests provided for the component')
@@ -120,11 +123,28 @@ class WorkflowTomorrow(gluetool.Module):
                 'metavar': 'FILE'
             },
             'wow-options': {
-                'help': 'Additional options for workflow-tomorrow'
+                'help': """
+                        Options for ``workflow-tomorrow`` (e.g. ``--plan``, ``--run``, filter and so on.)
+                        Can be used multiple times, each instance represents a distinct set of options,
+                        module will try to create job XML for each of such sets.
+                        """,
+                'action': 'append',
+                'default': []
             },
             'use-general-test-plan': {
                 'help': 'Use general test plan for available build identified from primary_task shared function.',
                 'action': 'store_true'
+            },
+            'wow-options-separator': {
+                'help': """
+                        Due to technical limitations of Jenkins, when jobs want to pass multiple ``--wow-options``
+                        instances to this module, it is necessary to encode them into a single string. To tell them
+                        apart, this SEPARATOR string is used (default: %(default)s).
+                        """,
+                'metavar': 'SEPARATOR',
+                'type': str,
+                'action': 'store',
+                'default': DEFAULT_WOW_OPTIONS_SEPARATOR
             }
         })
     ]
@@ -140,6 +160,37 @@ class WorkflowTomorrow(gluetool.Module):
 
         return gluetool.utils.load_yaml(self.option('wow-options-map'), logger=self.logger)
 
+    def sanity(self):
+        # --wow-options can be specified multiple times, and, thanks to how we're letting Jenkins
+        # pass it between different jobs, we even have to accept multiple wow options instances
+        # in a single --wow-options specification, separated by a known separator.
+        # The goal here is to get rid of these, splitting such encoded strings into the original
+        # wow options, and make them transparent to the rest of the code.
+        #
+        # Options given to the module:
+        #
+        # --wow-options '--plan=foo --foo' --wow-options '--plan=foo --bar #-#-#-#-# --plan=foo --baz'
+        #
+        # should become a list of string like the second --wow-option was specified extra for each of its
+        # constituents:
+        #
+        # self.option('wow-options') => [
+        #   '--plan=foo --foo',
+        #   '--plan=foo --bar'
+        #   '--plan=foo --baz'
+        # ]
+
+        fixed_wow_options = []
+
+        for instance in self.option('wow-options'):
+            for subinstance in instance.split(self.option('wow-options-separator')):
+                fixed_wow_options.append(subinstance.strip())
+
+        # There's no way to set option value (what's self.option would return) in this stage, gluetool does
+        # not support such action. Hence this may break if gluetool implementation changes. Let's make PR
+        # for gluetool to provide legal way (e.g. self.option('foo', new_value)?)
+        self._config['wow-options'] = fixed_wow_options
+
     # pylint: disable=too-many-arguments
     def beaker_job_xml(self, body_options=None, options=None, environment=None, task_params=None, extra_context=None):
         """
@@ -154,7 +205,7 @@ class WorkflowTomorrow(gluetool.Module):
 
         Final ``workflow-tomorrow`` options are constructed from several sources, primary ones being
         one of ``body_options`` parameter and ``wow-options`` option. These represent the main "body"
-        of tasks to test the artifact - or do perform any other task caller wanted to achieve - and
+        of tasks to test the artifact - or to perform any other task caller wanted to achieve - and
         are coupled with options specified by ``wow-options-map`` mapping and by ``options`` parameter.
 
         Caller can control what environmental variables are passed to his tasks with ``task_params`` parameter.
@@ -192,9 +243,57 @@ class WorkflowTomorrow(gluetool.Module):
         if not body_options and not self.option('wow-options') and not self.option('use-general-test-plan'):
             raise NoTestAvailableError(primary_task)
 
+        # Construct the actual "body" options:
+        #
+        # 1. `body_options` argument - ignore everything else, use just these - caller knows what
+        #    he's doing.
+        # 2. --wow-options - a list of string items, each item represents one set of options
+        #
+        # Actual "body" options are a list of lists:
+        #
+        # [
+        #     [ ... body_options ]
+        # ]
+        #
+        # or:
+        #
+        # [
+        #     ['--foo', '--bar'], # first --wow-option instance
+        #     ['--baz']           # second --wow-option instance
+        # ]
+
+        if body_options is not None:
+            # This is simple, body_options is already a list. Just wrap it by the outer list.
+            actual_body_options = [
+                body_options
+            ]
+
+        else:
+            # For each --wow-options instance, add one set of options to the list, and sprinkle
+            # with general test plan if needed.
+
+            actual_body_options = [
+                # --wow-options stashed strings, split it into list of options ("--foo --bar" => ["--foo", "--bar"])
+                shlex.split(wow_options) for wow_options in self.option('wow-options')
+            ]
+
+            if self.option('use-general-test-plan'):
+                component = primary_task.component
+
+                try:
+                    plan_id = qe.GeneralPlan(component).id
+
+                except qe.GeneralPlanError:
+                    raise NoGeneralTestPlanError(primary_task)
+
+                for wow_options in actual_body_options:
+                    wow_options.append('--plan={}'.format(plan_id))
+
+        log_dict(self.debug, 'actual body options', actual_body_options)
+
         extra_context = extra_context or {}
 
-        def _plan_job(distro):
+        def _plan_job(distro, wow_options):
             # pylint: disable=too-many-statements
 
             self.debug("constructing options distro '{}'".format(distro))
@@ -213,23 +312,8 @@ class WorkflowTomorrow(gluetool.Module):
             ], logger=self.logger)
 
             #
-            # add body options
-            if body_options is not None:
-                command.options += body_options
-
-            else:
-                if self.option('wow-options'):
-                    command.options += shlex.split(self.option('wow-options'))
-
-                # incorporate general test plan if requested
-                if self.option('use-general-test-plan'):
-                    component = primary_task.component
-
-                    try:
-                        command.options += ['--plan={}'.format(str(qe.GeneralPlan(component).id))]
-
-                    except qe.GeneralPlanError:
-                        raise NoGeneralTestPlanError(primary_task)
+            # add "body" workflow-options (prepared by caller)
+            command.options += wow_options
 
             #
             # add additional options
@@ -280,5 +364,11 @@ class WorkflowTomorrow(gluetool.Module):
 
                 raise GeneralWOWError(primary_task, exc.output)
 
-        # For each distro, construct one wow command/job
-        return [_plan_job(distro) for distro in self.shared('distro')]
+        # For each distro and "body" option set, construct one wow command (producing a job)
+        jobs = []
+
+        for distro in self.shared('distro'):
+            for wow_options in actual_body_options:
+                jobs.append(_plan_job(distro, wow_options))
+
+        return jobs
