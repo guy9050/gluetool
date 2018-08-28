@@ -64,10 +64,8 @@ def test_error(log, module, local_guest, monkeypatch):
 
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
-    with pytest.raises(gluetool.GlueError, message='Failure during Ansible playbook execution. See log for details.'):
+    with pytest.raises(gluetool.GlueError, match='Failure during Ansible playbook execution: dummy error message'):
         module.run_playbook('dummy playbook file', [local_guest])
-
-    assert log.match(message='Ansible says: dummy error message')
 
 
 def test_extra_vars(module, local_guest, monkeypatch):

@@ -2,6 +2,43 @@ import json
 
 import gluetool
 from gluetool.utils import Command
+from libci.sentry import PrimaryTaskFingerprintsMixin
+
+
+class PlaybookError(PrimaryTaskFingerprintsMixin, gluetool.GlueError):
+    def __init__(self, task, ansible_output, fatal_reports, fatal_messages):
+        super(PlaybookError, self).__init__(task, PlaybookError.exception_message(fatal_messages))
+
+        self.ansible_output = ansible_output
+        self.fatal_reports = fatal_reports
+        self.fatal_messages = fatal_messages
+
+    @staticmethod
+    def log_ansible_fatals(module, output):
+        fatal_reports = []
+
+        for line in output.stdout.split('\n'):
+            line = line.strip()
+
+            if not line.startswith('fatal: '):
+                continue
+
+            fatal_reports.append(json.loads(line[line.index('{'):]))
+
+        fatal_messages = [
+            report['msg'] for report in fatal_reports if 'msg' in report
+        ]
+
+        gluetool.log.log_dict(module.debug, 'fatal Ansible reports', fatal_reports)
+
+        return fatal_reports, fatal_messages
+
+    @staticmethod
+    def exception_message(fatal_messages):
+        if fatal_messages:
+            return 'Failure during Ansible playbook execution: {}'.format(fatal_messages[-1])
+
+        return 'Failure during Ansible playbook execution'
 
 
 class Ansible(gluetool.Module):
@@ -62,16 +99,10 @@ class Ansible(gluetool.Module):
             return Command(cmd, logger=self.logger).run()
 
         except gluetool.GlueCommandError as e:
-            self.error('Failure during ansible playbook execution')
+            fatal_reports, fatal_messages = PlaybookError.log_ansible_fatals(self, e.output)
 
-            for line in e.output.stdout.split('\n'):
-                line = line.strip()
+            primary_task = self.shared('primary_task')
+            if primary_task:
+                raise PlaybookError(primary_task, e.output, fatal_reports, fatal_messages)
 
-                if not line.startswith('fatal: '):
-                    continue
-
-                message = json.loads(line[line.index('{'):])
-                if 'msg' in message:
-                    self.error('Ansible says: {}'.format(message['msg']))
-
-            raise gluetool.GlueError('Failure during Ansible playbook execution. See log for details.')
+            raise gluetool.GlueError(PlaybookError.exception_message(fatal_messages))
