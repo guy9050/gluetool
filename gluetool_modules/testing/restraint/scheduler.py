@@ -137,11 +137,19 @@ class RestraintScheduler(gluetool.Module):
 
         return self.shared('beaker_job_xml', options=options)
 
-    def create_schedule(self, job_desc):
+    def _log_schedule(self, label, schedule):
+        self.debug('{}:'.format(label))
+
+        for guest, recipe_set in schedule:
+            gluetool.log.log_blob(self.debug, str(guest), format_xml(recipe_set))
+
+    def create_schedule(self, job_desc, partial_index):
         """
         Main workhorse - given the job XML, get necessary guests and assign recipe sets to these guests.
 
         :param xml job_desc: Job XML description.
+        :param int partial_index: ``create_schedule`` may be called multiple times, once for each
+            known job description. This number helps recognize them in the log.
         """
 
         self.require_shared('provision')
@@ -171,9 +179,9 @@ class RestraintScheduler(gluetool.Module):
             if not guests:
                 raise GlueError('No guests provisioned.')
 
-            self._schedule.append((guests[0], recipe_set))
+            schedule.append((guests[0], recipe_set))
 
-        log_dict(self.debug, 'schedule', self._schedule)
+        log_dict(self.debug, 'schedule', schedule)
 
         # there are tags that make not much sense for restraint - we'll filter them out
         def _remove_tags(recipe_set, name):
@@ -184,7 +192,7 @@ class RestraintScheduler(gluetool.Module):
 
         setup_threads = []
 
-        for i, (guest, recipe_set) in enumerate(self._schedule):
+        for i, (guest, recipe_set) in enumerate(schedule):
             self.debug('guest #{}: {}'.format(i, guest))
             log_xml(self.debug, 'recipe set #{}'.format(i), recipe_set)
 
@@ -193,8 +201,6 @@ class RestraintScheduler(gluetool.Module):
                 _remove_tags(recipe_set, tag)
 
             log_xml(self.debug, 'final recipe set #{}'.format(i), recipe_set)
-
-            schedule.append((guest, recipe_set))
 
             # setup guest
             thread_name = 'setup-guest-{}'.format(guest.name)
@@ -240,10 +246,7 @@ class RestraintScheduler(gluetool.Module):
             # Ok, no custom exception, maybe just some Python ones - kill the pipeline.
             raise GlueError('At least one guest setup failed')
 
-        self.debug('Schedule:')
-
-        for guest, recipe_set in schedule:
-            gluetool.log.log_blob(self.debug, str(guest), format_xml(recipe_set))
+        self._log_schedule('partial schedule #{}'.format(partial_index), schedule)
 
         return schedule
 
@@ -295,4 +298,6 @@ class RestraintScheduler(gluetool.Module):
         for i, job in enumerate(jobs):
             log_xml(self.debug, 'job #{} as planned by wow'.format(i), job)
 
-            self._schedule += self.create_schedule(job)
+            self._schedule += self.create_schedule(job, i)
+
+        self._log_schedule('complete schedule', self._schedule)
