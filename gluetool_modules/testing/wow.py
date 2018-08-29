@@ -118,7 +118,7 @@ class WorkflowTomorrow(gluetool.Module):
     options = [
         ('Global options', {
             'wow-options-map': {
-                'help': 'Path to a file with preconfigured ``workflow-tomorrow`` options.',
+                'help': 'Path to a file with preconfigured ``workflow-tomorrow`` options (default: %(default)s).',
                 'default': None,
                 'metavar': 'FILE'
             },
@@ -126,7 +126,7 @@ class WorkflowTomorrow(gluetool.Module):
                 'help': """
                         Options for ``workflow-tomorrow`` (e.g. ``--plan``, ``--run``, filter and so on.)
                         Can be used multiple times, each instance represents a distinct set of options,
-                        module will try to create job XML for each of such sets.
+                        module will try to create job XML for each of such sets (default: none).
                         """,
                 'action': 'append',
                 'default': []

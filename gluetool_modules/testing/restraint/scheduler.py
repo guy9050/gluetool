@@ -48,17 +48,18 @@ class RestraintScheduler(gluetool.Module):
     name = 'restraint-scheduler'
     description = 'Prepares "schedule" for runners of restraint.'
 
+    # pylint: disable=gluetool-option-hard-default
     options = {
         'arch-compatibility-map': {
             'help': """
                     Mapping between artifact arches and the actual arches we can use to test them (e.g. i686
-                    can be tested on both x86_64 and i686 boxes.
+                    can be tested on both x86_64 and i686 boxes (default: %(default)s).
                     """,
             'metavar': 'FILE',
             'default': None
         },
         'unsupported-arches': {
-            'help': 'List of arches not supported by system pool.',
+            'help': 'List of arches not supported by system pool (default: None).',
             'metavar': 'ARCH1[,ARCH2...]',
             'default': [],
             'action': 'append'

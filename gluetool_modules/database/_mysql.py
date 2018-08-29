@@ -18,20 +18,22 @@ class MySQL(gluetool.Module):
 
     options = {
         'host': {
-            'help': 'Database server hostname (default: localhost).',
+            'help': 'Database server hostname (default: %(default)s).',
             'type': str,
             'default': 'localhost'
         },
         'port': {
-            'help': 'Database server port number(default: 3306).',
+            'help': 'Database server port number(default: %(default)s).',
             'type': int,
             'default': 3306
         },
         'user': {
-            'help': 'Username (default: None).'
+            'help': 'Username (default: %(default)s).',
+            'default': None
         },
         'password': {
-            'help': 'Password (default: None).'
+            'help': 'Password (default: %(default)s).',
+            'default': None
         },
         'dbname': {
             'help': 'Database name to connect to.'

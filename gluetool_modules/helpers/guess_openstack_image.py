@@ -29,7 +29,7 @@ class GuessOpenstackImage(gluetool.Module):
 
     options = {
         'method': {
-            'help': 'What method to use for image "guessing"',
+            'help': 'What method to use for image "guessing" (default: %(default)s).',
             'choices': ('target-autodetection', 'force', 'recent'),
             'default': 'target-autodetection'
         },

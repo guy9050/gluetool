@@ -95,7 +95,7 @@ class NotifyRecipients(gluetool.Module):
             },
             'recipients-map': {
                 # pylint: disable=line-too-long
-                'help': "File with recipients mapping.",
+                'help': "File with recipients mapping (default: %(default)s).",
                 'default': None,
                 'metavar': 'PATH'
             }

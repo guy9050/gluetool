@@ -16,19 +16,23 @@ class TaskDispatcher(gluetool.Module):
 
     options = {
         'pipeline-test-categories': {
-            # pylint: disable=line-too-long
-            'help': 'Mapping between jobs and their default test category, as reported later by ``pipeline-state-reporter`` module.',
+            'help': """
+                    Mapping between jobs and their default test category, as reported later by
+                    ``pipeline-state-reporter`` module (default: %(default)s).
+                    """,
             'type': str,
             'default': None
         },
         'pipeline-test-types': {
-            # pylint: disable=line-too-long
-            'help': 'Mapping between jobs and their default test type, as reported later by ``pipeline-state-reporter`` module.',
+            'help': """
+                    Mapping between jobs and their default test type, as reported later by
+                    ``pipeline-state-reporter`` module (default: %(default)s).
+                    """,
             'type': str,
             'default': None
         },
         'pipeline-test-bus-topic': {
-            'help': 'Topic to use for messages sent for dispatched jobs.',
+            'help': 'Topic to use for messages sent for dispatched jobs (default: %(default)s).',
             'type': str,
             'default': None
         }

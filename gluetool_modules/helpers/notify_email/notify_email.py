@@ -184,7 +184,7 @@ class Notify((gluetool.Module)):
                 'help': 'E-mail of the sender.'
             },
             'reply-to': {
-                'help': 'If set, it will be used as a Reply-To header of every outgoing e-mail.',
+                'help': 'If set, it will be used as a Reply-To header of every outgoing e-mail (default: %(default)s).',
                 'default': None
             },
             'email-map': {

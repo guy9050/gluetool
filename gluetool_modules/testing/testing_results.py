@@ -24,7 +24,7 @@ class TestingResults(gluetool.Module):
 
     options = {
         'results-file': {
-            'help': 'Format and path to a file to store results into.',
+            'help': 'Format and path to a file to store results into (default: none).',
             'metavar': 'FORMAT:PATH',
             'action': 'append',
             'default': []

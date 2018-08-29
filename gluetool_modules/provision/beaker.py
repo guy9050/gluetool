@@ -128,14 +128,14 @@ class BeakerProvisioner(gluetool.Module):
                 'help': 'SSH username'
             },
             'ssh-options': {
-                'help': 'SSH options',
+                'help': 'SSH options (default: none).',
                 'action': 'append',
                 'default': []
             }
         }),
         ('Provisioning options', {
             'static-guest': {
-                'help': 'Wrap given machine and present it as "provisioned" guest.',
+                'help': 'Wrap given machine and present it as "provisioned" guest (default: none).',
                 'metavar': '(FQDN|IP):ARCH',
                 'action': 'append',
                 'default': []
@@ -147,20 +147,20 @@ class BeakerProvisioner(gluetool.Module):
             },
             'activation-timeout': {
                 # pylint: disable=line-too-long
-                'help': 'Wait SECOND for a guest to become reachable over network (default: {})'.format(DEFAULT_ACTIVATION_TIMEOUT),
+                'help': 'Wait SECOND for a guest to become reachable over network (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_ACTIVATION_TIMEOUT,
                 'metavar': 'SECONDS'
             },
             'echo-timeout': {
-                'help': 'Wait SECOND for a guest shell to become available (default: {})'.format(DEFAULT_ECHO_TIMEOUT),
+                'help': 'Wait SECOND for a guest shell to become available (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_ECHO_TIMEOUT,
                 'metavar': 'SECONDS'
             },
             'boot-timeout': {
                 # pylint: disable=line-too-long
-                'help': 'Wait SECONDS for a guest to finish its booting process (default: {})'.format(DEFAULT_BOOT_TIMEOUT),
+                'help': 'Wait SECONDS for a guest to finish its booting process (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_BOOT_TIMEOUT,
                 'metavar': 'SECONDS'

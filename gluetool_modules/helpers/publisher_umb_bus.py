@@ -241,21 +241,24 @@ class UMBPublisher((gluetool.Module)):
         }),
         ('Timeout options', {
             'connect-timeout': {
-                # pylint: disable=line-too-long
-                'help': 'Wait at max N second before giving up on a broker connection (default: {}).'.format(DEFAULT_CONNECT_TIMEOUT),  # Ignore PEP8Bear
+                'help': 'Wait at max N second before giving up on a broker connection (default: %(default)s).',
                 'type': int,
+                'metavar': 'N',
                 'default': DEFAULT_CONNECT_TIMEOUT
             },
             'sendable-timeout': {
-                # pylint: disable=line-too-long
-                'help': 'Wait at max N second before giving up before broker allows message sending (default: {}).'.format(DEFAULT_SENDABLE_TIMEOUT),  # Ignore PEP8Bear
+                'help': """
+                        Wait at max N second before giving up before broker allows message sending
+                        (default: %(default)s)).
+                        """,
                 'type': int,
+                'metavar': 'N',
                 'default': DEFAULT_SENDABLE_TIMEOUT
             },
             'global-timeout': {
-                # pylint: disable=line-too-long
-                'help': 'Wait at max N second before giving up on the whole publishing action (default: {}).'.format(DEFAULT_GLOBAL_TIMEOUT),  # Ignore PEP8Bear
+                'help': 'Wait at max N second before giving up on the whole publishing action (default: %(default)s).',
                 'type': int,
+                'metavar': 'N',
                 'default': DEFAULT_GLOBAL_TIMEOUT
             },
             'on-auth-error-retries': {

@@ -122,24 +122,26 @@ class CIJenkins(gluetool.Module):
 
     options = {
         'create-jjb-config': {
-            'help': 'Force creation Jenkins Job Builder configuration',
+            'help': 'Force creation Jenkins Job Builder configuration (default: %(default)s).',
             'default': None,
             'metavar': 'FILE',
             'type': str
         },
         'password': {
-            'help': 'Jenkins admin password (default: None)',
+            'help': 'Jenkins admin password (default: %(default)s)',
+            'default': None
         },
         'url': {
             'help': 'Jenkins URL (e.g. http://localhost:8080)',
         },
         'username': {
-            'help': 'Jenkins admin username (default: None)',
+            'help': 'Jenkins admin username (default: %(default)s)',
+            'default': None
         },
         'no-ssl-verify': {
-            'help': 'Do not verify HTTPS certificate.',
+            'help': 'Do not verify HTTPS certificate (default: %(default)s).',
             'action': 'store_true',
-            'default': False
+            'default': 'no'
         }
     }
     required_options = ['url']
@@ -268,7 +270,7 @@ class CIJenkins(gluetool.Module):
         password = self.option('password')
         url = self.option('url')
         user = self.option('username')
-        ssl_verify = not self.option('no-ssl-verify')
+        ssl_verify = not gluetool.utils.normalize_bool_option(self.option('no-ssl-verify'))
 
         # connect to the jenkins instance
         try:

@@ -11,6 +11,7 @@ class ExecuteCommand(gluetool.Module):
     name = 'execute-command'
     description = 'Run an arbitrary command, or their sequence, and log the output.'
 
+    # pylint: disable=gluetool-option-no-default-in-help
     options = {
         'command': {
             'help': 'Command to run.',
@@ -25,9 +26,9 @@ class ExecuteCommand(gluetool.Module):
             'default': []
         },
         'on-destroy': {
-            'help': 'Execute commands when destroying the module, not when executing it.',
+            'help': 'Execute commands when destroying the module, not when executing it (default: %(default)s).',
             'action': 'store_true',
-            'default': False
+            'default': 'no'
         }
     }
 
@@ -81,13 +82,13 @@ class ExecuteCommand(gluetool.Module):
                 raise gluetool.GlueError("Command '{}' exited with non-zero exit code".format(original_command))
 
     def execute(self):
-        if self.option('on-destroy') is True:
+        if gluetool.utils.normalize_bool_option(self.option('on-destroy')):
             return
 
         self._execute_commands()
 
     def destroy(self, failure=None):
-        if self.option('on-destroy') is not True:
+        if not gluetool.utils.normalize_bool_option(self.option('on-destroy')):
             return
 
         self._execute_commands(context_extra={

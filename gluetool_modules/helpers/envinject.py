@@ -20,7 +20,7 @@ class EnvInject(gluetool.Module):
 
     options = {
         ('f', 'file'): {
-            'help': 'Properties file, read by EnvInject',
+            'help': 'Properties file, read by EnvInject (default: %(default)s).',
             'default': DEFAULT_PROPS_FILE
         }
     }

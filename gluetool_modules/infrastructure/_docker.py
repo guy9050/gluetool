@@ -17,7 +17,7 @@ class Docker(gluetool.Module):
 
     options = {
         'protocol-version': {
-            'help': 'Docker protocol version to force (default: {})'.format(DEFAULT_VERSION),
+            'help': 'Docker protocol version to force (default: %(default)s)',
             'default': DEFAULT_VERSION
         }
     }

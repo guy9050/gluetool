@@ -10,7 +10,7 @@ class CIMTF(gluetool.Module):
 
     options = {
         'test-module': {
-            'help': 'which module to test',
+            'help': 'which module to test (default: %(default)s).',
             'default': 'testing-module'
         }
     }
