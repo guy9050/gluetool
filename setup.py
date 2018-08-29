@@ -26,7 +26,7 @@ DESCRIPTION = 'Gluetool & Citool modules'
 #    sys.exit(1)
 
 INSTALL_REQUIRES = [
-    "ansible==2.4.2.0",
+    "ansible==2.5.8.0",
     "composeci",  # composetest
     "cmd2==0.8.6",
     "beautifulsoup4==4.5.3",
