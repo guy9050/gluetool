@@ -10,7 +10,7 @@ import zlib
 
 import gluetool
 from gluetool.log import log_dict
-from gluetool.utils import render_template, treat_url
+from gluetool.utils import render_template, treat_url, normalize_bool_option
 
 
 STATE_QUEUED = 'queued'
@@ -388,7 +388,8 @@ class PipelineStateReporter(gluetool.Module):
         self.shared('publish_bus_messages', message, topic=topic)
 
     def execute(self):
-        if self.option('dont-report-running'):
+        if normalize_bool_option(self.option('dont-report-running')):
+            self.info('not reporting the beginning of the pipeline')
             return
 
         self.info('reporting pipeline beginning')
