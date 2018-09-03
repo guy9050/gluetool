@@ -217,7 +217,13 @@ class RestraintScheduler(gluetool.Module):
         for thread in setup_threads:
             thread.join()
 
-        if any((isinstance(thread.result, Exception) for thread in setup_threads)):
+        thread_results = [
+            thread.result for thread in setup_threads
+        ]
+
+        log_dict(self.debug, 'thread results', thread_results)
+
+        if any((isinstance(result, Exception) for result in thread_results)):
             self.error('At least one guest setup failed')
             self.error('Note: see detailed exception in debug log for more information')
 
@@ -227,15 +233,12 @@ class RestraintScheduler(gluetool.Module):
             # first custom exception we find.
 
             def _raise_first(check):
-                # how to find the first item in the list: create a generator returning only those items
-                # that match a condition (by calling check()), and calling next() on it will return
-                # its first item (or None, in this case).
-                error = next((thread.result for thread in setup_threads if check(thread.result)), None)
+                suitable = [result for result in thread_results if check(result)]
 
-                if error is None:
+                if not suitable:
                     return
 
-                raise error
+                raise suitable[0]
 
             # Soft errors have precedence - the let user know something bad happened, which is better
             # than just "infrastructure error".
