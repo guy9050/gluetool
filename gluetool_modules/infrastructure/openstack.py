@@ -13,7 +13,7 @@ import six
 
 import novaclient.exceptions
 from novaclient import client
-from novaclient.exceptions import BadRequest, NotFound, Unauthorized
+from novaclient.exceptions import BadRequest, NotFound, Unauthorized, NoUniqueMatch
 
 import gluetool
 from gluetool import GlueError, GlueCommandError
@@ -74,31 +74,45 @@ class OpenStackImage(object):
 
         raise GlueError("Cannot convert '{}' of type {} to an OpenStackImage instance".format(image, type(image)))
 
-    @property
-    def resource(self):
+    def resource(self, on_nonactive_raise=True):
+        """
+        Return reference to an Openstack image.
+
+        :param: bool on_nonactive_raise: raise exception if no active image found (default)
+        :raises gluetool.glue.GlueError: if no image found or
+                                         if multiple images with same name found or
+                                         if no active image found and on_nonactive_raise is True
+        """
         self.debug("get image reference for '{}'".format(self.name))
 
-        if self._resource is None:
-            images = self.module.nova.images.findall(name=self.name)
+        if self._resource:
+            return self._resource
 
-            if not images:
-                # pylint: disable=protected-access
-                self.module._resource_not_found('images', self.name)
+        try:
+            image = self.module.nova.images.find(name=self.name)
+            self._resource = image
 
-            for image in images:
-                self.debug('name: {}, status: {}'.format(image.name, image.status))
+        except NotFound:
+            # pylint: disable=protected-access
+            self.module._resource_not_found('images', self.name)
 
-                if image.status == u'ACTIVE':
-                    self._resource = image
-                    break
+        except NoUniqueMatch:
+            raise GlueError("Image name '{}' references multiple images".format(self.name))
 
-            else:
-                raise GlueError("Multiple images found for '{}', and none of them is active".format(self.name))
+        self.debug('name: {}, status: {}'.format(image.name, image.status))
+
+        if image.status != u'ACTIVE':
+
+            # blow up if image is not ACTIVE and the caller wants this
+            if on_nonactive_raise:
+                raise GlueError("Image '{}' found but is not active".format(image.name))
+
+            self.warn("Image '{}' found but is not active".format(self.name))
 
         return self._resource
 
     def release(self):
-        self.resource.delete()
+        self.resource(on_nonactive_raise=False).delete()
 
         self.debug('released the image')
 
@@ -127,7 +141,7 @@ class OpenStackImage(object):
                 '--os-password', glance_options['password'],
                 'image-download',
                 '--file', filename,
-                str(self.resource.id)
+                str(self.resource().id)
             ])
 
         except gluetool.GlueCommandError as exc:
@@ -301,7 +315,7 @@ class OpenstackGuest(NetworkedGuest):
                                                                 self._nova.servers.create,
                                                                 name=self._os_name,
                                                                 flavor=self._os_details['flavor'],
-                                                                image=image.resource,
+                                                                image=image.resource(),
                                                                 nics=self._os_nics,
                                                                 key_name=self._os_details['key_name'],
                                                                 userdata=self._os_details['user_data'])
@@ -408,7 +422,7 @@ class OpenstackGuest(NetworkedGuest):
 
         original_status = self._get_resource_status('servers', self._os_instance.id)
 
-        self._os_instance.rebuild(image.resource)
+        self._os_instance.rebuild(image.resource())
 
         if original_status == u'ACTIVE':
             self._wait_active()
