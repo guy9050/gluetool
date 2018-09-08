@@ -1,4 +1,5 @@
 import json
+import shlex
 
 import gluetool
 from gluetool.utils import Command
@@ -53,9 +54,21 @@ class Ansible(gluetool.Module):
     name = 'ansible'
     description = 'Run an Ansible playbook on a given guest.'
 
+    options = {
+        'ansible-playbook-options': {
+            'help': "Additional ansible-playbook options, for example '-vvv'. (default: none)",
+            'action': 'append',
+            'default': []
+        }
+    }
+
     shared_functions = ('run_playbook',)
 
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
+
+    @gluetool.utils.cached_property
+    def additional_options(self):
+        return sum([shlex.split(item) for item in self.option('ansible-playbook-options')], [])
 
     def run_playbook(self, playbook_path, guests, variables=None):
         """
@@ -87,6 +100,8 @@ class Ansible(gluetool.Module):
                 '--extra-vars',
                 ' '.join(['{}="{}"'.format(k, v) for k, v in variables.iteritems()])
             ]
+
+        cmd += self.additional_options
 
         if not self.dryrun_allows('Running a playbook in non-check mode'):
             self.debug("dry run enabled, telling ansible to use 'check' mode")

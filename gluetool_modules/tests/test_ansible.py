@@ -15,7 +15,9 @@ from . import create_module
 def fixture_module():
     # pylint: disable=unused-argument
 
-    return create_module(gluetool_modules.helpers.ansible.Ansible)[1]
+    module = create_module(gluetool_modules.helpers.ansible.Ansible)[1]
+    module._config['ansible-playbook-options'] = []
+    return module
 
 
 @pytest.fixture(name='local_guest')
@@ -106,3 +108,24 @@ def test_dryrun(module, local_guest, monkeypatch):
     ], logger=module.logger)
 
     mock_command_run.assert_called_once_with()
+
+
+def test_additonal_options(module, local_guest, monkeypatch):
+
+    mock_command_init = MagicMock(return_value=None)
+    mock_command_run = MagicMock()
+
+    monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
+    monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
+    module._config['ansible-playbook-options'] = ['-vvv', '-d']
+
+    module.run_playbook('dummy playbook file', [local_guest], variables={
+        'FOO': 'bar'
+    })
+
+    mock_command_init.assert_called_once_with([
+        'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key,
+        '--extra-vars', 'FOO="bar"',
+        '-vvv', '-d',
+        os.path.abspath('dummy playbook file')
+    ], logger=module.logger)
