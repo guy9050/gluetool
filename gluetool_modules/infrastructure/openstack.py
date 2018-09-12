@@ -9,6 +9,8 @@ import re
 from time import gmtime, strftime
 from datetime import datetime, timedelta
 
+import dateutil.parser
+import pytz
 import six
 
 import novaclient.exceptions
@@ -74,11 +76,14 @@ class OpenStackImage(object):
 
         raise GlueError("Cannot convert '{}' of type {} to an OpenStackImage instance".format(image, type(image)))
 
-    def resource(self, on_nonactive_raise=True):
+    def resource(self, on_nonactive_raise=True, pick_most_recent=False):
         """
         Return reference to an Openstack image.
 
-        :param: bool on_nonactive_raise: raise exception if no active image found (default)
+        :param bool on_nonactive_raise: raise exception if no active image found (default)
+        :param bool pick_most_recent: when the image name returns multiple OpenStack images,
+            pick the one updated most recently. If not set, raise an exception reporting
+            multiple images were found.
         :raises gluetool.glue.GlueError: if no image found or
                                          if multiple images with same name found or
                                          if no active image found and on_nonactive_raise is True
@@ -97,12 +102,29 @@ class OpenStackImage(object):
             self.module._resource_not_found('images', self.name)
 
         except NoUniqueMatch:
-            raise GlueError("Image name '{}' references multiple images".format(self.name))
+            self.debug("found multiple images for name '{}'".format(self.name))
 
-        self.debug('name: {}, status: {}'.format(image.name, image.status))
+            if not pick_most_recent:
+                raise GlueError("Image name '{}' references multiple images".format(self.name))
+
+            images = [
+                (image, image.to_dict()) for image in self.module.nova.images.findall(name=self.name)
+            ]
+
+            log_dict(self.debug, 'found images', images)
+
+            for _, image_info in images:
+                image_info['updated-comparable'] = dateutil.parser.parse(image_info['updated']).astimezone(pytz.utc)
+
+            log_dict(self.debug, 'found images with comparable timestamps', images)
+
+            image, _ = sorted(images, key=lambda x: x[1]['updated-comparable'])[-1]
+
+            self._resource = image
+
+        self.debug("image settled on '{}' {} ({})".format(self._resource, self._resource.id, self._resource.status))
 
         if image.status != u'ACTIVE':
-
             # blow up if image is not ACTIVE and the caller wants this
             if on_nonactive_raise:
                 raise GlueError("Image '{}' found but is not active".format(image.name))
@@ -315,7 +337,7 @@ class OpenstackGuest(NetworkedGuest):
                                                                 self._nova.servers.create,
                                                                 name=self._os_name,
                                                                 flavor=self._os_details['flavor'],
-                                                                image=image.resource(),
+                                                                image=image.resource(pick_most_recent=True),
                                                                 nics=self._os_nics,
                                                                 key_name=self._os_details['key_name'],
                                                                 userdata=self._os_details['user_data'])
@@ -1242,7 +1264,7 @@ class CIOpenstack(gluetool.Module):
                 'user_data': self.user_data
             }
 
-            self.verbose('creating guest with following details\n{}'.format(format_dict(details)))
+            log_dict(self.debug, 'creating guest with following details', details)
             guest = OpenstackGuest(self, details=details, arch=self.option('arch'))
 
             self._all.append(guest)
