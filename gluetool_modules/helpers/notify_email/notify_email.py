@@ -462,10 +462,13 @@ class Notify((gluetool.Module)):
         self.info('Sending failure-state notifications to: {}'.format(', '.join(recipients)))
 
         body_header = self.render_template(self.option('body-header-template'), **{
+            'FAILURE': failure,
             'SUMMARY_URL': self._get_summary_url(libci.results.TestResult(self.glue, 'dummy', 'ERROR'))
         })
 
-        body_footer = self.render_template(self.option('body-footer-template'))
+        body_footer = self.render_template(self.option('body-footer-template'), **{
+            'FAILURE': failure
+        })
 
         # Any subclass of CIError (which covers all soft errors by default) can provide its own templates
         # - but not the CIError or SoftCIError, these are way too generic.
