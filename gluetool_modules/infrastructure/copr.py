@@ -3,17 +3,8 @@ import collections
 import requests
 
 import gluetool
-from gluetool import SoftGlueError
 from gluetool.utils import cached_property
 from gluetool.log import log_dict
-
-
-class NotBuildTaskError(SoftGlueError):
-    def __init__(self, build_id):
-        super(NotBuildTaskError, self).__init__('Build task not found')
-
-        self.build_id = build_id
-
 
 #: Information about task architectures.
 #:
@@ -93,21 +84,41 @@ class CoprTask(object):
         copr_api = module.copr_api()
 
         build_info = copr_api.get_build_info(task_id.build_id)
-        self._build = build_info['build']
 
-        project_info = copr_api.get_href(build_info['_links']['project']['href'])
-        self._project = project_info['project']
+        if build_info.get('message', '') == 'Build with id `{}` not found'.format(task_id.build_id):
 
-        build_tasks_info = copr_api.get_build_task_info(task_id.build_id, task_id.chroot_name)
-        self._build_task = build_tasks_info['build_task']
+            self.module.warn('Build {} not found'.format(task_id.build_id))
+
+            self._build = {
+                'package_version': 'UNKNOWN-COPR-VERSION',
+                'package_name': 'UNKNOWN-COPR-COMPONENT'
+            }
+            self._project = {
+                'owner': 'UNKNOWN-COPR-OWNER',
+                'name': 'UNKNOWN-COPR-PROJECT'
+            }
+            self._build_task = {
+                'state': 'UNKNOWN-COPR-STATUS'
+            }
+
+        else:
+            self._build = build_info['build']
+
+            project_info = copr_api.get_href(build_info['_links']['project']['href'])
+            self._project = project_info['project']
+
+            build_tasks_info = copr_api.get_build_task_info(task_id.build_id, task_id.chroot_name)
+            self._build_task = build_tasks_info['build_task']
 
         self.status = self._build_task['state']
         self.component = self._build['package_name']
         self.target = task_id.chroot_name
-        self.nvr = '{}-{}'.format(self._build['package_name'], self._build['package_version'])
+        self.nvr = '{}-{}'.format(self.component, self._build['package_version'])
         self.owner = self._project['owner']
-        self.issuer = self._build.get('submitter', 'UNKNOWN-COPR-ISSUER')
         self.project = self._project['name']
+        # issuer is optional item
+        self.issuer = self._build.get('submitter', 'UNKNOWN-COPR-ISSUER')
+
         # this string identifies component in static config file
         self.component_id = '{}/{}/{}'.format(self.owner, self.project, self.component)
 
