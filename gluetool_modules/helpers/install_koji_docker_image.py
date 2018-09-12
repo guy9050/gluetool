@@ -79,7 +79,8 @@ class InstallKojiDockerImage(gluetool.Module):
         ] + [
             '--arch={}'.format(guest.arch)
         ], extra_context={
-            'GUEST': guest
+            'GUEST': guest,
+            'PHASE': 'artifact-installation'
         })
 
         # This is probably not true in general, but our Docker pipelines - in both beaker and openstack - deal
