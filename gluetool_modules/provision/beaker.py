@@ -201,6 +201,8 @@ class BeakerProvisioner(gluetool.Module):
     def provision(self, environment, **kwargs):
         # pylint: disable=unused-argument
 
+        log_dict(self.debug, 'provision for environment', environment)
+
         ssh_options = normalize_multistring_option(self.option('ssh-options'))
 
         static_guests = normalize_multistring_option(self.option('static-guest'))
@@ -214,6 +216,12 @@ class BeakerProvisioner(gluetool.Module):
             except ValueError:
                 raise GlueError("Static guest format is FQDN:ARCH, '{}' is not correct".format(guest_spec))
 
+            self.debug('possible static guest: {} ({})'.format(fqdn, arch))
+
+            if environment.arch != arch:
+                self.debug('  incompatible architecture')
+                continue
+
             # `arch` is valid keyword arg, but pylint doesn't agree... no idea why
             # pylint: disable=unexpected-keyword-arg
             guest = BeakerGuest(self, fqdn,
@@ -224,6 +232,9 @@ class BeakerProvisioner(gluetool.Module):
                                 arch=arch)
 
             guests.append(guest)
+
+        if not guests:
+            raise GlueError('Cannot provision a guest for given environment')
 
         self.debug('created {} guests, waiting for them to become alive'.format(len(guests)))
 
