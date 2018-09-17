@@ -24,7 +24,7 @@ dependencies:
     - qa-tools-workstation
 
   pip:
-    - beautifulsoup4==4.5.3
+    - beautifulsoup4==4.6.3
     - git+https://github.com/psss/python-nitrate.git@1.3-2#egg=nitrate
     - python-dateutil==2.6.1
 

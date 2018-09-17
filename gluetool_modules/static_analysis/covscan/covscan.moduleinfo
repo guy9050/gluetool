@@ -18,7 +18,7 @@ dependencies:
     - libcurl-devel
   pip:
     - urlgrabber==3.10.2
-    - requests==2.18.4
+    - requests==2.19.1
     - pycurl==7.43.0
   ansible_tasks:
     #

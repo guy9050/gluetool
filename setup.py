@@ -32,7 +32,7 @@ INSTALL_REQUIRES = [
     "ansible==2.5.8.0",
     "composeci",  # composetest
     "cmd2==0.8.6",
-    "beautifulsoup4==4.5.3",
+    "beautifulsoup4==4.6.3",
     "python-dateutil==2.6.1",
     "docker-pycreds==0.2.1",
     "docker==2.5.1",
@@ -43,7 +43,7 @@ INSTALL_REQUIRES = [
     "mako==1.0.6",
     # available over external URL => dependency_links => they does not seem to work when installing via pip :/
     #    "mysql-connector-python==2.0.4",
-    "packaging==16.8",
+    "packaging==17.1",
     "proton==0.8.8",
     "psycopg2==2.7.3.1",
     "pyOpenSSL==17.0.0",
@@ -53,7 +53,7 @@ INSTALL_REQUIRES = [
     "python-openstackclient==3.9.0",
     "python-qpid-proton==0.18.1",
     "requests-kerberos==0.11.0",
-    "requests==2.18.4",
+    "requests==2.19.1",
     "requestsexceptions==1.2.0",
     "stomp.py==4.1.17",
     "urlgrabber==3.10.2",
