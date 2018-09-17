@@ -342,10 +342,16 @@ class TestBatchPlanner(gluetool.Module):
         component_commands = None
 
         for pattern, commands in packages_config.iteritems():
-            self.debug("pattern: '{}'".format(pattern))
+            self.debug("component: '{}', pattern: '{}'".format(component, pattern))
 
             try:
-                if not re.match('^' + pattern + '$', component):
+                match = re.match(pattern, component)
+
+                if match is None:
+                    continue
+
+                if match.group() != component:
+                    self.warn("match '{}' is not equal to component '{}'".format(match.group(), component), sentry=True)
                     continue
 
             except re.error as exc:
