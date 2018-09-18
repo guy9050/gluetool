@@ -33,31 +33,66 @@ getTaskInfo:
         - git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde
         - f25-candidate
         - {}
+  15736657:
+    id: 15736657
+    waiting: false
+    state: 2
+    method: build
+    request:
+    - git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde
+    - f25-candidate
+    - {}
 
 listBuilds:
-  - package_name: bash
-    extra:
-    creation_time: '2016-09-30 08:22:42.639802'
-    completion_time: '2016-09-30 08:34:58.935735'
-    package_id: 1088
-    build_id: 805705
-    state: 1
-    source:
-    epoch:
-    version: 4.3.43
-    completion_ts: 1475224498.93573
-    owner_id: 3543
-    owner_name: svashisht
-    nvr: bash-4.3.43-4.fc25
-    start_time: '2016-09-30 08:22:42.639802'
-    creation_event_id: 18507215
-    start_ts: 1475223762.6398
-    volume_id: 0
-    creation_ts: 1475223762.6398
-    name: bash
-    task_id: 15869828
-    volume_name: DEFAULT
-    release: 4.fc25
+  15869828:
+    - package_name: bash
+      extra:
+      creation_time: '2016-09-30 08:22:42.639802'
+      completion_time: '2016-09-30 08:34:58.935735'
+      package_id: 1088
+      build_id: 805705
+      state: 1
+      source:
+      epoch:
+      version: 4.3.43
+      completion_ts: 1475224498.93573
+      owner_id: 3543
+      owner_name: svashisht
+      nvr: bash-4.3.43-4.fc25
+      start_time: '2016-09-30 08:22:42.639802'
+      creation_event_id: 18507215
+      start_ts: 1475223762.6398
+      volume_id: 0
+      creation_ts: 1475223762.6398
+      name: bash
+      task_id: 15869828
+      volume_name: DEFAULT
+      release: 4.fc25
+
+  15736657:
+    - package_name: bash
+      extra:
+      creation_time: '2016-09-30 08:22:42.639802'
+      completion_time: '2016-09-30 08:34:58.935735'
+      package_id: 1088
+      build_id: 805705
+      state: 1
+      source:
+      epoch:
+      version: 4.3.43
+      completion_ts: 1475224498.93573
+      owner_id: 3543
+      owner_name: svashisht
+      nvr: bash-4.3.43-3.fc25
+      start_time: '2016-09-30 08:22:42.639802'
+      creation_event_id: 18507215
+      start_ts: 1475223762.6398
+      volume_id: 0
+      creation_ts: 1475223762.6398
+      name: bash
+      task_id: 15736657
+      volume_name: DEFAULT
+      release: 3.fc25
 
 getTaskChildren:
   15869828:
@@ -141,7 +176,7 @@ getTaskChildren:
         - 337
         - 805705
         - false
-        - 
+        -
         - true
       start_time: '2016-09-30 08:35:07.226981'
       start_ts: 1475224507.22698

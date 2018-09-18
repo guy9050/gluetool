@@ -33,6 +33,15 @@ getTaskInfo:
       - cli-build/1498396792.492652.jYJCrkUF/bash-4.4.12-5.fc26.src.rpm
       - rawhide
       - scratch: true
+  25004470:
+    id: 25004470
+    waiting: false
+    state: 2
+    method: build
+    request:
+      - cli-build/1498396792.492652.jYJCrkUF/bash-4.4.12-5.fc26.src.rpm
+      - rawhide
+      - scratch: true
 
 listBuilds:
   - package_name: bash
@@ -236,6 +245,15 @@ getTaskChildren:
       completion_ts: 1498397329.74504
       arch: ppc64le
       method: buildArch
+  25004470:
+    - method: buildArch
+      id: 25004470
+      request:
+      - cli-build/1498396792.492652.jYJCrkUF/bash-4.4.19-1.fc27.src.rpm
+      - 425
+      - ppc64le
+      - false
+      - repo_id: 763209
 
 listTaskOutput:
   20166989: []
@@ -245,6 +263,7 @@ listTaskOutput:
   20166987: []
   20166991: []
   20166986: []
+  25004470: []
 
 getUser:
   3823:

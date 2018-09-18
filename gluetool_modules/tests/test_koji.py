@@ -25,6 +25,9 @@ class MockClientSession(object):
         def getter(name, *args, **kwargs):
             assert name in data, "Attempt to use API endpoint '{}' which is not mocked".format(name)
 
+            if name == 'listBuilds' and not args and 'taskID' in kwargs:
+                args = (kwargs['taskID'],)
+
             if args:
                 assert args[0] in data[name], "Attempt to use API endpoint '{}({})' which is not mocked".format(
                     name, args[0])
