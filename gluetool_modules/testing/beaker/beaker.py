@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 import urlparse
@@ -33,13 +32,6 @@ class BeakerError(PrimaryTaskFingerprintsMixin, GlueError):
     Hard exception, used instead plain :py:class:`gluetool.GlueError` when task context
     is available and reasonable.
     """
-
-
-class InvalidTasksError(PrimaryTaskFingerprintsMixin, SoftGlueError):
-    def __init__(self, task, test_tasks):
-        super(InvalidTasksError, self).__init__(task, 'Invalid task names provided')
-
-        self.tasks = test_tasks
 
 
 class BeakerJobwatchError(PrimaryTaskFingerprintsMixin, SoftGlueError):
@@ -244,56 +236,6 @@ class Beaker(gluetool.Module):
 
         return [(bs4.BeautifulSoup(output.stdout, 'xml'), [job_id])]
 
-    def _submit_job(self, index, job):
-        # pylint: disable=no-self-use
-        """
-        Submit a job description to Beaker.
-
-        :param element job: XML describing the job.
-        :param int index: index of the job among all jobs we're going to start. Used to keep track of saved
-            XML files.
-        :rtype: list(int)
-        :returns: List of Beaker job IDs.
-        """
-
-        # save the copy
-        job_filename = 'job-{}.xml'.format(index)
-
-        with open(job_filename, 'w') as f:
-            f.write(job.prettify(encoding='utf-8'))
-            f.flush()
-
-        # submit the job to beaker
-        try:
-            output = run_command(['bkr', 'job-submit', job_filename])
-
-        except GlueCommandError as exc:
-            if 'Invalid task(s):' in exc.output.stderr:
-                s = exc.output.stderr.strip()
-                tasks = [name.strip() for name in s[s.index('Invalid task(s)') + 17:-2].split(',')]
-
-                raise InvalidTasksError(self.shared('primary_task'), tasks)
-
-            raise BeakerError(self.shared('primary_task'),
-                              "Failure during 'job-submit' execution: {}".format(exc.output.stderr))
-
-        try:
-            # Submitted: ['J:1806666', 'J:1806667']
-            jobs = output.stdout[output.stdout.index(' ') + 1:]
-            # ['J:1806666', 'J:1806667']
-            jobs = jobs.replace('\'', '"')
-            # ["J:1806666", "J:1806667"]
-            jobs = json.loads(jobs)
-            # ['J:1806666', 'J:1806667']
-            ids = [int(job_id.split(':')[1]) for job_id in jobs]
-            # [1806666, 1806667]
-
-        except Exception as exc:
-            raise BeakerError(self.shared('primary_task'),
-                              'Cannot convert job-submit output to job ID: {}'.format(str(exc)))
-
-        return ids
-
     def _run_wow(self):
         # pylint: disable=too-many-statements
         """
@@ -326,8 +268,7 @@ class Beaker(gluetool.Module):
             options += ['--no-reserve']
 
         return [
-            (job, self._submit_job(index, job)) for index, job in enumerate(self.shared('beaker_job_xml',
-                                                                                        options=options))
+            (job, self.shared('submit_beaker_jobs', [job])) for job in self.shared('beaker_job_xml', options=options)
         ]
 
     def _run_jobwatch(self, jobs):
@@ -416,7 +357,7 @@ class Beaker(gluetool.Module):
 
     def execute(self):
         self.require_shared('wow_artifact_installation_options', 'tasks', 'primary_task', 'beaker_job_xml',
-                            'parse_beah_result', 'beaker_jobwatch')
+                            'parse_beah_result', 'beaker_jobwatch', 'submit_beaker_jobs')
 
         # workflow-tomorrow
         jobs = self._run_wow()
