@@ -1,0 +1,33 @@
+---
+
+name: bkr
+description: Wrapper of (low-level) Beaker API and commands.
+dependencies:
+  repo:
+    - name: beaker-client
+      description: Beaker client repository
+      baseurl: http://download-node-02.eng.bos.redhat.com/beakerrepos/client/RedHatEnterpriseLinux7
+      exclude: kobo kobo-rpmlib kobo-client
+
+  yum:
+    - beaker-client
+    - beaker-redhat
+
+  ansible_tasks:
+    - name: "Requires: krb5-devel because of krb5.h"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^Requires: krb5-devel"
+        line: "# added by 'bkr' module\nRequires: krb5-devel\n"
+        state: present
+        insertbefore: "^# TASK: GLOBAL-BEFORE-DESCRIPTION"
+      when: BUILDING_SPECFILE is defined
+
+    - name: "BuildRequires: krb5-devel because of krb5.h"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^BuildRequires: krb5-devel"
+        line: "# added by 'bkr' module\nBuildRequires: krb5-devel\n"
+        state: present
+        insertbefore: "^# TASK: GLOBAL-BEFORE-DESCRIPTION"
+      when: BUILDING_SPECFILE is defined
