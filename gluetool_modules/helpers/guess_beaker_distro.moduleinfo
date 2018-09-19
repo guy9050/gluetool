@@ -4,4 +4,4 @@ name: guess-beaker-distro
 description: "Guess beaker distro from build target of a brew build"
 dependencies:
   pip:
-    - beautifulsoup4==4.5.3
+    - beautifulsoup4==4.6.3

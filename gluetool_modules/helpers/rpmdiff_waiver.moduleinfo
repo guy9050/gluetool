@@ -9,6 +9,6 @@ dependencies:
     - postgresql
   pip:
     - psycopg2==2.7.1
-    - requests==2.18.4
+    - requests==2.19.1
     - requests-kerberos==0.11.0
-    - beautifulsoup4==4.5.3
+    - beautifulsoup4==4.6.3

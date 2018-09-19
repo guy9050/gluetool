@@ -24,6 +24,7 @@ Table of contents
    howto-docs
    protocols/protocols
    DEVELOPMENT
+   CHANGELOG
 
 
 Indices and tables

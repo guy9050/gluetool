@@ -144,7 +144,7 @@ class RestraintScheduler(gluetool.Module):
         for guest, recipe_set in schedule:
             gluetool.log.log_blob(self.debug, str(guest), format_xml(recipe_set))
 
-    def create_schedule(self, job_desc, partial_index):
+    def _create_job_schedule(self, job_desc, partial_index):
         """
         Main workhorse - given the job XML, get necessary guests and assign recipe sets to these guests.
 
@@ -163,6 +163,13 @@ class RestraintScheduler(gluetool.Module):
 
         self.info('job contains {} recipe sets, asking for guests'.format(len(recipe_sets)))
 
+        # there are tags that make not much sense for restraint - we'll filter them out
+        def _remove_tags(recipe_set, name):
+            self.debug("removing tags '{}'".format(name))
+
+            for tag in recipe_set.find_all(name):
+                tag.decompose()
+
         for i, recipe_set in enumerate(recipe_sets):
             # From each recipe, extract distro and architecture, and construct testing environment description.
             # That will be passed to the provisioning modules. This module does not have to know it.
@@ -180,28 +187,40 @@ class RestraintScheduler(gluetool.Module):
             if not guests:
                 raise GlueError('No guests provisioned.')
 
+            # remove tags we want to filter out
+            for tag in ('distroRequires', 'hostRequires', 'repos', 'partitions'):
+                _remove_tags(recipe_set, tag)
+
+            log_xml(self.debug, 'purified recipe set #{}'.format(i), recipe_set)
+
             schedule.append((guests[0], recipe_set))
 
-        log_dict(self.debug, 'schedule', schedule)
+        self._log_schedule('partial schedule #{}'.format(partial_index), schedule)
 
-        # there are tags that make not much sense for restraint - we'll filter them out
-        def _remove_tags(recipe_set, name):
-            self.debug("removing tags '{}'".format(name))
+        return schedule
 
-            for tag in recipe_set.find_all(name):
-                tag.decompose()
+    def _create_schedule(self):
+        jobs = self._run_wow()
+
+        self.info('scheduling {} jobs'.format(len(jobs)))
+
+        schedule = []
+
+        # for each job, provision necessary guests
+        for i, job in enumerate(jobs):
+            log_xml(self.debug, 'job #{} as planned by wow'.format(i), job)
+
+            schedule += self._create_job_schedule(job, i)
+
+        self._log_schedule('complete schedule', schedule)
+
+        self.debug('setting up the guests')
 
         setup_threads = []
 
         for i, (guest, recipe_set) in enumerate(schedule):
             self.debug('guest #{}: {}'.format(i, guest))
             log_xml(self.debug, 'recipe set #{}'.format(i), recipe_set)
-
-            # remove tags we want to filter out
-            for tag in ('distroRequires', 'hostRequires', 'repos', 'partitions'):
-                _remove_tags(recipe_set, tag)
-
-            log_xml(self.debug, 'final recipe set #{}'.format(i), recipe_set)
 
             # setup guest
             thread_name = 'setup-guest-{}'.format(guest.name)
@@ -217,7 +236,13 @@ class RestraintScheduler(gluetool.Module):
         for thread in setup_threads:
             thread.join()
 
-        if any((isinstance(thread.result, Exception) for thread in setup_threads)):
+        thread_results = [
+            thread.result for thread in setup_threads
+        ]
+
+        log_dict(self.debug, 'thread results', thread_results)
+
+        if any((isinstance(result, Exception) for result in thread_results)):
             self.error('At least one guest setup failed')
             self.error('Note: see detailed exception in debug log for more information')
 
@@ -227,15 +252,12 @@ class RestraintScheduler(gluetool.Module):
             # first custom exception we find.
 
             def _raise_first(check):
-                # how to find the first item in the list: create a generator returning only those items
-                # that match a condition (by calling check()), and calling next() on it will return
-                # its first item (or None, in this case).
-                error = next((thread.result for thread in setup_threads if check(thread.result)), None)
+                suitable = [result for result in thread_results if check(result)]
 
-                if error is None:
+                if not suitable:
                     return
 
-                raise error
+                raise suitable[0]
 
             # Soft errors have precedence - the let user know something bad happened, which is better
             # than just "infrastructure error".
@@ -246,8 +268,6 @@ class RestraintScheduler(gluetool.Module):
 
             # Ok, no custom exception, maybe just some Python ones - kill the pipeline.
             raise GlueError('At least one guest setup failed')
-
-        self._log_schedule('partial schedule #{}'.format(partial_index), schedule)
 
         return schedule
 
@@ -292,13 +312,6 @@ class RestraintScheduler(gluetool.Module):
             raise NoTestableArtifactsError(self.shared('primary_task'))
 
         # workflow-tomorrow
-        jobs = self._run_wow()
+        self._schedule = self._create_schedule()
 
-        self._schedule = []
-
-        for i, job in enumerate(jobs):
-            log_xml(self.debug, 'job #{} as planned by wow'.format(i), job)
-
-            self._schedule += self.create_schedule(job, i)
-
-        self._log_schedule('complete schedule', self._schedule)
+        self._log_schedule('final schedule', self._schedule)

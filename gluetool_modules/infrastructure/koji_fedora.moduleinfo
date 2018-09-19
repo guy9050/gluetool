@@ -18,7 +18,7 @@ dependencies:
     # related tools (e.g. Docker image building playbook)
     # - https://releases.pagure.org/koji/koji-1.16.0.tar.bz2
     - pyOpenSSL==17.0.0
-    - beautifulsoup4==4.5.3
+    - beautifulsoup4==4.6.3
     - rpm-py-installer==0.7.1
 
   ansible_tasks:

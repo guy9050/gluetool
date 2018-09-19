@@ -64,11 +64,11 @@ def test_covscan(module, monkeypatch):
     nvr = 'dummy_nvr'
     task_id = 'dummy_task_id'
     brew_url = 'dummy_brew_url'
-    latest = 'dummy_baseline'
+    baseline_nvr = 'dummy_baseline_nvr'
     covscan_url = 'dummy_covscan_url'
     overall_results = 'dummy_overall_results'
 
-    mocked_task = MagicMock(nvr=nvr, scratch=True, id=task_id, url=brew_url, latest=latest)
+    mocked_task = MagicMock(nvr=nvr, scratch=True, id=task_id, url=brew_url, latest=baseline_nvr)
     mocked_covscan_result = MagicMock(url=covscan_url, add=[], fixed=[])
     mocked_result = CovscanTestResult(module.glue, overall_results, mocked_covscan_result, mocked_task)
     mocked_publish = MagicMock()
@@ -99,26 +99,26 @@ def test_covscan(module, monkeypatch):
     assert message1.headers['testcase'] == 'dist.covscan'
     assert message1.headers['scratch']
     assert message1.headers['taskid'] == task_id
-    assert message1.headers['item'] == '{} {}'.format(nvr, latest)
+    assert message1.headers['item'] == '{} {}'.format(nvr, baseline_nvr)
 
     assert message2.headers['CI_TYPE'] == 'resultsdb'
     assert message2.headers['type'] == 'koji_build_pair'
     assert message2.headers['testcase'] == 'dist.covscan'
     assert message2.headers['scratch']
     assert message2.headers['taskid'] == task_id
-    assert message2.headers['item'] == '{} {}'.format(nvr, latest)
+    assert message2.headers['item'] == '{} {}'.format(nvr, baseline_nvr)
 
-    assert message1.body['data']['item'] == '{} {}'.format(nvr, latest)
+    assert message1.body['data']['item'] == '{} {}'.format(nvr, baseline_nvr)
     assert message1.body['data']['newnvr'] == nvr
-    assert message1.body['data']['oldnvr'] == latest
+    assert message1.body['data']['oldnvr'] == baseline_nvr
     assert message1.body['data']['scratch']
     assert message1.body['data']['taskid'] == task_id
     assert message1.body['outcome'] == overall_results
     assert message1.body['ref_url'] == covscan_url
 
-    assert message2.body['data']['item'] == '{} {}'.format(nvr, latest)
+    assert message2.body['data']['item'] == '{} {}'.format(nvr, baseline_nvr)
     assert message2.body['data']['newnvr'] == nvr
-    assert message2.body['data']['oldnvr'] == latest
+    assert message2.body['data']['oldnvr'] == baseline_nvr
     assert message2.body['data']['scratch']
     assert message2.body['data']['taskid'] == task_id
     assert message2.body['outcome'] == overall_results
