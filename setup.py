@@ -26,6 +26,9 @@ DESCRIPTION = 'Gluetool & Citool modules'
 #    sys.exit(1)
 
 INSTALL_REQUIRES = [
+    # required by all...
+    "typing==3.6.6",
+
     # required to build documentation - workaround, this will end up in gluetool upstream
     "commonmark==0.8.0",
 
