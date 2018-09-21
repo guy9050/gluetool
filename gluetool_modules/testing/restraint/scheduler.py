@@ -175,8 +175,8 @@ class RestraintScheduler(gluetool.Module):
             # That will be passed to the provisioning modules. This module does not have to know it.
 
             testing_env = TestingEnvironment(
-                distro=recipe_set.find('distroRequires').find('distro_name')['value'],
-                arch=recipe_set.find('distroRequires').find('distro_arch')['value']
+                distro=recipe_set.find('distroRequires').find('distro_name')['value'].encode('ascii'),
+                arch=recipe_set.find('distroRequires').find('distro_arch')['value'].encode('ascii')
             )
 
             log_xml(self.debug, 'recipe set #{}'.format(i), recipe_set)
