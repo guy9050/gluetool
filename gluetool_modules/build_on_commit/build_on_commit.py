@@ -4,7 +4,7 @@ import shutil
 
 import gluetool
 from gluetool import GlueCommandError, GlueError, SoftGlueError
-from gluetool.utils import cached_property, check_for_commands, run_command, PatternMap
+from gluetool.utils import cached_property, check_for_commands, Command, PatternMap
 
 # Required commands
 # rhpkg, rpmbuild - for building scratch build
@@ -20,6 +20,14 @@ class BocBuildError(SoftGlueError):
         self.component = component
         self.target = target
         self.task_url = task_url
+
+
+class BocNoBranchError(SoftGlueError):
+    def __init__(self, branch, component):
+        super(BocNoBranchError, self).__init__('Branch {} not found in git for {}'.format(branch, component))
+
+        self.branch = branch
+        self.component = component
 
 
 class CIBuildOnCommit(gluetool.Module):
@@ -69,18 +77,6 @@ class CIBuildOnCommit(gluetool.Module):
         Checks that required commands are available on the host.
         """
         check_for_commands(REQUIRED_CMDS)
-
-    def _run_command(self, command, exception=None):
-        try:
-            return run_command(command)
-        except GlueCommandError as exc:
-            error = exc.output.stdout.rstrip("'\n") + exc.output.stderr.rstrip("'\n")
-
-            # call a custom exception
-            if exception:
-                raise exception(self.branch, self.component, self.target, self.task_url)
-
-            raise GlueError("failure during '{}' execution\n{}'".format(command[0], error))
 
     def set_build_name(self, label):
         """
@@ -133,7 +129,12 @@ class CIBuildOnCommit(gluetool.Module):
         self.info("cloning repository of '{}', branch '{}'".format(component, branch))
         git_args = ["--depth", "1", "--single-branch", "--branch", branch]
         command = ["git", "clone", os.path.join(self.option('git-base-url'), component)] + git_args
-        self._run_command(command)
+        try:
+            Command(command).run()
+        except GlueCommandError as exc:
+            if "Remote branch {} not found in upstream origin".format(self.branch) in exc.output.stderr:
+                raise BocNoBranchError(self.branch, self.component)
+            raise exc
 
         # schedule scratch build
         msg = ['scheduling scratch build of component']
@@ -144,7 +145,7 @@ class CIBuildOnCommit(gluetool.Module):
             "--target", target, "--nowait"
         ]
 
-        output = self._run_command(command)
+        output = Command(command).run()
 
         # detect brew task id
         taskid = re.search(".*Created task: [0-9]+", output.stdout, re.M).group()
@@ -165,7 +166,10 @@ class CIBuildOnCommit(gluetool.Module):
 
         # wait until brew task finish
         command = ["brew", "watch-task", taskid]
-        self._run_command(command, exception=BocBuildError)
+        try:
+            Command(command).run()
+        except GlueCommandError as exc:
+            raise BocBuildError(self.branch, self.component, self.target, self.task_url)
 
         # if self.has_shared('report_pipeline_state'):
         #    self.shared('report_pipeline_state', 'finished', artifact={
