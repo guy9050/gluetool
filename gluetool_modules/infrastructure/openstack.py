@@ -1221,6 +1221,8 @@ class CIOpenstack(gluetool.Module):
 
         assert count >= 1, 'count needs to >= 1'
 
+        self.info('provisioning guest for environment {}'.format(environment))
+
         image = self._provision_image(image)
 
         # get flavor reference
