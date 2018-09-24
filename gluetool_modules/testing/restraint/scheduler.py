@@ -1,10 +1,14 @@
 import collections
 import shlex
 
+import concurrent.futures
+
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
-from gluetool.log import log_dict, log_xml, format_xml
+from gluetool.log import log_dict, log_xml, ContextAdapter
 from libci.sentry import PrimaryTaskFingerprintsMixin
+
+from six import reraise
 
 
 #: Testing environment description.
@@ -37,16 +41,54 @@ class NoTestableArtifactsError(PrimaryTaskFingerprintsMixin, SoftGlueError):
         super(NoTestableArtifactsError, self).__init__(task, message)
 
 
+class ScheduleEntryAdapter(ContextAdapter):
+    def __init__(self, logger, job_index, recipe_set_index):
+        super(ScheduleEntryAdapter, self).__init__(logger, {
+            'ctx_schedule_entry_index': (200, 'schedule entry J#{}-RS#{})'.format(job_index, recipe_set_index))
+        })
+
+
+class ScheduleEntry(object):
+    # pylint: disable=too-few-public-methods
+
+    """
+    Internal representation of stuff to run, where to run and other bits necessary for scheduling
+    all things the module was asked to perform.
+
+    :param logger: logger used as a parent of this entry's own logger.
+    :param int job_index: index of job within all jobs this entry belongs to.
+    :param int recipe_set_index: index of recipe set within its job this entry belongs to.
+    :param xml recipe_set: XML description of (Beaker) recipe set this entry handles.
+    """
+
+    def __init__(self, logger, job_index, recipe_set_index, recipe_set):
+        self.logger = ScheduleEntryAdapter(logger, job_index, recipe_set_index)
+        self.logger.connect(self)
+
+        self.recipe_set = recipe_set
+
+        self.testing_environment = None
+        self.guest = None
+
+
 class RestraintScheduler(gluetool.Module):
     """
-    Prepares "schedule" for runners. It uses workflow-tomorrow - with options
-    provided by the user - to prepare a list of recipe sets, then it acquire
-    required number of guests, and hands this to whoever will actually run
-    the recipe sets.
+    Prepares "schedule" for other modules to perform. A schedule is a list of (Beaker-compatible) XML
+    descriptions of recipes paired with guests. Following modules can then use these guests to perform
+    whatever necessary to achieve results for XML prescriptions.
+
+    Schedule creation has following phases:
+
+        * XML descriptions of jobs are acquired by calling ``beaker_job_xml`` shared function;
+        * these jobs are split to recipe sets, and each recipe set is used to extract a testing environment
+          it requires for testing;
+        * for every testing environment, a guest is provisioned (processes all environments in parallel);
+        * each guest is set up by calling ``setup_guest`` shared function indirectly (processes all guests
+          in parallel as well).
     """
 
     name = 'restraint-scheduler'
-    description = 'Prepares "schedule" for runners of restraint.'
+    description = 'Prepares "schedule" for ``restraint`` runners.'
 
     # pylint: disable=gluetool-option-hard-default
     options = {
@@ -141,135 +183,211 @@ class RestraintScheduler(gluetool.Module):
     def _log_schedule(self, label, schedule):
         self.debug('{}:'.format(label))
 
-        for guest, recipe_set in schedule:
-            gluetool.log.log_blob(self.debug, str(guest), format_xml(recipe_set))
+        for schedule_entry in schedule:
+            schedule_entry.debug('testing environment: {}'.format(schedule_entry.testing_environment))
+            schedule_entry.debug('guest: {}'.format(schedule_entry.guest))
+            log_xml(schedule_entry.debug, 'recipe set', schedule_entry.recipe_set)
 
-    def _create_job_schedule(self, job_desc, partial_index):
+    def _create_job_schedule(self, index, job):
         """
-        Main workhorse - given the job XML, get necessary guests and assign recipe sets to these guests.
+        For a given job XML, extract recipe sets and their corresponding testing environments.
 
-        :param xml job_desc: Job XML description.
-        :param int partial_index: ``create_schedule`` may be called multiple times, once for each
-            known job description. This number helps recognize them in the log.
+        :param int index: index of the ``job`` in greater scheme of things - used for logging purposes.
+        :param xml job: job XML description.
+        :rtype: list(ScheduleEntry)
         """
 
-        self.require_shared('provision')
-
-        log_xml(self.debug, 'full job description', job_desc)
+        log_xml(self.debug, 'full job description', job)
 
         schedule = []
 
-        recipe_sets = job_desc.find_all('recipeSet')
-
-        self.info('job contains {} recipe sets, asking for guests'.format(len(recipe_sets)))
-
-        # there are tags that make not much sense for restraint - we'll filter them out
-        def _remove_tags(recipe_set, name):
-            self.debug("removing tags '{}'".format(name))
-
-            for tag in recipe_set.find_all(name):
-                tag.decompose()
+        recipe_sets = job.find_all('recipeSet')
 
         for i, recipe_set in enumerate(recipe_sets):
             # From each recipe, extract distro and architecture, and construct testing environment description.
             # That will be passed to the provisioning modules. This module does not have to know it.
 
-            testing_env = TestingEnvironment(
+            schedule_entry = ScheduleEntry(self.logger, index, i, recipe_set)
+
+            schedule_entry.testing_environment = TestingEnvironment(
                 distro=recipe_set.find('distroRequires').find('distro_name')['value'].encode('ascii'),
                 arch=recipe_set.find('distroRequires').find('distro_arch')['value'].encode('ascii')
             )
 
-            log_xml(self.debug, 'recipe set #{}'.format(i), recipe_set)
-            log_dict(self.debug, 'testing environment #{}'.format(i), testing_env)
-
-            guests = self.shared('provision', testing_env, count=1)
-
-            if not guests:
-                raise GlueError('No guests provisioned.')
+            log_xml(schedule_entry.debug, 'full recipe set', schedule_entry.recipe_set)
+            log_dict(schedule_entry.debug, 'testing environment', schedule_entry.testing_environment)
 
             # remove tags we want to filter out
             for tag in ('distroRequires', 'hostRequires', 'repos', 'partitions'):
-                _remove_tags(recipe_set, tag)
+                schedule_entry.debug("removing tags '{}'".format(tag))
 
-            log_xml(self.debug, 'purified recipe set #{}'.format(i), recipe_set)
+                for element in schedule_entry.recipe_set.find_all(tag):
+                    element.decompose()
 
-            schedule.append((guests[0], recipe_set))
+            log_xml(schedule_entry.debug, 'purified recipe set', schedule_entry.recipe_set)
 
-        self._log_schedule('partial schedule #{}'.format(partial_index), schedule)
+            schedule.append(schedule_entry)
+
+        self._log_schedule('job #{} schedule'.format(index), schedule)
 
         return schedule
 
-    def _create_schedule(self):
-        jobs = self._run_wow()
+    def _handle_futures_errors(self, errors, exception_label, exception_message):
+        """
+        Take care of reporting exceptions gathered from futures, and re-raise
+        one of them - or a new, generic one - to report a phase of scheduling process failed.
 
-        self.info('scheduling {} jobs'.format(len(jobs)))
+        :param list(tuple(ScheduleEntry, exception info)) errors: schedule entries and their corresponding
+            exceptions
+        :param str exception_label: a label used for logging exceptions
+        :param str exception_message: a message used when raising generic exception.
+        """
 
-        schedule = []
+        self.debug('at least one future failed')
 
-        # for each job, provision necessary guests
-        for i, job in enumerate(jobs):
-            log_xml(self.debug, 'job #{} as planned by wow'.format(i), job)
+        # Report all exceptions to log and to the Sentry - at max, just a single one would be re-raised,
+        # the rest of them might go unnoticed because they were raised *and* captured.
+        for schedule_entry, exc_info in errors:
+            schedule_entry.error(exception_label, exc_info=exc_info)
 
-            schedule += self._create_job_schedule(job, i)
+            self.glue.sentry_submit_exception(gluetool.Failure(self, exc_info), logger=schedule_entry.logger)
 
-        self._log_schedule('complete schedule', schedule)
+        # filter exceptions using given ``check`` callback, and raise the first suitable one - or return back
+        def _raise_first(check):
+            for schedule_entry, exc_info in errors:
+                if not check(exc_info):
+                    continue
+
+                schedule_entry.error('terminating schedule creation')
+
+                reraise(*exc_info)
+
+        # Soft errors have precedence - the let user know something bad happened, which is better
+        # than just "infrastructure error".
+        _raise_first(lambda exc: isinstance(exc[1], SoftGlueError))
+
+        # Then common CI errors
+        _raise_first(lambda exc: isinstance(exc[1], GlueError))
+
+        # Ok, no custom exception, maybe just some Python ones - kill the pipeline.
+        raise GlueError(exception_message)
+
+    def _provision_guests(self, schedule):
+        """
+        Provision guests for schedule entries.
+
+        :param list(ScheduleEntry) schedule: Schedule to provision guests for.
+        """
+
+        self.debug('provisioning guests')
+
+        # for each schedule entry, create a setup thread running shared function ``provision`` for
+        # given testing environment
+        futures = {}
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(schedule),
+                                                   thread_name_prefix='provision-thread') as executor:
+            for schedule_entry in schedule:
+                schedule_entry.debug('planning guest for environment: {}'.format(schedule_entry.testing_environment))
+
+                future = executor.submit(self.get_shared('provision'), schedule_entry.testing_environment)
+                futures[future] = schedule_entry
+
+            self.info('waiting for guests to become available for setup')
+
+        # gather errors, and handle them if necessary
+        errors = []
+
+        for future in concurrent.futures.as_completed(futures):
+            schedule_entry = futures[future]
+
+            if future.exception() is None:
+                # provisioning succeeded - store returned guest in the schedule entry
+                schedule_entry.guest = future.result()[0]
+                continue
+
+            exc_info = future.exception_info()
+
+            # Exception info returned by future does not contain exception class while the info returned
+            # by sys.exc_info() does and all users of it expect the first item to be exception class.
+            exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
+
+            errors.append((schedule_entry, exc_info))
+
+        if errors:
+            self._handle_futures_errors(errors, 'Provisioning failed', 'At least one provisioning attempt failed')
+
+    def _setup_guests(self, schedule):
+        """
+        Setup all guests of a schedule.
+
+        :param list(ScheduleEntry) schedule: Schedule listing guests to set up.
+        """
 
         self.debug('setting up the guests')
 
-        setup_threads = []
+        # for each schedule entry, create a setup thread running ``guest.setup``
+        futures = {}
 
-        for i, (guest, recipe_set) in enumerate(schedule):
-            self.debug('guest #{}: {}'.format(i, guest))
-            log_xml(self.debug, 'recipe set #{}'.format(i), recipe_set)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(schedule),
+                                                   thread_name_prefix='setup-thread') as executor:
+            for schedule_entry in schedule:
+                schedule_entry.debug('planning setup of guest: {}'.format(schedule_entry.guest))
 
-            # setup guest
-            thread_name = 'setup-guest-{}'.format(guest.name)
-            thread = utils.WorkerThread(guest.logger,
-                                        guest.setup,
-                                        name=thread_name)
-            setup_threads.append(thread)
+                future = executor.submit(schedule_entry.guest.setup)
+                futures[future] = schedule_entry
 
-            thread.start()
-            self.debug("setup thread '{}' started".format(thread_name))
+            self.info('waiting for guests to finish their initial setup')
 
-        self.info('waiting for all guests to finish their initial setup')
-        for thread in setup_threads:
-            thread.join()
+        # gather errors, and handle them if necessary
+        errors = []
 
-        thread_results = [
-            thread.result for thread in setup_threads
+        for future in concurrent.futures.as_completed(futures):
+            schedule_entry = futures[future]
+
+            if future.exception() is None:
+                continue
+
+            exc_info = future.exception_info()
+            exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
+
+            errors.append((schedule_entry, exc_info))
+
+        if errors:
+            self._handle_futures_errors(errors, 'Guest setup failed', 'At least one guest setup failed')
+
+    def _create_jobs_schedule(self, jobs):
+        """
+        Create schedule for given set of jobs.
+
+        :param list(xml) jobs: List of jobs - in their XML representation, as scheduled
+            by e.g. ``workflow-tomorrow`` - to schedule.
+        :rtype: list(tuple(libci.guest.Guest, xml))
+        """
+
+        self.info('creating schedule for {} jobs'.format(len(jobs)))
+
+        schedule = []
+
+        # for each job, create a schedule entries for its recipe sets, and put them all on one pile
+        for i, job in enumerate(jobs):
+            schedule += self._create_job_schedule(i, job)
+
+        self._log_schedule('complete schedule', schedule)
+
+        # provision guests for schedule entries - use their testing environments and use provisioning modules
+        self._provision_guests(schedule)
+        self._log_schedule('complete schedule with guests', schedule)
+
+        # setup guests
+        self._setup_guests(schedule)
+
+        self._log_schedule('final schedule', schedule)
+
+        # strip away our internal info - all our customers are interested in are recipe sets and guests
+        return [
+            (schedule_entry.guest, schedule_entry.recipe_set) for schedule_entry in schedule
         ]
-
-        log_dict(self.debug, 'thread results', thread_results)
-
-        if any((isinstance(result, Exception) for result in thread_results)):
-            self.error('At least one guest setup failed')
-            self.error('Note: see detailed exception in debug log for more information')
-
-            # This is strange - we can have N threads, M of them failed with an exception, but we can
-            # kill pipeline only with a single one. They are all logged, though, so there should not
-            # be any loss of information. Not having a better idea, let's kill pipeline with the
-            # first custom exception we find.
-
-            def _raise_first(check):
-                suitable = [result for result in thread_results if check(result)]
-
-                if not suitable:
-                    return
-
-                raise suitable[0]
-
-            # Soft errors have precedence - the let user know something bad happened, which is better
-            # than just "infrastructure error".
-            _raise_first(lambda result: isinstance(result, SoftGlueError))
-
-            # Then common CI errors
-            _raise_first(lambda result: isinstance(result, GlueError))
-
-            # Ok, no custom exception, maybe just some Python ones - kill the pipeline.
-            raise GlueError('At least one guest setup failed')
-
-        return schedule
 
     def execute(self):
         self.require_shared('primary_task', 'restraint')
@@ -312,6 +430,4 @@ class RestraintScheduler(gluetool.Module):
             raise NoTestableArtifactsError(self.shared('primary_task'))
 
         # workflow-tomorrow
-        self._schedule = self._create_schedule()
-
-        self._log_schedule('final schedule', self._schedule)
+        self._schedule = self._create_jobs_schedule(self._run_wow())
