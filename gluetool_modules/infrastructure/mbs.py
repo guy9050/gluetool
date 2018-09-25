@@ -6,14 +6,14 @@ from gluetool.log import log_dict
 
 
 class MBSApi(object):
-    # pylint: disable=too-few-public-methods
 
-    def __init__(self, mbs_url, module):
-        self.mbs_url = mbs_url
+    def __init__(self, mbs_api_url, mbs_ui_url, module):
+        self.mbs_api_url = mbs_api_url
+        self.mbs_ui_url = mbs_ui_url
         self.module = module
 
     def _get_json(self, location):
-        url = '{}/{}'.format(self.mbs_url, location)
+        url = '{}/{}'.format(self.mbs_api_url, location)
 
         self.module.debug('[MBS API]: {}'.format(url))
 
@@ -28,19 +28,24 @@ class MBSApi(object):
     def get_module_build(self, build_id):
         return self._get_json('module-build-service/1/module-builds/{}'.format(build_id))
 
+    def get_build_ui_url(self, build_id):
+        return '{}/modules/{}'.format(self.mbs_ui_url, build_id)
+
 
 class MBSTask(object):
     # pylint: disable=too-few-public-methods
 
     ARTIFACT_NAMESPACE = 'mbs-build'
 
-    def __init__(self, task_id, module):
+    def __init__(self, build_id, module):
+        # pylint: disable=invalid-name
+        self.id = build_id
 
         self.module = module
 
         mbs_api = module.mbs_api()
 
-        build_info = mbs_api.get_module_build(task_id)
+        build_info = mbs_api.get_module_build(build_id)
 
         self.name = build_info['name']
         self.stream = build_info['stream']
@@ -58,11 +63,15 @@ class MBS(gluetool.Module):
     description = 'Provides information about MBS (Module Build Service) artifact'
 
     options = {
+        'mbs-ui-url': {
+            'help': 'URL of mbs ui server.',
+            'type': str
+        },
         'mbs-api-url': {
             'help': 'URL of mbs api server.',
             'type': str
         },
-        'task-id': {
+        'build-id': {
             'help': 'MBS id',
             'type': str
         },
@@ -73,7 +82,7 @@ class MBS(gluetool.Module):
         }
     }
 
-    required_options = ('mbs-api-url', 'task-id')
+    required_options = ('mbs-api-url', 'build-id')
 
     shared_functions = ['primary_task', 'tasks', 'mbs_api']
 
@@ -118,15 +127,15 @@ class MBS(gluetool.Module):
 
     @cached_property
     def _mbs_api(self):
-        return MBSApi(self.option('mbs-api-url'), self)
+        return MBSApi(self.option('mbs-api-url'), self.option('mbs-ui-url'), self)
 
     def mbs_api(self):
         return self._mbs_api
 
     def execute(self):
-        task_id = self.option('task-id')
+        build_id = self.option('build-id')
 
-        self.task = MBSTask(task_id, self)
+        self.task = MBSTask(build_id, self)
         self._tasks = [self.task]
 
-        self.info('Init from task_id: {}'.format(task_id))
+        self.info('Init using build {} ({})'.format(build_id, self._mbs_api.get_build_ui_url(build_id)))
