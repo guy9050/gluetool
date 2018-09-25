@@ -351,7 +351,7 @@ class TestBatchPlanner(gluetool.Module):
                     continue
 
                 if match.group() != component:
-                    self.warn("match '{}' is not equal to component '{}'".format(match.group(), component), sentry=True)
+                    self.debug("match '{}' is not equal to component '{}'".format(match.group(), component))
                     continue
 
             except re.error as exc:
