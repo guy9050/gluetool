@@ -30,6 +30,11 @@ class BeakerGuest(NetworkedGuest):
     Implements Beaker guest.
     """
 
+    def __init__(self, module, fqdn, is_static=False, **kwargs):
+        super(BeakerGuest, self).__init__(module, fqdn, **kwargs)
+
+        self._is_static = is_static
+
     def _is_allowed_degraded(self, service):
         self.debug("service '{}' is degraded, check whether it's allowed".format(service))
 
@@ -96,6 +101,9 @@ class BeakerGuest(NetworkedGuest):
         except GlueError as exc:
             raise GlueError('Guest failed to become alive: {}'.format(exc.message))
 
+    def _extend_reservation(self):
+        self.execute('extendtesttime.sh <<< 99')
+
     #
     # "Public" API
     #
@@ -104,6 +112,13 @@ class BeakerGuest(NetworkedGuest):
 
     def create_snapshot(self, start_again=True):
         raise NotImplementedError()
+
+    def destroy(self):
+        if self._is_static:
+            return
+
+        # pylint: disable=protected-access
+        self._module._release_dynamic_guest(self)
 
 
 class BeakerProvisioner(gluetool.Module):
@@ -170,6 +185,11 @@ class BeakerProvisioner(gluetool.Module):
 
     shared_functions = ('provision', 'provisioner_capabilities')
 
+    def __init__(self, *args, **kwargs):
+        super(BeakerProvisioner, self).__init__(*args, **kwargs)
+
+        self._dynamic_guests = []
+
     @cached_property
     def degraded_services_map(self):
         if not self.option('degraded-services-map'):
@@ -179,11 +199,20 @@ class BeakerProvisioner(gluetool.Module):
 
     @cached_property
     def static_guests(self):
-        return [
-            StaticGuestDefinition(fqdn, arch) for fqdn, arch in [
-                definition.split(':') for definition in normalize_multistring_option(self.option('static-guest'))
-            ]
-        ]
+        guests = []
+
+        for guest_spec in normalize_multistring_option(self.option('static-guest')):
+            try:
+                fqdn, arch = guest_spec.split(':')
+
+            except ValueError:
+                raise GlueError("Static guest format is FQDN:ARCH, '{}' is not correct".format(guest_spec))
+
+            guests.append(StaticGuestDefinition(fqdn, arch))
+
+        log_dict(self.debug, 'static guest pool', guests)
+
+        return guests
 
     def provisioner_capabilities(self):
         """
@@ -192,59 +221,205 @@ class BeakerProvisioner(gluetool.Module):
         Follows :doc:`Provisioner Capabilities Protocol </protocols/provisioner-capabilities>`.
         """
 
+        if self.static_guests:
+            return ProvisionerCapabilities(
+                available_arches=[
+                    guest.arch for guest in self.static_guests
+                ]
+            )
+
         return ProvisionerCapabilities(
             available_arches=[
-                guest.arch for guest in self.static_guests
+                'x86_64', 'aarch64', 'ppc64', 'ppc64le', 's390x'
             ]
         )
 
-    def provision(self, environment, **kwargs):
-        # pylint: disable=unused-argument
+    def _acquire_dynamic_guests_from_beaker(self, environment):
+        """
+        Provision guests by reserving them in Beaker pool..
 
-        log_dict(self.debug, 'provision for environment', environment)
+        :param tuple environment: description of the envronment caller wants to provision.
+            Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
+        :rtype: list(BeakerGuest)
+        :returns: List of provisioned guests.
+        """
 
+        self.require_shared('beaker_job_xml', 'beaker_jobwatch',
+                            'submit_beaker_jobs', 'beaker_jobs_results', 'parse_beaker_matrix_url')
+
+        ssh_user = self.option('ssh-user')
+        ssh_key = normalize_path(self.option('ssh-key'))
         ssh_options = normalize_multistring_option(self.option('ssh-options'))
 
-        static_guests = normalize_multistring_option(self.option('static-guest'))
+        jobs = self.shared('beaker_job_xml', body_options=[
+            '--no-reserve',
+            '--task=/distribution/utils/dummy',
+            '--last-task=RESERVETIME=24h /distribution/reservesys'
+        ], options=[
+            '--arch', environment.arch
+        ])
+
+        for i, job in enumerate(jobs):
+            gluetool.log.log_xml(self.debug, 'job {}#'.format(i), job)
+
+        beaker_ids = self.shared('submit_beaker_jobs', jobs)
+
+        _, matrix_url = self.shared('beaker_jobwatch', beaker_ids,
+                                    end_task='/distribution/utils/dummy', inspect=False)
+
+        self.debug('matrix url: {}'.format(matrix_url))
+
+        matrix_url_info = self.shared('parse_beaker_matrix_url', matrix_url)
+        self.debug('matrix URL info: {}'.format(matrix_url_info))
+
+        results = self.shared('beaker_jobs_results', matrix_url_info.job_ids)
+        self.debug('all results: {}'.format(results))
+
+        systems = []
+        for result in results.itervalues():
+            for recipe_set in result.find_all('recipeSet', response='ack'):
+                for recipe in recipe_set.find_all('recipe'):
+                    if not recipe.get('system'):
+                        continue
+
+                    systems.append(recipe.get('system').encode('ascii'))
+
+        log_dict(self.debug, 'systems', systems)
+
+        guests = [
+            BeakerGuest(self, fqdn,
+                        is_static=False,
+                        name=fqdn,
+                        username=ssh_user,
+                        key=ssh_key,
+                        options=ssh_options,
+                        arch=environment.arch)
+            for fqdn in systems
+        ]
+
+        log_dict(self.debug, 'guests', guests)
+
+        self._dynamic_guests += guests
+
+        return guests
+
+    def _acquire_dynamic_guests(self, environment):
+        """
+        Provision guests dynamically.
+
+        :param tuple environment: description of the envronment caller wants to provision.
+            Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
+        :rtype: list(BeakerGuest)
+        :returns: List of provisioned guests.
+        """
+
+        # One day in the future, an internal cache of provisioned guests will be held.
+        # guests = self._acquire_dynamic_guest_from_cache(environment)
+
+        # if guests:
+        #    return guests
+
+        return self._acquire_dynamic_guests_from_beaker(environment)
+
+    def _release_dynamic_guest(self, guest):
+        # pylint: disable=no-self-use
+        """
+        Mark the guest as no longer in user.
+
+        In the future, the guest will be added to a cache, at this moment it is simply returned
+        back to Beaker's pool.
+
+        :param BeakerGuest guest: guest to release.
+        """
+
+        guest.execute('return2beaker.sh')
+
+    def _provision_dynamic_guests(self, environment):
+        """
+        Provision guests dynamically by either finding them in a cache or by picking new ones from
+        Beaker pool.
+
+        :param tuple environment: description of the envronment caller wants to provision.
+            Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
+        :rtype: list(BeakerGuest)
+        :returns: List of provisioned guests.
+        """
+
+        return self._acquire_dynamic_guests(environment)
+
+    def _provision_static_guests(self, environment):
+        """
+        Provision guests stacially. The list of known "static" guests is used as a "pool" from which
+        matching guests are picked.
+
+        :param tuple environment: description of the envronment caller wants to provision.
+            Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
+        :rtype: list(BeakerGuest)
+        :returns: List of provisioned guests.
+        """
 
         guests = []
 
-        for guest_spec in static_guests:
-            try:
-                fqdn, arch = guest_spec.split(':')
+        for guest_def in self.static_guests:
+            self.debug('possible static guest: {}'.format(guest_def))
 
-            except ValueError:
-                raise GlueError("Static guest format is FQDN:ARCH, '{}' is not correct".format(guest_spec))
-
-            self.debug('possible static guest: {} ({})'.format(fqdn, arch))
-
-            if environment.arch != arch:
+            if environment.arch != guest_def.arch:
                 self.debug('  incompatible architecture')
                 continue
 
             # `arch` is valid keyword arg, but pylint doesn't agree... no idea why
             # pylint: disable=unexpected-keyword-arg
-            guest = BeakerGuest(self, fqdn,
-                                name=fqdn,
+            guest = BeakerGuest(self, guest_def.fqdn,
+                                is_static=True,
+                                name=guest_def.fqdn,
                                 username=self.option('ssh-user'),
                                 key=normalize_path(self.option('ssh-key')),
-                                options=ssh_options,
-                                arch=arch)
+                                options=normalize_multistring_option(self.option('ssh-options')),
+                                arch=guest_def.arch)
 
             guests.append(guest)
+
+        return guests
+
+    def provision(self, environment, **kwargs):
+        # pylint: disable=unused-argument
+        """
+        Provision (possibly multiple) guests backed by Beaker machines.
+
+        :param tuple environment: description of the envronment caller wants to provision.
+            Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
+        """
+
+        log_dict(self.debug, 'provision for environment', environment)
+
+        if self.option('static-guest'):
+            guests = self._provision_static_guests(environment)
+
+        else:
+            guests = self._provision_dynamic_guests(environment)
 
         if not guests:
             raise GlueError('Cannot provision a guest for given environment')
 
-        self.debug('created {} guests, waiting for them to become alive'.format(len(guests)))
+        log_dict(self.debug, 'provisioned guests', guests)
+
+        self.debug('waiting for guests to become alive')
 
         for guest in guests:
             # pylint: disable=protected-access
             # guest is already running, check its status before moving on
             guest._wait_alive()
+            guest._extend_reservation()
 
         self.info('provisioned {} guests'.format(len(guests)))
 
-        log_dict(self.debug, 'guests', guests)
-
         return guests
+
+    def destroy(self, failure=None):
+        if not self._dynamic_guests:
+            return
+
+        for guest in self._dynamic_guests:
+            guest.destroy()
+
+        self.info('successfully removed all guests')
