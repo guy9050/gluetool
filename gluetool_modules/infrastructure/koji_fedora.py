@@ -352,8 +352,13 @@ class KojiTask(object):
         """
         Task's source, e.g. git+https://src.fedoraproject.org/rpms/rust-tokio-proto.git?#b59219
 
+        By default try to get from build's info. Fallback to taskinfo's request[0] field.
+
         :rtype: str
         """
+
+        if self.has_build and self._build.get('source', None):
+            return self._build['source']
 
         if self._task_request.source:
             return self._task_request.source
@@ -1471,7 +1476,7 @@ class Koji(gluetool.Module):
             self.tasks(task_ids=task_ids, wait_timeout=wait_timeout)
 
         for task in self._tasks:
-            self.info('initialized task {}'.format(task.full_name))
+            self.info('initialized {}'.format(task.full_name))
 
         for task in self._tasks:
             if not task.has_artifacts:

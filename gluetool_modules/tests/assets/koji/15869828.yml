@@ -52,7 +52,7 @@ listBuilds:
       package_id: 1088
       build_id: 805705
       state: 1
-      source:
+      source: 'fakeSource'
       epoch:
       version: 4.3.43
       completion_ts: 1475224498.93573
