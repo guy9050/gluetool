@@ -1,8 +1,14 @@
+import collections
 import requests
 
 import gluetool
 from gluetool.utils import cached_property
 from gluetool.log import log_dict
+
+#: Information about task architectures.
+#:
+#: :ivar list(str) arches: List of architectures.
+TaskArches = collections.namedtuple('TaskArches', ['arches'])
 
 
 class MBSApi(object):
@@ -57,6 +63,15 @@ class MBSTask(object):
         # this string identifies component in static config file
         self.component_id = '{}:{}'.format(self.name, self.stream)
 
+    @cached_property
+    def task_arches(self):
+        """
+        :rtype: TaskArches
+        :return: information about arches the task was building for
+        """
+
+        return TaskArches([self.module.option('arches')])
+
 
 class MBS(gluetool.Module):
     name = 'mbs'
@@ -78,7 +93,12 @@ class MBS(gluetool.Module):
         'target': {
             'help': 'Value for property target (default: %(default)s).',
             'type': str,
-            'default': 'RHEL-8'
+            'default': 'module-rhel8'
+        },
+        'arches': {
+            'help': 'Value for property arches (default: %(default)s).',
+            'type': str,
+            'default': 'x86_64'
         }
     }
 
