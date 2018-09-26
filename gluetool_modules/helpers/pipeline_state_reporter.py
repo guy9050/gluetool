@@ -185,13 +185,18 @@ class PipelineStateReporter(gluetool.Module):
                                        Test namespace (i.e. prefix) used when constructing ResultsDB testcase name.
                                        See ``test-namespace`` option.
                                        """,
+            'PIPELINE_LABEL': """
+                              Pipeline label - arbitrary string specified by the user to better distinguish this
+                              pipeline from other pipelines taking care of the artifact. See ``--label`` option.
+                              """
         }
 
         return {
             # common for all artifact providers
             'PIPELINE_TEST_TYPE': self.option('test-type'),
             'PIPELINE_TEST_CATEGORY': self.option('test-category'),
-            'PIPELINE_TEST_NAMESPACE': self._get_test_namespace()
+            'PIPELINE_TEST_NAMESPACE': self._get_test_namespace(),
+            'PIPELINE_LABEL': self.option('label')
         }
 
     @gluetool.utils.cached_property
