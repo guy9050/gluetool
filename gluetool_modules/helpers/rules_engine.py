@@ -225,7 +225,7 @@ class RulesEngine(gluetool.Module):
         custom_locals['EXISTS'] = lambda name: name in custom_locals
 
         self.debug('rules: {}'.format(rules))
-        log_dict(self.debug, 'locals', custom_locals)
+        log_dict(self.verbose, 'locals', custom_locals)
 
         result = Rules(rules).eval({}, custom_locals)
 
