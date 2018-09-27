@@ -390,7 +390,7 @@ class BeakerProvisioner(gluetool.Module):
             Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
         """
 
-        log_dict(self.debug, 'provision for environment', environment)
+        self.info('provisioning guest for environment {}'.format(environment))
 
         if self.option('static-guest'):
             guests = self._provision_static_guests(environment)
