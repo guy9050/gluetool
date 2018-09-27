@@ -37,6 +37,7 @@ INSTALL_REQUIRES = [
     "docker-pycreds==0.2.1",
     "docker==2.5.1",
     "enum34==1.1.6",
+    'futures==3.2.0; python_version == "2.7"',  # restraint-scheduler
     "jenkins-job-builder==1.6.2",
     "jenkinsapi==0.3.3",
     "koji",  # composetest
