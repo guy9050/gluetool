@@ -27,8 +27,8 @@ class InstallCoprBuild(gluetool.Module):
 
         self.overloaded_shared('setup_guest', guests, **kwargs)
 
-        primary_task = self.shared('primary_task')
-        rpm_urls = primary_task.rpm_urls
+        tasks = self.shared('tasks')
+        rpm_urls = sum([task.rpm_urls for task in tasks], [])
 
         log_dict(self.debug, 'RPMs to install', rpm_urls)
 
