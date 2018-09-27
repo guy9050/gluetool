@@ -4,7 +4,7 @@ import requests
 
 import gluetool
 from gluetool.utils import cached_property
-from gluetool.log import log_dict
+from gluetool.log import log_dict, log_blob
 
 #: Information about task architectures.
 #:
@@ -18,27 +18,92 @@ class CoprApi(object):
         self.copr_url = copr_url
         self.module = module
 
-    def _get_json(self, url, label):
-        url = '{}/{}'.format(self.copr_url, url)
+    def _api_request(self, url, label, full_url=False):
+        if not full_url:
+            url = '{}/{}'.format(self.copr_url, url)
 
         self.module.debug('[copr API] {}: {}'.format(label, url))
 
         try:
-            output = requests.get(url).json()
+            request = requests.get(url)
         except Exception:
             raise gluetool.GlueError('Unable to get: {}'.format(url))
 
+        return request
+
+    def _get_text(self, url, label, full_url=None):
+        output = self._api_request(url, label, full_url=full_url).text
+        log_blob(self.module.debug, '[copr API] {} output'.format(label), output)
+        return output
+
+    def _get_json(self, url, label, full_url=None):
+        output = self._api_request(url, label, full_url=full_url).json()
         log_dict(self.module.debug, '[copr API] {} output'.format(label), output)
         return output
 
-    def get_href(self, href):
-        return self._get_json(href, '')
-
-    def get_build_info(self, build_id):
+    def _get_build_info(self, build_id):
         return self._get_json('api_2/builds/{}'.format(build_id), 'build info')
 
+    def get_build_info(self, build_id):
+        build_info = self._get_build_info(build_id)
+
+        if build_info.get('message', '') == 'Build with id `{}` not found'.format(build_id):
+            self.module.warn('Build {} not found'.format(build_id))
+
+            return {
+                'package_version': 'UNKNOWN-COPR-VERSION',
+                'package_name': 'UNKNOWN-COPR-COMPONENT'
+            }
+
+        return build_info['build']
+
     def get_build_task_info(self, build_id, chroot_name):
-        return self._get_json('api_2/build_tasks/{}/{}'.format(build_id, chroot_name), 'build tasks info')
+        build_task_info = self._get_json('api_2/build_tasks/{}/{}'.format(build_id, chroot_name), 'build tasks info')
+
+        # copr api actually returns message with {}, no .format() is missing
+        if build_task_info.get('message', '') == 'Build task {} for build {} not found':
+            return {
+                'state': 'UNKNOWN-COPR-STATUS'
+            }
+
+        return build_task_info['build_task']
+
+    def get_project_info(self, build_id):
+        build_info = self._get_build_info(build_id)
+
+        if not build_info.get('_links', ''):
+            return {
+                'owner': 'UNKNOWN-COPR-OWNER',
+                'name': 'UNKNOWN-COPR-PROJECT'
+            }
+
+        return self._get_json(build_info['_links']['project']['href'], 'project info')['project']
+
+    def _result_dir_url(self, build_id, chroot_name):
+        build_task_info = self.get_build_task_info(build_id, chroot_name)
+        return build_task_info.get('result_dir_url', 'UNKNOWN-COPR-RESULT-DIR-URL')
+
+    def get_rpm_names(self, build_id, chroot_name, result_dir_url=None):
+        if not result_dir_url:
+            result_dir_url = self._result_dir_url(build_id, chroot_name)
+
+        if result_dir_url == 'UNKNOWN-COPR-RESULT-DIR-URL':
+            return []
+
+        result_dir_url = '{}/builder-live.log'.format(result_dir_url)
+
+        builder_live_log = self._get_text(result_dir_url, 'builder live log', full_url=True)
+
+        rpm_names = re.findall(r'Wrote: /builddir/build/RPMS/(.*)\.rpm', builder_live_log)
+
+        return rpm_names
+
+    def get_rpm_urls(self, build_id, chroot_name):
+        result_dir_url = self._result_dir_url(build_id, chroot_name)
+
+        rpm_names = self.get_rpm_names(build_id, chroot_name, result_dir_url)
+
+        return ['{}{}.rpm'.format(result_dir_url, rpm_name) for rpm_name in rpm_names]
 
 
 class BuildTaskID(object):
@@ -81,34 +146,11 @@ class CoprTask(object):
 
         self.module = module
 
-        copr_api = module.copr_api()
+        self.copr_api = module.copr_api()
 
-        build_info = copr_api.get_build_info(task_id.build_id)
-
-        if build_info.get('message', '') == 'Build with id `{}` not found'.format(task_id.build_id):
-
-            self.module.warn('Build {} not found'.format(task_id.build_id))
-
-            self._build = {
-                'package_version': 'UNKNOWN-COPR-VERSION',
-                'package_name': 'UNKNOWN-COPR-COMPONENT'
-            }
-            self._project = {
-                'owner': 'UNKNOWN-COPR-OWNER',
-                'name': 'UNKNOWN-COPR-PROJECT'
-            }
-            self._build_task = {
-                'state': 'UNKNOWN-COPR-STATUS'
-            }
-
-        else:
-            self._build = build_info['build']
-
-            project_info = copr_api.get_href(build_info['_links']['project']['href'])
-            self._project = project_info['project']
-
-            build_tasks_info = copr_api.get_build_task_info(task_id.build_id, task_id.chroot_name)
-            self._build_task = build_tasks_info['build_task']
+        self._build = self.copr_api.get_build_info(task_id.build_id)
+        self._build_task = self.copr_api.get_build_task_info(task_id.build_id, task_id.chroot_name)
+        self._project = self.copr_api.get_project_info(task_id.build_id)
 
         self.status = self._build_task['state']
         self.component = self._build['package_name']
@@ -123,18 +165,12 @@ class CoprTask(object):
         self.component_id = '{}/{}/{}'.format(self.owner, self.project, self.component)
 
     @cached_property
+    def rpm_names(self):
+        return self.copr_api.get_rpm_names(self.task_id.build_id, self.task_id.chroot_name)
+
+    @cached_property
     def rpm_urls(self):
-        result_dir_url = '{}/builder-live.log'.format(self._build_task['result_dir_url'])
-        self.module.debug('result_dir_url: {}'.format(result_dir_url))
-        try:
-            builder_live_log = requests.get(result_dir_url).text
-        except Exception:
-            raise gluetool.GlueError('Unable to get: {}'.format(result_dir_url))
-
-        log_dict(self.module.debug, 'builder live log', builder_live_log)
-        rpm_names = re.findall(r'Wrote: /builddir/build/RPMS/(.*\.rpm)', builder_live_log)
-
-        return ['{}/{}'.format(self._build_task['result_dir_url'], rpm_name) for rpm_name in rpm_names]
+        return self.copr_api.get_rpm_urls(self.task_id.build_id, self.task_id.chroot_name)
 
     @cached_property
     def task_arches(self):
@@ -249,8 +285,8 @@ class Copr(gluetool.Module):
     def execute(self):
         build_id, chroot_name = [s.strip() for s in self.option('task-id').split(':')]
 
-        self.debug('build_id: {}'.format(build_id))
-        self.debug('chroot_name {}'.format(chroot_name))
-
-        self.task = CoprTask(BuildTaskID(int(build_id), chroot_name), self)
+        build_task_id = BuildTaskID(int(build_id), chroot_name)
+        self.task = CoprTask(build_task_id, self)
         self._tasks = [self.task]
+
+        self.info('Init using build task {}'.format(build_task_id))
