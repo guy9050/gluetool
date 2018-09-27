@@ -63,6 +63,14 @@ static-analysis-coala:
   script:
     - /usr/bin/coala --non-interactive --config .coafile
 
+# Static analysis - type checking
+static-analysis-type-check:
+  stage: test
+  allow_failure: true
+  image: "docker-registry.engineering.redhat.com/baseos-ci/baseosci-gitlab-cicd-f26"
+  script:
+    - tox -e type-check
+
 # Run integration tests
 #
 # Note: integration tests have - so far - the configuration available. While making use
