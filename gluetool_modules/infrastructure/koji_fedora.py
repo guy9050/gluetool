@@ -1353,7 +1353,7 @@ class Koji(gluetool.Module):
 
     def _assert_tasks(self):
         if not self._tasks:
-            raise GlueError('No tasks specified.')
+            self.warn('No tasks specified.', sentry=True)
 
     def tasks(self, task_ids=None, build_ids=None, nvrs=None, names=None, **kwargs):
         """
@@ -1400,7 +1400,7 @@ class Koji(gluetool.Module):
 
         self._assert_tasks()
 
-        return self._tasks[0]
+        return self._tasks[0] if self._tasks else None
 
     @property
     def eval_context(self):
@@ -1430,6 +1430,10 @@ class Koji(gluetool.Module):
         }
 
         primary_task = self.primary_task()
+
+        if not primary_task:
+            self.warn('No primary task available, cannot pass it to eval_context', sentry=True)
+            return {}
 
         return {
             # common for all artifact providers
