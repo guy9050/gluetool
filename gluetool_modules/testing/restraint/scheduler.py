@@ -283,7 +283,11 @@ class RestraintScheduler(gluetool.Module):
 
         # for each schedule entry, create a setup thread running shared function ``provision`` for
         # given testing environment
+
         futures = {}
+        errors = []
+
+        self.info('provisioning {} guests'.format(len(schedule)))
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(schedule),
                                                    thread_name_prefix='provision-thread') as executor:
@@ -293,26 +297,34 @@ class RestraintScheduler(gluetool.Module):
                 future = executor.submit(self.get_shared('provision'), schedule_entry.testing_environment)
                 futures[future] = schedule_entry
 
-            self.info('waiting for guests to become available for setup')
+            # If we leave context here, the rest of our code would run after all futures finished - context would
+            # block in its __exit__ on executor's state.. That'd be generaly fine but we'd like to inform user about
+            # our progress, and that we can do be checking futures as they complete, one by one, not waiting for the
+            # last one before we start checking them. This thread *will* sleep from time to time, when there's no
+            # complete future available, but that's fine. We'll get our hands on each complete one as soon as
+            # possible, letting user know about the progress.
 
-        # gather errors, and handle them if necessary
-        errors = []
+            for i, future in enumerate(concurrent.futures.as_completed(futures), start=1):
+                remaining_count = len(schedule) - i
 
-        for future in concurrent.futures.as_completed(futures):
-            schedule_entry = futures[future]
+                schedule_entry = futures[future]
 
-            if future.exception() is None:
-                # provisioning succeeded - store returned guest in the schedule entry
-                schedule_entry.guest = future.result()[0]
-                continue
+                if future.exception() is None:
+                    # provisioning succeeded - store returned guest in the schedule entry
+                    self.info('provisioning of guest #{} finished, {} guests pending'.format(i, remaining_count))
 
-            exc_info = future.exception_info()
+                    schedule_entry.guest = future.result()[0]
+                    continue
 
-            # Exception info returned by future does not contain exception class while the info returned
-            # by sys.exc_info() does and all users of it expect the first item to be exception class.
-            exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
+                self.error('provisioning of guest #{} failed, {} guests pending'.format(i, remaining_count))
 
-            errors.append((schedule_entry, exc_info))
+                exc_info = future.exception_info()
+
+                # Exception info returned by future does not contain exception class while the info returned
+                # by sys.exc_info() does and all users of it expect the first item to be exception class.
+                exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
+
+                errors.append((schedule_entry, exc_info))
 
         if errors:
             self._handle_futures_errors(errors, 'Provisioning failed', 'At least one provisioning attempt failed')
@@ -327,7 +339,11 @@ class RestraintScheduler(gluetool.Module):
         self.debug('setting up the guests')
 
         # for each schedule entry, create a setup thread running ``guest.setup``
+
         futures = {}
+        errors = []
+
+        self.info('setting up {} guests'.format(len(schedule)))
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(schedule),
                                                    thread_name_prefix='setup-thread') as executor:
@@ -337,21 +353,21 @@ class RestraintScheduler(gluetool.Module):
                 future = executor.submit(schedule_entry.guest.setup)
                 futures[future] = schedule_entry
 
-            self.info('waiting for guests to finish their initial setup')
+            for i, future in enumerate(concurrent.futures.as_completed(futures), start=1):
+                remaining_count = len(schedule) - i
 
-        # gather errors, and handle them if necessary
-        errors = []
+                schedule_entry = futures[future]
 
-        for future in concurrent.futures.as_completed(futures):
-            schedule_entry = futures[future]
+                if future.exception() is None:
+                    self.info('setup of guest #{} finished, {} guests pending'.format(i, remaining_count))
+                    continue
 
-            if future.exception() is None:
-                continue
+                self.error('setup of guest #{} failed, {} guests pending'.format(i, remaining_count))
 
-            exc_info = future.exception_info()
-            exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
+                exc_info = future.exception_info()
+                exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
 
-            errors.append((schedule_entry, exc_info))
+                errors.append((schedule_entry, exc_info))
 
         if errors:
             self._handle_futures_errors(errors, 'Guest setup failed', 'At least one guest setup failed')
