@@ -59,7 +59,6 @@ class BeakerJobwatch(gluetool.Module):
             raise BeakerJobwatchError(self.shared('primary_task'),
                                       'Could not find beaker matrix URL in jobwatch output')
 
-        self.info(jobwatch_log[-1].strip())
         if jobwatch_log[-1].strip() not in ['finished successfully', 'finished unsuccessfully']:
             raise BeakerJobwatchError(self.shared('primary_task'), 'beaker-jobwatch does not report completion')
 
