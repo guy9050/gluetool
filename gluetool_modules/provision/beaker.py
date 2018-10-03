@@ -99,7 +99,7 @@ class BeakerGuest(NetworkedGuest):
                                    boot_timeout=self._module.option('boot-timeout'), boot_tick=BOOT_TICK)
 
         except GlueError as exc:
-            raise GlueError('Guest failed to become alive: {}'.format(exc.message))
+            raise GlueError('Guest failed to become alive: {}'.format(exc))
 
     def _extend_reservation(self):
         self.execute('extendtesttime.sh <<< 99')
