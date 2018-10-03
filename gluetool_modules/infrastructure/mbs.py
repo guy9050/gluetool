@@ -35,7 +35,7 @@ class MBSApi(object):
         return self._get_json('module-build-service/1/module-builds/{}'.format(build_id))
 
     def get_build_ui_url(self, build_id):
-        return '{}/modules/{}'.format(self.mbs_ui_url, build_id)
+        return '{}/module/{}'.format(self.mbs_ui_url, build_id)
 
 
 class MBSTask(object):
