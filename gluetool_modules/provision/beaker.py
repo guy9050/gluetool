@@ -251,16 +251,27 @@ class BeakerProvisioner(gluetool.Module):
         ssh_key = normalize_path(self.option('ssh-key'))
         ssh_options = normalize_multistring_option(self.option('ssh-options'))
 
+        # Override whatever value ``wow`` might think is a suitable distro for this request - we don't care!
+        # We want *exactly* the distro specified in the environment, on the exact architecture specified
+        # by that environment, and nothing else. ``wow`` is smart and can guess a lot of things, with
+        # the help of other modules (shared ``distro`` function) but by this time, given the most common
+        # usage pattern, someone else already used ``wow`` to prepare the whole set of jobs, giving its
+        # smart ass a chance to show off, now we are not interested in that anymore - give us what we want!
         jobs = self.shared('beaker_job_xml', body_options=[
             '--no-reserve',
             '--task=/distribution/utils/dummy',
             '--last-task=RESERVETIME=24h /distribution/reservesys'
         ], options=[
             '--arch', environment.arch
+        ], distros=[
+            environment.distro
         ])
 
+        if len(jobs) != 1:
+            raise GlueError('For an environment a single guest is needed, multiple jobs were returned instead')
+
         for i, job in enumerate(jobs):
-            gluetool.log.log_xml(self.debug, 'job {}#'.format(i), job)
+            gluetool.log.log_xml(self.debug, 'guest provisioning job #{}'.format(i), job)
 
         beaker_ids = self.shared('submit_beaker_jobs', jobs)
 
