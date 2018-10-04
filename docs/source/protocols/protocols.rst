@@ -12,5 +12,6 @@ Known protocols
 .. toctree::
    :maxdepth: 1
 
+   cache
    provisioner-capabilities
    testing-environment
