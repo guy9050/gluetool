@@ -295,6 +295,18 @@ class RestraintScheduler(gluetool.Module):
         # entries (for free :).
 
         def _provision_wrapper(schedule_entry):
+            # This is necessary - the output would tie the thread and the schedule entry in
+            # the output. Modules used to actually provision the guest use their own module
+            # loggers, therefore there's no connection between these two entities in the output
+            # visible to the user with INFO+ loglevel.
+            #
+            # I don't like this line very much, it's way too similar to the most common next message:
+            # usualy the ``provision`` shared function emits log message of form 'provisioning guest
+            # for environment ...', but it's lesser of two evils. The proper solution would be propagation
+            # of schedule_entry.logger down the stream for ``provision`` shared function to use. Leaving
+            # that as an exercise for long winter evenings...
+            schedule_entry.info('starting guest provisioning thread')
+
             try:
                 return self.shared('provision', schedule_entry.testing_environment)
 
@@ -369,6 +381,8 @@ class RestraintScheduler(gluetool.Module):
         self.info('setting up {} guests'.format(len(schedule)))
 
         def _guest_setup_wrapper(schedule_entry):
+            schedule_entry.info('starting guest setup thread')
+
             try:
                 return schedule_entry.guest.setup()
 
