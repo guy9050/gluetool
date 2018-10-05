@@ -1,47 +1,214 @@
+import json
+import threading
+import urllib
+
 from pymemcache.client import base
 
 import gluetool
+from gluetool.log import log_dict
+
+
+# Our custom serializer/deserializer - memcached accepts strings, we switch between Python data structures
+# and strings using JSON library. Gluetool's support is not usable as it tends to replace Python objects
+# with their __repr__ which is usually not possible to deserialize. This way we can at least catch such
+# objects by raising an exception.
+def _json_serializer(key, value):
+    # pylint: disable=unused-argument
+
+    # sends strings as they are, set flag to 1 to announce it's pure string
+    if isinstance(value, str):
+        return value, 1
+
+    # dump the rest
+    return json.dumps(value), 2
+
+
+def _json_deserializer(key, value, flags):
+    # pylint: disable=unused-argument
+
+    # if the flag is 1, the value was a string
+    if flags == 1:
+        return value
+
+    # when the flag is 2, it was something more complicated
+    if flags == 2:
+        return json.loads(value)
+
+    raise gluetool.GlueError('Data in cache has invalid format')
 
 
 class Cache(object):
+    """
+    Provides access to cache API.
+    """
+
     def __init__(self, module, client):
         self._module = module
         self._client = client
 
+        module.logger.connect(self)
+
+        # guards access to self._client - apparently, it's not thread-safe by default
+        self._lock = threading.Lock()
+
     def get(self, key, default=None):
         """
-        Return a value of key ``key`` or return value of ``default`` if the key does not exist.
+        Retrieve value for a given key.
+
+        :param str key: cache key.
+        :param default: value returned in case the key is not present in the cache.
+        :returns: a value of the key when the key exists, or ``default`` when it does not.
         """
 
-        return self._client.get(key, default=default)
+        with self._lock:
+            value = self._client.get(key, default=default)
+
+        log_dict(self.debug, "get '{}'".format(key), value)
+
+        return value
 
     def gets(self, key, default=None, cas_default=None):
         """
-        Return a tuple consiting of value of key ``key`` and CAS tag, or tuple of ``default`` and ``cas_default``
-        if the key does not exist.
+        Retrieve value for a given key and its CAS tag.
+
+        :param str key: cache key.
+        :param default: value returned in case the key is not present in the cache.
+        :param str cas_default: CAS tag returned in case the key is not present in the cache.
+        :rtype: tuple(object, str)
+        :returns: tuple of two items, either value and CAS tag when the key exists, or provided default values
+            when it does not.
         """
 
-        return self._client.gets(key, default=default, cas_default=cas_default)
+        with self._lock:
+            value, cas_tag = self._client.gets(key, default=default, cas_default=cas_default)
+
+        log_dict(self.debug, "gets '{}' (CAS {})".format(key, cas_tag), value)
+
+        return value, cas_tag
+
+    def add(self, key, value):
+        """
+        Add a key with a given value.
+
+        :param str key: cache key.
+        :param value: desired value of the key.
+        :rtype: bool
+        :returns: ``True`` when the key didn't exist and the value was stored, or ``False`` when the key
+            already existed.
+        """
+
+        log_dict(self.debug, "add '{}'".format(key), value)
+
+        with self._lock:
+            return self._client.add(key, value, noreply=False)
 
     def set(self, key, value):
         """
-        Set a value of key ``key`` to ``value``
+        Set a value of a given key.
+
+        :param str key: cache key.
+        :param value: desired value of the key.
+        :rtype: bool
+        :returns: ``True`` when the value was successfully changed, ``False`` otherwise.
         """
 
-        return self._client.set(key, value)
+        log_dict(self.debug, "set '{}'".format(key), value)
+
+        with self._lock:
+            return self._client.set(key, value, noreply=False)
 
     def cas(self, key, value, tag):
         """
-        *Check And Set* operation. Set a value of key ``key`` to ``value``. ``tag`` is the *CAS tag* previously
-        obtained by calling ``gets``. If the key was modified by other process/thread between ``gets`` and ``cas``,
-        the update **is not** performed and the method returns ``False``. In such case, to successfully change the
-        value, one must call ``gets`` again to obtain changed value and CAS tag, and pass new CAS tag to ``cas``
-        method.
+        *Check And Set* operation. Set a value of a given key but only when it didn't change - to honor this
+        condition, a CAS tag is used. It is retrieved with the value via ``gets`` method and passed to ``cas``
+        method. If CAS tag stored in cache hasn't been changed - changes wit hevery change of the key value -
+        new value is set. Otherwise, it is left unchanged and ``cas`` reports back to the caller the key value
+        has been updated by someone else in the meantime.
 
-        If the value was not changed between ``gets`` and ``cas`` calls, ``cas`` return ``True``.
+        :param str key: cache key.
+        :param value: desired value of the key.
+        :param str tag: CAS tag previously recieved in return value of ``gets``.
+        :returns: ``None`` when the key didn't exist - in such case it is **not** created! ``True`` when new value
+            was successfully set, or ``False`` when the key has changed and CAS tag didn't match the one stored
+            in cache.
         """
 
-        return self._client.cas(key, value, tag)
+        log_dict(self.debug, "cas '{}' (CAS {})".format(key, tag), value)
+
+        if not isinstance(tag, str):
+            raise gluetool.GlueError('CAS tag must be a string, {} found instead'.format(type(tag)))
+
+        with self._lock:
+            return self._client.cas(key, value, tag, noreply=False)
+
+    def delete(self, key):
+        """
+        Delete a given key.
+
+        :param str key: cache key.
+        :rtype: bool
+        :returns: ``True`` if the key was removed, or ``False`` if it wasn't, e.g. when no such key was found.
+        """
+
+        with self._lock:
+            return self._client.delete(key, noreply=False)
+
+    def dump(self, separator='/'):
+        """
+        Dump content of the cache in a form of nested dictionaries, forming a tree and subtrees based on key
+        and their components.
+
+        :param str separator: separator delimiting levels of keys. E.g. ``foo/bar/baz`` uses ``/`` as
+            a separator.
+        :rtype: dict
+        :returns: nested dictionaries. For the ``foo/bar/baz`` example above, ``{'foo': {'bar': {'baz': <value>}}}``
+            would be returned.
+        """
+
+        # We obtain a "metadump" - basically slightly complicated list of all keys in the case, with some
+        # other metadata. We cut out all these keys, and then we ask cache to provide values. Then we split
+        # keys to their bits, and we construct pile of nested dictionaries of keys and values.
+
+        with self._lock:
+            # pylint: disable=protected-access
+
+            metadump = self._client._misc_cmd(['lru_crawler metadump all\r\n'], 'metadump all', False)
+
+        dump = {}
+
+        # metadump consists of a list of strings
+        for part in metadump:
+            # each string contains multiple lines
+            for line in part.splitlines():
+                line = line.strip()
+
+                if line == 'END':
+                    break
+
+                # line is a sequence of 'foo=bar' items, separated by space
+                info = line.split(' ')
+
+                # first item is 'key=...' - the key we're looking for
+                key = info[0].split('=')[1].strip()
+
+                # key can contain "weird" characters, e.g. strange things like '/' or '#' - they are encoded
+                # in metadump (%2F and so on), `unquote` will give us the decoded string
+                key = urllib.unquote(key)
+
+                key_path = key.split(separator)
+
+                # Beginning with the `dump` dictionary, travel down the road and initialize necessary subdictionaries.
+                # Ignore the very last bit of the key - this will be set to the value of the key.
+                store = dump
+                for step in key_path[0:-1]:
+                    if step not in store:
+                        store[step] = {}
+
+                    store = store[step]
+
+                store[key_path[-1]] = self.get(key)
+
+        return dump
 
 
 class Memcached(gluetool.Module):
@@ -60,6 +227,11 @@ class Memcached(gluetool.Module):
         'server-port': {
             'help': 'Memcached server port.',
             'type': int
+        },
+        'show-content': {
+            'help': 'Dump content of the cache (default: %(default)s).',
+            'action': 'store_true',
+            'default': False
         }
     }
 
@@ -69,7 +241,8 @@ class Memcached(gluetool.Module):
 
     @gluetool.utils.cached_property
     def _client(self):
-        return base.Client((self.option('server-hostname'), self.option('server-port')))
+        return base.Client((self.option('server-hostname'), self.option('server-port')),
+                           serializer=_json_serializer, deserializer=_json_deserializer)
 
     @gluetool.utils.cached_property
     def _cache(self):
@@ -83,3 +256,7 @@ class Memcached(gluetool.Module):
         """
 
         return self._cache
+
+    def execute(self):
+        if gluetool.utils.normalize_bool_option(self.option('show-content')):
+            log_dict(self.info, 'cache content', self._cache.dump())
