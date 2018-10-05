@@ -192,7 +192,8 @@ class WorkflowTomorrow(gluetool.Module):
         self._config['wow-options'] = fixed_wow_options
 
     # pylint: disable=too-many-arguments
-    def beaker_job_xml(self, body_options=None, options=None, environment=None, task_params=None, extra_context=None):
+    def beaker_job_xml(self, distros=None, body_options=None, options=None, environment=None, task_params=None,
+                       extra_context=None):
         """
         Run ``workflow-tomorrow`` utility to create a Bbeaker job XML.
 
@@ -211,6 +212,9 @@ class WorkflowTomorrow(gluetool.Module):
         Caller can control what environmental variables are passed to his tasks with ``task_params`` parameter.
         Each `key/value` pair is passed to ``workflow-tomorrow`` via ``--taskparam="<key>=<value>"`` option.
 
+        :param list(str) distros: list of distros to use. If not set, shared function ``distro`` is called,
+            which is the default behavior most uses would seek. But some users may have specific needs,
+            incompatible with the return value of ``distro``.
         :param list body_options: main options, usually representing a test plan or a list of tasks
             to wrap by "paperwork" elements. If not set, ``wow-options`` option is used. Even an empty
             list has more priority than ``wow-options`` option.
@@ -239,9 +243,13 @@ class WorkflowTomorrow(gluetool.Module):
         log_dict(self.debug, 'environment', environment)
         log_dict(self.debug, 'task params', task_params)
         log_dict(self.debug, 'extra context', extra_context)
+        log_dict(self.debug, 'distros', distros)
 
         if not body_options and not self.option('wow-options') and not self.option('use-general-test-plan'):
             raise NoTestAvailableError(primary_task)
+
+        distros = distros or self.shared('distro')
+        log_dict(self.debug, 'actual distros', distros)
 
         # Construct the actual "body" options:
         #
@@ -367,7 +375,7 @@ class WorkflowTomorrow(gluetool.Module):
         # For each distro and "body" option set, construct one wow command (producing a job)
         jobs = []
 
-        for distro in self.shared('distro'):
+        for distro in distros:
             for wow_options in actual_body_options:
                 jobs.append(_plan_job(distro, wow_options))
 
