@@ -29,9 +29,12 @@ class InstallCoprBuild(gluetool.Module):
 
         tasks = self.shared('tasks')
         rpm_urls = sum([task.rpm_urls for task in tasks], [])
+        rpm_names = sum([task.rpm_names for task in tasks], [])
 
-        log_dict(self.debug, 'RPMs to install', rpm_urls)
+        log_dict(self.debug, 'RPMs to install', rpm_names)
+        log_dict(self.debug, 'RPMs install from', rpm_urls)
 
         self.shared('run_playbook', gluetool.utils.normalize_path(self.option('playbook')), guests, variables={
-            'PACKAGE_URLS': rpm_urls
+            'PACKAGE_URLS': rpm_urls,
+            'PACKAGE_NAMES': rpm_names
         })
