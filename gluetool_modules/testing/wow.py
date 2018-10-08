@@ -18,6 +18,11 @@ class NoTestAvailableError(PrimaryTaskFingerprintsMixin, SoftGlueError):
     def __init__(self, task):
         super(NoTestAvailableError, self).__init__(task, 'No tests provided for the component')
 
+    # We no longer want to see this exception in Sentry
+    @property
+    def submit_to_sentry(self):
+        return False
+
 
 class NoGeneralTestPlanError(PrimaryTaskFingerprintsMixin, SoftGlueError):
     def __init__(self, task):
