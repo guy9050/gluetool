@@ -33,11 +33,12 @@ class NoTestableArtifactsError(PrimaryTaskFingerprintsMixin, SoftGlueError):
        e.g. in Beaker - yet. Hence the explicit list of supported arches in the message.
     """
 
-    def __init__(self, task):
+    def __init__(self, task, supported_arches):
         # pylint: disable=line-too-long
-        arches = task.task_arches.arches
+        self.task_arches = task.task_arches.arches
+        self.supported_arches = supported_arches
 
-        message = 'Task does not have any testable artifact - {} arches are not supported'.format(', '.join(arches))
+        message = 'Task does not have any testable artifact - {} arches are not supported'.format(', '.join(self.task_arches))  # Ignore PEP8Bear
 
         super(NoTestableArtifactsError, self).__init__(task, message)
 
@@ -496,7 +497,7 @@ class RestraintScheduler(gluetool.Module):
         log_dict(self.debug, 'valid artifact arches', valid_arches)
 
         if not valid_arches:
-            raise NoTestableArtifactsError(self.shared('primary_task'))
+            raise NoTestableArtifactsError(self.shared('primary_task'), supported_arches)
 
         # workflow-tomorrow
         self._schedule = self._create_jobs_schedule(self._run_wow())
