@@ -58,10 +58,13 @@ class CoprApi(object):
         return build_info['build']
 
     def get_build_task_info(self, build_id, chroot_name):
+        # pylint: disable=line-too-long
         build_task_info = self._get_json('api_2/build_tasks/{}/{}'.format(build_id, chroot_name), 'build tasks info')
 
         # copr api actually returns message with {}, no .format() is missing
-        if build_task_info.get('message', '') == 'Build task {} for build {} not found':
+        if build_task_info.get('message', '') == 'Build task {} for build {} not found' or \
+                build_task_info.get('error', '') == "Request wasn't successful, there is probably a bug in the API code.":
+            self.module.warn('Build task {}:{} not found'.format(build_id, chroot_name))
             return {
                 'state': 'UNKNOWN-COPR-STATUS'
             }
