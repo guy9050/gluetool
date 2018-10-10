@@ -94,8 +94,8 @@ import jinja2
 
 import gluetool
 from gluetool import utils
-from gluetool.utils import render_template, normalize_path
-from gluetool.log import log_blob
+from gluetool.utils import render_template, normalize_path, normalize_multistring_option
+from gluetool.log import log_blob, log_dict
 import libci
 
 
@@ -103,7 +103,7 @@ class Message(object):
     # pylint: disable=too-few-public-methods
 
     def __init__(self, module, subject=None, header=None, footer=None, body=None, recipients=None, cc=None,
-                 sender=None, reply_to=None):
+                 sender=None, reply_to=None, xheaders=None):
         # pylint: disable=too-many-arguments
         self._module = module
 
@@ -116,6 +116,7 @@ class Message(object):
         self.cc = cc or []
         self.sender = sender or self._module.option('sender')
         self.reply_to = reply_to or self._module.option('reply-to')
+        self.xheaders = xheaders or {}
 
     def send(self):
         if not self.subject:
@@ -132,10 +133,11 @@ class Message(object):
         msg['From'] = self.sender
         msg['To'] = ', '.join(self.recipients)
         msg['Cc'] = ', '.join(self.cc)
-
         if self.reply_to:
             msg.add_header('Reply-To', self.reply_to)
-
+        for name, value in self.xheaders.iteritems():
+            msg[name] = value
+            self._module.debug("{}: '{}'".format(name, value))
         self._module.debug("Recipients: '{}'".format(', '.join(self.recipients)))
         self._module.debug("Bcc: '{}'".format(', '.join(self.cc)))
         self._module.debug("Sender: '{}'".format(self.sender))
@@ -196,6 +198,12 @@ class Notify((gluetool.Module)):
             'email-map': {
                 'help': 'Pattern map for recipient => e-mail translation.',
                 'metavar': 'FILE'
+            },
+            'xheaders': {
+                'help': 'List of comma-separated pairs <header name>:<header value> (default: none).',
+                'metavar': 'HEADER:VALUE',
+                'action': 'append',
+                'default': []
             }
         }),
         ('Content options', {
@@ -440,7 +448,8 @@ class Notify((gluetool.Module)):
                       }),
                       footer=self.render_template(self.option('body-footer-template'), **{
                           'RESULT': result
-                      }))
+                      }),
+                      xheaders=self.xheaders)
 
         if formatter_name is not None:
             self.shared(formatter_name, self, result, msg)
@@ -523,7 +532,20 @@ class Notify((gluetool.Module)):
                        footer=body_footer,
                        body=body,
                        recipients=recipients,
-                       cc=self.archive_cc)
+                       cc=self.archive_cc,
+                       xheaders=self.xheaders)
+
+    @utils.cached_property
+    def xheaders(self):
+        xheaders_config = normalize_multistring_option(self.option('xheaders'))
+        xheaders = {}
+        for xheader in xheaders_config:
+            if not xheader or ':' not in xheader:
+                raise gluetool.GlueError("'{}' is not correct format of xheader".format(xheader))
+            name, value = xheader.strip().split(':')
+            xheaders[name] = value
+        log_dict(self.debug, 'X-Headers', xheaders)
+        return xheaders
 
     def destroy(self, failure=None):
         if failure is None or isinstance(failure.exc_info[1], SystemExit):
