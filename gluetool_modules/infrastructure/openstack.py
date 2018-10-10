@@ -1283,6 +1283,7 @@ class CIOpenstack(gluetool.Module):
             self._reserve_guests()
 
         self.info("created {} instance(s) with flavor '{}' from image '{}'".format(count, flavor, image.name))
+        log_dict(self.info, 'provisioned guests', guests)
 
         return guests
 
@@ -1391,7 +1392,7 @@ class CIOpenstack(gluetool.Module):
 
         # provision given number of guests right away
         if provision_count:
-            guests = self.provision(provision_count)
+            guests = self.provision('dummy_environment', count=provision_count)
 
             if self.option('setup-provisioned'):
                 for guest in guests:
