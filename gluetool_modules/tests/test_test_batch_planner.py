@@ -20,7 +20,7 @@ def _load_from_assets(starts_with):
             continue
 
         with open(os.path.join(assets_dir, filename), 'r') as f:
-            assets.append(gluetool.utils.YAML.load(f))
+            assets.append(gluetool.utils.YAML().load(f))
 
     return assets
 

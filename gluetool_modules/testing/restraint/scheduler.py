@@ -1,10 +1,15 @@
 import collections
 import shlex
+import sys
+
+import concurrent.futures
 
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
-from gluetool.log import log_dict, log_xml, format_xml
+from gluetool.log import log_dict, log_xml, ContextAdapter
 from libci.sentry import PrimaryTaskFingerprintsMixin
+
+from six import reraise
 
 
 #: Testing environment description.
@@ -28,25 +33,64 @@ class NoTestableArtifactsError(PrimaryTaskFingerprintsMixin, SoftGlueError):
        e.g. in Beaker - yet. Hence the explicit list of supported arches in the message.
     """
 
-    def __init__(self, task):
+    def __init__(self, task, supported_arches):
         # pylint: disable=line-too-long
-        arches = task.task_arches.arches
+        self.task_arches = task.task_arches.arches
+        self.supported_arches = supported_arches
 
-        message = 'Task does not have any testable artifact - {} arches are not supported'.format(', '.join(arches))
+        message = 'Task does not have any testable artifact - {} arches are not supported'.format(', '.join(self.task_arches))  # Ignore PEP8Bear
 
         super(NoTestableArtifactsError, self).__init__(task, message)
 
 
+class ScheduleEntryAdapter(ContextAdapter):
+    def __init__(self, logger, job_index, recipe_set_index):
+        super(ScheduleEntryAdapter, self).__init__(logger, {
+            'ctx_schedule_entry_index': (200, 'schedule entry J#{}-RS#{}'.format(job_index, recipe_set_index))
+        })
+
+
+class ScheduleEntry(object):
+    # pylint: disable=too-few-public-methods
+
+    """
+    Internal representation of stuff to run, where to run and other bits necessary for scheduling
+    all things the module was asked to perform.
+
+    :param logger: logger used as a parent of this entry's own logger.
+    :param int job_index: index of job within all jobs this entry belongs to.
+    :param int recipe_set_index: index of recipe set within its job this entry belongs to.
+    :param xml recipe_set: XML description of (Beaker) recipe set this entry handles.
+    """
+
+    def __init__(self, logger, job_index, recipe_set_index, recipe_set):
+        self.logger = ScheduleEntryAdapter(logger, job_index, recipe_set_index)
+        self.logger.connect(self)
+
+        self.recipe_set = recipe_set
+
+        self.testing_environment = None
+        self.guest = None
+
+
 class RestraintScheduler(gluetool.Module):
     """
-    Prepares "schedule" for runners. It uses workflow-tomorrow - with options
-    provided by the user - to prepare a list of recipe sets, then it acquire
-    required number of guests, and hands this to whoever will actually run
-    the recipe sets.
+    Prepares "schedule" for other modules to perform. A schedule is a list of (Beaker-compatible) XML
+    descriptions of recipes paired with guests. Following modules can then use these guests to perform
+    whatever necessary to achieve results for XML prescriptions.
+
+    Schedule creation has following phases:
+
+        * XML descriptions of jobs are acquired by calling ``beaker_job_xml`` shared function;
+        * these jobs are split to recipe sets, and each recipe set is used to extract a testing environment
+          it requires for testing;
+        * for every testing environment, a guest is provisioned (processes all environments in parallel);
+        * each guest is set up by calling ``setup_guest`` shared function indirectly (processes all guests
+          in parallel as well).
     """
 
     name = 'restraint-scheduler'
-    description = 'Prepares "schedule" for runners of restraint.'
+    description = 'Prepares "schedule" for ``restraint`` runners.'
 
     # pylint: disable=gluetool-option-hard-default
     options = {
@@ -141,135 +185,279 @@ class RestraintScheduler(gluetool.Module):
     def _log_schedule(self, label, schedule):
         self.debug('{}:'.format(label))
 
-        for guest, recipe_set in schedule:
-            gluetool.log.log_blob(self.debug, str(guest), format_xml(recipe_set))
+        for schedule_entry in schedule:
+            schedule_entry.debug('testing environment: {}'.format(schedule_entry.testing_environment))
+            schedule_entry.debug('guest: {}'.format(schedule_entry.guest))
+            log_xml(schedule_entry.debug, 'recipe set', schedule_entry.recipe_set)
 
-    def _create_job_schedule(self, job_desc, partial_index):
+    def _create_job_schedule(self, index, job):
         """
-        Main workhorse - given the job XML, get necessary guests and assign recipe sets to these guests.
+        For a given job XML, extract recipe sets and their corresponding testing environments.
 
-        :param xml job_desc: Job XML description.
-        :param int partial_index: ``create_schedule`` may be called multiple times, once for each
-            known job description. This number helps recognize them in the log.
+        :param int index: index of the ``job`` in greater scheme of things - used for logging purposes.
+        :param xml job: job XML description.
+        :rtype: list(ScheduleEntry)
         """
 
-        self.require_shared('provision')
-
-        log_xml(self.debug, 'full job description', job_desc)
+        log_xml(self.debug, 'full job description', job)
 
         schedule = []
 
-        recipe_sets = job_desc.find_all('recipeSet')
-
-        self.info('job contains {} recipe sets, asking for guests'.format(len(recipe_sets)))
-
-        # there are tags that make not much sense for restraint - we'll filter them out
-        def _remove_tags(recipe_set, name):
-            self.debug("removing tags '{}'".format(name))
-
-            for tag in recipe_set.find_all(name):
-                tag.decompose()
+        recipe_sets = job.find_all('recipeSet')
 
         for i, recipe_set in enumerate(recipe_sets):
             # From each recipe, extract distro and architecture, and construct testing environment description.
             # That will be passed to the provisioning modules. This module does not have to know it.
 
-            testing_env = TestingEnvironment(
-                distro=recipe_set.find('distroRequires').find('distro_name')['value'],
-                arch=recipe_set.find('distroRequires').find('distro_arch')['value']
+            schedule_entry = ScheduleEntry(self.logger, index, i, recipe_set)
+
+            schedule_entry.testing_environment = TestingEnvironment(
+                distro=recipe_set.find('distroRequires').find('distro_name')['value'].encode('ascii'),
+                arch=recipe_set.find('distroRequires').find('distro_arch')['value'].encode('ascii')
             )
 
-            log_xml(self.debug, 'recipe set #{}'.format(i), recipe_set)
-            log_dict(self.debug, 'testing environment #{}'.format(i), testing_env)
-
-            guests = self.shared('provision', testing_env, count=1)
-
-            if not guests:
-                raise GlueError('No guests provisioned.')
+            log_xml(schedule_entry.debug, 'full recipe set', schedule_entry.recipe_set)
+            log_dict(schedule_entry.debug, 'testing environment', schedule_entry.testing_environment)
 
             # remove tags we want to filter out
             for tag in ('distroRequires', 'hostRequires', 'repos', 'partitions'):
-                _remove_tags(recipe_set, tag)
+                schedule_entry.debug("removing tags '{}'".format(tag))
 
-            log_xml(self.debug, 'purified recipe set #{}'.format(i), recipe_set)
+                for element in schedule_entry.recipe_set.find_all(tag):
+                    element.decompose()
 
-            schedule.append((guests[0], recipe_set))
+            log_xml(schedule_entry.debug, 'purified recipe set', schedule_entry.recipe_set)
 
-        self._log_schedule('partial schedule #{}'.format(partial_index), schedule)
+            schedule.append(schedule_entry)
+
+        self._log_schedule('job #{} schedule'.format(index), schedule)
 
         return schedule
 
-    def _create_schedule(self):
-        jobs = self._run_wow()
+    def _handle_futures_errors(self, errors, exception_message):
+        """
+        Take care of reporting exceptions gathered from futures, and re-raise
+        one of them - or a new, generic one - to report a phase of scheduling process failed.
 
-        self.info('scheduling {} jobs'.format(len(jobs)))
+        :param list(tuple(ScheduleEntry, exception info)) errors: schedule entries and their corresponding
+            exceptions
+        :param str exception_label: a label used for logging exceptions
+        :param str exception_message: a message used when raising generic exception.
+        """
 
-        schedule = []
+        self.debug('at least one future failed')
 
-        # for each job, provision necessary guests
-        for i, job in enumerate(jobs):
-            log_xml(self.debug, 'job #{} as planned by wow'.format(i), job)
+        # filter exceptions using given ``check`` callback, and raise the first suitable one - or return back
+        def _raise_first(check):
+            for schedule_entry, exc_info in errors:
+                if not check(exc_info):
+                    continue
 
-            schedule += self._create_job_schedule(job, i)
+                schedule_entry.error('terminating schedule creation')
 
-        self._log_schedule('complete schedule', schedule)
+                reraise(*exc_info)
+
+        # Soft errors have precedence - the let user know something bad happened, which is better
+        # than just "infrastructure error".
+        _raise_first(lambda exc: isinstance(exc[1], SoftGlueError))
+
+        # Then common CI errors
+        _raise_first(lambda exc: isinstance(exc[1], GlueError))
+
+        # Ok, no custom exception, maybe just some Python ones - kill the pipeline.
+        raise GlueError(exception_message)
+
+    def _provision_guests(self, schedule):
+        """
+        Provision guests for schedule entries.
+
+        :param list(ScheduleEntry) schedule: Schedule to provision guests for.
+        """
+
+        self.debug('provisioning guests')
+
+        # for each schedule entry, create a setup thread running shared function ``provision`` for
+        # given testing environment
+
+        futures = {}
+        errors = []
+
+        self.info('provisioning {} guests'.format(len(schedule)))
+
+        # Yes, we could pass shared function ``provision`` directly to executor, but that way we
+        # wouldn't have any knowledge about the thread used to run it when we handle future exceptions.
+        # All code running within the future does have thread context in the log, our error handling
+        # would not because it'd be runing in the main thread, making it hard for user to debug which
+        # exception originated in which thread - and hence what environment was affected.
+        #
+        # Using this wrapper we can log - and submit to Sentry! - the exception using schedule entry's logger
+        # (which isn't new, we can do that now as well) but since we capture - and log - exceptions while
+        # still in their respective threads, running to fulfill the future, we get thread name in all our log
+        # entries (for free :).
+
+        def _provision_wrapper(schedule_entry):
+            # This is necessary - the output would tie the thread and the schedule entry in
+            # the output. Modules used to actually provision the guest use their own module
+            # loggers, therefore there's no connection between these two entities in the output
+            # visible to the user with INFO+ loglevel.
+            #
+            # I don't like this line very much, it's way too similar to the most common next message:
+            # usualy the ``provision`` shared function emits log message of form 'provisioning guest
+            # for environment ...', but it's lesser of two evils. The proper solution would be propagation
+            # of schedule_entry.logger down the stream for ``provision`` shared function to use. Leaving
+            # that as an exercise for long winter evenings...
+            schedule_entry.info('starting guest provisioning thread')
+
+            try:
+                return self.shared('provision', schedule_entry.testing_environment)
+
+            # pylint: disable=broad-except
+            except Exception:
+                # save exc_info, to avoid spoiling it by any exception raised while logging/reporting it
+                exc_info = sys.exc_info()
+
+                schedule_entry.exception('Guest provisioning failed')
+
+                self.glue.sentry_submit_exception(gluetool.Failure(self, exc_info), logger=schedule_entry.logger)
+
+                # And re-raise it when we're done with it - we logged and reported the exception, by re-raising it
+                # we propagate it outside of this thread, and the "global" error handling code could see her when
+                # deciding what exception to use to kill the pipeline.
+                reraise(*exc_info)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(schedule),
+                                                   thread_name_prefix='provision-thread') as executor:
+            for schedule_entry in schedule:
+                schedule_entry.debug('planning guest for environment: {}'.format(schedule_entry.testing_environment))
+
+                future = executor.submit(_provision_wrapper, schedule_entry)
+                futures[future] = schedule_entry
+
+            # If we leave context here, the rest of our code would run after all futures finished - context would
+            # block in its __exit__ on executor's state.. That'd be generaly fine but we'd like to inform user about
+            # our progress, and that we can do be checking futures as they complete, one by one, not waiting for the
+            # last one before we start checking them. This thread *will* sleep from time to time, when there's no
+            # complete future available, but that's fine. We'll get our hands on each complete one as soon as
+            # possible, letting user know about the progress.
+
+            for i, future in enumerate(concurrent.futures.as_completed(futures), start=1):
+                remaining_count = len(schedule) - i
+
+                schedule_entry = futures[future]
+
+                if future.exception() is None:
+                    # provisioning succeeded - store returned guest in the schedule entry
+                    schedule_entry.info('provisioning of guest finished, {} guests pending'.format(remaining_count))
+
+                    schedule_entry.guest = future.result()[0]
+                    continue
+
+                schedule_entry.error('provisioning of guest failed, {} guests pending'.format(remaining_count))
+
+                exc_info = future.exception_info()
+
+                # Exception info returned by future does not contain exception class while the info returned
+                # by sys.exc_info() does and all users of it expect the first item to be exception class.
+                exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
+
+                errors.append((schedule_entry, exc_info))
+
+        if errors:
+            self._handle_futures_errors(errors, 'At least one provisioning attempt failed')
+
+    def _setup_guests(self, schedule):
+        """
+        Setup all guests of a schedule.
+
+        :param list(ScheduleEntry) schedule: Schedule listing guests to set up.
+        """
 
         self.debug('setting up the guests')
 
-        setup_threads = []
+        # for each schedule entry, create a setup thread running ``guest.setup``
 
-        for i, (guest, recipe_set) in enumerate(schedule):
-            self.debug('guest #{}: {}'.format(i, guest))
-            log_xml(self.debug, 'recipe set #{}'.format(i), recipe_set)
+        futures = {}
+        errors = []
 
-            # setup guest
-            thread_name = 'setup-guest-{}'.format(guest.name)
-            thread = utils.WorkerThread(guest.logger,
-                                        guest.setup,
-                                        name=thread_name)
-            setup_threads.append(thread)
+        self.info('setting up {} guests'.format(len(schedule)))
 
-            thread.start()
-            self.debug("setup thread '{}' started".format(thread_name))
+        def _guest_setup_wrapper(schedule_entry):
+            schedule_entry.info('starting guest setup thread')
 
-        self.info('waiting for all guests to finish their initial setup')
-        for thread in setup_threads:
-            thread.join()
+            try:
+                return schedule_entry.guest.setup()
 
-        thread_results = [
-            thread.result for thread in setup_threads
+            # pylint: disable=broad-except
+            except Exception:
+                exc_info = sys.exc_info()
+
+                schedule_entry.exception('Guest setup failed')
+
+                self.glue.sentry_submit_exception(gluetool.Failure(self, exc_info), logger=schedule_entry.logger)
+
+                # And re-raise it when we're done with it - the error handling code wants
+                # to see all exceptions, and wants to raise the best one.
+                reraise(*exc_info)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(schedule),
+                                                   thread_name_prefix='setup-thread') as executor:
+            for schedule_entry in schedule:
+                schedule_entry.debug('planning setup of guest: {}'.format(schedule_entry.guest))
+
+                future = executor.submit(_guest_setup_wrapper, schedule_entry)
+                futures[future] = schedule_entry
+
+            for i, future in enumerate(concurrent.futures.as_completed(futures), start=1):
+                remaining_count = len(schedule) - i
+
+                schedule_entry = futures[future]
+
+                if future.exception() is None:
+                    schedule_entry.info('setup of guest finished, {} guests pending'.format(remaining_count))
+                    continue
+
+                self.error('setup of guest failed, {} guests pending'.format(remaining_count))
+
+                exc_info = future.exception_info()
+                exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
+
+                errors.append((schedule_entry, exc_info))
+
+        if errors:
+            self._handle_futures_errors(errors, 'At least one guest setup failed')
+
+    def _create_jobs_schedule(self, jobs):
+        """
+        Create schedule for given set of jobs.
+
+        :param list(xml) jobs: List of jobs - in their XML representation, as scheduled
+            by e.g. ``workflow-tomorrow`` - to schedule.
+        :rtype: list(tuple(libci.guest.Guest, xml))
+        """
+
+        self.info('creating schedule for {} jobs'.format(len(jobs)))
+
+        schedule = []
+
+        # for each job, create a schedule entries for its recipe sets, and put them all on one pile
+        for i, job in enumerate(jobs):
+            schedule += self._create_job_schedule(i, job)
+
+        self._log_schedule('complete schedule', schedule)
+
+        # provision guests for schedule entries - use their testing environments and use provisioning modules
+        self._provision_guests(schedule)
+        self._log_schedule('complete schedule with guests', schedule)
+
+        # setup guests
+        self._setup_guests(schedule)
+
+        self._log_schedule('final schedule', schedule)
+
+        # strip away our internal info - all our customers are interested in are recipe sets and guests
+        return [
+            (schedule_entry.guest, schedule_entry.recipe_set) for schedule_entry in schedule
         ]
-
-        log_dict(self.debug, 'thread results', thread_results)
-
-        if any((isinstance(result, Exception) for result in thread_results)):
-            self.error('At least one guest setup failed')
-            self.error('Note: see detailed exception in debug log for more information')
-
-            # This is strange - we can have N threads, M of them failed with an exception, but we can
-            # kill pipeline only with a single one. They are all logged, though, so there should not
-            # be any loss of information. Not having a better idea, let's kill pipeline with the
-            # first custom exception we find.
-
-            def _raise_first(check):
-                suitable = [result for result in thread_results if check(result)]
-
-                if not suitable:
-                    return
-
-                raise suitable[0]
-
-            # Soft errors have precedence - the let user know something bad happened, which is better
-            # than just "infrastructure error".
-            _raise_first(lambda result: isinstance(result, SoftGlueError))
-
-            # Then common CI errors
-            _raise_first(lambda result: isinstance(result, GlueError))
-
-            # Ok, no custom exception, maybe just some Python ones - kill the pipeline.
-            raise GlueError('At least one guest setup failed')
-
-        return schedule
 
     def execute(self):
         self.require_shared('primary_task', 'restraint')
@@ -309,9 +497,7 @@ class RestraintScheduler(gluetool.Module):
         log_dict(self.debug, 'valid artifact arches', valid_arches)
 
         if not valid_arches:
-            raise NoTestableArtifactsError(self.shared('primary_task'))
+            raise NoTestableArtifactsError(self.shared('primary_task'), supported_arches)
 
         # workflow-tomorrow
-        self._schedule = self._create_schedule()
-
-        self._log_schedule('final schedule', self._schedule)
+        self._schedule = self._create_jobs_schedule(self._run_wow())

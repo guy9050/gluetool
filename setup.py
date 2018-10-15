@@ -26,6 +26,9 @@ DESCRIPTION = 'Gluetool & Citool modules'
 #    sys.exit(1)
 
 INSTALL_REQUIRES = [
+    # required by all...
+    "typing==3.6.6",
+
     # required to build documentation - workaround, this will end up in gluetool upstream
     "commonmark==0.8.0",
 
@@ -37,6 +40,7 @@ INSTALL_REQUIRES = [
     "docker-pycreds==0.2.1",
     "docker==2.5.1",
     "enum34==1.1.6",
+    'futures==3.2.0; python_version == "2.7"',  # restraint-scheduler
     "jenkins-job-builder==1.6.2",
     "jenkinsapi==0.3.3",
     "koji",  # composetest
@@ -48,6 +52,7 @@ INSTALL_REQUIRES = [
     "psycopg2==2.7.3.1",
     "pyOpenSSL==17.0.0",
     "pycurl==7.43.0",
+    'pymemcache==2.0.0',  # memcache
     "python-glanceclient==2.8.0",
     "python-novaclient==7.1.0",
     "python-openstackclient==3.9.0",

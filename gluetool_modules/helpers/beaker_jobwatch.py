@@ -59,7 +59,6 @@ class BeakerJobwatch(gluetool.Module):
             raise BeakerJobwatchError(self.shared('primary_task'),
                                       'Could not find beaker matrix URL in jobwatch output')
 
-        self.info(jobwatch_log[-1].strip())
         if jobwatch_log[-1].strip() not in ['finished successfully', 'finished unsuccessfully']:
             raise BeakerJobwatchError(self.shared('primary_task'), 'beaker-jobwatch does not report completion')
 
@@ -68,11 +67,13 @@ class BeakerJobwatch(gluetool.Module):
         # matrix url is always on the 3rd line from the end
         return jobwatch_log[-3].strip()
 
-    def beaker_jobwatch(self, jobs, end_task=None, critical_tasks=None):
+    def beaker_jobwatch(self, jobs, end_task=None, critical_tasks=None, inspect=True):
         """
         Start beaker-jobwatch, to baby-sit given jobs, and wait for their completion.
 
         :param list(int) jobs: List of Beaker job IDs.
+        :param bool inspect: If set, output of the ``beaker-jobwatch`` command would be directed
+            to stdout by passing ``inspect`` down to an instance of gluetool's ``Command``.
         :rtype: tuple(gluetool.utils.ProcessOutput, str)
         :returns: ``beaker-jobwatch`` output (as a :py:class:`gluetool.utils.ProcessOutput` instance)
             and the final Beaker matrix URL.
@@ -105,7 +106,7 @@ class BeakerJobwatch(gluetool.Module):
         self.info("running 'beaker-jobwatch' to babysit the jobs")
 
         try:
-            output = cmd.run(inspect=True)
+            output = cmd.run(inspect=inspect)
 
             return output, self._get_matrix_url(output.stdout)
 

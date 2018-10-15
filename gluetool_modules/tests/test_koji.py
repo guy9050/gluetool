@@ -196,8 +196,7 @@ def test_no_koji_task(module):
     Module haven't been told to represent any tasks yet, however someone already asks for them.
     """
 
-    with pytest.raises(gluetool.GlueError, match=r'No tasks specified\.'):
-        module.tasks()
+    assert module.tasks() == []
 
 
 def test_invalid_task_id_type(module):

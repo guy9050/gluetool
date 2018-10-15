@@ -61,7 +61,7 @@ class RulesASTVisitor(ast.NodeTransformer):
     _valid_classes = tuple([
         getattr(_ast, node_class) for node_class in (
             'Expression', 'Expr', 'Compare', 'Name', 'Load', 'BoolOp', 'UnaryOp',
-            'Str', 'Num', 'List', 'Tuple',
+            'Str', 'Num', 'List', 'Tuple', 'Dict',
             'Subscript', 'Index', 'ListComp', 'comprehension',
             'Store',
             'Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE', 'Is', 'IsNot', 'In', 'NotIn',
@@ -225,7 +225,7 @@ class RulesEngine(gluetool.Module):
         custom_locals['EXISTS'] = lambda name: name in custom_locals
 
         self.debug('rules: {}'.format(rules))
-        log_dict(self.debug, 'locals', custom_locals)
+        log_dict(self.verbose, 'locals', custom_locals)
 
         result = Rules(rules).eval({}, custom_locals)
 
