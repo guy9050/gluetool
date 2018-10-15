@@ -5,6 +5,60 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+
+2018-10-15
+----------
+
+Changed
+~~~~~~~
+
+- [koji-fedora] when build is available, extract source from it, otherwise task's ``request`` field is used
+- [restraint-scheduler] guest provisioning and setup are completely paralelized
+- [restraint-scheduler] check and report progress of provisioning/guest setup as soon as possible
+- [rules-engine] context is now logged using ``verbose`` severity
+- [wow] "No test available" error will not be reported to Sentry anymore
+
+Added
+~~~~~
+
+- Optional type check job in Gitlab CI
+- [beaker-jobwatch] allow caller disable live streaming of ``beaker-jobwatch`` output
+- [beaker-provisioner] when provisioning, log the requested testing environment
+- [beaker-provisioner] support the real provisioning of guests ("dynamic" guests, as oposed to "static" ones already supported)
+- [bkr] access to job results
+- [bkr] matrix URL parser
+- [build-dependencies] support for companions from Copr
+- [mbs] new module - experimental support for Module Building Service (future ``redhat-module`` artifacts)
+- [memcached] new module - access to Memcached cache API
+- [openstack] when provisioning, log the requested testing environment
+- [openstack] when guests are provisioned, log them with INFO level to display their properties, namely their IP addresses
+- [pipeline-state-reporter] publish value of ``--label`` in eval context
+- [restraint-scheduler] guest provisioning and setup are completely paralelized
+- [restraint-scheduler] check and report progress of provisioning/guest setup as soon as possible
+- [restraint-scheduler] "No testable artifacts error" gained access to supported arches, providing more descriptive e-mail notification
+- [rules-engine] allow creation of dictionaries in rules
+- [wow] user of ``beaker_job_xml`` can now force use of a specific distro
+
+Removed
+~~~~~~~
+
+- [beaker-jobwatch] don't log the last line of ``beaker-jobwatch`` output, module has its own messages
+- [test-batch-planner] disable warning on match not being equal to the component
+
+Fixed
+~~~~~
+
+- [beaker-provisioner] avoid using ``message`` attribute of an exception, it has been deprecated for ``BaseException`` and its children
+- [brew] don't raise error when asked for eval context before ``execute`` gets called
+- [build-on-commit] better handling of situation when the remote branch has been removed from the repository
+- [copr] better check for possible missing build task info in Copr API
+- [copr] adds NVR check after artifact installation
+- [copr] don't raise error when asked for eval context before ``execute`` gets called
+- [mbs] don't raise error when asked for eval context before ``execute`` gets called
+- [restraint-scheduler] apply ``decode()`` on distro name and architecture when extracting them from recipe XML
+- [restraint-scheduler] "No testable artifacts error" gained access to supported arches, providing more descriptive e-mail notification
+
+
 2018-09-19
 ----------
 
