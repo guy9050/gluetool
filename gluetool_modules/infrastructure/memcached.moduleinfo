@@ -5,4 +5,4 @@ description: Provides access to Memcached server.
 
 dependencies:
   pip:
-    - pymemcache==1.4.4
+    - pymemcache==2.0.0

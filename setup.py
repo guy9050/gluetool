@@ -52,7 +52,7 @@ INSTALL_REQUIRES = [
     "psycopg2==2.7.3.1",
     "pyOpenSSL==17.0.0",
     "pycurl==7.43.0",
-    'pymemcache==1.4.4',  # memcache
+    'pymemcache==2.0.0',  # memcache
     "python-glanceclient==2.8.0",
     "python-novaclient==7.1.0",
     "python-openstackclient==3.9.0",

@@ -1,7 +1,11 @@
 Cache Protocol
 ==============
 
-Modules may provide a cache other modules could use to store data temporarily, possibly with persistency across multiple runs of ``gluetool`` pipelines.
+Modules may provide a cache other modules could use to store data temporarily. API must be thread- and process-safe, safely supporting use from multiple threads and processes.
+
+A *key* is a string. Use of structured keys is recommended - pick a character, e.g. ``/``, and use it to construct hierarchical keys, describing a tree-like structure. This is, however, just a recommendation - for cache use, a key is opaque and its content has not other meaning than being a pointer to a value.
+
+A *value* is a structured data. Basic Python data structures are supported - dictionaries, lists, tuples, built-in types like integers or strings. Objects of user-defined classes may or may not be supported.
 
 
 Query
@@ -13,22 +17,80 @@ None, often the shared function providing access to cache interface bears name `
 Packet
 ------
 
+.. py:method:: ``add(key: str, value: Any) -> bool``
+
+   Add a key with a given value.
+
+   :param str key: cache key.
+   :param value: desired value of the key.
+   :rtype: bool
+   :returns: ``True`` when the key didn't exist and the value was stored, or ``False`` when the key
+       already existed.
+
+
 .. py:method:: ``get(key: str, default: Any=None) -> Any``
 
-   Return a value of key ``key`` or return value of ``default`` if the key does not exist.
+   Retrieve value for a given key.
+
+   :param str key: cache key.
+   :param default: value returned in case the key is not present in the cache.
+   :returns: a value of the key when the key exists, or ``default`` when it does not.
 
 
-.. py:method:: ``gets(key: str, default: Any=None, cas_default: Any=None) -> Tuple(Any, Any)``
+.. py:method:: ``gets(key: str, default: Any=None, cas_default: str=None) -> Tuple(Any, str)``
 
-   Return a tuple consiting of value of key ``key`` and CAS tag, or tuple of ``default`` and ``cas_default`` if the key does not exist.
+   Retrieve value for a given key and its CAS tag.
+
+   :param str key: cache key.
+   :param default: value returned in case the key is not present in the cache.
+   :param str cas_default: CAS tag returned in case the key is not present in the cache.
+   :rtype: tuple(object, str)
+   :returns: tuple of two items, either value and CAS tag when the key exists, or provided default values
+       when it does not.
 
 
-.. py:method:: ``set(key: str, value: Any) -> Any``
+.. py:method:: ``set(key: str, value: Any) -> set``
 
-   Set a value of key ``key`` to ``value``.
+   Set a value of a given key.
+
+   :param str key: cache key.
+   :param value: desired value of the key.
+   :rtype: bool
+   :returns: ``True`` when the value was successfully changed, ``False`` otherwise.
 
 
-.. py:method:: ``cas(key: str, value: str, tag: Any) -> Any``
+.. py:method:: ``cas(key: str, value: Any, tag: str) -> Optional[bool]``
 
-   *Check And Set* operation. Set a value of key ``key`` to ``value``. ``tag`` is the *CAS tag* previously obtained by calling ``gets``. If the key was modified by other process/thread between ``gets`` and ``cas``, the update **is not** performed and the method returns ``False``. In such case, to successfully change the value, one must call ``gets`` again to obtain changed value and CAS tag, and pass new CAS tag to ``cas`` method.
-   If the value was not changed between ``gets`` and ``cas`` calls, ``cas`` return ``True``.
+   *Check And Set* operation. Set a value of a given key but only when it didn't change - to honor this
+   condition, a CAS tag is used. It is retrieved with the value via ``gets`` method and passed to ``cas``
+   method. If CAS tag stored in cache hasn't been changed - changes with every change of the key value -
+   new value is set. Otherwise, it is left unchanged and ``cas`` reports back to the caller the key value
+   has been updated by someone else in the meantime.
+
+   :param str key: cache key.
+   :param value: desired value of the key.
+   :param str tag: CAS tag previously recieved in return value of ``gets``.
+   :returns: ``None`` when the key didn't exist - in such case it is **not** created! ``True`` when new value
+       was successfully set, or ``False`` when the key has changed and CAS tag didn't match the one stored
+       in cache.
+
+
+.. py:method:: ``delete(key: str) -> bool``
+
+   Delete a given key.
+
+   :param str key: cache key.
+   :rtype: bool
+   :returns: ``True`` if the key was removed, or ``False`` if it wasn't, e.g. when no such key was found.
+
+
+.. py:method:: ``dump(separator: str='/') -> dict``
+
+   Dump content of the cache in a form of nested dictionaries, forming a tree and subtrees based on key
+   and their components.
+
+   :param str separator: separator delimiting levels of keys. E.g. ``foo/bar/baz`` uses ``/`` as
+       a separator.
+   :rtype: dict
+   :returns: nested dictionaries. For the ``foo/bar/baz`` example above, ``{'foo': {'bar': {'baz': <value>}}}``
+       would be returned.
