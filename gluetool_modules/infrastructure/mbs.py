@@ -41,7 +41,7 @@ class MBSApi(object):
 class MBSTask(object):
     # pylint: disable=too-few-public-methods
 
-    ARTIFACT_NAMESPACE = 'mbs-build'
+    ARTIFACT_NAMESPACE = 'redhat-module'
 
     def __init__(self, build_id, module):
         # pylint: disable=invalid-name
@@ -57,7 +57,13 @@ class MBSTask(object):
         self.component = self.name
         self.stream = build_info['stream']
         self.version = build_info['version']
-        self.owner = build_info['owner']
+        self.context = build_info['context']
+        self.issuer = build_info['owner']
+        self.nsvc = '{}:{}:{}:{}'.format(self.name, self.stream, self.version, self.context)
+        # `nvr` is often used as unique id of task (e.g. in mail notifications)
+        # so this task sets `nvr` too, yet its value is not actually 'name', 'version' and 'release',
+        # but 'name', 'stream', 'version' and 'context'
+        self.nvr = self.nsvc
         # set by param for now
         self.target = self.module.option('target')
 
