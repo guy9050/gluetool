@@ -54,6 +54,7 @@ class MBSTask(object):
         build_info = mbs_api.get_module_build(build_id)
 
         self.name = build_info['name']
+        self.component = self.name
         self.stream = build_info['stream']
         self.version = build_info['version']
         self.owner = build_info['owner']
