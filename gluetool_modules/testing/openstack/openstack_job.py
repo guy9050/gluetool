@@ -85,8 +85,6 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         }
     })
 
-    required_options = ('wow-options',)
-
     @cached_property
     def build_params(self):
         brew_build_task_params_options = self.option('brew-build-task-params-options')
