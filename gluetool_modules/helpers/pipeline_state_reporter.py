@@ -148,6 +148,10 @@ class PipelineStateReporter(gluetool.Module):
             'note': {
                 'help': 'Custom, arbitrary note or comment (default: %(default)s).',
                 'default': None
+            },
+            'version': {
+                'help': 'Current version of emitted messages (default: %(default)s).',
+                'default': None
             }
         }),
         ('General options', {
@@ -300,6 +304,7 @@ class PipelineStateReporter(gluetool.Module):
         body['namespace'] = test_namespace or self._get_test_namespace()
 
         body['generated_at'] = datetime.datetime.utcnow().isoformat(' ')
+        body['version'] = self.option('version')
 
         if thread_id is not None:
             body['thread_id'] = thread_id
@@ -399,7 +404,7 @@ class PipelineStateReporter(gluetool.Module):
 
         self.info('reporting pipeline beginning')
 
-        self.report_pipeline_state('running')
+        self.report_pipeline_state(STATE_RUNNING)
 
     def _get_test_namespace(self):
         """
@@ -436,7 +441,7 @@ class PipelineStateReporter(gluetool.Module):
 
     def _get_final_state(self, failure):
         """
-        Read instructions from a file, and find out what the final state of the crrent pipeline
+        Read instructions from a file, and find out what the final state of the current pipeline
         should be.
         """
 
