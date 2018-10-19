@@ -16,6 +16,14 @@ Guests's *in use* flag
 Named ``guests.<guest FQDN>.in-use``. Set to ``true`` when the guest is in cache but it's being used by some process
 for testing. Guests with ``false`` in-use flag are available to grab.
 
+Guest's *use-by* flag
+~~~~~~~~~~~~~~~~~~~~~
+
+Named ``guests.<guest FQDN>.use-by``. Set to a UTC timestamp after which the guest should not be used anymore.
+Periodically being updated when extending guest's reservation timer. When the guest is not in use but its ``use-by``
+flag has passed by, the guest should be removed from the cache since the actual machine is probably back in
+the hands of Beaker.
+
 Guests' info
 ~~~~~~~~~~~~
 
@@ -58,6 +66,10 @@ ProvisionerCapabilities = collections.namedtuple('ProvisionerCapabilities', ['av
 
 
 def _time_from_now(**kwargs):
+    """
+    Returns "deadline": "now", extended by ``timedelta`` which is constructed using given keyword arguments.
+    """
+
     return datetime.datetime.utcnow() + datetime.timedelta(**kwargs)
 
 
@@ -156,9 +168,16 @@ class BeakerGuest(NetworkedGuest):
 
         hours = hours or self._module.option('reservation-extension')
 
+        use_by = str(_time_from_now(hours=hours))
+
         self.execute('extendtesttime.sh <<< {}'.format(hours))
 
-        self.info('extended reservation till cca {} UTC ({} hours from now)'.format(_time_from_now(hours=hours), hours))
+        self.info('extended reservation till cca {} UTC ({} hours from now)'.format(use_by, hours))
+
+        if not self._is_static and self._module.use_cache:
+            # pylint: disable=protected-access
+
+            self._module._touch_dynamic_guest(self, use_by)
 
     def _refresh_reservation(self):
         """
@@ -516,9 +535,35 @@ class BeakerProvisioner(gluetool.Module):
                 self.debug('  failed to grab')
                 continue
 
-            # Good, it's ours! Download the remaining info and create the guest instance.
+            # Good, it's ours! But we have to check its `use-by` stamp, it might be rotten.
             self.debug('grabbing {} from cache'.format(cached_fqdn))
 
+            use_by = cache.get(self._key('guests', cached_fqdn, 'use-by'))
+
+            # This probably should not happen, I'm not 100% sure - we own the guest,
+            # no client should ever remove the `use-by` without owning the guest...
+            # Raise a warning and try another guest - leaving this one reserved so
+            # nobody else would touch it, our human overlords investigate the case.
+            if not result:
+                self.warn('Guest {} free for use byt has no use-by flag'.format(cached_fqdn), sentry=True)
+                continue
+
+            use_by = datetime.datetime.strptime(use_by, '%Y-%m-%d %H:%M:%S.%f')
+
+            # We need some extra time to finish the provisioning, close the paperwork and so on,
+            # so let's pretend the first chance we get to extend guest reservation would happen
+            # an hours from now. Would the guest still be fine by that time?
+            not_actually_now = _time_from_now(hours=1)
+
+            self.debug('use-by {}, "now" {}'.format(use_by, not_actually_now))
+
+            if use_by <= not_actually_now:
+                self.debug('  use-by stamp is too old')
+
+                self._remove_dynamic_guest_from_cache(cached_fqdn, environment)
+                continue
+
+            # Download the remaining info and create the guest instance.
             guest_info = cache.get(self._key('guests', cached_fqdn, 'info'))
 
             return [
@@ -617,6 +662,73 @@ class BeakerProvisioner(gluetool.Module):
                 guest.debug('  guest is now listed as cached')
 
                 break
+
+    def _remove_dynamic_guest_from_cache(self, name, environment):
+        """
+        For some reason, the guest entry should be removed from the cache.
+        We **must** own the guest entry to avoid any race conditions.
+
+        :param str name: guest FQDN.
+        """
+
+        self.info("Removing guest '{}' from the cache".format(name))
+
+        self.require_shared('cache')
+
+        cache = self.shared('cache')
+
+        # We own the guest entry, therefore nobody should even try to reads its properties,
+        # but when it comes to the list of cached guests, we must be more careful.
+
+        # these are safe, we own the guest - nothing even reads these without grabing the guest first
+        cache.delete(self._key('guests', name, 'info'))
+        cache.delete(self._key('guests', name, 'use-by'))
+
+        # We can remove `in-use` as well - should anyone try to read it (because they found the guest
+        # in the list of cached guests), the would see it's either `True` or missing, in both cases moving
+        # to guests with better prospects.
+        cache.delete(self._key('guests', name, 'in-use'))
+
+        # Remove the guest from list of cached guests. When we're done, there should be no trace
+        # of the guest.
+
+        self.debug('removing from list of cached guests')
+
+        guests_key = self._key('environments', environment.distro, environment.arch, 'guests')
+
+        while True:
+            guests, cas_tag = cache.gets(guests_key, default=None, cas_default='0')
+
+            # Is the list empty? At least our guest should be there... Cache may have been pruned
+            # by an external event, nothing to do.
+            if not guests:
+                self.debug('list of cached guests is empty')
+                break
+
+            # Now this one is strange as well, but may happen - we grabbed the guest, then fall
+            # asleep. In the meantime, something killed the cache, other processes began filling
+            # it with new entries, and we're wake up again - the list exists, but obviously doesn't
+            # contain our guest. Log & quit.
+            if name not in guests:
+                self.debug('list exists but does not contain the guest')
+                break
+
+            guests.remove(name)
+
+            if cache.cas(guests_key, guests, cas_tag):
+                self.debug('guest removed from the list')
+                break
+
+    def _touch_dynamic_guest(self, guest, use_by):
+        """
+        Update guest's ``use-by`` flag.
+
+        :param str use_by: time when the guest should not be used anymore.
+        """
+
+        self.require_shared('cache')
+
+        self.shared('cache').set(self._key('guests', guest.name, 'use-by'), use_by)
 
     def _acquire_dynamic_guests(self, environment):
         """
