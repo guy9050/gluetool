@@ -27,7 +27,7 @@ import gluetool_modules.helpers.notify_email.notify_email
 
 import gluetool_modules.static_analysis.covscan.covscan
 import gluetool_modules.static_analysis.rpmdiff.rpmdiff
-import gluetool_modules.testing.restraint.runner
+import gluetool_modules.testing.test_schedule_runner_restraint
 import gluetool_modules.helpers.notify_email.notify_email_rpmdiff_formatter
 import gluetool_modules.helpers.notify_email.notify_email_covscan_formatter
 import gluetool_modules.helpers.notify_email.notify_email_beah_formatter
@@ -45,7 +45,7 @@ from . import create_module, patch_shared
 
 sys.modules['gluetool.glue.static_analysis/covscan-covscan'] = sys.modules['gluetool_modules.static_analysis.covscan.covscan']
 sys.modules['gluetool.glue.static_analysis/rpmdiff-rpmdiff'] = sys.modules['gluetool_modules.static_analysis.rpmdiff.rpmdiff']
-sys.modules['gluetool.glue.testing/restraint-runner'] = sys.modules['gluetool_modules.testing.restraint.runner']
+sys.modules['gluetool.glue/testing-test_schedule_runner_restraint'] = sys.modules['gluetool_modules.testing.test_schedule_runner_restraint']
 sys.modules['gluetool.glue.testing/beaker-beaker'] = sys.modules['gluetool_modules.testing.beaker.beaker']
 
 
