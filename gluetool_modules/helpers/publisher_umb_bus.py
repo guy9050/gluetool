@@ -261,18 +261,18 @@ class UMBPublisher((gluetool.Module)):
                 'metavar': 'N',
                 'default': DEFAULT_GLOBAL_TIMEOUT
             },
-            'on-auth-error-retries': {
+            'on-error-retries': {
                 'help': """
-                        When broker responds with an auth error, try to connect and repeat procedure
-                        for the same message N times (default: %(default)s).
+                        When broker responds with an error, try to connect and repeat procedure N times
+                        (default: %(default)s).
                         """,
                 'type': int,
                 'metavar': 'N',
                 'default': DEFAULT_ON_AUTH_ERROR_RETRIES
             },
-            'on-auth-error-delay': {
+            'on-error-delay': {
                 'help': """
-                        Delay between each retry of ``--on-auth-error-retries`` should be N seconds
+                        Delay between each retry of ``--on-error-retries`` should be N seconds
                         (default: %(default)s).
                         """,
                 'type': float,
@@ -336,22 +336,16 @@ class UMBPublisher((gluetool.Module)):
                 if handler.error is None:
                     break
 
-                # Handle specific errors
-                if handler.error.name == 'amqp:unauthorized-access':
-                    self.warn('Broker responded with unauthorized-access error.')
-
-                    if i == self.option('on-auth-error-retries') + 1:
-                        self.warn('Ran out of allowed retry attempts on unauthorized-access, giving up on message bus')
-                        break
-
-                    time.sleep(self.option('on-auth-error-delay'))
-                    continue
-
-                # Here comes future handling of other errors, should we need it.
+                # Here should come breaking in case of fatal errors, should we need it.
                 # ...
 
-                # When we get here, there was an error and it was not handled. Give up.
-                break
+                self.warn('Retrying because of error: {}'.format(handler.error.name), sentry=True)
+
+                if i == self.option('on-error-retries') + 1:
+                    self.warn('Ran out of allowed retry attempts, giving up on message bus')
+                    break
+
+                time.sleep(self.option('on-error-delay'))
 
         if not messages:
             self.info('{} messages successfully sent'.format(messages_count))
