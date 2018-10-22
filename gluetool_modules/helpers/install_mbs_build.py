@@ -32,9 +32,9 @@ class InstallMBSBuild(gluetool.Module):
 
     shared_functions = ('setup_guest',)
 
-    def _get_repo(self, module_name):
+    def _get_repo(self, module_nsvc):
         self.info('Generating repo for module via ODCS')
-        command = ['odcs', '--redhat', 'create', 'module', module_name,
+        command = ['odcs', '--redhat', 'create', 'module', module_nsvc,
                    '--sigkey', 'none', '--flag', 'no_deps']
         # TO improve: raise OdcsError if command fails
         output = Command(command).run()
@@ -57,13 +57,13 @@ class InstallMBSBuild(gluetool.Module):
 
         primary_task = self.shared('primary_task')
 
-        module_name = '{}:{}:{}'.format(primary_task.name, primary_task.stream, primary_task.version)
-        repo_url = self._get_repo(module_name)
-        self.info('Installing module "{}" from {}'.format(module_name, repo_url))
+        nsvc = primary_task.nsvc
+        repo_url = self._get_repo(nsvc)
+        self.info('Installing module "{}" from {}'.format(nsvc, repo_url))
 
         self.shared('run_playbook', gluetool.utils.normalize_path(self.option('playbook')), guests, variables={
             'REPO_URL': repo_url,
-            'MODULE_NAME': module_name,
+            'MODULE_NSVC': nsvc,
             'ansible_python_interpreter': '/usr/bin/python3'
         })
         self.info('rhel-module installed')
