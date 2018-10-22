@@ -1,5 +1,4 @@
 import json
-import shlex
 
 import gluetool
 from gluetool.utils import Command
@@ -68,7 +67,7 @@ class Ansible(gluetool.Module):
 
     @gluetool.utils.cached_property
     def additional_options(self):
-        return sum([shlex.split(item) for item in self.option('ansible-playbook-options')], [])
+        return gluetool.utils.normalize_multistring_option(self.option('ansible-playbook-options'))
 
     def run_playbook(self, playbook_path, guests, variables=None, inventory=None):
         """
