@@ -323,13 +323,18 @@ class UMBPublisher((gluetool.Module)):
         if not self.isolatedrun_allows('Connecting to message bus'):
             isolated_run = True
 
-        handler = TestHandler(self, self._environment['urls'], messages, topic)
-        container = proton.reactor.Container(handler)
-
         if not isolated_run:
             for i in itertools.count(start=1):
                 self.info('Publishing {} messages on the UMB, attempt #{}'.format(messages_count, i))
 
+                # We used to create container just once, but suddenly, SEGFAULTs start to pop up when
+                # code tried to retry sending messages, using the pre-created container, by calling its
+                # `run()`. maybe we don't understand it fully...
+                #
+                # As a workaround, let's create the container from the scratch for each attempt.
+
+                handler = TestHandler(self, self._environment['urls'], messages, topic)
+                container = proton.reactor.Container(handler)
                 container.run()
 
                 # Everything went fine (probably) because handler signals no error
