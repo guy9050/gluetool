@@ -150,6 +150,8 @@ class Cache(object):
         :returns: ``True`` if the key was removed, or ``False`` if it wasn't, e.g. when no such key was found.
         """
 
+        self.debug("delete '{}'".format(key))
+
         with self._lock:
             return self._client.delete(key, noreply=False)
 

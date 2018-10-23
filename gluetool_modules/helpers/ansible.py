@@ -1,5 +1,4 @@
 import json
-import shlex
 
 import gluetool
 from gluetool.utils import Command
@@ -68,9 +67,9 @@ class Ansible(gluetool.Module):
 
     @gluetool.utils.cached_property
     def additional_options(self):
-        return sum([shlex.split(item) for item in self.option('ansible-playbook-options')], [])
+        return gluetool.utils.normalize_multistring_option(self.option('ansible-playbook-options'))
 
-    def run_playbook(self, playbook_path, guests, variables=None):
+    def run_playbook(self, playbook_path, guests, variables=None, inventory=None):
         """
         Run Ansible playbook.
 
@@ -78,6 +77,8 @@ class Ansible(gluetool.Module):
         :param list(libci.guest.NetworkedGuest) guests: Guests to run playbooks on.
         :param dict variables: If set, represents additional variables that will
           be passed to ``ansible-playbook`` using ``--extra-vars`` option.
+        :param str inventory: A path to the inventory file. You can use it if you
+          want to cheat the ansible module e.g. to overshadow localhost with another host.
         :returns: :py:class:`gluetool.utils.ProcessOutput` instance.
         """
 
@@ -87,9 +88,11 @@ class Ansible(gluetool.Module):
         if not all([guest.key == guests[0].key for guest in guests]):
             raise gluetool.GlueError('SSH key must be the same for all guests')
 
+        inventory = inventory or '{},'.format(','.join([guest.hostname for guest in guests]))  # note the comma
+
         cmd = [
             'ansible-playbook',
-            '-i', '{},'.format(','.join([guest.hostname for guest in guests])),  # note the comma
+            '-i', inventory,
             '--private-key', guests[0].key
         ]
 

@@ -6,6 +6,29 @@ All notable changes to this project will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
 
+2018-10-23
+----------
+
+Changed
+~~~~~~~
+
+- [mbs] use full module NSVC to install it, instead of NSV
+- [publisher-umb-bus] retry on *all* errors, not just on auth* related ones
+
+Added
+~~~~~
+
+- [ansible] let user specify the inventory file instead of generating the default inventory based on given guests
+- [beaker-provisioner] keep track of the age of guests in the cache
+- [mbs] provide common artifact properties like ``nvr``, ``nsvc``, or ``component``
+- [pipeline-state-reporter] state version of the generated message
+
+Fixed
+~~~~~
+
+- [ansible] to process ``--ansible-playbook-options``, use gluetool's ``normalize_multistring_option``
+
+
 2018-10-15
 ----------
 
