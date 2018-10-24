@@ -1,11 +1,13 @@
 import shlex
 
 import gluetool
+from gluetool.log import log_blob
 
 
 class ExecuteCommand(gluetool.Module):
     """
-    Run an arbitrary command, or their sequence, and log the output.
+    Run an arbitrary command, or their sequence, when the module is executed or destroyed. Log the output.
+    Also provides shared function for executing commands during the runtime, on demand of other modules.
     """
 
     name = 'execute-command'
@@ -32,14 +34,77 @@ class ExecuteCommand(gluetool.Module):
         }
     }
 
-    def sanity(self):
-        if not self.option('command') and not self.option('script'):
-            raise gluetool.GlueError("You have to use either `--command` or `--script`")
+    shared_functions = ('execute_commands',)
 
-        if self.option('command') and self.option('script'):
-            raise gluetool.GlueError("You have to use just one of `--command` or `--script`")
+    def _execute_command(self, command, printable=None):
+        """
+        Run a single command.
 
-    def _execute_commands(self, context_extra=None):
+        :param list(str) command: A command to execute.
+        :param str printable: Printable form of the command, used for logging purposes. If not set, it is created
+            from ``command`` by joining its items with a space character (`` ``).
+        :rtype: gluetool.utils.ProcessOutput
+        :returns: output of the command.
+        :raises: gluetool.GlueError when command finished with non-zero exit code.
+        """
+
+        printable = printable or ' '.join(command)
+
+        self.info('Running command: {}'.format(printable))
+
+        try:
+            output = gluetool.utils.run_command(command)
+
+        except gluetool.GlueCommandError as exc:
+            output = exc.output
+
+        (self.info if output.exit_code == 0 else self.error)('Exited with code {}'.format(output.exit_code))
+        log_blob(self.info, 'stdout', output.stdout)
+        log_blob(self.error, 'stderr', output.stderr)
+
+        if output.exit_code != 0:
+            raise gluetool.GlueError("Command '{}' exited with non-zero exit code".format(printable))
+
+        return output
+
+    def _execute_command_templates(self, commands, context_extra=None):
+        """
+        Execute sequence of commands, represented as a list of templates. Each template is first rendred
+        and the resulting string is treated as a command to execute.
+
+        :param list(str) commands: templates of commands to execute.
+        :param dict context_extra: if set, it is added to a context used when redering the templates.
+        """
+
+        context = gluetool.utils.dict_update(
+            self.shared('eval_context'),
+            context_extra or {}
+        )
+
+        for command in commands:
+            rendered_command = gluetool.utils.render_template(command, logger=self.logger, **context)
+
+            self._execute_command(shlex.split(rendered_command), printable=command)
+
+    def execute_commands(self, commands, context_extra=None):
+        """
+        Execute sequence of commands, represented as a list of templates. Each template is first rendred
+        and the resulting string is treated as a command to execute.
+
+        :param list(str) commands: templates of commands to execute.
+        :param dict context_extra: if set, it is added to a context used when redering the templates.
+        """
+
+        self._execute_command_templates(commands, context_extra=context_extra)
+
+    @gluetool.utils.cached_property
+    def _external_commands(self):
+        """
+        Gather commands specified by module options, and provide them transparently to other parts of the module.
+
+        :rtype: list(str)
+        """
+
         commands = []
 
         if self.option('command'):
@@ -54,43 +119,18 @@ class ExecuteCommand(gluetool.Module):
 
                 commands += script_commands
 
-        context = gluetool.utils.dict_update(
-            self.shared('eval_context'),
-            context_extra or {}
-        )
-
-        for command in commands:
-            original_command = command
-
-            self.info('Running command: {}'.format(command))
-
-            command = gluetool.utils.render_template(command, logger=self.logger, **context)
-
-            split_command = shlex.split(command)
-
-            try:
-                output = gluetool.utils.run_command(split_command)
-
-            except gluetool.GlueCommandError as exc:
-                output = exc.output
-
-            (self.info if output.exit_code == 0 else self.error)('Exited with code {}'.format(output.exit_code))
-            gluetool.log.log_blob(self.info, 'stdout', output.stdout)
-            gluetool.log.log_blob(self.error, 'stderr', output.stderr)
-
-            if output.exit_code != 0:
-                raise gluetool.GlueError("Command '{}' exited with non-zero exit code".format(original_command))
+        return commands
 
     def execute(self):
         if gluetool.utils.normalize_bool_option(self.option('on-destroy')):
             return
 
-        self._execute_commands()
+        self._execute_command_templates(self._external_commands)
 
     def destroy(self, failure=None):
         if not gluetool.utils.normalize_bool_option(self.option('on-destroy')):
             return
 
-        self._execute_commands(context_extra={
+        self._execute_command_templates(self._external_commands, context_extra={
             'FAILURE': failure
         })
