@@ -425,7 +425,9 @@ class BeakerProvisioner(gluetool.Module):
             '--arch', environment.arch
         ], distros=[
             environment.distro
-        ])
+        ], extra_context={
+            'PHASE': 'guest-provisioning'
+        })
 
         if len(jobs) != 1:
             raise GlueError('For an environment a single guest is needed, multiple jobs were returned instead')
