@@ -17,13 +17,29 @@ class PlaybookError(PrimaryTaskFingerprintsMixin, gluetool.GlueError):
     def log_ansible_fatals(module, output):
         fatal_reports = []
 
-        for line in output.stdout.split('\n'):
-            line = line.strip()
+        # Simple iterating over lines in `output.stdout` isn't good enough
+        # since we might need to move on to the next line. Therefore we prepare
+        # our own generator providing lines.
+        def output_lines():
+            for line in output.stdout.split('\n'):
+                yield line.strip()
 
+        # The generator cannot be "anonymous", instantiated once in the loop control. It must have a name
+        # because we want to call its `next()` on demand.
+        iter_lines = output_lines()
+
+        for line in iter_lines:
             if not line.startswith('fatal: '):
                 continue
 
-            fatal_reports.append(json.loads(line[line.index('{'):]))
+            # Try to decode the line as a JSON object first - this is the default output "structure".
+            try:
+                fatal_reports.append(json.loads(line[line.index('{'):]))
+
+            except ValueError:
+                # Failed to parse JSON? Maybe it's YAML - in that case, pop next line, it contains
+                # the message. Probably. Best we can do at this moment, sadly, Ansible YAML is not YAML :/
+                fatal_reports.append(gluetool.utils.from_yaml(next(iter_lines)))
 
         fatal_messages = [
             report['msg'] for report in fatal_reports if 'msg' in report
