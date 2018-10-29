@@ -6,18 +6,21 @@ Environment
 
 Before moving on to the actual setup, there are few important notes:
 
--  **The only supported and (sort of tested) way of installation and
-   using ``citool`` is a separate virtual environment!** It is possible
-   to install ``citool`` & modules somewhere into your system but we don't
-   recommend that, we don't use it that way when developing things, and we
-   don't know what kind of hell you might run into. Please, stick with
-   ``virtualenv``.
+- **The only supported and (sort of tested) way of using and developing these modules is a separate virtual
+  environment!**
 
--  The tested distributions (as in "we're using these") are either
-   recent Fedora, RHEL or CentOS. You could try to install ``citool``
-   in a different environment - or even development trees of Fedora, for
-   example - please, make notes about differences, and it'd be awesome
-   if your first merge request could update this file :)
+  It is possible to install ``citool`` and these modules directly into your system but we don't recommend that. We
+  definitely recommend either:
+
+  - creating a virtual environment for your development, or
+  - installing ``citool`` from RPM, and adding this collection into the virtual environment created by the installation.
+
+-  The tested distributions (as in "we're using these") are the recent released of Fedora - 26, 27 and 28. You could
+   try other distributions but we didn't - please, let us know, and it'd be awesome if your first merge request could
+   update this file :)
+
+We will focus on creating a separate virtual environment for your development efforts.
+
 
 Requirements
 ------------
@@ -28,11 +31,10 @@ To begin digging into sources, there are few requirements:
 
 -  ``ansible-playbook``
 
--  system packages - it is either impossible or impractical to use their
-   Python counterpart, or they are required to build a Python package. In
-   some cases, on recent Fedora (26+) for example, it's been shown for some
-   packages their ``compat-*`` variant might be needed. See the optional
-   ``Bootstrap system environment`` step bellow.
+-  system packages - it is either impossible or impractical to use their Python counterpart, or they are required to
+  build a Python package. In some cases, on recent Fedora (26+) for example, it's been shown for some packages
+  their ``compat-*`` variant might be needed. See the optional ``Bootstrap system environment`` step bellow.
+
 
 Installation
 ------------
@@ -40,8 +42,7 @@ Installation
 0. (optional) Bootstrap system environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Following steps are necessary to install requirements when installing
-``citool`` on different distributions:
+Following steps are necessary to install requirements for different distributions:
 
 **RHEL 7.4**
 
@@ -100,12 +101,10 @@ Following steps are necessary to install requirements when installing
 
    pushd gluetool-modules && /usr/bin/ansible-playbook ./inject-extra-requirements.yml && popd
 
-**Be warned:** read the messages reported by this step - ``inject-extra-requirements.yml``
-playbook checks for necessary system packages, and reports any missing
-pieces. **It does not install them!** - we don't want to mess up your
-system setup, as we try to stay inside our little own virtualenv, but
-the playbook will try to provide hints on what packages might solve the
-issue.
+**Be warned:** read the messages reported by this step - ``inject-extra-requirements.yml`` playbook checks for
+necessary system packages, and reports any missing pieces. **It does not install them!** - we don't want to
+mess up your system setup, as we try to stay inside our little own virtualenv, but the playbook will try to
+provide hints on what packages might solve the issue. Hopefully, you already have all required system packages.
 
 6. Install ``gluetool-modules``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -129,8 +128,8 @@ it's necessary to re-activate the virtualenv before actually doing stuff:
 8. Add configuration
 ~~~~~~~~~~~~~~~~~~~~~~
 
-``citool`` looks for its configuration in ``~/.citool.d``. Add configuration
-for the modules according to your preference:
+``citool`` looks for its configuration in ``~/.citool.d``. Add configuration for the modules according to your
+preference:
 
 .. code-block:: bash
 
@@ -139,7 +138,10 @@ for the modules according to your preference:
 9. Add local configuration (optional)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A configuration you cloned from remote repository in step #8 is often tailored for other task (e.g. CI) while providing reasonable functionality when used locally. To tweak things for you, you can create a local configuration ``citool`` looks for configuration files in its working directory as well, i.e. when running from your ``gluetool-modules`` clone, it looks for ``.gluetool.d`` (or ``.citool.d`` directory).
+A configuration you cloned from remote repository in step #8 is often tailored for other task (e.g. CI) while
+providing reasonable functionality when used locally. To tweak things for you, you can create a local configuration
+``citool`` looks for configuration files in its working directory as well, i.e. when running from your
+``gluetool-modules`` clone, it looks for ``.gluetool.d`` (or ``.citool.d`` directory).
 
 .. code-block:: bash
 
@@ -179,8 +181,7 @@ run ``citool``:
 Test suites
 -----------
 
-The test suite is governed by ``tox`` and ``py.test``. Before running
-the test suite, you have to install ``tox``:
+The test suite is governed by ``tox`` and ``py.test``. Before running the test suite, you have to install ``tox``:
 
 .. code-block:: bash
 
@@ -192,23 +193,20 @@ Tox can be easily executed by:
 
     tox
 
-Tox also accepts additional options which are then passed to
-``py.test``:
+Tox also accepts additional options which are then passed to ``py.test``:
 
 .. code-block:: bash
 
     tox -- --cov=libci --cov-report=html:coverage-report
 
-Tox creates (and caches) virtualenv for its test runs, and uses them for
-running the tests. It integrates multiple different types of test (you
-can see them by running ``tox -l``).
+Tox creates (and caches) virtualenv for its test runs, and uses them for running the tests. It integrates multiple
+different types of test (you can see them by running ``tox -l``).
 
 
 Documentation
 -------------
 
-Auto-generated documentation is located in ``docs/`` directory. To
-update your local copy, run these commands:
+Auto-generated documentation is located in ``docs/`` directory. To update your local copy, run these commands:
 
 .. code-block:: bash
 

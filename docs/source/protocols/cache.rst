@@ -17,7 +17,7 @@ None, often the shared function providing access to cache interface bears name `
 Packet
 ------
 
-.. py:method:: ``add(key: str, value: Any) -> bool``
+.. py:method:: add(key, value)
 
    Add a key with a given value.
 
@@ -28,7 +28,7 @@ Packet
        already existed.
 
 
-.. py:method:: ``get(key: str, default: Any=None) -> Any``
+.. py:method:: get(key, default=None)
 
    Retrieve value for a given key.
 
@@ -37,7 +37,7 @@ Packet
    :returns: a value of the key when the key exists, or ``default`` when it does not.
 
 
-.. py:method:: ``gets(key: str, default: Any=None, cas_default: str=None) -> Tuple(Any, str)``
+.. py:method:: gets(key, default=None, cas_default=None)
 
    Retrieve value for a given key and its CAS tag.
 
@@ -49,7 +49,7 @@ Packet
        when it does not.
 
 
-.. py:method:: ``set(key: str, value: Any) -> set``
+.. py:method:: set(key, value)
 
    Set a value of a given key.
 
@@ -59,7 +59,7 @@ Packet
    :returns: ``True`` when the value was successfully changed, ``False`` otherwise.
 
 
-.. py:method:: ``cas(key: str, value: Any, tag: str) -> Optional[bool]``
+.. py:method:: cas(key, value, tag)
 
    *Check And Set* operation. Set a value of a given key but only when it didn't change - to honor this
    condition, a CAS tag is used. It is retrieved with the value via ``gets`` method and passed to ``cas``
@@ -75,7 +75,7 @@ Packet
        in cache.
 
 
-.. py:method:: ``delete(key: str) -> bool``
+.. py:method:: delete(key)
 
    Delete a given key.
 
@@ -84,7 +84,7 @@ Packet
    :returns: ``True`` if the key was removed, or ``False`` if it wasn't, e.g. when no such key was found.
 
 
-.. py:method:: ``dump(separator: str='/') -> dict``
+.. py:method:: dump(separator='/')
 
    Dump content of the cache in a form of nested dictionaries, forming a tree and subtrees based on key
    and their components.

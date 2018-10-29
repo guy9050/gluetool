@@ -11,11 +11,13 @@
       - source/howto-docs.rst
       - source/howto-modules.rst
       - source/index.rst
+      - source/protocols/cache.rst
       - source/protocols/protocols.rst
       - source/protocols/provisioner-capabilities.rst
       - source/protocols/testing-environment.rst
       - source/CHANGELOG.rst
       - source/DEVELOPMENT.rst
+      - source/fix-argparse-table.css
     base_files:
       - source/conf.py
       - source/modules.txt

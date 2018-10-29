@@ -1,5 +1,5 @@
-``citool`` modules
-==================
+Gluetool Modules Collection
+===========================
 
 .. toctree::
    :maxdepth: 1

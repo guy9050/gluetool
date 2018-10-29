@@ -19,7 +19,7 @@ MOD_TEMPLATE = """
 ``{{ name }}``
 {{ title_underline }}
 
-{{ description }}
+**{{ description }}**
 
 .. automoddesc:: {{ modpath }}.{{ klass }}
    :noindex:
@@ -88,7 +88,7 @@ def gather_module_data():
         modpath = re.sub(r'\.tox\..*\.site-packages\.', '', modpath)
         modpath = re.sub(r'\.tox\..*\.gluetool_modules.', '', modpath)
 
-        description = "**{}**".format(properties['description']) if properties['description'] else ''
+        description = properties['description'] if properties['description'] else 'Module did not provide a description'
 
         filepath = filepath.replace('-', '_')
 
@@ -158,7 +158,7 @@ def write_index_doc(modules, output_dir):
         with open('{}/modules.rst'.format(output_dir), 'w') as g:
             g.write(f.read().format(modules='\n'.join(sorted([
                 # pylint: disable=line-too-long
-                '   {}\n'.format(gluetool.utils.render_template('{{ name }}: {{ description }} <modules/{{ name }}>', **module_data)) for module_data in modules
+                '{}\n'.format(gluetool.utils.render_template('`{{ name }} <modules/{{ name }}.html>`_\n\n  {{ description }}\n', **module_data)) for module_data in modules
             ]))))
             g.flush()
 
