@@ -4,13 +4,16 @@ from gluetool.log import log_dict
 from gluetool.utils import Command
 from gluetool import SoftGlueError, GlueError
 from libci.sentry import PrimaryTaskFingerprintsMixin
+# pylint: disable=no-name-in-module
+from jq import jq
 
 
 class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
-    def __init__(self, task, installation_logs):
+    def __init__(self, task, guest, packages):
         super(SUTInstallationFailedError, self).__init__(task, 'SUT installation failed')
 
-        self.installation_logs = installation_logs
+        self.guest = guest
+        self.packages = packages
 
 
 class InstallMBSBuild(gluetool.Module):
@@ -61,9 +64,41 @@ class InstallMBSBuild(gluetool.Module):
         repo_url = self._get_repo(nsvc)
         self.info('Installing module "{}" from {}'.format(nsvc, repo_url))
 
-        self.shared('run_playbook', gluetool.utils.normalize_path(self.option('playbook')), guests, variables={
-            'REPO_URL': repo_url,
-            'MODULE_NSVC': nsvc,
-            'ansible_python_interpreter': '/usr/bin/python3'
-        })
-        self.info('rhel-module installed')
+        ansible_output = self.shared(
+            'run_playbook',
+            gluetool.utils.normalize_path(self.option('playbook')),
+            guests,
+            variables={
+                'REPO_URL': repo_url,
+                'MODULE_NSVC': nsvc,
+                'ansible_python_interpreter': '/usr/bin/python3'
+            }
+        )
+
+        query = """
+              .plays[].tasks[]
+            | select(.task.name == "Install module")
+            | .hosts | to_entries[]
+            | {
+                host: .key,
+                packages: [
+                    .value.results[]
+                  | select(.failed == true)
+                  | .item
+                ]
+              }
+            | select(.packages != [])""".replace('\n', '')
+
+        failed_tasks = jq(query).transform(ansible_output, multiple_output=True)
+
+        log_dict(self.debug, 'ansible output after jq processing', failed_tasks)
+
+        if failed_tasks:
+            first_fail = failed_tasks[0]
+            guest = [guest for guest in guests if guest.hostname == first_fail['host']][0]
+            packages = first_fail['packages']
+
+            guest.warn('Modules {} have not been installed.'.format(','.join(packages)))
+            raise SUTInstallationFailedError(self.shared('primary_task'), guest, packages)
+
+        self.info('All modules have been successfully installed')
