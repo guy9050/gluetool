@@ -1039,6 +1039,7 @@ class CIOpenstack(gluetool.Module):
     # all openstack guests
     _all = []
 
+    @property
     def eval_context(self):
         # pylint: disable=unused-variable
         __content__ = {  # noqa
