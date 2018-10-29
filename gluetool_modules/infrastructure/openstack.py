@@ -63,6 +63,21 @@ class OpenStackImage(object):
 
         module.logger.connect(self)
 
+        glance_options = {}
+        for option in ['auth-url', 'project-name', 'username', 'password']:
+            if self.module.option('glance.' + option):
+                glance_options[option] = self.module.option('glance.' + option)
+            else:
+                glance_options[option] = self.module.option(option)
+
+        self._glance_command = [
+            'glance',
+            '--os-auth-url', glance_options['auth-url'],
+            '--os-project-name', glance_options['project-name'],
+            '--os-username', glance_options['username'],
+            '--os-password', glance_options['password']
+        ]
+
     def __repr__(self):
         return '<OpenStackImage(name="{}")>'.format(self.name)
 
@@ -147,29 +162,36 @@ class OpenStackImage(object):
 
         self.debug("downloading image '{}' into '{}'".format(self.name, filename))
 
-        glance_options = {}
-        for option in ['auth-url', 'project-name', 'username', 'password']:
-            if self.module.option('glance.' + option):
-                glance_options[option] = self.module.option('glance.' + option)
-            else:
-                glance_options[option] = self.module.option(option)
-
         try:
-            gluetool.utils.run_command([
-                'glance',
-                '--os-auth-url', glance_options['auth-url'],
-                '--os-project-name', glance_options['project-name'],
-                '--os-username', glance_options['username'],
-                '--os-password', glance_options['password'],
-                'image-download',
-                '--file', filename,
-                str(self.resource().id)
-            ])
+            gluetool.utils.Command(self._glance_command + ['image-download',
+                                                           '--file', filename,
+                                                           str(self.resource().id)]).run()
 
         except gluetool.GlueCommandError as exc:
             raise GlueError('Failed to download snapshot: {}'.format(exc.output.stderr))
 
         return filename
+
+    @cached_property
+    def _image_info(self):
+        try:
+            image_info_cmd = gluetool.utils.Command(self._glance_command + ['image-show', str(self.resource().id)])
+            output = image_info_cmd.run()
+
+        except gluetool.GlueCommandError as exc:
+            raise GlueError('Failed to get image info: {}'.format(exc.output.stderr))
+
+        return output.stdout
+
+    @cached_property
+    def compose(self):
+        match = re.findall('\"meta_compose=(.*)\"', self._image_info)
+
+        if not match:
+            self.warn('No compose found for image: {}'.format(self.name), sentry=True)
+            return ''
+
+        return match[0]
 
 
 class OpenstackGuest(NetworkedGuest):
@@ -1017,6 +1039,19 @@ class CIOpenstack(gluetool.Module):
     # all openstack guests
     _all = []
 
+    def eval_context(self):
+        # pylint: disable=unused-variable
+        __content__ = {  # noqa
+            'OPENSTACK_GUESTS': """
+                             List of `OpenstackGuest` object, which represents currently provisioned guests
+                             from Openstack.
+                             """
+        }
+
+        return {
+            'OPENSTACK_GUESTS': self._all
+        }
+
     @cached_property
     def user_data(self):
         user_data = self.option('user-data')
@@ -1339,6 +1374,7 @@ class CIOpenstack(gluetool.Module):
 
         for instance in self._all:
             instance.destroy()
+        self._all = []
 
         self.info('successfully removed all guests')
 
