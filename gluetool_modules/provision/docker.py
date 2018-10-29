@@ -1,8 +1,10 @@
+import collections
 import random
 import time
 
 import gluetool
 from gluetool import GlueError, GlueCommandError
+from gluetool.utils import normalize_multistring_option
 import libci.guest
 
 
@@ -16,14 +18,28 @@ def rand_id():
 class Image(object):
     """
     Thin wrapper around Docker's image instance, providing few helper methods.
+
+    :param str image: image ID as understood by Docker.
+    :param str name: image name as presented to the user - often consits of "repository" and "tag" elements.
+    :ivar str name: image name as presented to the user - often consits of "repository" and "tag" elements.
+    :ivar str full_id: Docker image ID in its long form.
+    :ivar str short_id: Docker image ID in its short form (cca 12 characters).
     """
 
     @staticmethod
     def image_by_id(docker, image_id):
+        """
+        Create ``Image`` instance from Docker image ID.
+        """
+
         return Image(docker.images.get(image_id))
 
     @staticmethod
     def image_by_name(docker, image_name):
+        """
+        Create ``Image`` instance from human-readable name.
+        """
+
         return Image(docker.images.get(image_name), name=image_name)
 
     def __init__(self, image, name=None):
@@ -40,6 +56,12 @@ class Image(object):
 
     @property
     def attrs(self):
+        """
+        Return image attributes as provided by Docker API.
+
+        :rtype: dict
+        """
+
         self._image.reload()
 
         return self._image.attrs
@@ -59,16 +81,16 @@ class DockerGuest(libci.guest.Guest):
     * short ID - shortened variant of ID. Much better.
     * repository + tag - it looks like a "name", e.g. ``rhscl/devtoolset-4-toolchain-rhel7:latest``.
       ``latest`` is the tag, the rest is called repository. One image can have multiple "names"
-      which share ID but differ in repository/tag.
+      pointing to the same ID with different repository/tag labels.
 
     To identify images that belong to the guest we create a "namespace":
 
         ``<guest name>-<random string>/<base image ID>``
 
-    This namespace then represents *repository* part of guest's image names, and each image
-    gets a tag, representing a "generation" of the base image - with each change, generation
-    is raised by one, and together with namespace creates a trail of unique, followable image
-    names. This way we can referr to images using their IDs while we still can print somewhat
+    This namespace then represents **repository** part of guest's image names, and each image
+    in this repository gets a tag, representing a "generation" of the base image - with each change,
+    generation is raised by one, and together with namespace creates a trail of unique, followable
+    image names. This way we can referr to images using their IDs while we still can print somewhat
     readable names to follow in logs.
 
     Base image has usually completely different name but we add it into our namespace as a
@@ -80,11 +102,15 @@ class DockerGuest(libci.guest.Guest):
     :param Image image: image to instantiate.
     """
 
-    def __init__(self, module, name, docker, image):
+    # pylint: disable=too-many-arguments
+    def __init__(self, module, name, docker, image, volumes=None):
         super(DockerGuest, self).__init__(module, name)
 
         self._docker = docker
         self._name = name
+
+        # volumes to mount when running the container
+        self._volumes = volumes or {}
 
         # each guest has its own namespace where it keeps its private images
         self._namespace = '{}-{}/{}'.format(self.name, rand_id(), image.full_id)
@@ -144,6 +170,9 @@ class DockerGuest(libci.guest.Guest):
         assert self._image is not None
 
         self.debug("creating a container from '{}'".format(self._image.name))
+
+        if self._volumes and 'volumes' not in kwargs:
+            kwargs['volumes'] = self._volumes
 
         container = creator(self._image.full_id, *args, **kwargs)
 
@@ -243,7 +272,7 @@ class DockerGuest(libci.guest.Guest):
 
         output = gluetool.utils.ProcessOutput(cmd, container.attrs['State']['ExitCode'], stdout, stderr, {})
 
-        output.log(self.debug)
+        output.log(self.logger)
 
         if output.exit_code != 0:
             raise GlueCommandError(cmd, output)
@@ -267,6 +296,35 @@ class DockerGuest(libci.guest.Guest):
             self._create_container()
 
         return self._execute_shell(['docker', 'cp', '{}:{}'.format(self._container.id, src), dst])
+
+    def add_volume(self, host_path, guest_path, mode='ro'):
+        """
+        Add a volume that should be mounted when running a command.
+
+        :param str host_path: path on the host system.
+        :param str guest_path: path on the guest - a mount point.
+        :param str mode: either ``ro`` for read-only access, or ``rw`` for read-write.
+        """
+
+        assert mode in ('rw', 'ro')
+
+        self._volumes[host_path] = {
+            'bind': guest_path,
+            'mode': mode
+        }
+
+    def remove_volume(self, host_path):
+        """
+        Remove previously configured volume.
+
+        :param str host_path: path on the host system, used in the previous call
+            to :py:ref:`DockerGuest.add_volume`.
+        """
+
+        if host_path not in self._volumes:
+            return
+
+        del self._volumes[host_path]
 
     def create_snapshot(self, start_again=True):
         self.debug('creating a snapshot')
@@ -325,14 +383,27 @@ class DockerProvisioner(gluetool.Module):
     description = 'Provision guests backed by docker containers.'
 
     options = [
+        ('Environment options', {
+            'environment-map': {
+                'help': 'Mapping translating testing environments to Docker images.',
+                'action': 'store'
+            }
+        }),
         ('Direct provisioning', {
             'provision': {
-                'help': 'Provision given number of guests',
+                'help': """
+                        Provision given number of guests. Use ``--environment`` or ``--image``
+                        to specify what should the guests provide.
+                        """,
                 'metavar': 'COUNT',
                 'type': int
             },
+            'environment': {
+                'help': 'Environment to provision.',
+                'metavar': 'key1=value1,key2=value2,...'
+            },
             'image': {
-                'help': 'Force image name to be used.'
+                'help': 'Image to provision.'
             },
             'setup-provisioned': {
                 'help': "Setup guests after provisioning them. See 'guest-setup' module",
@@ -344,12 +415,18 @@ class DockerProvisioner(gluetool.Module):
         })
     ]
 
-    shared_functions = ['provision']
+    required_options = ('environment-map',)
+
+    shared_functions = ('provision',)
 
     def __init__(self, *args, **kwargs):
         super(DockerProvisioner, self).__init__(*args, **kwargs)
 
         self._guests = []
+
+    @gluetool.utils.cached_property
+    def environment_map(self):
+        return gluetool.utils.load_yaml(self.option('environment-map'), logger=self.logger)
 
     def guest_factory(self, *args, **kwargs):
         """
@@ -365,38 +442,106 @@ class DockerProvisioner(gluetool.Module):
 
         return guest
 
-    # pylint: disable=unused-argument
-    def provision(self, count=1, name=DEFAULT_NAME, image=None, **kwargs):
+    def _determine_image_name(self, image_name):
         """
-        Provision guests.
+        Find a Docker image reference based on its supposed name.
 
-        :param int count: number of guests to provision.
-        :param str name:
+        :param str name: image name as presented to the user - often consits of "repository" and "tag" elements.
+        :rtype: Image
         """
+
+        self.info('finding image for name {}'.format(image_name))
+
+        self.require_shared('docker')
+
+        image = Image.image_by_name(self.shared('docker'), image_name)
+
+        self.info('image is {}'.format(image))
+
+        return image
+
+    def _determine_image_environment(self, environment):
+        """
+        Find a Docker image reference based on its Docker ID.
+
+        :param str image: image ID as understood by Docker.
+        :rtype: Image
+        """
+
+        self.info('finding image for environment {}'.format(environment))
+
+        self.require_shared('docker', 'evaluate_filter')
+
+        context = gluetool.utils.dict_update(self.shared('eval_context'), {
+            'ENVIRONMENT': environment
+        })
+
+        image_entries = self.shared('evaluate_filter', self.environment_map, context=context, stop_at_first_hit=True)
+
+        if not image_entries:
+            raise GlueError('No image configured for environment {}'.format(environment))
+
+        image = Image.image_by_name(self.shared('docker'), image_entries[0]['image'])
+
+        self.info('image is {}'.format(image))
+
+        return image
+
+    def _determine_image(self, environment, image_name):
+        if image_name:
+            return self._determine_image_name(image_name)
+
+        return self._determine_image_environment(environment)
+
+    # pylint: disable=unused-argument
+    def provision(self, environment, count=1, image_name=None, name=DEFAULT_NAME, **kwargs):
+        """
+        Provision guest for the given environment.
+
+        :param tuple environment: description of the envronment caller wants to provision.
+            Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
+        :param int count: provision this many guests.
+        :param str image_name: instead of environment, force use of image of this name.
+        :param str name: name prefix used for naming guests.
+        """
+
+        self.require_shared('docker')
 
         if count < 1:
             raise GlueError('You must provision at least one guest')
 
-        if image is None:
-            raise GlueError('You must specify docker image')
+        image = self._determine_image(environment, image_name)
 
         docker = self.shared('docker')
 
-        self.info("looking for image by name '{}'".format(image))
+        return [
+            self.guest_factory(self, name, docker, image) for _ in range(0, count)
+        ]
 
-        image = Image.image_by_name(docker, image)
-        self.info('image is {}'.format(image))
+    def sanity(self):
+        if self.option('provision') and not self.option('image') and not self.option('environment'):
+            raise GlueError('You must specify either ``--image`` or ``--environment`` when using direct provisioning')
 
-        return [self.guest_factory(self, name, docker, image) for _ in range(0, count)]
+        if self.option('environment'):
+            env_properties = {
+                key: value for key, value in [
+                    env_property.split('=') for env_property in normalize_multistring_option(self.option('environment'))
+                ]
+            }
+
+            env_class = collections.namedtuple('TestingEnvironment', env_properties.keys())
+
+            self._config['environment'] = env_class(**env_properties)
 
     def execute(self):
         random.seed(int(time.time()))
 
         if self.option('provision'):
-            if not self.option('image'):
-                raise GlueError('You must specify image when using direct provisioning')
-
-            guests = self.provision(count=self.option('provision'), image=self.option('image'))
+            # ``provision``` will chose one of ``environment``` or ``image_name``, at least
+            # one of them is not ``None``.
+            guests = self.provision(self.option('environment'),
+                                    count=self.option('provision'),
+                                    image_name=self.option('image'))
 
             if self.option('setup-provisioned'):
                 for guest in guests:
@@ -410,7 +555,7 @@ class DockerProvisioner(gluetool.Module):
                     except GlueCommandError as exc:
                         output = exc.output
 
-                    output.log(self.info)
+                    output.log(self.logger)
 
     def destroy(self, failure=None):
         for guest in self._guests:

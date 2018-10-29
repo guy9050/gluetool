@@ -37,8 +37,8 @@ INSTALL_REQUIRES = [
     "cmd2==0.8.6",
     "beautifulsoup4==4.6.3",
     "python-dateutil==2.6.1",
-    "docker-pycreds==0.2.1",
-    "docker==2.5.1",
+    "docker==3.5.1",  # docker
+    "docker-pycreds==0.3.0",  # docker
     "enum34==1.1.6",
     'futures==3.2.0; python_version == "2.7"',  # restraint-scheduler
     "jenkins-job-builder==1.6.2",
