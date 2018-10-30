@@ -78,7 +78,7 @@ def test_extra_vars(module, local_guest, monkeypatch):
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
     module.run_playbook('dummy playbook file', [local_guest], variables={
         'FOO': 'bar'
-    })
+    }, cwd='foo')
 
     mock_command_init.assert_called_once_with([
         'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key,
@@ -86,7 +86,7 @@ def test_extra_vars(module, local_guest, monkeypatch):
         os.path.abspath('dummy playbook file')
     ], logger=module.logger)
 
-    mock_command_run.assert_called_once_with()
+    mock_command_run.assert_called_once_with(cwd='foo')
 
 
 def test_dryrun(module, local_guest, monkeypatch):
@@ -107,7 +107,7 @@ def test_dryrun(module, local_guest, monkeypatch):
         os.path.abspath('dummy playbook path')
     ], logger=module.logger)
 
-    mock_command_run.assert_called_once_with()
+    mock_command_run.assert_called_once_with(cwd=None)
 
 
 def test_additonal_options(module, local_guest, monkeypatch):

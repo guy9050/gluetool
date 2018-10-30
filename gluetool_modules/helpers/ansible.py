@@ -85,7 +85,8 @@ class Ansible(gluetool.Module):
     def additional_options(self):
         return gluetool.utils.normalize_multistring_option(self.option('ansible-playbook-options'))
 
-    def run_playbook(self, playbook_path, guests, variables=None, inventory=None):
+    # pylint: disable=too-many-arguments
+    def run_playbook(self, playbook_path, guests, variables=None, inventory=None, cwd=None):
         """
         Run Ansible playbook.
 
@@ -95,6 +96,7 @@ class Ansible(gluetool.Module):
           be passed to ``ansible-playbook`` using ``--extra-vars`` option.
         :param str inventory: A path to the inventory file. You can use it if you
           want to cheat the ansible module e.g. to overshadow localhost with another host.
+        :param str cwd: A path to a directory where ansible will be executed from.
         :returns: :py:class:`gluetool.utils.ProcessOutput` instance.
         """
 
@@ -130,7 +132,7 @@ class Ansible(gluetool.Module):
         cmd += [playbook_path]
 
         try:
-            return Command(cmd, logger=self.logger).run()
+            return Command(cmd, logger=self.logger).run(cwd=cwd)
 
         except gluetool.GlueCommandError as e:
             fatal_reports, fatal_messages = PlaybookError.log_ansible_fatals(self, e.output)
