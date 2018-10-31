@@ -197,6 +197,12 @@ class TestHandler(proton.handlers.MessagingHandler):
                 description=event.link.remote_condition.description
             )
 
+        else:
+            self.error = UMBErrorDescription(
+                name=message,
+                description='<no detailed description available>'
+            )
+
         if self.error:
             self.warn('{}: {}'.format(self.error.name, self.error.description))
 

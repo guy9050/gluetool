@@ -313,6 +313,9 @@ class RestraintRunner(gluetool.Module):
         except gluetool.GlueError as exc:
             download_snapshot()
 
+            self.shared('trigger_event', 'restraint-runner.test-set-crashed',
+                        guest=guest, task_set=task_set)
+
             raise exc
 
         log_blob(self.info, 'Task set output', output.execution_output.stdout)
@@ -326,6 +329,9 @@ class RestraintRunner(gluetool.Module):
 
         # A zero exit status? Fine!
         if exit_code == 0:
+            self.shared('trigger_event', 'restraint-runner.test-set-finished',
+                        guest=guest, task_set=task_set, output=output, result=result)
+
             return result
 
         self.debug('restraint exited with invalid exit code {}'.format(exit_code))
@@ -335,7 +341,13 @@ class RestraintRunner(gluetool.Module):
             # We can safely move on and return results we got from restraint.
             self.info('restraint reports: One or more tasks failed')
 
+            self.shared('trigger_event', 'restraint-runner.test-set-finished',
+                        guest=guest, task_set=task_set, output=output, result=result)
+
             return result
+
+        self.shared('trigger_event', 'restraint-runner.test-set-crashed',
+                    guest=guest, task_set=task_set, output=output, result=result)
 
         # Now we're dealing with an error we don't know how to handle better, so...
 

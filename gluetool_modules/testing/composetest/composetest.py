@@ -40,7 +40,8 @@ class ComposeTest(gluetool.Module):
 
     options = {
         'tag-configuration': {
-            'help': 'Tag configuration of ComposeCI to use',
+            'help': 'Tag configuration of ComposeCI to use (default: %(default)s)',
+            'default': 'rhel-8.0.0',
         },
         # for now we just pass x86_64 as the only arch
         # 'arches': {
@@ -80,7 +81,7 @@ class ComposeTest(gluetool.Module):
 
     def execute(self):
         package = None
-        tag_configuration = 'rhel-8.0.0'
+        tag_configuration = self.option('tag-configuration')
 
         if self.option('no-trigger-event') is False:
             self.require_shared('trigger_message')
@@ -107,9 +108,7 @@ class ComposeTest(gluetool.Module):
             cmd.extend(['--package', package])
         for opt in self.options:
             value = self.option(opt)
-            if opt == 'tag-configuration':
-                value = value or tag_configuration
-            elif opt in ['db-url', 'no-trigger-event']:
+            if opt in ['db-url', 'no-trigger-event']:
                 continue  # skip db-url here
             cmd.extend(['--{opt}'.format(opt=opt), value])
 
