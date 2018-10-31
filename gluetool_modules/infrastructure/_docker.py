@@ -4,7 +4,7 @@ import requests
 import gluetool
 
 
-DEFAULT_VERSION = '1.22'
+DEFAULT_VERSION = '1.26'
 
 
 class Docker(gluetool.Module):
