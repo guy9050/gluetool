@@ -6,6 +6,31 @@ All notable changes to this project will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
 
+2018-10-30
+----------
+
+Changed
+~~~~~~~
+
+- [beaker-provisioner] use PHASE to inform wow that we're provisioning guests
+
+Added
+~~~~~
+
+- [ansible] parse failues from YAML Ansible output
+- [ansible] ``cwd`` parameter to control Ansible's working directory
+- [events] new module - let modules trigger and subscribe to events
+- [execute-command] export functionality as a shared function
+- [openstack] extract metadata and compose name from image
+- [openstack] export list of guests via eval context
+- [publisher-umb-bus] on error, without a link, create dummy error description
+
+Fixed
+~~~~~
+
+- [composetest] fix handling default configuration
+
+
 2018-10-23
 ----------
 
