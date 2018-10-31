@@ -1,7 +1,9 @@
 import json
+import os
 
 import gluetool
-from gluetool.utils import Command
+from gluetool.utils import Command, from_json
+from gluetool.log import log_dict
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 
@@ -86,7 +88,7 @@ class Ansible(gluetool.Module):
         return gluetool.utils.normalize_multistring_option(self.option('ansible-playbook-options'))
 
     # pylint: disable=too-many-arguments
-    def run_playbook(self, playbook_path, guests, variables=None, inventory=None, cwd=None):
+    def run_playbook(self, playbook_path, guests, variables=None, inventory=None, cwd=None, json_output=True):
         """
         Run Ansible playbook.
 
@@ -97,7 +99,9 @@ class Ansible(gluetool.Module):
         :param str inventory: A path to the inventory file. You can use it if you
           want to cheat the ansible module e.g. to overshadow localhost with another host.
         :param str cwd: A path to a directory where ansible will be executed from.
-        :returns: :py:class:`gluetool.utils.ProcessOutput` instance.
+        :param bool json_output: ansible returns response as json if set.
+        :returns: structure representing JSON output of ansible call or
+         :py:class:`gluetool.utils.ProcessOutput` instance.
         """
 
         playbook_path = gluetool.utils.normalize_path(playbook_path)
@@ -131,8 +135,13 @@ class Ansible(gluetool.Module):
 
         cmd += [playbook_path]
 
+        env_variables = os.environ.copy()
+
+        if json_output:
+            env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'json'})
+
         try:
-            return Command(cmd, logger=self.logger).run(cwd=cwd)
+            ansible_call = Command(cmd, logger=self.logger).run(cwd=cwd, env=env_variables)
 
         except gluetool.GlueCommandError as e:
             fatal_reports, fatal_messages = PlaybookError.log_ansible_fatals(self, e.output)
@@ -142,3 +151,10 @@ class Ansible(gluetool.Module):
                 raise PlaybookError(primary_task, e.output, fatal_reports, fatal_messages)
 
             raise gluetool.GlueError(PlaybookError.exception_message(fatal_messages))
+
+        if json_output:
+            ansible_json_output = from_json(ansible_call.stdout)
+            log_dict(self.debug, 'Ansible json output', ansible_json_output)
+            return ansible_json_output
+
+        return ansible_call

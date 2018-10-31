@@ -1,4 +1,5 @@
 import os
+import json
 
 import pytest
 
@@ -41,8 +42,9 @@ def test_shared(module):
     assert module.glue.has_shared('run_playbook')
 
 
-def test_run_playbook(module, local_guest, monkeypatch):
-    mock_output = MagicMock()
+def test_run_playbook_json(module, local_guest, monkeypatch):
+    json_output = {'task': 'ok'}
+    mock_output = MagicMock(stdout=json.dumps(json_output))
 
     mock_command_init = MagicMock(return_value=None)
     mock_command_run = MagicMock(return_value=mock_output)
@@ -52,11 +54,38 @@ def test_run_playbook(module, local_guest, monkeypatch):
 
     output = module.run_playbook('dummy playbook file', [local_guest])
 
+    assert output == json_output
+
+    mock_command_init.assert_called_once_with([
+        'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key, os.path.abspath('dummy playbook file')
+    ], logger=module.logger)
+
+    env_variables = os.environ.copy()
+    env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'json'})
+
+    mock_command_run.assert_called_once_with(cwd=None, env=env_variables)
+
+
+def test_run_playbook_plaintext(module, local_guest, monkeypatch):
+    mock_output = MagicMock()
+
+    mock_command_init = MagicMock(return_value=None)
+    mock_command_run = MagicMock(return_value=mock_output)
+
+    monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
+    monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
+
+    output = module.run_playbook('dummy playbook file', [local_guest], json_output=False)
+
     assert output is mock_output
 
     mock_command_init.assert_called_once_with([
         'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key, os.path.abspath('dummy playbook file')
     ], logger=module.logger)
+
+    env_variables = os.environ.copy()
+
+    mock_command_run.assert_called_once_with(cwd=None, env=env_variables)
 
 
 def test_error(log, module, local_guest, monkeypatch):
@@ -71,8 +100,10 @@ def test_error(log, module, local_guest, monkeypatch):
 
 
 def test_extra_vars(module, local_guest, monkeypatch):
+    mock_output = MagicMock(stdout=json.dumps({'task': 'ok'}))
+
     mock_command_init = MagicMock(return_value=None)
-    mock_command_run = MagicMock()
+    mock_command_run = MagicMock(return_value=mock_output)
 
     monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
@@ -86,13 +117,17 @@ def test_extra_vars(module, local_guest, monkeypatch):
         os.path.abspath('dummy playbook file')
     ], logger=module.logger)
 
-    mock_command_run.assert_called_once_with(cwd='foo')
+    env_variables = os.environ.copy()
+    env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'json'})
+
+    mock_command_run.assert_called_once_with(cwd='foo', env=env_variables)
 
 
 def test_dryrun(module, local_guest, monkeypatch):
+    mock_output = MagicMock(stdout=json.dumps({'task': 'ok'}))
 
     mock_command_init = MagicMock(return_value=None)
-    mock_command_run = MagicMock()
+    mock_command_run = MagicMock(return_value=mock_output)
 
     monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
@@ -107,13 +142,17 @@ def test_dryrun(module, local_guest, monkeypatch):
         os.path.abspath('dummy playbook path')
     ], logger=module.logger)
 
-    mock_command_run.assert_called_once_with(cwd=None)
+    env_variables = os.environ.copy()
+    env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'json'})
+
+    mock_command_run.assert_called_once_with(cwd=None, env=env_variables)
 
 
 def test_additonal_options(module, local_guest, monkeypatch):
+    mock_output = MagicMock(stdout=json.dumps({'task': 'ok'}))
 
     mock_command_init = MagicMock(return_value=None)
-    mock_command_run = MagicMock()
+    mock_command_run = MagicMock(return_value=mock_output)
 
     monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
