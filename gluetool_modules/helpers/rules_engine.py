@@ -197,7 +197,7 @@ class RulesEngine(gluetool.Module):
         }
     }
 
-    shared_functions = ('evaluate_rules', 'evaluate_instructions')
+    shared_functions = ('evaluate_rules', 'evaluate_filter', 'evaluate_instructions')
 
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
@@ -232,6 +232,62 @@ class RulesEngine(gluetool.Module):
         log_dict(self.debug, 'eval result', result)
 
         return result
+
+    # pylint: disable=too-many-arguments
+    def evaluate_filter(self, entries, context=None, default_rule='True',
+                        stop_at_first_hit=False):
+        """
+        Find out what entries of the list are allowed by their rules, and return them.
+
+        An entry is a simple dictionary with arbitrary keys. If there is a key named ``rule``, it
+        is evaluated and when the result is false-ish, the entry does not make the cut. The list of
+        entries that are allowed by their rules is returned.
+
+        .. code-block:: yaml
+
+           - rule: ...
+             <key #1>: ...
+             <key #2>: ...
+
+        :param list(dict) entries: List of entries to filter.
+        :param context: Provider of context for rules and templating services. Either a dictionary or a callable
+            returning a dictionary. If callable is provided, it will be called before each entry to
+            refresh the context.
+        :param str default_rule: If there's no rule in the instruction, this will be used. For example, use ``False``
+            to skip instructions without rules.
+        :param bool stop_at_first_hit: If set, first entry whose rule evaluated true-ishly is returned immediately.
+        :rtype: list(dict)
+        :returns: List of entries that passed through the filter.
+        """
+
+        # If we don't have a context, get one from the core.
+        if context is None:
+            context = self.shared('eval_context')
+
+        # For the sake of simplicity, the loop over instructions will always call context_getter. It's either
+        # callable given by caller, or a simple anonymous function returning a dictionary - either the one
+        # given by caller or the default from above.
+        context_getter = context if callable(context) else lambda: context
+
+        suitable = []
+
+        for entry in entries:
+            loop_context = context_getter()
+
+            log_dict(self.debug, 'entry', entry)
+
+            # Not calling `self.evaluate_rules` directly - other modules may have overload this shared function,
+            # let's use the correct implementation.
+            if not self.shared('evaluate_rules', entry.get('rule', default_rule), context=loop_context):
+                self.debug('denied by rules')
+                continue
+
+            suitable.append(entry)
+
+            if stop_at_first_hit:
+                break
+
+        return suitable
 
     # pylint: disable=too-many-arguments
     def evaluate_instructions(self, instructions, commands, context=None,
@@ -301,6 +357,8 @@ class RulesEngine(gluetool.Module):
 
             log_dict(self.debug, 'instruction', instruction)
 
+            # Not calling `self.evaluate_rules` directly - other modules may have overload this shared function,
+            # let's use the correct implementation.
             if not self.shared('evaluate_rules', instruction.get('rule', default_rule), context=loop_context):
                 self.debug('denied by rules')
                 continue
