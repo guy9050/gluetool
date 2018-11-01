@@ -44,7 +44,7 @@ def test_shared(module):
 
 def test_run_playbook_json(module, local_guest, monkeypatch):
     json_output = {'task': 'ok'}
-    mock_output = MagicMock(stdout=json.dumps(json_output))
+    mock_output = MagicMock(exit_code=0, stdout=json.dumps(json_output))
 
     mock_command_init = MagicMock(return_value=None)
     mock_command_run = MagicMock(return_value=mock_output)
@@ -52,8 +52,9 @@ def test_run_playbook_json(module, local_guest, monkeypatch):
     monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
-    output = module.run_playbook('dummy playbook file', [local_guest])
+    ansible_call, output = module.run_playbook('dummy playbook file', [local_guest])
 
+    assert ansible_call is mock_output
     assert output == json_output
 
     mock_command_init.assert_called_once_with([
@@ -67,7 +68,7 @@ def test_run_playbook_json(module, local_guest, monkeypatch):
 
 
 def test_run_playbook_plaintext(module, local_guest, monkeypatch):
-    mock_output = MagicMock()
+    mock_output = MagicMock(exit_code=0)
 
     mock_command_init = MagicMock(return_value=None)
     mock_command_run = MagicMock(return_value=mock_output)
@@ -75,9 +76,10 @@ def test_run_playbook_plaintext(module, local_guest, monkeypatch):
     monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
-    output = module.run_playbook('dummy playbook file', [local_guest], json_output=False)
+    ansible_call, output = module.run_playbook('dummy playbook file', [local_guest], json_output=False)
 
-    assert output is mock_output
+    assert ansible_call is mock_output
+    assert output is None
 
     mock_command_init.assert_called_once_with([
         'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key, os.path.abspath('dummy playbook file')
@@ -90,17 +92,29 @@ def test_run_playbook_plaintext(module, local_guest, monkeypatch):
 
 def test_error(log, module, local_guest, monkeypatch):
     # simulate output of failed ansible-playbook run, giving user JSON blob with an error message
-    mock_error = gluetool.GlueCommandError([], output=MagicMock(stdout='fatal: {"msg": "dummy error message"}'))
+    mock_error = gluetool.GlueCommandError([], output=MagicMock(stdout='{"msg": "dummy error message"}'))
     mock_command_run = MagicMock(side_effect=mock_error)
 
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
-    with pytest.raises(gluetool.GlueError, match='Failure during Ansible playbook execution: dummy error message'):
+    with pytest.raises(gluetool.GlueError, match='Failure during Ansible playbook execution'):
+        module.run_playbook('dummy playbook file', [local_guest])
+
+
+def test_error_exit_code(log, module, local_guest, monkeypatch):
+    mock_output = MagicMock(exit_code=1, stdout='{"msg": "dummy error message"}')
+    mock_command_init = MagicMock(return_value=None)
+    mock_command_run = MagicMock(return_value=mock_output)
+
+    monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
+    monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
+
+    with pytest.raises(gluetool.GlueError, match='Failure during Ansible playbook execution'):
         module.run_playbook('dummy playbook file', [local_guest])
 
 
 def test_extra_vars(module, local_guest, monkeypatch):
-    mock_output = MagicMock(stdout=json.dumps({'task': 'ok'}))
+    mock_output = MagicMock(exit_code=0, stdout=json.dumps({'task': 'ok'}))
 
     mock_command_init = MagicMock(return_value=None)
     mock_command_run = MagicMock(return_value=mock_output)
@@ -124,7 +138,7 @@ def test_extra_vars(module, local_guest, monkeypatch):
 
 
 def test_dryrun(module, local_guest, monkeypatch):
-    mock_output = MagicMock(stdout=json.dumps({'task': 'ok'}))
+    mock_output = MagicMock(exit_code=0, stdout=json.dumps({'task': 'ok'}))
 
     mock_command_init = MagicMock(return_value=None)
     mock_command_run = MagicMock(return_value=mock_output)
@@ -149,7 +163,7 @@ def test_dryrun(module, local_guest, monkeypatch):
 
 
 def test_additonal_options(module, local_guest, monkeypatch):
-    mock_output = MagicMock(stdout=json.dumps({'task': 'ok'}))
+    mock_output = MagicMock(exit_code=0, stdout=json.dumps({'task': 'ok'}))
 
     mock_command_init = MagicMock(return_value=None)
     mock_command_run = MagicMock(return_value=mock_output)
