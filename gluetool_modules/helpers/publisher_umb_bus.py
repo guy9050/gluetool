@@ -120,6 +120,12 @@ class TestHandler(proton.handlers.MessagingHandler):
 
         self.debug('  connection opened successfully: {}'.format(event.connection.hostname))
 
+        # If we get so far, errors so far has been just transient errors. We have to reset the error
+        # signal, because from this point, we could successfully send messages but still signal error
+        # by having self.error set, despite the fact it didn't stop us from sending messages.
+        self.debug('  resetting error signal')
+        self.error = None
+
         self._set_timeout(event.container, 'step', self._module.option('sendable-timeout'), 'waiting for sendable')
 
     def on_sendable(self, event):
@@ -131,6 +137,10 @@ class TestHandler(proton.handlers.MessagingHandler):
 
     def send_messages(self, event):
         self.debug('send_messages: {}'.format(event))
+
+        if not self.messages:
+            # this should not happen :/
+            raise gluetool.GlueError('There are no messages left to send out.')
 
         for message in self.messages[:]:
             self.debug('  sending the message')
@@ -189,7 +199,7 @@ class TestHandler(proton.handlers.MessagingHandler):
     def _handle_connection_error(self, event_name, message, event, **kwargs):
         self.debug('{}: {}'.format(event_name, event))
 
-        self.warn('network error: {}'.format(message))
+        self.warn('  connection error: {}'.format(message))
 
         if event.link:
             self.error = UMBErrorDescription(
@@ -204,7 +214,7 @@ class TestHandler(proton.handlers.MessagingHandler):
             )
 
         if self.error:
-            self.warn('{}: {}'.format(self.error.name, self.error.description))
+            self.warn('  signaling error {}: {}'.format(self.error.name, self.error.description))
 
         self._stop(event, **kwargs)
 
