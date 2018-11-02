@@ -52,6 +52,9 @@ ECHO_TICK = 10
 DEFAULT_BOOT_TIMEOUT = 240
 BOOT_TICK = 10
 
+DEFAULT_EXTENDTESTTIME_CHECK_TIMEOUT = 3600
+DEFAULT_EXTENDTESTTIME_CHECK_TICK = 30
+
 # 99 would be the most common value, however, we suspect Beaker checks for frequent extends of 99 hours,
 # silently "stealing" such machines back for its pool. Hence the slightly lower value, hopefuly avoiding
 # any suspicion from Beaker.
@@ -207,6 +210,30 @@ class BeakerGuest(NetworkedGuest):
         Start reservation refresh process in the background.
         """
 
+        # We call this method to start a refresh, when it comes to freshly reserved boxes,
+        # it gets called when the dummy task, which serves as a jobwatch roadblock,
+        # finished. It may happen that it gets called before reservesys starts - and extendtesttime.sh
+        # is created by that task, so, our attempt to call the script would fail. To prevent that,
+        # let's wait till the script appears.
+        #
+        # Machines from cache already passed this test, therefore in their case, this should
+        # be just a quick sanity check.
+        def _check_extendtesttime():
+            try:
+                self.execute('type extendtesttime.sh')
+
+            except gluetool.utils.GlueCommandError:
+                self.debug('extendtesttime.sh does not exist yet')
+
+                return False
+
+            return True
+
+        gluetool.utils.wait('check whether extendtesttime.sh exists', _check_extendtesttime,
+                            logger=self.logger,
+                            timeout=self._module.option('extend-test-time-check-timeout'),
+                            tick=self._module.option('extend-test-time-check-tick'))
+
         # we need to initialize timer variable to something true-ish, otherwise _refresh_reservation would quit :)
         with self._reservation_refresh_lock:
             self._reservation_refresh_timer = True
@@ -333,6 +360,18 @@ class BeakerProvisioner(gluetool.Module):
                 'type': int,
                 'default': DEFAULT_BOOT_TIMEOUT,
                 'metavar': 'SECONDS'
+            },
+            'extend-test-time-check-timeout': {
+                'help': 'Wait SECONDS for extendtesttime.sh script to appear (default: %(default)s).',
+                'type': int,
+                'default': DEFAULT_EXTENDTESTTIME_CHECK_TIMEOUT,
+                'metavar': 'SECONDS'
+            },
+            'extend-test-time-check-tick': {
+                'help': 'Wait SECONDS before checking for extendtesttime.sh presence again (default: %(default)s).',
+                'type': int,
+                'default': DEFAULT_EXTENDTESTTIME_CHECK_TICK,
+                'metavar': 'SECONDS'
             }
         })
     ]
@@ -420,7 +459,7 @@ class BeakerProvisioner(gluetool.Module):
         jobs = self.shared('beaker_job_xml', body_options=[
             '--no-reserve',
             '--task=/distribution/utils/dummy',
-            '--last-task=RESERVETIME=24h /distribution/reservesys'
+            '--last-task=RESERVETIME=86400 /distribution/reservesys'
         ], options=[
             '--arch', environment.arch
         ], distros=[
