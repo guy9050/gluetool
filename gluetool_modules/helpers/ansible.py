@@ -1,5 +1,5 @@
-import json
 import os
+import re
 
 import gluetool
 from gluetool.utils import Command, from_json
@@ -8,55 +8,10 @@ from libci.sentry import PrimaryTaskFingerprintsMixin
 
 
 class PlaybookError(PrimaryTaskFingerprintsMixin, gluetool.GlueError):
-    def __init__(self, task, ansible_output, fatal_reports, fatal_messages):
-        super(PlaybookError, self).__init__(task, PlaybookError.exception_message(fatal_messages))
+    def __init__(self, task, ansible_output):
+        super(PlaybookError, self).__init__(task, 'Failure during Ansible playbook execution')
 
         self.ansible_output = ansible_output
-        self.fatal_reports = fatal_reports
-        self.fatal_messages = fatal_messages
-
-    @staticmethod
-    def log_ansible_fatals(module, output):
-        fatal_reports = []
-
-        # Simple iterating over lines in `output.stdout` isn't good enough
-        # since we might need to move on to the next line. Therefore we prepare
-        # our own generator providing lines.
-        def output_lines():
-            for line in output.stdout.split('\n'):
-                yield line.strip()
-
-        # The generator cannot be "anonymous", instantiated once in the loop control. It must have a name
-        # because we want to call its `next()` on demand.
-        iter_lines = output_lines()
-
-        for line in iter_lines:
-            if not line.startswith('fatal: '):
-                continue
-
-            # Try to decode the line as a JSON object first - this is the default output "structure".
-            try:
-                fatal_reports.append(json.loads(line[line.index('{'):]))
-
-            except ValueError:
-                # Failed to parse JSON? Maybe it's YAML - in that case, pop next line, it contains
-                # the message. Probably. Best we can do at this moment, sadly, Ansible YAML is not YAML :/
-                fatal_reports.append(gluetool.utils.from_yaml(next(iter_lines)))
-
-        fatal_messages = [
-            report['msg'] for report in fatal_reports if 'msg' in report
-        ]
-
-        gluetool.log.log_dict(module.debug, 'fatal Ansible reports', fatal_reports)
-
-        return fatal_reports, fatal_messages
-
-    @staticmethod
-    def exception_message(fatal_messages):
-        if fatal_messages:
-            return 'Failure during Ansible playbook execution: {}'.format(fatal_messages[-1])
-
-        return 'Failure during Ansible playbook execution'
 
 
 class Ansible(gluetool.Module):
@@ -100,8 +55,9 @@ class Ansible(gluetool.Module):
           want to cheat the ansible module e.g. to overshadow localhost with another host.
         :param str cwd: A path to a directory where ansible will be executed from.
         :param bool json_output: ansible returns response as json if set.
-        :returns: structure representing JSON output of ansible call or
-         :py:class:`gluetool.utils.ProcessOutput` instance.
+        :returns: tuple of two items: a :py:class:`gluetool.utils.ProcessOutput` instance
+            storing outcome of Ansible run, and a data structure representing the JSON output
+            produced, or None if ``json_output`` was set to ``False``.
         """
 
         playbook_path = gluetool.utils.normalize_path(playbook_path)
@@ -143,18 +99,28 @@ class Ansible(gluetool.Module):
         try:
             ansible_call = Command(cmd, logger=self.logger).run(cwd=cwd, env=env_variables)
 
-        except gluetool.GlueCommandError as e:
-            fatal_reports, fatal_messages = PlaybookError.log_ansible_fatals(self, e.output)
-
-            primary_task = self.shared('primary_task')
-            if primary_task:
-                raise PlaybookError(primary_task, e.output, fatal_reports, fatal_messages)
-
-            raise gluetool.GlueError(PlaybookError.exception_message(fatal_messages))
+        except gluetool.GlueCommandError as exc:
+            ansible_call = exc.output
 
         if json_output:
-            ansible_json_output = from_json(ansible_call.stdout)
-            log_dict(self.debug, 'Ansible json output', ansible_json_output)
-            return ansible_json_output
+            # With `-v` option, ansible-playbook produces additional output, placed before the JSON
+            # blob. Find the first '{' on a new line, that should be the start of the actual JSON data.
+            match = re.search(r'^{', ansible_call.stdout, flags=re.M)
+            if not match:
+                raise gluetool.GlueError('Ansible did not produce JSON output')
 
-        return ansible_call
+            ansible_json_output = from_json(ansible_call.stdout[match.start():])
+
+            log_dict(self.debug, 'Ansible json output', ansible_json_output)
+
+        else:
+            ansible_json_output = None
+
+        if ansible_call.exit_code != 0:
+            primary_task = self.shared('primary_task')
+            if primary_task:
+                raise PlaybookError(primary_task, ansible_call)
+
+            raise gluetool.GlueError('Failure during Ansible playbook execution')
+
+        return ansible_call, ansible_json_output
