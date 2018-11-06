@@ -6,3 +6,14 @@ description: Install RHEL-8 module from Module Building Service (MBS), using On 
 dependencies:
   yum:
     - odcs-client
+    - autoconf
+    - automake
+    - libtool
+    - python-devel
+    - redhat-rpm-config
+    - make
+    - gcc
+    - python
+
+  pip:
+    - jq
