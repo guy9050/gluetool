@@ -6,17 +6,29 @@ stages:
   - build-docker
   - deploy-staging
   - accessories
+  - status
 
 
 variables:
+  MODULES_REPO_ID: "8896"
+  MODULES_REPO_TOKEN: "bSBxviSe_8p3ZrDNsZa4"
+  GITLAB_API_URL: "https://gitlab.cee.redhat.com/api/v4/projects/${MODULES_REPO_ID}/"
+
   SSH_OPTIONS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i http-space.key"
   DOCS_SPACE: "mprchlik@liver3.lab.eng.brq.redhat.com:/home/mprchlik/webspace/testing/docs/gluetool-modules"
   COVERAGE_SPACE: "mprchlik@liver3.lab.eng.brq.redhat.com:/home/mprchlik/webspace/testing/coverage/gluetool-modules"
+
+  DOCS_URL: "http://liver3.lab.eng.brq.redhat.com/gluetool/testing/docs/gluetool-modules"
+  COVERAGE_URL: "http://liver3.lab.eng.brq.redhat.com/gluetool/testing/coverage/gluetool-modules"
 
   # This one keeps popping up again and again and again... It works locally while tox is not
   # psssing this variable to its command... That should not work at all :/
   PYCURL_SSL_LIBRARY: nss
 
+  MERGE_REQUEST_STATUS: >
+    ## Merge Request Status for ${CI_COMMIT_SHA}
+
+    [Documentation](${DOCS_URL}-${CI_COMMIT_REF_NAME}/) | [Coverage](${COVERAGE_URL}-${CI_COMMIT_REF_NAME}/)
 
 image: "docker-registry.engineering.redhat.com/baseos-ci/citool-gitlab-ci"
 
@@ -154,20 +166,29 @@ deploy-to-staging:
 # Upload documentation to the remote location
 upload-docs:
   stage: accessories
-  only:
-    - master@baseos-qe/gluetool-modules
   dependencies:
     - generate-docs
   script:
-    - rsync -avz -e "ssh $SSH_OPTIONS" .tox/py27-doctest/tmp/docs/build/html/ $DOCS_SPACE
+    - rsync -avz -e "ssh $SSH_OPTIONS" .tox/py27-doctest/tmp/docs/build/html/ "${DOCS_SPACE}-${CI_COMMIT_REF_NAME}"
 
 
 # Upload coverage report to the remote location
 upload-coverage:
   stage: accessories
-  only:
-    - master@baseos-qe/gluetool-modules
   dependencies:
     - unit-tests
   script:
-    - rsync -avz -e "ssh $SSH_OPTIONS" coverage-report/ $COVERAGE_SPACE
+    - rsync -avz -e "ssh $SSH_OPTIONS" coverage-report/ "${COVERAGE_SPACE}-${CI_COMMIT_REF_NAME}"
+
+
+# Add a status comment
+update-status:
+  stage: status
+  script:
+    # Find out what the MR IID is
+    - |
+      curl --insecure --silent --header "Private-Token: $MODULES_REPO_TOKEN" "$GITLAB_API_URL/merge_requests?state=opened" | jq -r ".[]|select(.sha == \"${CI_COMMIT_SHA}\")|.iid" > merge-request-iid
+
+    # Add the comment
+    - |
+      curl --insecure --silent --header "Private-Token: $MODULES_REPO_TOKEN" --request POST --data-binary "body=${MERGE_REQUEST_STATUS}" "$GITLAB_API_URL/merge_requests/$(cat merge-request-iid)/notes"
