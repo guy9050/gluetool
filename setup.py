@@ -43,6 +43,7 @@ INSTALL_REQUIRES = [
     'futures==3.2.0; python_version == "2.7"',  # restraint-scheduler
     "jenkins-job-builder==1.6.2",
     "jenkinsapi==0.3.3",
+    "jq==0.1.6",
     "koji",  # composetest
     "mako==1.0.6",
     # available over external URL => dependency_links => they does not seem to work when installing via pip :/
