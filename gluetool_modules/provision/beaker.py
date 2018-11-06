@@ -335,6 +335,22 @@ class BeakerProvisioner(gluetool.Module):
                 'metavar': '(FQDN|IP):ARCH',
                 'action': 'append',
                 'default': []
+            },
+            'provision': {
+                'help': """
+                        Provision given number of guests. Use ``--environment`` to specify
+                        what should the guests provide.
+                        """,
+                'metavar': 'COUNT',
+                'type': int
+            },
+            'environment': {
+                'help': 'Environment to provision, e.g. ``arch=x86_64,distro=rhel-7.6``.',
+                'metavar': 'key1=value1,key2=value2,...'
+            },
+            'setup-provisioned': {
+                'help': "Setup guests after provisioning them. See 'guest-setup' module.",
+                'action': 'store_true'
             }
         }),
         ('Workarounds', {
@@ -907,6 +923,30 @@ class BeakerProvisioner(gluetool.Module):
         self.info('provisioned {} guests'.format(len(guests)))
 
         return guests
+
+    def sanity(self):
+        if self.option('provision'):
+            if not self.option('environment'):
+                raise GlueError('You must specify ``--environment`` when using direct provisioning')
+
+            env_properties = {
+                key: value for key, value in [
+                    env_property.split('=') for env_property in normalize_multistring_option(self.option('environment'))
+                ]
+            }
+
+            env_class = collections.namedtuple('TestingEnvironment', env_properties.keys())
+
+            self._config['environment'] = env_class(**env_properties)
+
+    def execute(self):
+        if self.option('provision'):
+            guests = self.provision(self.option('environment'),
+                                    count=self.option('provision'))
+
+            if self.option('setup-provisioned'):
+                for guest in guests:
+                    guest.setup()
 
     def destroy(self, failure=None):
         if not self._dynamic_guests:
