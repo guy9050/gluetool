@@ -64,7 +64,7 @@ class InstallMBSBuild(gluetool.Module):
         repo_url = self._get_repo(nsvc)
         self.info('Installing module "{}" from {}'.format(nsvc, repo_url))
 
-        ansible_output = self.shared(
+        _, ansible_output = self.shared(
             'run_playbook',
             gluetool.utils.normalize_path(self.option('playbook')),
             guests,
