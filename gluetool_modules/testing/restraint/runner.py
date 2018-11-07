@@ -17,6 +17,7 @@ from libci.results import TestResult, publish_result
 # I failed to find any documentation on this...
 class RestraintExitCodes(enum.IntEnum):
     # pylint: disable=invalid-name
+    RESTRAINT_TASK_RUNNER_WATCHDOG_ERROR = 4
     RESTRAINT_TASK_RUNNER_RESULT_ERROR = 10
     RESTRAINT_SSH_ERROR = 14
 
@@ -340,6 +341,14 @@ class RestraintRunner(gluetool.Module):
             # "One or more tasks failed" error - this is a good, well behaving error.
             # We can safely move on and return results we got from restraint.
             self.info('restraint reports: One or more tasks failed')
+
+            self.shared('trigger_event', 'restraint-runner.test-set-finished',
+                        guest=guest, task_set=task_set, output=output, result=result)
+
+            return result
+
+        if exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_WATCHDOG_ERROR:
+            self.info('restraint reports: Watchdog timer exceeded')
 
             self.shared('trigger_event', 'restraint-runner.test-set-finished',
                         guest=guest, task_set=task_set, output=output, result=result)
