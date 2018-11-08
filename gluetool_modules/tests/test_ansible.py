@@ -90,6 +90,30 @@ def test_run_playbook_plaintext(module, local_guest, monkeypatch):
     mock_command_run.assert_called_once_with(cwd=None, env=env_variables)
 
 
+def test_run_playbooks(module, local_guest, monkeypatch):
+    mock_output = MagicMock(exit_code=0)
+
+    mock_command_init = MagicMock(return_value=None)
+    mock_command_run = MagicMock(return_value=mock_output)
+
+    monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
+    monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
+
+    ansible_call, output = module.run_playbook(['playbook1', 'playbook2'], [local_guest], json_output=False)
+
+    assert ansible_call is mock_output
+    assert output is None
+
+    mock_command_init.assert_called_once_with([
+        # pylint: disable=long-line
+        'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key, os.path.abspath('playbook1'), os.path.abspath('playbook2')  # Ignore PEP8Bear
+    ], logger=module.logger)
+
+    env_variables = os.environ.copy()
+
+    mock_command_run.assert_called_once_with(cwd=None, env=env_variables)
+
+
 def test_error(log, module, local_guest, monkeypatch):
     # simulate output of failed ansible-playbook run, giving user JSON blob with an error message
     mock_error = gluetool.GlueCommandError([], output=MagicMock(stdout='{"msg": "dummy error message"}'))
