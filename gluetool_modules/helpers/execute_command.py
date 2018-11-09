@@ -1,4 +1,5 @@
 import shlex
+import sys
 
 import gluetool
 from gluetool.log import log_blob
@@ -52,10 +53,18 @@ class ExecuteCommand(gluetool.Module):
 
         self.info('Running command: {}'.format(printable))
 
+        # Should the command exit with non-zero exit code, there will be an exception raised.
+        # We want to do few things in either case, therefore we don't propagate that exception
+        # from the `except` clause, but later. That costs us the automagicall exception chaining,
+        # to do that manually we need to store exception info on our own.
+        exc_info = None
+
         try:
-            output = gluetool.utils.run_command(command)
+            output = gluetool.utils.Command(command).run()
 
         except gluetool.GlueCommandError as exc:
+            exc_info = sys.exc_info()
+
             output = exc.output
 
         (self.info if output.exit_code == 0 else self.error)('Exited with code {}'.format(output.exit_code))
@@ -63,7 +72,8 @@ class ExecuteCommand(gluetool.Module):
         log_blob(self.error, 'stderr', output.stderr)
 
         if output.exit_code != 0:
-            raise gluetool.GlueError("Command '{}' exited with non-zero exit code".format(printable))
+            raise gluetool.GlueError("Command '{}' exited with non-zero exit code".format(printable),
+                                     caused_by=exc_info)
 
         return output
 
