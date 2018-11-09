@@ -175,7 +175,8 @@ if __name__ == '__main__':
           setup_requires=['setuptools_scm'],
           use_scm_version=True,
           packages=[
-              'gluetool_modules'
+              'gluetool_modules',
+              'gluetool_modules.libs'
           ] + [
               'gluetool_modules.{}'.format(subpackage) for subpackage in [
                   'testing',
