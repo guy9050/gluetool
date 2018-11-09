@@ -9,7 +9,7 @@ from gluetool.log import log_dict, log_xml
 #:
 #: Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
 TestingEnvironment = collections.namedtuple('TestingEnvironment', [
-    'distro',
+    'compose',
     'arch'
 ])
 
@@ -141,7 +141,7 @@ class TestSchedulerWow(gluetool.Module):
             schedule_entry = TestScheduleEntry(gluetool.log.Logging.get_logger(), index, i, recipe_set)
 
             schedule_entry.testing_environment = TestingEnvironment(
-                distro=recipe_set.find('distroRequires').find('distro_name')['value'].encode('ascii'),
+                compose=recipe_set.find('distroRequires').find('distro_name')['value'].encode('ascii'),
                 arch=recipe_set.find('distroRequires').find('distro_arch')['value'].encode('ascii')
             )
 

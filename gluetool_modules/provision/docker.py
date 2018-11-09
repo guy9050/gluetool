@@ -399,7 +399,7 @@ class DockerProvisioner(gluetool.Module):
                 'type': int
             },
             'environment': {
-                'help': 'Environment to provision.',
+                'help': 'Environment to provision, e.g. ``arch=x86_64,compose=rhel-7.6``.',
                 'metavar': 'key1=value1,key2=value2,...'
             },
             'image': {
