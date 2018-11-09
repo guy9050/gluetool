@@ -43,11 +43,11 @@ class Ansible(gluetool.Module):
         return gluetool.utils.normalize_multistring_option(self.option('ansible-playbook-options'))
 
     # pylint: disable=too-many-arguments
-    def run_playbook(self, playbook_path, guests, variables=None, inventory=None, cwd=None, json_output=True):
+    def run_playbook(self, playbook_paths, guests, variables=None, inventory=None, cwd=None, json_output=True):
         """
         Run Ansible playbook.
 
-        :param str playbook_path: Path to the playbook.
+        :param str or list playbook_paths: Path to the playbook or a list of playbook paths.
         :param list(libci.guest.NetworkedGuest) guests: Guests to run playbooks on.
         :param dict variables: If set, represents additional variables that will
           be passed to ``ansible-playbook`` using ``--extra-vars`` option.
@@ -60,8 +60,10 @@ class Ansible(gluetool.Module):
             produced, or None if ``json_output`` was set to ``False``.
         """
 
-        playbook_path = gluetool.utils.normalize_path(playbook_path)
-        self.debug("running playbook '{}'".format(playbook_path))
+        if isinstance(playbook_paths, str):
+            playbook_paths = [playbook_paths]
+
+        self.debug("running playbooks '{}'".format(', '.join(playbook_paths)))
 
         if not all([guest.key == guests[0].key for guest in guests]):
             raise gluetool.GlueError('SSH key must be the same for all guests')
@@ -89,7 +91,7 @@ class Ansible(gluetool.Module):
 
             cmd += ['-C']
 
-        cmd += [playbook_path]
+        cmd += [gluetool.utils.normalize_path(path) for path in playbook_paths]
 
         env_variables = os.environ.copy()
 
