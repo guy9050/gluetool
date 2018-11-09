@@ -215,20 +215,22 @@ class RestraintScheduler(gluetool.Module):
 
                 if future.exception() is None:
                     # provisioning succeeded - store returned guest in the schedule entry
-                    schedule_entry.info('provisioning of guest finished, {} guests pending'.format(remaining_count))
+                    schedule_entry.info('provisioning of guest finished')
 
                     schedule_entry.guest = future.result()[0]
-                    continue
 
-                schedule_entry.error('provisioning of guest failed, {} guests pending'.format(remaining_count))
+                else:
+                    schedule_entry.error('provisioning of guest failed')
 
-                exc_info = future.exception_info()
+                    exc_info = future.exception_info()
 
-                # Exception info returned by future does not contain exception class while the info returned
-                # by sys.exc_info() does and all users of it expect the first item to be exception class.
-                exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
+                    # Exception info returned by future does not contain exception class while the info returned
+                    # by sys.exc_info() does and all users of it expect the first item to be exception class.
+                    exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
 
-                errors.append((schedule_entry, exc_info))
+                    errors.append((schedule_entry, exc_info))
+
+                self.info('{} guests pending'.format(remaining_count))
 
         if errors:
             self._handle_futures_errors(errors, 'At least one provisioning attempt failed')
@@ -281,15 +283,17 @@ class RestraintScheduler(gluetool.Module):
                 schedule_entry = futures[future]
 
                 if future.exception() is None:
-                    schedule_entry.info('setup of guest finished, {} guests pending'.format(remaining_count))
-                    continue
+                    schedule_entry.info('setup of guest finished')
 
-                self.error('setup of guest failed, {} guests pending'.format(remaining_count))
+                else:
+                    schedule_entry.error('setup of guest failed')
 
-                exc_info = future.exception_info()
-                exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
+                    exc_info = future.exception_info()
+                    exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
 
-                errors.append((schedule_entry, exc_info))
+                    errors.append((schedule_entry, exc_info))
+
+                self.info('{} guests pending'.format(remaining_count))
 
         if errors:
             self._handle_futures_errors(errors, 'At least one guest setup failed')
