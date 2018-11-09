@@ -605,7 +605,7 @@ class RestraintRunner(gluetool.Module):
             threads = []
 
             for i, schedule_entry in enumerate(schedule):
-                thread = gluetool.utils.WorkerThread(self.logger, self._run_schedule_entry, fn_args=schedule_entry,
+                thread = gluetool.utils.WorkerThread(self.logger, self._run_schedule_entry, fn_args=(schedule_entry,),
                                                      name='recipe-set-runner-{}'.format(i))
                 threads.append(thread)
 
