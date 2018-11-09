@@ -14,6 +14,7 @@
       - source/protocols/cache.rst
       - source/protocols/protocols.rst
       - source/protocols/provisioner-capabilities.rst
+      - source/protocols/test-schedule-entry.rst
       - source/protocols/testing-environment.rst
       - source/CHANGELOG.rst
       - source/DEVELOPMENT.rst

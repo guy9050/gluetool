@@ -1,24 +1,14 @@
-import collections
 import shlex
 import sys
 
 import concurrent.futures
 
-import gluetool
-from gluetool import utils, GlueError, SoftGlueError
-from gluetool.log import log_dict, log_xml, ContextAdapter
-from libci.sentry import PrimaryTaskFingerprintsMixin
-
 from six import reraise
 
-
-#: Testing environment description.
-#:
-#: Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
-TestingEnvironment = collections.namedtuple('TestingEnvironment', [
-    'distro',
-    'arch'
-])
+import gluetool
+from gluetool import utils, GlueError, SoftGlueError
+from gluetool.log import log_dict
+from libci.sentry import PrimaryTaskFingerprintsMixin
 
 
 class NoTestableArtifactsError(PrimaryTaskFingerprintsMixin, SoftGlueError):
@@ -43,54 +33,23 @@ class NoTestableArtifactsError(PrimaryTaskFingerprintsMixin, SoftGlueError):
         super(NoTestableArtifactsError, self).__init__(task, message)
 
 
-class ScheduleEntryAdapter(ContextAdapter):
-    def __init__(self, logger, job_index, recipe_set_index):
-        super(ScheduleEntryAdapter, self).__init__(logger, {
-            'ctx_schedule_entry_index': (200, 'schedule entry J#{}-RS#{}'.format(job_index, recipe_set_index))
-        })
-
-
-class ScheduleEntry(object):
-    # pylint: disable=too-few-public-methods
-
-    """
-    Internal representation of stuff to run, where to run and other bits necessary for scheduling
-    all things the module was asked to perform.
-
-    :param logger: logger used as a parent of this entry's own logger.
-    :param int job_index: index of job within all jobs this entry belongs to.
-    :param int recipe_set_index: index of recipe set within its job this entry belongs to.
-    :param xml recipe_set: XML description of (Beaker) recipe set this entry handles.
-    """
-
-    def __init__(self, logger, job_index, recipe_set_index, recipe_set):
-        self.logger = ScheduleEntryAdapter(logger, job_index, recipe_set_index)
-        self.logger.connect(self)
-
-        self.recipe_set = recipe_set
-
-        self.testing_environment = None
-        self.guest = None
-
-
 class RestraintScheduler(gluetool.Module):
     """
-    Prepares "schedule" for other modules to perform. A schedule is a list of (Beaker-compatible) XML
-    descriptions of recipes paired with guests. Following modules can then use these guests to perform
-    whatever necessary to achieve results for XML prescriptions.
+    Prepares "test schedule" for other modules to perform. A schedule is a list of "test schedule entries"
+    (see :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry>`). To create the schedule,
+    supporting modules are required, to extract test plans and package necessary information into
+    test schedule entries. This module then provisions and sets up the necessary guests.
 
     Schedule creation has following phases:
 
-        * XML descriptions of jobs are acquired by calling ``beaker_job_xml`` shared function;
-        * these jobs are split to recipe sets, and each recipe set is used to extract a testing environment
-          it requires for testing;
+        * test schedule entries are obtained by calling ``create_test_schedule`` shared function;
         * for every testing environment, a guest is provisioned (processes all environments in parallel);
         * each guest is set up by calling ``setup_guest`` shared function indirectly (processes all guests
           in parallel as well).
     """
 
-    name = 'restraint-scheduler'
-    description = 'Prepares "schedule" for ``restraint`` runners.'
+    name = 'test-scheduler'
+    description = 'Prepares "test schedule" for other modules to perform.'
 
     # pylint: disable=gluetool-option-hard-default
     options = {
@@ -112,7 +71,7 @@ class RestraintScheduler(gluetool.Module):
 
     required_options = ('unsupported-arches',)
 
-    shared_functions = ['schedule']
+    shared_functions = ['test_schedule']
 
     _schedule = None
 
@@ -127,7 +86,7 @@ class RestraintScheduler(gluetool.Module):
 
         return utils.load_yaml(self.option('arch-compatibility-map'), logger=self.logger)
 
-    def schedule(self):
+    def test_schedule(self):
         """
         Returns schedule for runners. It tells runner which recipe sets
         it should run on which guest.
@@ -137,102 +96,11 @@ class RestraintScheduler(gluetool.Module):
 
         return self._schedule
 
-    def _run_wow(self):
-        """
-        Run workflow-tomorrow to create beaker job description, using options we
-        got from the user.
-
-        :returns: gluetool.utils.ProcessOutput with the output of w-t.
-        """
-
-        self.info('running workflow-tomorrow to get job description')
-
-        options = [
-            '--single',  # ignore multihost tests
-            '--no-reserve',  # don't reserve hosts
-            '--hardware-skip',  # ignore tasks with specific hardware requirements
-            '--restraint',
-            '--suppress-install-task'
-        ]
-
-        # To limit to just supported architectures, using --arch=foo would work fine
-        # until the testing runs into an artifact with incomplete set of arches, with
-        # foo present. Configuration would try to limit recipe sets to just those arches
-        # present, add --arch=foo. The scheduler would try to limit arches even more,
-        # to supported ones only, adding another --arch=foo, which would make wow construct
-        # *two* same recipeSets for arch foo, possibly leading to provisioning two boxes
-        # for this arch, running the exactly same set of tasks.
-        #
-        # On the other hand, multiple --no-arch=not-foo seem to be harmless, therefore we
-        # could try this approach instead. So, user must provide a list of arches not
-        # supported by the backing pool, and we add --no-arch for each of them, letting wow
-        # know we cannot run any tasks relevant just on those arches. It *still* may lead
-        # to multiple recipeSets: e.g. if our backend supports x86_64, it supports i686
-        # out of the box as well, and wow may split i686-only tasks to a separate box. But
-        # this is not that harmful as the original issue.
-        #
-        # This is far from ideal - in the ideal world, scheduler should not have its own
-        # list of unsupported, it should rely on provisioner features (what arches it can
-        # and cannot schedule); but that would require each provisioner to report not just
-        # supported arches, but unsupported as well, being aware of *all* existing arches,
-        # which smells weird :/ Needs a bit of thinking.
-        options += [
-            '--no-arch={}'.format(arch) for arch in self.unsupported_arches
-        ]
-
-        return self.shared('beaker_job_xml', options=options)
-
     def _log_schedule(self, label, schedule):
         self.debug('{}:'.format(label))
 
         for schedule_entry in schedule:
-            schedule_entry.debug('testing environment: {}'.format(schedule_entry.testing_environment))
-            schedule_entry.debug('guest: {}'.format(schedule_entry.guest))
-            log_xml(schedule_entry.debug, 'recipe set', schedule_entry.recipe_set)
-
-    def _create_job_schedule(self, index, job):
-        """
-        For a given job XML, extract recipe sets and their corresponding testing environments.
-
-        :param int index: index of the ``job`` in greater scheme of things - used for logging purposes.
-        :param xml job: job XML description.
-        :rtype: list(ScheduleEntry)
-        """
-
-        log_xml(self.debug, 'full job description', job)
-
-        schedule = []
-
-        recipe_sets = job.find_all('recipeSet')
-
-        for i, recipe_set in enumerate(recipe_sets):
-            # From each recipe, extract distro and architecture, and construct testing environment description.
-            # That will be passed to the provisioning modules. This module does not have to know it.
-
-            schedule_entry = ScheduleEntry(self.logger, index, i, recipe_set)
-
-            schedule_entry.testing_environment = TestingEnvironment(
-                distro=recipe_set.find('distroRequires').find('distro_name')['value'].encode('ascii'),
-                arch=recipe_set.find('distroRequires').find('distro_arch')['value'].encode('ascii')
-            )
-
-            log_xml(schedule_entry.debug, 'full recipe set', schedule_entry.recipe_set)
-            log_dict(schedule_entry.debug, 'testing environment', schedule_entry.testing_environment)
-
-            # remove tags we want to filter out
-            for tag in ('distroRequires', 'hostRequires', 'repos', 'partitions'):
-                schedule_entry.debug("removing tags '{}'".format(tag))
-
-                for element in schedule_entry.recipe_set.find_all(tag):
-                    element.decompose()
-
-            log_xml(schedule_entry.debug, 'purified recipe set', schedule_entry.recipe_set)
-
-            schedule.append(schedule_entry)
-
-        self._log_schedule('job #{} schedule'.format(index), schedule)
-
-        return schedule
+            schedule_entry.log()
 
     def _handle_futures_errors(self, errors, exception_message):
         """
@@ -426,24 +294,16 @@ class RestraintScheduler(gluetool.Module):
         if errors:
             self._handle_futures_errors(errors, 'At least one guest setup failed')
 
-    def _create_jobs_schedule(self, jobs):
+    def _assign_guests(self, schedule):
         """
-        Create schedule for given set of jobs.
+        Provision, setup and assign guests for entries in a given schedule.
 
-        :param list(xml) jobs: List of jobs - in their XML representation, as scheduled
-            by e.g. ``workflow-tomorrow`` - to schedule.
-        :rtype: list(tuple(libci.guest.Guest, xml))
+        :param list(TestScheduleEntry) schedule: List of test schedule entries.
         """
 
-        self.info('creating schedule for {} jobs'.format(len(jobs)))
+        self.info('assigning guests to a test schedule')
 
-        schedule = []
-
-        # for each job, create a schedule entries for its recipe sets, and put them all on one pile
-        for i, job in enumerate(jobs):
-            schedule += self._create_job_schedule(i, job)
-
-        self._log_schedule('complete schedule', schedule)
+        self._log_schedule('schedule', schedule)
 
         # provision guests for schedule entries - use their testing environments and use provisioning modules
         self._provision_guests(schedule)
@@ -454,13 +314,8 @@ class RestraintScheduler(gluetool.Module):
 
         self._log_schedule('final schedule', schedule)
 
-        # strip away our internal info - all our customers are interested in are recipe sets and guests
-        return [
-            (schedule_entry.guest, schedule_entry.recipe_set) for schedule_entry in schedule
-        ]
-
     def execute(self):
-        self.require_shared('primary_task', 'restraint')
+        self.require_shared('primary_task', 'restraint', 'create_test_schedule')
 
         def _command_options(name):
             opts = self.option(name)
@@ -499,5 +354,16 @@ class RestraintScheduler(gluetool.Module):
         if not valid_arches:
             raise NoTestableArtifactsError(self.shared('primary_task'), supported_arches)
 
-        # workflow-tomorrow
-        self._schedule = self._create_jobs_schedule(self._run_wow())
+        # Call plugin to create the schedule
+        #
+        # Note: the link between us and the plugin, formed by giving it `unsupported_arches`,
+        # doesn't feel right - it will disappear some day, right now I'm going to keep it,
+        # leaving it for the next patch.
+        schedule = self.shared('create_test_schedule', unsupported_arches=self.unsupported_arches)
+
+        if not schedule:
+            raise GlueError('Test schedule is empty')
+
+        self._assign_guests(schedule)
+
+        self._schedule = schedule

@@ -1,0 +1,4 @@
+---
+
+name: test-scheduler-beaker-xml
+description: Create test schedule entries for ``test-scheduler`` module by calling ``beaker_job_xml`` shared function.
