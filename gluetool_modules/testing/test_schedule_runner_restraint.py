@@ -408,8 +408,9 @@ class RestraintRunner(gluetool.Module):
         if exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_WATCHDOG_ERROR:
             self.info('restraint reports: Watchdog timer exceeded')
 
-            self.shared('trigger_event', 'test-schedule-runner-restraint.test-set-finished',
-                        guest=guest, task_set=task_set, output=output, result=result)
+            self.shared('trigger_event', 'test-schedule-runner-restraint.task-set.finished',
+                        schedule_entry=schedule_entry, task_set=task_set,
+                        output=output, result=result)
 
             return result
 
