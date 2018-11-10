@@ -96,6 +96,8 @@ class BeakerGuest(NetworkedGuest):
         self._reservation_refresh_timer = None
 
     def _is_allowed_degraded(self, service):
+        self._module.require_shared('evaluate_instructions')
+
         self.debug("service '{}' is degraded, check whether it's allowed".format(service))
 
         context = dict_update(self._module.shared('eval_context'), {
