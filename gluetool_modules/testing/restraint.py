@@ -9,7 +9,7 @@ import gluetool
 from gluetool.log import log_xml, ContextAdapter
 from gluetool.utils import Bunch, Command
 
-DEFAULT_RESTRAINT_PORT = 8081
+DEFAULT_RESTRAINTD_PORT = 8081
 
 DEFAULT_RESTRAINTD_START_TIMEOUT = 30
 DEFAULT_RESTRAINTD_START_TIMEOUT_TICK = 10
@@ -57,6 +57,12 @@ class Restraint(gluetool.Module):
             'type': int,
             'default': DEFAULT_RESTRAINTD_START_TIMEOUT_TICK,
             'metavar': 'SECONDS'
+        },
+        'restraintd-port': {
+            'help': 'Port on which ``restraind`` is waiting for the tests (default: %(default)s).',
+            'type': int,
+            'default': DEFAULT_RESTRAINTD_PORT,
+            'metavar': 'PORT'
         }
     }
 
@@ -65,19 +71,20 @@ class Restraint(gluetool.Module):
     def sanity(self):
         gluetool.utils.check_for_commands(['restraint'])
 
-    def _guest_restraint_address(self, guest, port=DEFAULT_RESTRAINT_PORT):
+    def _guest_restraint_address(self, guest, restraintd_port):
         # pylint: disable=no-self-use
 
-        return '{}:{}/{}'.format(guest.hostname, port, guest.port)
+        return '{}:{}/{}'.format(guest.hostname, restraintd_port, guest.port)
 
-    def restraint(self, guest, job, port=DEFAULT_RESTRAINT_PORT, rename_dir_to=None, label=None):
+    def restraint(self, guest, job, port=None, rename_dir_to=None, label=None):
         # pylint: disable=too-many-arguments
         """
         Run a job on the guest.
 
         :param libci.guest.Guest guest: guest to use for running tests.
         :param job: <job /> element describing the test job.
-        :param int port: restraint port.
+        :param int port: port on which ``restraind`` is waiting for the tests. The default value is set
+            by ``--restraintd-port`` option.
         :param str rename_dir_to: if set, when ``restraint`` finishes, its output directory
             would be renamed to this value.
         :param str label: if set, path or URL to ``restraint`` index.html report will be logged
@@ -88,6 +95,8 @@ class Restraint(gluetool.Module):
         """
 
         log_xml(guest.debug, 'Job', job)
+
+        port = port or self.option('restraintd-port')
 
         # Make sure restraintd is running and listens for connections
         guest.execute('service restraintd start')
@@ -159,8 +168,10 @@ class Restraint(gluetool.Module):
                         stream_handler.buff.append(c)
 
             try:
+                remote = '1={}@{}'.format(guest.username, self._guest_restraint_address(guest, port))
+
                 cmd = Command(restraint_command + [
-                    '--host', '1={}@{}'.format(guest.username, self._guest_restraint_address(guest, port=port)),
+                    '--host', remote,
                     '--job', f.name
                 ], logger=guest.logger)
 

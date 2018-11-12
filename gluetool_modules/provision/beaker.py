@@ -45,6 +45,12 @@ from libci.guest import NetworkedGuest
 
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
 
+#: A port on which ``restraintd`` listens for connections to run tests. Since we're using ``restraint``
+#: to run the pseudo-tests that provision the machine - and this ``restraintd`` instance keeps running
+#: since there's still and unfinished test, ``reservesys``, we need an extra ``restraintd`` instance
+#: to run the actual tests. And this is its port.
+DEFAULT_RESTRAINTD_PORT = 8082
+
 DEFAULT_ACTIVATION_TIMEOUT = 240
 ACTIVATION_TICK = 5
 DEFAULT_ECHO_TIMEOUT = 240
@@ -329,6 +335,12 @@ class BeakerProvisioner(gluetool.Module):
                 'metavar': 'SECONDS',
                 'type': int,
                 'default': DEFAULT_REFRESHER_PERIOD
+            },
+            'restraintd-port': {
+                'help': 'Port on which ``restraintd`` for running tests should listen to (default: %(default)s).',
+                'metavar': 'PORT',
+                'type': int,
+                'default': DEFAULT_RESTRAINTD_PORT
             }
         }),
         ('Provisioning options', {
@@ -474,16 +486,26 @@ class BeakerProvisioner(gluetool.Module):
         # the help of other modules (shared ``distro`` function) but by this time, given the most common
         # usage pattern, someone else already used ``wow`` to prepare the whole set of jobs, giving its
         # smart ass a chance to show off, now we are not interested in that anymore - give us what we want!
+        #
+        # Also, tell ``reservesys`` to start *another* ``restraintd`` instance: when ``RSTRNT_PORT`` variable
+        # is set, ``reservesys`` starts new instance of ``restraintd``, listening on this port, aside from
+        # the "original" ``restraintd`` (which is running the ``reservesys`` task :). Should anyone wanted
+        # to use this guest to run tests via ``restraint`` (which is quite common...) they would need
+        # a ``restraintd`` which is not occupied by running our provisioning pseudo-tests, and that's the
+        # new ``restraintd`` listening on ``RSTRNT_PORT``.
         jobs = self.shared('beaker_job_xml', body_options=[
             '--no-reserve',
             '--task=/distribution/utils/dummy',
-            '--last-task=RESERVETIME=86400 /distribution/reservesys'
+            '--last-task=RESERVETIME=86400 RSTRNT_PORT={} /distribution/reservesys'.format(
+                self.option('restraintd-port')
+            )
         ], options=[
             '--arch', environment.arch
         ], distros=[
             environment.distro
         ], extra_context={
-            'PHASE': 'guest-provisioning'
+            'PHASE': 'guest-provisioning',
+            'ENVIRONMENT': environment
         })
 
         if len(jobs) != 1:
