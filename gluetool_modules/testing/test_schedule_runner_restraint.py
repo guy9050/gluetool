@@ -401,7 +401,7 @@ class RestraintRunner(gluetool.Module):
 
             self.shared('trigger_event', 'test-schedule-runner-restraint.task-set.finished',
                         schedule_entry=schedule_entry, task_set=task_set,
-                        otuput=output, results=results)
+                        output=output, results=results)
 
             return results
 
@@ -418,7 +418,7 @@ class RestraintRunner(gluetool.Module):
 
         self.shared('trigger_event', 'test-schedule-runner-restraint.task-set.crashed',
                     schedule_entry=schedule_entry, task_set=task_set,
-                    otuput=output, results=results)
+                    output=output, results=results)
 
         # Download a snapshot.
         download_snapshot()
