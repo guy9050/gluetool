@@ -6,6 +6,9 @@ from gluetool.utils import Command, from_json
 from gluetool.log import log_dict
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
+# possible python interpreters
+ANSIBLE_PYTHON_INTERPRETERS = ["/usr/bin/python3", "/usr/bin/python2", "/usr/libexec/platform-python"]
+
 
 class PlaybookError(PrimaryTaskFingerprintsMixin, gluetool.GlueError):
     def __init__(self, task, ansible_output):
@@ -34,13 +37,50 @@ class Ansible(gluetool.Module):
         }
     }
 
-    shared_functions = ('run_playbook',)
+    shared_functions = ('run_playbook', 'detect_ansible_interpreter')
 
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     @gluetool.utils.cached_property
     def additional_options(self):
         return gluetool.utils.normalize_multistring_option(self.option('ansible-playbook-options'))
+
+    def detect_ansible_interpreter(self, guest):
+        """
+        Detect Ansible's python interpreter on the given guest and return it.
+
+        :param libci.guest.NetworkedGuest guest: Guest for auto-detection
+        :returns: List of paths to the auto-detected python interpreters. Empty list if auto-detection failed.
+        """
+
+        available_interpreters = []
+
+        cmd = [
+            'ansible',
+            '--inventory', '{},'.format(guest.name),
+            '--private-key', guest.key,
+            '--user', guest.username,
+            '--module-name', 'raw',
+            '--args', 'command -v ' + ' '.join(ANSIBLE_PYTHON_INTERPRETERS),
+            '--ssh-common-args',
+            ' '.join(['-o ' + option for option in guest.options]),
+            guest.name
+        ]
+
+        try:
+            ansible_call = Command(cmd, logger=guest.logger).run()
+
+            available_interpreters = [
+                intrp for intrp in ansible_call.stdout.splitlines() if intrp in ANSIBLE_PYTHON_INTERPRETERS
+            ]
+
+            log_dict(guest.debug, 'available interpreters', available_interpreters)
+
+        except gluetool.GlueCommandError as exc:
+            self.warn('failed to auto-detect Ansible python interpreter\n{}'.format(
+                exc.output.stdout))
+
+        return available_interpreters
 
     # pylint: disable=too-many-arguments
     def run_playbook(self, playbook_paths, guests, variables=None, inventory=None, cwd=None, json_output=True):
