@@ -166,6 +166,7 @@ deploy-to-staging:
 # Upload documentation to the remote location
 upload-docs:
   stage: accessories
+  allow_failure: true
   dependencies:
     - generate-docs
   script:
@@ -175,6 +176,7 @@ upload-docs:
 # Upload coverage report to the remote location
 upload-coverage:
   stage: accessories
+  allow_failure: true
   dependencies:
     - unit-tests
   script:
@@ -184,6 +186,7 @@ upload-coverage:
 # Add a status comment
 update-status:
   stage: status
+  allow_failure: true
   script:
     # Find out what the MR IID is
     - |
