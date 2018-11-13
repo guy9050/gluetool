@@ -6,6 +6,46 @@ All notable changes to this project will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
 
+2018-11-13
+----------
+
+Changed
+~~~~~~~
+
+- [ansible] JSON output is the default now
+- [ansible] ``run_playbook`` accepts newly also a list of playbooks
+- [test-scheduler] renamed from ``restraint-scheduler``, not tied to ``restraint`` anymore
+- [test-scheduler-beaker-xml] test scheduler plugin producing Restraint/Beaker XML
+- [test-scheduler-runner-restraint] renamed from ``restraint-runner``
+- [test-schedule-runner-restraint] report watchdog triggerings to use as a failed testing, not a crash
+
+
+Added
+~~~~~
+
+- [ansible] new shared function ``detect_ansible_interpreter`` to auto-detect suitable interpreters for Ansible
+- [beaker-provisioner] support direct provisioning via ``--provision``
+- [beaker-provisioner] start another ``restraintd`` instance on specified port (``--restraintd-port`` option)
+- [copr] handle and report failures in artifact installation as a specific exception
+- [mbs] handle and report failures in artifact installation as a specific exception
+- [restraint] allow change of default port on which the module expects running ``restraintd`` (``--restraintd-port`` option)
+- [rules-engine] new ``filter``-like shared function, ``evaluate_filter``
+
+
+Fixed
+~~~~~
+
+- [beaker] require ``evaluate_instructions`` shared function before checking degraded services
+- [beaker-provisioner] check for ``extendtesttime.sh`` script before starting extend refresh loop to avoid race condition
+- [docker-provisioner] updated to the latest "standards" of usage and testing environment handling
+- [openstack] require ``evaluate_instructions`` shared function before checking degraded services
+
+Removed
+~~~~~~~
+
+- [ansible] "smart" picking of failed tasks from the log was removed, detailed exception messages are no longer provided
+
+
 2018-10-30
 ----------
 
