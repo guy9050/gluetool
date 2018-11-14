@@ -7,7 +7,7 @@ Consists of three types of cache keys:
 List of cached guests
 ~~~~~~~~~~~~~~~~~~~~~
 
-Named ``environments.<environment.distro>.<environment.arch>.guests``, stores a list of guests' names (FQDN). These
+Named ``environments.<environment.compose>.<environment.arch>.guests``, stores a list of guests' names (FQDN). These
 names represent guests known to cache, providing the given testing environment.
 
 Guests's *in use* flag
@@ -359,7 +359,7 @@ class BeakerProvisioner(gluetool.Module):
                 'type': int
             },
             'environment': {
-                'help': 'Environment to provision, e.g. ``arch=x86_64,distro=rhel-7.6``.',
+                'help': 'Environment to provision, e.g. ``arch=x86_64,compose=rhel-7.6``.',
                 'metavar': 'key1=value1,key2=value2,...'
             },
             'setup-provisioned': {
@@ -481,7 +481,7 @@ class BeakerProvisioner(gluetool.Module):
         ssh_options = normalize_multistring_option(self.option('ssh-options'))
 
         # Override whatever value ``wow`` might think is a suitable distro for this request - we don't care!
-        # We want *exactly* the distro specified in the environment, on the exact architecture specified
+        # We want *exactly* the compose specified in the environment, on the exact architecture specified
         # by that environment, and nothing else. ``wow`` is smart and can guess a lot of things, with
         # the help of other modules (shared ``distro`` function) but by this time, given the most common
         # usage pattern, someone else already used ``wow`` to prepare the whole set of jobs, giving its
@@ -502,7 +502,7 @@ class BeakerProvisioner(gluetool.Module):
         ], options=[
             '--arch', environment.arch
         ], distros=[
-            environment.distro
+            environment.compose
         ], extra_context={
             'PHASE': 'guest-provisioning',
             'ENVIRONMENT': environment
@@ -579,7 +579,7 @@ class BeakerProvisioner(gluetool.Module):
 
         # Check whether there's an entry for our environment. It's supposed to be a list of guest names,
         # but it may be missing, we might be the first one to check.
-        cached_guests = cache.get(self._key('environments', environment.distro, environment.arch, 'guests'),
+        cached_guests = cache.get(self._key('environments', environment.compose, environment.arch, 'guests'),
                                   default=None)
 
         # If there's no such entry or the list is empty, leave - we have nothing to pick from cache.
@@ -695,7 +695,7 @@ class BeakerProvisioner(gluetool.Module):
         # Insert guest name into the list of cached guests, if it's not there. If it is, just bail,
         # the guest was already cached and we set its in-use to False in the previous step, the guest
         # no longer interests us in such case.
-        guests_key = self._key('environments', guest.environment.distro, guest.environment.arch, 'guests')
+        guests_key = self._key('environments', guest.environment.compose, guest.environment.arch, 'guests')
 
         guest.debug('adding to list of cached guests')
 
@@ -775,7 +775,7 @@ class BeakerProvisioner(gluetool.Module):
 
         self.debug('removing from list of cached guests')
 
-        guests_key = self._key('environments', environment.distro, environment.arch, 'guests')
+        guests_key = self._key('environments', environment.compose, environment.arch, 'guests')
 
         while True:
             guests, cas_tag = cache.gets(guests_key, default=None, cas_default='0')
