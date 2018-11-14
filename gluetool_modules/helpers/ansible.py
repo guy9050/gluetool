@@ -57,14 +57,14 @@ class Ansible(gluetool.Module):
 
         cmd = [
             'ansible',
-            '--inventory', '{},'.format(guest.name),
+            '--inventory', '{},'.format(guest.hostname),
             '--private-key', guest.key,
             '--user', guest.username,
             '--module-name', 'raw',
             '--args', 'command -v ' + ' '.join(ANSIBLE_PYTHON_INTERPRETERS),
             '--ssh-common-args',
             ' '.join(['-o ' + option for option in guest.options]),
-            guest.name
+            guest.hostname
         ]
 
         try:
