@@ -22,6 +22,8 @@ class TestScheduleEntryAdapter(gluetool.log.ContextAdapter):
 
 
 class TestScheduleEntry(object):
+    # pylint: disable=too-few-public-methods
+
     """
     Internal representation of stuff to run, where to run and other bits necessary for scheduling
     all things the module was asked to perform.

@@ -38,6 +38,7 @@ class NotifyEmailComposetestFormatter((gluetool.Module)):
     required_options = ('template-root', 'body-template', 'footer-template')
     shared_functions = ('notify_email_composetest_formatter',)
 
+    # pylint: disable=invalid-name
     def notify_email_composetest_formatter(self, notify_email, result, message):
         """
         Format message to represent the ComposeTest result. Updates body and footer of given message.

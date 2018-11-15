@@ -297,6 +297,7 @@ class RestraintRunner(gluetool.Module):
         return results
 
     def _run_task_set(self, schedule_entry, task_set, recipe_attrs, recipe_set_attrs, actual_guest=None):
+        # pylint: disable=too-many-arguments
         """
         Run a set of tasks on the guest.
 
@@ -410,9 +411,9 @@ class RestraintRunner(gluetool.Module):
 
             self.shared('trigger_event', 'test-schedule-runner-restraint.task-set.finished',
                         schedule_entry=schedule_entry, task_set=task_set,
-                        output=output, result=result)
+                        output=output, results=results)
 
-            return result
+            return results
 
         # Now we're dealing with an error we don't know how to handle better, so...
 
@@ -561,7 +562,7 @@ class RestraintRunner(gluetool.Module):
 
         self.debug('Try to find any non-PASS task')
 
-        for task_name, task_runs in results.tasks.iteritems():
+        for _, task_runs in results.tasks.iteritems():
             for task_run in task_runs:
                 schedule_entry, run_results = task_run.schedule_entry, task_run.results
 
