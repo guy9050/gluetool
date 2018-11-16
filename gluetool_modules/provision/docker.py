@@ -1,11 +1,11 @@
-import collections
 import random
 import time
 
 import gluetool
 from gluetool import GlueError, GlueCommandError
-from gluetool.utils import normalize_multistring_option
 import libci.guest
+
+from gluetool_modules.libs.testing_environment import TestingEnvironment
 
 
 DEFAULT_NAME = 'citool'
@@ -523,15 +523,7 @@ class DockerProvisioner(gluetool.Module):
             raise GlueError('You must specify either ``--image`` or ``--environment`` when using direct provisioning')
 
         if self.option('environment'):
-            env_properties = {
-                key: value for key, value in [
-                    env_property.split('=') for env_property in normalize_multistring_option(self.option('environment'))
-                ]
-            }
-
-            env_class = collections.namedtuple('TestingEnvironment', env_properties.keys())
-
-            self._config['environment'] = env_class(**env_properties)
+            self._config['environment'] = TestingEnvironment.unserialize_from_string(self.option('environment'))
 
     def execute(self):
         random.seed(int(time.time()))

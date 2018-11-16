@@ -1,4 +1,3 @@
-import collections
 import glob
 import tempfile
 import os
@@ -15,16 +14,11 @@ from gluetool.utils import Command, log_blob
 
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
+from gluetool_modules.libs.testing_environment import TestingEnvironment
+
+
 # Check whether Ansible finished running tests every 5 seconds.
 DEFAULT_WATCH_TIMEOUT = 5
-
-#: Testing environment description.
-#:
-#: Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
-TestingEnvironment = collections.namedtuple('TestingEnvironment', [
-    'distro',
-    'arch'
-])
 
 
 class NoTestAvailableError(PrimaryTaskFingerprintsMixin, SoftGlueError):
@@ -109,7 +103,7 @@ _   """
     def execute(self):
         self.require_shared('provision', 'run_playbook', 'detect_ansible_interpreter')
 
-        guests = self.shared('provision', TestingEnvironment(arch=self.option('arch'), distro=None))
+        guests = self.shared('provision', TestingEnvironment(arch=self.option('arch'), compose=None))
 
         # get playbooks (tests) from command-line or dist-git
         playbooks = gluetool.utils.normalize_path_option(self.option('playbook'))
