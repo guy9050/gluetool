@@ -195,11 +195,26 @@ class BuildDependencies(gluetool.Module):
             raise gluetool.utils.IncompatibleOptionsError("--companions option is required with methods: {}.".format(', '.join(self._methods.keys())))  # Ignore PEP8Bear
 
     def execute(self):
-        self.require_shared('tasks')
+        self.require_shared('primary_task', 'tasks')
 
         if self.option('method') is None:
             self.info('No method specified, moving on.')
             return
+
+        # It may happen that user configured CI to run a single command for mulptiple components, adding them
+        # as each others companions as well, e.g. "for A, B or C, run foo and, as companions, install latest
+        # builds of A, B and C". In such case, we'd try to install A's build under the test and the latest
+        # regular build of A at the same moment, and these two build may be different builds (think scratch build,
+        # newer than the most recent regular build). Our attempt to install these two builds of component A
+        # would obviously fail. To avoid that situation, if the primary component is present on the list
+        # of companions, remove it, that way we would just try to install A's build under the test.
+        primary_component = self.shared('primary_tasks').component
+        if primary_component in self.companions:
+            self.info("removing primary component '{}' from a list of companions".format(primary_component))
+
+            self.companions.remove(primary_component)
+
+        log_dict(self.debug, 'final list of companions', self.companions)
 
         method = self._methods.get(self.option('method'), None)
 
