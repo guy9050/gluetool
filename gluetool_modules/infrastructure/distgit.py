@@ -50,12 +50,15 @@ class DistGit(gluetool.Module):
             self.require_shared('primary_task')
             task = self.shared('primary_task')
 
-        # NOTE for modules and containers we might need to match by something else
+        # map artifact's target to branch name
         branch = branch or self.branch_map.match(task.target)
 
         if branch is None:
             raise GlueError("Could not translate target to dist-git branch")
 
+        branch = render_template(branch, **self.shared('eval_context'))
+
+        # map repository according to artifact's namespace
         repository = self.repository_map.match(task.ARTIFACT_NAMESPACE)
 
         if repository is None:
