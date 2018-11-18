@@ -262,7 +262,12 @@ class Notify((gluetool.Module)):
 
     @utils.cached_property
     def _template_env(self):
-        return jinja2.Environment(loader=jinja2.FileSystemLoader(self.template_root))
+        return jinja2.Environment(
+            loader=jinja2.FileSystemLoader(self.template_root),
+            extensions=[
+                'jinja2.ext.do'
+            ]
+        )
 
     def render_template(self, filename, **variables):
         """
