@@ -1,7 +1,5 @@
 import re
 import shlex
-import ast
-import _ast
 
 import gluetool
 from gluetool import GlueError, SoftGlueError
@@ -58,7 +56,7 @@ class TestBatchPlanner(gluetool.Module):
 
     options = {
         'methods': {
-            'help': 'Comma-separated list of methods.',
+            'help': 'Comma-separated list of methods (default: none).',
             'metavar': 'METHOD',
             'action': 'append',
             'choices': ['static-config'],
@@ -68,7 +66,7 @@ class TestBatchPlanner(gluetool.Module):
             'help': 'Static configuration for components.'
         },
         'job-result-type': {
-            'help': 'List of comma-separated pairs <job>:<result type>',
+            'help': 'List of comma-separated pairs <job>:<result type> (default: none).',
             'action': 'append',
             'default': []
         }
@@ -394,7 +392,7 @@ class TestBatchPlanner(gluetool.Module):
 
         else:
             self.warn('Cannot select any section, no rules matched current environment')
-            return
+            return None
 
         # Find command sets for the component
         commands = self._construct_command_sets(matching_config, task.component_id)
