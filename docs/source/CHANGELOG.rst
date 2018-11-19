@@ -6,6 +6,30 @@ All notable changes to this project will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
 
+2018-11-20
+----------
+
+Changed
+~~~~~~~
+
+- ``distro`` property of testing environment renamed to ``compose`` to better reflect its content
+
+Added
+~~~~~
+
+- [dist-git] new module - provides access to a dist-git repository of a component
+- [notify-email] support ``do`` keyword in templates ("expression statement" extension)
+- [static-guest] new module - wrap static guests, without any provisioning
+- [sti] new module - run tests as specified by STI
+- [test-scheduler] tweaked logging when provisioning and setting up guests
+
+Fixed
+~~~~~
+
+- [build-dependencies] when primary component is listed among companions, remove it to avoid build collisions
+- when running tests, ``test_`` pattern was skipped, which ignored multiple genuine modules
+
+
 2018-11-13
 ----------
 
