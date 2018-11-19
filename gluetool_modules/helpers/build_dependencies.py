@@ -208,7 +208,7 @@ class BuildDependencies(gluetool.Module):
         # newer than the most recent regular build). Our attempt to install these two builds of component A
         # would obviously fail. To avoid that situation, if the primary component is present on the list
         # of companions, remove it, that way we would just try to install A's build under the test.
-        primary_component = self.shared('primary_tasks').component
+        primary_component = self.shared('primary_task').component
         if primary_component in self.companions:
             self.info("removing primary component '{}' from a list of companions".format(primary_component))
 
