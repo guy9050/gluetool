@@ -1,17 +1,8 @@
-import collections
-
 import gluetool
 import gluetool.log
 from gluetool.log import log_dict, log_xml
 
-
-#: Testing environment description.
-#:
-#: Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
-TestingEnvironment = collections.namedtuple('TestingEnvironment', [
-    'compose',
-    'arch'
-])
+from gluetool_modules.libs.testing_environment import TestingEnvironment
 
 
 class TestScheduleEntryAdapter(gluetool.log.ContextAdapter):

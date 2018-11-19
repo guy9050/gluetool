@@ -42,6 +42,8 @@ from gluetool.log import log_dict
 from gluetool.utils import cached_property, normalize_multistring_option, normalize_path, load_yaml, dict_update
 from libci.guest import NetworkedGuest
 
+from gluetool_modules.libs.testing_environment import TestingEnvironment
+
 
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
 
@@ -953,15 +955,7 @@ class BeakerProvisioner(gluetool.Module):
             if not self.option('environment'):
                 raise GlueError('You must specify ``--environment`` when using direct provisioning')
 
-            env_properties = {
-                key: value for key, value in [
-                    env_property.split('=') for env_property in normalize_multistring_option(self.option('environment'))
-                ]
-            }
-
-            env_class = collections.namedtuple('TestingEnvironment', env_properties.keys())
-
-            self._config['environment'] = env_class(**env_properties)
+            self._config['environment'] = TestingEnvironment.unserialize_from_string(self.option('environment'))
 
     def execute(self):
         if self.option('provision'):
