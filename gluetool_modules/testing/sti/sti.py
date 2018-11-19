@@ -111,6 +111,9 @@ _   """
 
         guests = self.shared('provision', TestingEnvironment(arch=self.option('arch'), distro=None))
 
+        # setup guests
+        guests[0].setup()
+
         # get playbooks (tests) from command-line or dist-git
         playbooks = gluetool.utils.normalize_path_option(self.option('playbook'))
 
