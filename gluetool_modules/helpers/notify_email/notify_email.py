@@ -1,26 +1,32 @@
 """
 Sending notifications about results, via e-mail.
 
-Each message consists of different areas:
+Each message consists of a **metadata** and a **body**. Each of these two consist of smaller pieces.
+
+**Metadata**:
 
 .. code-block:: none
 
    +------------------------------------------+
-   | Header                                   |
    |                                          |
    | +--------------------------------------+ |
-   | | Subject (subject)                      |
+   | | Subject (subject)                    | |
    | +--------------------------------------+ |
    |                                          |
    +------------------------------------------+
-   | Body                                     |
+
+**Body**:
+
+.. code-block:: none
+
+   +------------------------------------------+
    |                                          |
    | +--------------------------------------+ |
-   | | Body header (body-header)              |
+   | | Body header (body-header)            | |
    | +--------------------------------------+ |
    |                                          |
    | +--------------------------------------+ |
-   | | Body message                           |
+   | | Body message                         | |
    | +--------------------------------------+ |
    |                                          |
    | +--------------------------------------+ |
@@ -29,17 +35,16 @@ Each message consists of different areas:
    |                                          |
    +------------------------------------------+
 
-Each block is rendered from a template that's specified by an option (see ``notify-email`` module
-and its options). Additional templates are used to render inlined pieces of the message:
+Each piece is rendered from a template that's specified by a respective option. Additional templates are used to
+render inlined pieces of the message:
 
-    * ``frontend URL`` - an URL of your nice, cool & awesome website that shows results or progresss or whatever
-      else you want to display for this particular ``citool`` pipeline.
+    * `frontend URL` - an URL of your nice, cool & awesome website that shows results or progresss or whatever
+      else you want to display users who read the e-mail.
 
 To render ``Body message``, one of multiple templates is chosen, depending on the situation:
 
-    * ``notify-email`` can ask result-specific formatter to render the body, during
-      normal operation, when everything went well and the pipeline reports gathered
-      results, or
+    * when everything went well and there are results of tests, ``notify-email`` can ask result-specific formatter
+      to render this part, thus providing representation of the results, or
 
     * ``soft-error-message`` in the case the pipeline was killed by a soft error, or
 
@@ -47,11 +52,10 @@ To render ``Body message``, one of multiple templates is chosen, depending on th
 
 Rendered blocks are then joined together, and separated by a single blank line.
 
-All templates are given following variables:
+All templates are rendered with access to following variables:
 
+    * any variable exposed by other modules via ``eval_context`` shared function,
     * ``OS`` - :py:mod:`os` module from Python's standard library
-    * ``MODULE`` - instance of ``notify-email`` module which allows access to the whole pipeline
-    * any other variables, exposed by other modules and available via ``eval_context`` shared function
 
 Some templates are given special extra variables:
 
@@ -86,76 +90,13 @@ providing templates ``<class name>-[header|footer].j2``.
 """
 
 import os
-import smtplib
-import socket
-from email.mime.text import MIMEText
 
 import jinja2
 
-import gluetool
-from gluetool import utils
-from gluetool.utils import render_template, normalize_path, normalize_multistring_option
-from gluetool.log import log_blob, log_dict
 import libci
-
-
-class Message(object):
-    # pylint: disable=too-few-public-methods
-
-    def __init__(self, module, subject=None, header=None, footer=None, body=None, recipients=None, cc=None,
-                 sender=None, reply_to=None, xheaders=None):
-        # pylint: disable=too-many-arguments
-        self._module = module
-
-        self.subject = subject or ''
-        self.header = header or ''
-        self.footer = footer or ''
-        self.body = body or ''
-        self.recipients = recipients or []
-        # pylint: disable=invalid-name
-        self.cc = cc or []
-        self.sender = sender or self._module.option('sender')
-        self.reply_to = reply_to or self._module.option('reply-to')
-        self.xheaders = xheaders or {}
-
-    def send(self):
-        if not self.subject:
-            self._module.warn('Subject not set!')
-
-        if not self.recipients:
-            self._module.warn('Empty list of recipients')
-            self.recipients = self._module.email_map.match('nobody')
-
-        content = '{}\n\n{}\n\n{}'.format(self.header, self.body, self.footer)
-
-        msg = MIMEText(content)
-        msg['Subject'] = self.subject
-        msg['From'] = self.sender
-        msg['To'] = ', '.join(self.recipients)
-        msg['Cc'] = ', '.join(self.cc)
-        if self.reply_to:
-            msg.add_header('Reply-To', self.reply_to)
-        for name, value in self.xheaders.iteritems():
-            msg[name] = value
-            self._module.debug("{}: '{}'".format(name, value))
-        self._module.debug("Recipients: '{}'".format(', '.join(self.recipients)))
-        self._module.debug("Bcc: '{}'".format(', '.join(self.cc)))
-        self._module.debug("Sender: '{}'".format(self.sender))
-        self._module.debug("Subject: '{}'".format(self.subject))
-        self._module.debug("Reply-To: '{}'".format(self.reply_to))
-        log_blob(self._module.debug, 'Content', content)
-
-        if not self._module.dryrun_allows('Sending the notification'):
-            return
-
-        try:
-            smtp = smtplib.SMTP(self._module.option('smtp-server'), self._module.option('smtp-port'))
-
-            smtp.sendmail(self.sender, self.recipients + self.cc, msg.as_string())
-            smtp.quit()
-
-        except (socket.error, smtplib.SMTPException) as exc:
-            self._module.warn('Cannot send e-mail, SMTP raised an exception: {}'.format(str(exc)), sentry=True)
+import gluetool
+from gluetool import log, utils
+from gluetool_modules.libs.mail import Message
 
 
 class Notify((gluetool.Module)):
@@ -171,25 +112,17 @@ class Notify((gluetool.Module)):
 
     options = (
         ('SMTP options', {
-            'smtp-server': {
-                'help': 'Outgoing SMTP server (default: %(default)s).',
-                'default': 'localhost'
-            },
-            'smtp-port': {
-                'help': 'SMTP server port (default: %(default)s).',
-                'type': int,
-                'default': 25
-            },
             'hard-error-cc': {
                 'help': 'Recipients to notify when hard error occures.',
                 'metavar': 'EMAILS'
             },
-            'archive-cc': {
+            'archive-bcc': {
                 'help': 'If set, it will send copy of every outgoing e-mail to ``EMAILS``.',
                 'metavar': 'EMAILS',
             },
             'sender': {
-                'help': 'E-mail of the sender.'
+                'help': 'If set, it will be used as a ``From`` header of every outgoing e-mail (default: %(default)s).',
+                'default': None
             },
             'reply-to': {
                 'help': 'If set, it will be used as a Reply-To header of every outgoing e-mail (default: %(default)s).',
@@ -252,7 +185,7 @@ class Notify((gluetool.Module)):
         })
     )
 
-    required_options = ('smtp-server', 'sender', 'email-map',
+    required_options = ('email-map',
                         'template-root',
                         'subject-template', 'body-footer-template', 'body-header-template',
                         'custom-error-message-template', 'error-message-template',
@@ -262,11 +195,11 @@ class Notify((gluetool.Module)):
 
     @utils.cached_property
     def email_map(self):
-        return gluetool.utils.PatternMap(self.option('email-map'), logger=self.logger)
+        return utils.PatternMap(self.option('email-map'), logger=self.logger)
 
     @utils.cached_property
     def template_root(self):
-        return normalize_path(self.option('template-root'))
+        return utils.normalize_path(self.option('template-root'))
 
     @utils.cached_property
     def _template_env(self):
@@ -294,13 +227,13 @@ class Notify((gluetool.Module)):
         contexts = (
             self.shared('eval_context'),
             {
-                'OS': os,
-                'MODULE': self
+                'MODULE': self,
+                'OS': os
             },
             variables
         )
 
-        return render_template(
+        return utils.render_template(
             self._template_env.get_template(filename),
             **gluetool.utils.dict_update(*contexts)
         )
@@ -330,12 +263,30 @@ class Notify((gluetool.Module)):
         return self.option_to_mails('hard-error-cc')
 
     @utils.cached_property
-    def archive_cc(self):
+    def archive_bcc(self):
         """
         List of archive (Bcc) recipients.
         """
 
-        return self.option_to_mails('archive-cc')
+        return self.option_to_mails('archive-bcc')
+
+    @utils.cached_property
+    def xheaders(self):
+        xheaders_config = utils.normalize_multistring_option(self.option('xheaders'))
+
+        xheaders = {}
+
+        for xheader in xheaders_config:
+            if not xheader or ':' not in xheader:
+                raise gluetool.GlueError("'{}' is not correct format of xheader".format(xheader))
+
+            name, value = xheader.strip().split(':')
+
+            xheaders[name.strip()] = value.strip()
+
+        log.log_dict(self.debug, 'X-Headers', xheaders)
+
+        return xheaders
 
     def gather_reserved_guests(self, result):
         """
@@ -438,7 +389,8 @@ class Notify((gluetool.Module)):
 
         self.info('Sending {} result notifications to: {}'.format(result_type, ', '.join(recipients)))
 
-        msg = Message(self, recipients=recipients, cc=self.archive_cc,
+        msg = Message(recipients=recipients, bcc=self.archive_bcc,
+                      sender=self.option('sender'), reply_to=self.option('reply-to'),
                       subject=self.render_template(self.option('subject-template'), **{
                           'RESULT': result
                       }),
@@ -457,13 +409,17 @@ class Notify((gluetool.Module)):
         return msg
 
     def execute(self):
+        self.require_shared('send_email')
+
         results = self.shared('results') or []
 
         for result in results:
             msg = self._format_result(result)
 
-            if msg is not None:
-                msg.send()
+            if not msg:
+                continue
+
+            self.shared('send_email', msg)
 
     def _format_failure(self, failure):
         recipients = [self.email_map.match(name) for name in self.shared('notification_recipients')]
@@ -526,26 +482,15 @@ class Notify((gluetool.Module)):
             'FAILURE_BODY': failure_body
         })
 
-        return Message(self,
-                       subject=subject,
+        return Message(subject=subject,
                        header=body_header,
                        footer=body_footer,
                        body=body,
                        recipients=recipients,
-                       cc=self.archive_cc,
-                       xheaders=self.xheaders)
-
-    @utils.cached_property
-    def xheaders(self):
-        xheaders_config = normalize_multistring_option(self.option('xheaders'))
-        xheaders = {}
-        for xheader in xheaders_config:
-            if not xheader or ':' not in xheader:
-                raise gluetool.GlueError("'{}' is not correct format of xheader".format(xheader))
-            name, value = xheader.strip().split(':')
-            xheaders[name] = value
-        log_dict(self.debug, 'X-Headers', xheaders)
-        return xheaders
+                       bcc=self.archive_bcc,
+                       xheaders=self.xheaders,
+                       sender=self.option('sender'),
+                       reply_to=self.option('reply-to'))
 
     def destroy(self, failure=None):
         if failure is None or isinstance(failure.exc_info[1], SystemExit):
@@ -554,6 +499,6 @@ class Notify((gluetool.Module)):
         if not self.require_shared('notification_recipients', warn_only=True):
             return
 
-        msg = self._format_failure(failure)
+        self.require_shared('send_email')
 
-        msg.send()
+        self.shared('send_email', self._format_failure(failure))

@@ -370,6 +370,7 @@ def _test_message(notify_email, msg, expected):
 
     assert msg.recipients == expected['recipients']
     assert msg.cc == expected['cc']
+    assert msg.bcc == expected['bcc']
     assert msg.sender == expected['sender']
 
 
