@@ -1,4 +1,4 @@
-subject: "[CI] [notify-email] [ERROR] No tests found for component"
+subject: "[CI] [dummy-package-1.2.3-79.el7, task 123456, fixing-bz17] notify-email No tests found for component"
 body: |-
   CI pipeline was halted due to the following error:
 

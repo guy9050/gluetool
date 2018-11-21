@@ -1,4 +1,4 @@
-subject: "[CI] [ABORT] CI pipeline crashed, operations team was notified"
+subject: "[CI] [dummy-package-1.2.3-79.el7, task 123456, fixing-bz17] [ABORT] CI pipeline crashed, operations team was notified"
 body: |-
   CI pipeline crashed due to errors, and the operations team has been
   informed about the issue by this message.

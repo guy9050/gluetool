@@ -1,4 +1,4 @@
-subject: "[CI] [PASSED] dummy-package-1.2.3-79.el7, task 123456, branch fixing-bz17"
+subject: "[CI] [dummy-package-1.2.3-79.el7, task 123456, fixing-bz17] [PASSED]"
 body: |-
   Tested build:   https://brewweb.engineering.redhat.com/brew/taskinfo?taskID=14091309
 
