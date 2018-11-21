@@ -12,6 +12,7 @@ import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.utils import Command, log_blob
 
+import libci.results
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 from gluetool_modules.libs.testing_environment import TestingEnvironment
@@ -29,6 +30,14 @@ class NoTestAvailableError(PrimaryTaskFingerprintsMixin, SoftGlueError):
     @property
     def submit_to_sentry(self):
         return False
+
+
+class StiTestResult(libci.results.TestResult):
+    """ STI test result data container """
+
+    def __init__(self, glue, overall_result, result_details, **kwargs):
+        super(StiTestResult, self).__init__(glue, 'functional', overall_result, **kwargs)
+        self.payload = result_details
 
 
 class Sti(gluetool.Module):
@@ -103,6 +112,26 @@ _   """
             raise NoTestAvailableError(self.shared('primary_task'))
 
         return playbooks
+
+    def _publish_results(self, overall_result, result_details):
+        """ Make test results available """
+        libci.results.publish_result(self, StiTestResult, overall_result, result_details)
+
+    def _check_test_log(self, test_log_filename):
+        """ Check test log for detailed results """
+        results = {}
+        try:
+            with open(test_log_filename) as test_log:
+                self.debug('Checking results in {}'.format(test_log_filename))
+                for line in test_log:
+                    try:
+                        result, name = re.match('([^ ]+) (.*)', line).groups()
+                    except AttributeError:
+                        continue
+                    results[name] = result
+        except IOError:
+            self.debug('Unable to check results in {}'.format(test_log_filename))
+        return results
 
     def execute(self):
         self.require_shared('provision', 'run_playbook', 'detect_ansible_interpreter')
@@ -207,6 +236,7 @@ sut     ansible_host={} ansible_user=root {}
                     break
 
         # parse results
+        results = self._check_test_log(os.path.join(artifact_dir, 'test.log'))
         try:
             future.result()
 
@@ -217,11 +247,14 @@ sut     ansible_host={} ansible_user=root {}
                     exc.ansible_output.stdout))
 
             # STI defines that Ansible MUST fail if any of the tests fail
-            # To differentiate from a generic ansible error, we check if required test.log was generated
-            if not os.path.exists(os.path.join(artifact_dir, 'test.log')):
+            # To differentiate from a generic ansible error, we check if
+            # required test.log was generated with at least one result
+            if not results:
                 six.reraise(*sys.exc_info())
 
+            self._publish_results('FAIL', results)
             self.warn('some of the tests failed :/')
             return
 
+        self._publish_results('PASS', results)
         self.info('all tests passed \\o/')
