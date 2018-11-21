@@ -4,6 +4,4 @@ name: mysql
 description: Provides access to MySQL servers and databases.
 dependencies:
   pip:
-    # Provided directly by MySQL, see https://dev.mysql.com/downloads/connector/python/
-    - mysql-connector-python==2.0.4
-    - http://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-2.0.4.zip#md5=3df394d89300db95163f17c843ef49df&egg=mysql-connector-python-2.0.4
+    - mysql-connector-python==8.0.13
