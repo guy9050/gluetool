@@ -66,6 +66,10 @@ _   """
                 'help': 'Use the given ansible playbook(s) for execution, skip dist-git retrieval.',
                 'metavar': 'PLAYBOOK',
                 'action': 'append'
+            },
+            'skip-guest-setup': {
+                'help': 'Skip guest(s) setup',
+                'action': 'store_true'
             }
         }),
     ]
@@ -106,7 +110,8 @@ _   """
         guests = self.shared('provision', TestingEnvironment(arch=self.option('arch'), compose=None))
 
         # setup guests
-        guests[0].setup()
+        if not self.option('skip-guest-setup'):
+            guests[0].setup()
 
         # get playbooks (tests) from command-line or dist-git
         playbooks = gluetool.utils.normalize_path_option(self.option('playbook'))
