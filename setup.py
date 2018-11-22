@@ -106,7 +106,7 @@ CATEGORIES = [
     'infrastructure',
     'provision',
     'static_analysis', 'static_analysis/covscan', 'static_analysis/rpmdiff',
-    'testing', 'testing/beaker', 'testing/composetest', 'testing/openstack'
+    'testing', 'testing/beaker', 'testing/composetest', 'testing/openstack', 'testing/sti'
 ]
 
 DATA_FILES = [
@@ -184,6 +184,7 @@ if __name__ == '__main__':
                   'testing.beaker',
                   'testing.composetest',
                   'testing.openstack',
+                  'testing.sti',
                   'tests',
                   'dispatchers',
                   'helpers',
