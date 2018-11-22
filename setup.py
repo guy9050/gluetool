@@ -47,8 +47,7 @@ INSTALL_REQUIRES = [
     "jq==0.1.6",
     "koji",  # composetest
     "mako==1.0.6",
-    # available over external URL => dependency_links => they does not seem to work when installing via pip :/
-    #    "mysql-connector-python==2.0.4",
+    "mysql-connector-python==8.0.13",  # mysql
     "packaging==17.1",
     "proton==0.8.8",
     "psycopg2==2.7.3.1",
@@ -72,15 +71,13 @@ INSTALL_REQUIRES = [
 DEPENDENCY_LINKS = [
     "git+https://gitlab.cee.redhat.com/bkabrda/composeci.git#egg=composeci-9876543210",  # composetest
     "https://releases.pagure.org/koji/koji-1.16.0.tar.bz2#egg=koji-9876543210",  # composetest
-    # pylint: disable=line-too-long
-    #    "http://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-2.0.4.zip#md5=3df394d89300db95163f17c843ef49df&egg=mysql-connector-python-2.0.4"  # Ignore PEP8Bear
 ]
 
 
 # Generate list of data files - modules and their moduleinfo files - for a category.
 # That is basically a list of all files in a directory (which *is* the category name)
-# under gluetool_modules. Ignore other extensions, __init__.py - these are not modules
-# - and also skip _mysql module which has dependency issues :/ And sort those data files.
+# under gluetool_modules. Ignore other extensions, __init__.py - these are not modules.
+# And sort those data files.
 #
 # Output is what setup expects to get when dealing with data files:
 # [data file directory, [data file #1, data file #2, ...]]
@@ -92,7 +89,7 @@ def _data_files(category_slug):
         sorted([
             os.path.join(dirpath, filepath) for filepath in os.listdir(dirpath)
             # pylint: disable=line-too-long
-            if (filepath.endswith('.py') or filepath.endswith('.moduleinfo')) and filepath != '__init__.py' and not filepath.startswith('_mysql.')
+            if (filepath.endswith('.py') or filepath.endswith('.moduleinfo')) and filepath != '__init__.py'
         ])
     ]
 
