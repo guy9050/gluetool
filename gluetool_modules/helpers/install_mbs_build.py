@@ -35,10 +35,23 @@ class InstallMBSBuild(gluetool.Module):
 
     shared_functions = ('setup_guest',)
 
-    def _get_repo(self, module_nsvc):
+    def _get_repo(self, module_nsvc, guests):
         self.info('Generating repo for module via ODCS')
-        command = ['odcs', '--redhat', 'create', 'module', module_nsvc,
-                   '--sigkey', 'none', '--flag', 'no_deps']
+
+        command = [
+            'odcs',
+            '--redhat', 'create',
+            'module', module_nsvc,
+            '--sigkey', 'none',
+            '--flag', 'no_deps'
+        ]
+
+        # Inner list gather all arches, `set` gets rid of duplicities, and final `list` converts set to a list.
+        for arch in list(set([guest.arch for guest in guests])):
+            command += [
+                '--arch', arch
+            ]
+
         # TO improve: raise OdcsError if command fails
         output = Command(command).run()
         # strip 1st line before json data
@@ -61,7 +74,7 @@ class InstallMBSBuild(gluetool.Module):
         primary_task = self.shared('primary_task')
 
         nsvc = primary_task.nsvc
-        repo_url = self._get_repo(nsvc)
+        repo_url = self._get_repo(nsvc, guests)
         self.info('Installing module "{}" from {}'.format(nsvc, repo_url))
 
         _, ansible_output = self.shared(
