@@ -120,10 +120,20 @@ class SMTP((gluetool.Module)):
         if not self.dryrun_allows('Sending an e-mail'):
             return
 
+        self.info('Sending e-mail: from {} to {}, "{}"'.format(
+            message.sender, ', '.join(message.recipients), message.subject
+        ))
+
+        # Adding our Bcc recipients - not modifying the message, it's read-only from
+        # our point of view.
+        recipients = message.recipients + message.cc + message.bcc + self.archive_bcc
+
+        gluetool.log.log_dict(self.debug, 'final recipients', recipients)
+
         try:
             smtp = smtplib.SMTP(self.option('smtp-server'), self.option('smtp-port'))
 
-            smtp.sendmail(message.sender, message.recipients + message.cc + message.bcc, lowered_message.as_string())
+            smtp.sendmail(message.sender, recipients, lowered_message.as_string())
             smtp.quit()
 
         except (socket.error, smtplib.SMTPException) as exc:
