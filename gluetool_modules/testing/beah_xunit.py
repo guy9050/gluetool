@@ -81,10 +81,10 @@ class BeahXUnit(gluetool.Module):
                     for log in phase['logs']:
                         _add_log(test_phase_logs, log['name'], log['href'])
 
-                if run['bkr_status'] != 'Completed':
-                    new_xml_element('error', _parent=test_case, message='Test did not completed')
+                if run['bkr_status'].lower() != 'completed':
+                    new_xml_element('error', _parent=test_case, message='Test did not complete')
 
-                elif run['bkr_result'] != 'PASS':
+                elif run['bkr_result'].lower() not in ('pass', 'passed'):
                     new_xml_element('failure', _parent=test_case, message='Test failed')
 
                 # main_logs = [log for log in run['bkr_logs'] if log['name'].lower() in ('taskout.log',)]
