@@ -26,7 +26,8 @@ footer: |-
   IRC: #baseosci
 recipients:
   - dummy-recipient@redhat.com
-cc:
+cc: []
+bcc:
   - platform-ci-notification@redhat.com
 sender: "qe-baseos-automation@redhat.com"
 
