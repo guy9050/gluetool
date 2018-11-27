@@ -79,6 +79,10 @@ class MBSTask(object):
 
         return TaskArches([self.module.option('arches')])
 
+    @cached_property
+    def url(self):
+        return self.module.mbs_api().get_build_ui_url(self.id)
+
 
 class MBS(gluetool.Module):
     name = 'mbs'
@@ -169,4 +173,4 @@ class MBS(gluetool.Module):
         self.task = MBSTask(build_id, self)
         self._tasks = [self.task]
 
-        self.info('Init using build {} ({})'.format(build_id, self._mbs_api.get_build_ui_url(build_id)))
+        self.info('Initialized with {}: {} ({})'.format(self.task.id, self.task.nsvc, self.task.url))

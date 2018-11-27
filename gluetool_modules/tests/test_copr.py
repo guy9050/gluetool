@@ -133,7 +133,11 @@ Finish: run
 
 @pytest.fixture(name='module')
 def fixture_module():
-    return create_module(Copr)[1]
+    module = create_module(Copr)[1]
+
+    module._config['copr-web-url-template'] = 'dummy-web-url-{{ TASK.id }}'
+
+    return module
 
 
 def test_loadable(module):
@@ -199,6 +203,8 @@ def test_execute(module, monkeypatch):
     assert primary_task.task_arches == TaskArches(['x86_64'])
     assert primary_task.full_name == "package 'pycho' build '802020' target 'fedora-28-x86_64'"
 
+    assert primary_task.url == 'dummy-web-url-802020:fedora-28-x86_64'
+
 
 def test_not_found(module, monkeypatch):
     module._config['task-id'] = '999999:fedora-28-x86_64'
@@ -239,6 +245,8 @@ def test_not_found(module, monkeypatch):
     assert primary_task.rpm_urls == []
 
     assert primary_task.task_arches == TaskArches(['x86_64'])
+
+    assert primary_task.url == 'dummy-web-url-999999:fedora-28-x86_64'
 
 
 def test_unreachable_copr(module, monkeypatch):
