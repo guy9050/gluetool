@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2018-11-27
+----------
+
+Added
+~~~~~
+
+- [notes] new module - add various notes and warning to inform users about unexpected issues
+- [notify-email] support for adding custom X-* headers
+- [smtp] new module - SMTP support (sending e-mails) moved to a separate module
+
+
+Fixed
+~~~~~
+
+- [beah-xunit] status and result checks must be case-insensitive
+- [install-mbs-build] request repository with architectures matching given set of guests
+- [mysql] fix source of connector, now using one from PyPI
+- [sti] fix packaging issue
+
 
 2018-11-20
 ----------
