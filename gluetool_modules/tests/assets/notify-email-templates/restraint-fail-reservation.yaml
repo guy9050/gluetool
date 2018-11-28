@@ -43,6 +43,5 @@ footer: |-
 recipients:
   - dummy-recipient@redhat.com
 cc: []
-bcc:
-  - platform-ci-notification@redhat.com
-sender: "qe-baseos-automation@redhat.com"
+bcc: []
+sender: ""
