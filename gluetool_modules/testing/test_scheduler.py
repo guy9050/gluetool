@@ -1,14 +1,13 @@
 import shlex
 import sys
 
-import concurrent.futures
-
 from six import reraise
 
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
 from gluetool.log import log_dict
 from libci.sentry import PrimaryTaskFingerprintsMixin
+from gluetool_modules.libs.jobs import Job, run_jobs, handle_job_errors
 
 
 class NoTestableArtifactsError(PrimaryTaskFingerprintsMixin, SoftGlueError):
@@ -102,39 +101,6 @@ class RestraintScheduler(gluetool.Module):
         for schedule_entry in schedule:
             schedule_entry.log()
 
-    def _handle_futures_errors(self, errors, exception_message):
-        """
-        Take care of reporting exceptions gathered from futures, and re-raise
-        one of them - or a new, generic one - to report a phase of scheduling process failed.
-
-        :param list(tuple(ScheduleEntry, exception info)) errors: schedule entries and their corresponding
-            exceptions
-        :param str exception_label: a label used for logging exceptions
-        :param str exception_message: a message used when raising generic exception.
-        """
-
-        self.debug('at least one future failed')
-
-        # filter exceptions using given ``check`` callback, and raise the first suitable one - or return back
-        def _raise_first(check):
-            for schedule_entry, exc_info in errors:
-                if not check(exc_info):
-                    continue
-
-                schedule_entry.error('terminating schedule creation')
-
-                reraise(*exc_info)
-
-        # Soft errors have precedence - the let user know something bad happened, which is better
-        # than just "infrastructure error".
-        _raise_first(lambda exc: isinstance(exc[1], SoftGlueError))
-
-        # Then common CI errors
-        _raise_first(lambda exc: isinstance(exc[1], GlueError))
-
-        # Ok, no custom exception, maybe just some Python ones - kill the pipeline.
-        raise GlueError(exception_message)
-
     def _provision_guests(self, schedule):
         """
         Provision guests for schedule entries.
@@ -144,15 +110,12 @@ class RestraintScheduler(gluetool.Module):
 
         self.debug('provisioning guests')
 
-        # for each schedule entry, create a setup thread running shared function ``provision`` for
-        # given testing environment
-
-        futures = {}
-        errors = []
+        # For each schedule entry, create a setup thread running shared function ``provision`` for
+        # given testing environment.
 
         self.info('provisioning {} guests'.format(len(schedule)))
 
-        # Yes, we could pass shared function ``provision`` directly to executor, but that way we
+        # Yes, we could pass shared function ``provision`` directly to job, but that way we
         # wouldn't have any knowledge about the thread used to run it when we handle future exceptions.
         # All code running within the future does have thread context in the log, our error handling
         # would not because it'd be runing in the main thread, making it hard for user to debug which
@@ -193,47 +156,46 @@ class RestraintScheduler(gluetool.Module):
                 # deciding what exception to use to kill the pipeline.
                 reraise(*exc_info)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(schedule),
-                                                   thread_name_prefix='provision-thread') as executor:
-            for schedule_entry in schedule:
-                schedule_entry.debug('planning guest for environment: {}'.format(schedule_entry.testing_environment))
+        # Prepare list of jobs and callbacks for ``run_jobs``.
+        jobs = [
+            # `se` instead of `schedule_entry` to avoid binding in the inner functions bellow
+            Job(logger=se.logger, target=_provision_wrapper, args=(se,), kwargs={}) for se in schedule
+        ]
 
-                future = executor.submit(_provision_wrapper, schedule_entry)
-                futures[future] = schedule_entry
+        # called when provisioning jobs starts
+        def _before_job_start(schedule_entry):
+            schedule_entry.debug('planning guest for environment: {}'.format(schedule_entry.testing_environment))
 
-            # If we leave context here, the rest of our code would run after all futures finished - context would
-            # block in its __exit__ on executor's state.. That'd be generaly fine but we'd like to inform user about
-            # our progress, and that we can do be checking futures as they complete, one by one, not waiting for the
-            # last one before we start checking them. This thread *will* sleep from time to time, when there's no
-            # complete future available, but that's fine. We'll get our hands on each complete one as soon as
-            # possible, letting user know about the progress.
+        # called when provisioning job succeeded - store returned guest in the schedul eentry
+        def _on_job_complete(result, schedule_entry):
+            schedule_entry.info('provisioning of guest finished')
 
-            for i, future in enumerate(concurrent.futures.as_completed(futures), start=1):
-                remaining_count = len(schedule) - i
+            schedule_entry.guest = result[0]
 
-                schedule_entry = futures[future]
+        # called when provisioning job failed
+        def _on_job_error(exc_info, schedule_entry):
+            # pylint: disable=unused-argument
 
-                if future.exception() is None:
-                    # provisioning succeeded - store returned guest in the schedule entry
-                    schedule_entry.info('provisioning of guest finished')
+            schedule_entry.error('provisioning of guest failed')
 
-                    schedule_entry.guest = future.result()[0]
+        # called when provisioning job finished
+        def _on_job_done(remaining_count, schedule_entry):
+            # pylint: disable=unused-argument
 
-                else:
-                    schedule_entry.error('provisioning of guest failed')
+            self.info('{} guests pending'.format(remaining_count))
 
-                    exc_info = future.exception_info()
+        job_errors = run_jobs(
+            jobs,
+            logger=self.logger,
+            worker_name_prefix='provision-thread',
+            on_job_start=_before_job_start,
+            on_job_complete=_on_job_complete,
+            on_job_error=_on_job_error,
+            on_job_done=_on_job_done
+        )
 
-                    # Exception info returned by future does not contain exception class while the info returned
-                    # by sys.exc_info() does and all users of it expect the first item to be exception class.
-                    exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
-
-                    errors.append((schedule_entry, exc_info))
-
-                self.info('{} guests pending'.format(remaining_count))
-
-        if errors:
-            self._handle_futures_errors(errors, 'At least one provisioning attempt failed')
+        if job_errors:
+            handle_job_errors(job_errors, 'At least one provisioning attempt failed')
 
     def _setup_guests(self, schedule):
         """
@@ -245,9 +207,6 @@ class RestraintScheduler(gluetool.Module):
         self.debug('setting up the guests')
 
         # for each schedule entry, create a setup thread running ``guest.setup``
-
-        futures = {}
-        errors = []
 
         self.info('setting up {} guests'.format(len(schedule)))
 
@@ -269,34 +228,45 @@ class RestraintScheduler(gluetool.Module):
                 # to see all exceptions, and wants to raise the best one.
                 reraise(*exc_info)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(schedule),
-                                                   thread_name_prefix='setup-thread') as executor:
-            for schedule_entry in schedule:
-                schedule_entry.debug('planning setup of guest: {}'.format(schedule_entry.guest))
+        # Prepare list of jobs and callbacks for ``run_jobs``.
+        jobs = [
+            Job(logger=se.logger, target=_guest_setup_wrapper, args=(se,), kwargs={}) for se in schedule
+        ]
 
-                future = executor.submit(_guest_setup_wrapper, schedule_entry)
-                futures[future] = schedule_entry
+        # called when setup jobs starts
+        def _before_job_start(schedule_entry):
+            schedule_entry.debug('planning setup of guest: {}'.format(schedule_entry.guest))
 
-            for i, future in enumerate(concurrent.futures.as_completed(futures), start=1):
-                remaining_count = len(schedule) - i
+        # called when setup job succeeded
+        def _on_job_complete(result, schedule_entry):
+            # pylint: disable=unused-argument
 
-                schedule_entry = futures[future]
+            schedule_entry.info('setup of guest finished')
 
-                if future.exception() is None:
-                    schedule_entry.info('setup of guest finished')
+        # called when setup job failed
+        def _on_job_error(exc_info, schedule_entry):
+            # pylint: disable=unused-argument
 
-                else:
-                    schedule_entry.error('setup of guest failed')
+            schedule_entry.error('setup of guest failed')
 
-                    exc_info = future.exception_info()
-                    exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
+        # called when setup job finished
+        def _on_job_done(remaining_count, schedule_entry):
+            # pylint: disable=unused-argument
 
-                    errors.append((schedule_entry, exc_info))
+            self.info('{} guests pending'.format(remaining_count))
 
-                self.info('{} guests pending'.format(remaining_count))
+        job_errors = run_jobs(
+            jobs,
+            logger=self.logger,
+            worker_name_prefix='setup-thread',
+            on_job_start=_before_job_start,
+            on_job_complete=_on_job_complete,
+            on_job_error=_on_job_error,
+            on_job_done=_on_job_done
+        )
 
-        if errors:
-            self._handle_futures_errors(errors, 'At least one guest setup failed')
+        if job_errors:
+            handle_job_errors(job_errors, 'At least one guest setup failed')
 
     def _assign_guests(self, schedule):
         """
