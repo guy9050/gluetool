@@ -4,7 +4,7 @@ import shlex
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.log import format_dict, log_dict
-from gluetool.utils import cached_property, load_yaml
+from gluetool.utils import cached_property, load_yaml, PatternMap, requests
 
 
 class CommandsError(SoftGlueError):
@@ -46,6 +46,9 @@ class TestBatchPlanner(gluetool.Module):
 
     * ``static-config``: use a YAML file (set by ``--config`` option) to specify what jobs
       are supposed to be run for artifacts.
+
+    * ``sti``: check if test/test.yaml is present in component repository. Jenkins job name
+      is found in mapping file (set by ``--sti-job-map`` option).
     """
 
     # Supported flags - keep them alphabetically sorted
@@ -59,11 +62,15 @@ class TestBatchPlanner(gluetool.Module):
             'help': 'Comma-separated list of methods (default: none).',
             'metavar': 'METHOD',
             'action': 'append',
-            'choices': ['static-config'],
+            'choices': ['static-config', 'sti'],
             'default': []
         },
         'config': {
             'help': 'Static configuration for components.'
+        },
+        'sti-job-map': {
+            'help': 'Path to a file with ``ARTIFACT_NAMESPACE`` => ``<jenkins_job_name>`` patterns.',
+            'metavar': 'FILE'
         },
         'job-result-type': {
             'help': 'List of comma-separated pairs <job>:<result type> (default: none).',
@@ -366,6 +373,8 @@ class TestBatchPlanner(gluetool.Module):
                                     default_commands=global_default_commands)
 
     def _plan_by_static_config(self):
+        self.require_shared('evaluate_rules', 'eval_context')
+
         config = load_yaml(self.option('config'), logger=self.logger)
 
         if config is None:
@@ -413,6 +422,30 @@ class TestBatchPlanner(gluetool.Module):
 
         return final_commands
 
+    @cached_property
+    def sti_job_map(self):
+        return PatternMap(self.option('sti-job-map'), logger=self.logger)
+
+    def _plan_by_sti(self):
+        self.require_shared('dist_git_repository')
+
+        task = self.shared('primary_task')
+        job_name = self.sti_job_map.match(task.ARTIFACT_NAMESPACE)
+
+        # Construct URL to the dist-git repository of the component
+        repository = self.shared('dist_git_repository')
+        sti_url = '{}/blob/{}/f/tests'.format(repository.url, repository.branch)
+
+        # Note that we currently support only Openstack
+        with requests() as request:
+            if request.get(sti_url).ok:
+                self.info('Found STI tests at following URL: {}'.format(sti_url))
+                return [('openstack-job', ['--job-name', job_name])]
+
+        self.info('No STI tests found at following URL: {}'.format(sti_url))
+
+        return []
+
     def plan_test_batch(self):
         """
         Returns list of modules and their options. These modules implement testing process
@@ -423,40 +456,36 @@ class TestBatchPlanner(gluetool.Module):
         .. code-block:: python
 
            [
-               [ module1, [--option1, --option2, ...] ],
-               [ module2, [--option3, --option4, ...] ],
+               ( module1, [--option1, --option2, ...] ),
+               ( module2, [--option3, --option4, ...] ),
                ...
            ]
 
-        :rtype: list(list)
+        :rtype: list(tuple)
         """
 
-        self.require_shared('primary_task', 'evaluate_rules', 'eval_context')
+        self.require_shared('primary_task')
+
+        test_batch = []
 
         for method in self._methods:
             self.debug("Plan test batch using '{}' method".format(method))
 
-            test_batch = self._planners[method]()
+            test_batch += self._planners[method]()
 
             if not test_batch:
                 self.info("Method '{}' provided no tests, moving on".format(method))
                 continue
 
-            return test_batch
-
-        return []
+        return test_batch
 
     def sanity(self):
         self._planners = {
-            'static-config': self._plan_by_static_config
+            'static-config': self._plan_by_static_config,
+            'sti': self._plan_by_sti
         }
 
-        methods = self.option('methods')
-
-        if isinstance(methods, (str, unicode)):
-            methods = [method for method in methods.split(',')]
-
-        self._methods = [method.strip() for method in methods]
+        self._methods = gluetool.utils.normalize_multistring_option(self.option('methods'))
 
         for method in self._methods:
             if method not in self._planners:
@@ -465,3 +494,7 @@ class TestBatchPlanner(gluetool.Module):
             if method == 'static-config' and not self.option('config'):
                 raise gluetool.utils.IncompatibleOptionsError(self,
                                                               "--config option is required with method 'static-config'")
+
+            if method == 'sti' and not self.option('sti-job-map'):
+                raise gluetool.utils.IncompatibleOptionsError(self,
+                                                              "--sti-job-map option is required with method 'sti'")
