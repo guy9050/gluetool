@@ -1480,7 +1480,7 @@ class Koji(gluetool.Module):
             self.tasks(task_ids=task_ids, wait_timeout=wait_timeout)
 
         for task in self._tasks:
-            self.info('initialized {}'.format(task.full_name))
+            self.info('Initialized with {}: {} ({})'.format(task.id, task.full_name, task.url))
 
         for task in self._tasks:
             if not task.has_artifacts:

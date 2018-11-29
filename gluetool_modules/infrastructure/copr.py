@@ -3,7 +3,7 @@ import collections
 import requests
 
 import gluetool
-from gluetool.utils import cached_property
+from gluetool.utils import cached_property, dict_update, render_template
 from gluetool.log import log_dict, log_blob
 
 #: Information about task architectures.
@@ -185,6 +185,14 @@ class CoprTask(object):
         return TaskArches([self.target.split('-')[-1]])
 
     @cached_property
+    def url(self):
+        context = dict_update(self.module.shared('eval_context'), {
+            'TASK': self
+        })
+
+        return render_template(self.module.option('copr-web-url-template'), **context)
+
+    @cached_property
     def full_name(self):
         """
         String with human readable task details. Used for slightly verbose representation e.g. in logs.
@@ -211,13 +219,22 @@ class Copr(gluetool.Module):
             'help': 'Url of Copr build server',
             'type': str
         },
+        'copr-web-url-template': {
+            'help': """
+                    Template of URL leading to the Copr website, displaying the artifact. It has
+                    access to all variables available in the eval context, with ``TASK`` representing
+                    the task module generates URL for. (default: %(default)s).
+                    """,
+            'type': str,
+            'default': None
+        },
         'task-id': {
             'help': 'Copr build task ID, in a form of ``build-id:chroot-name``.',
             'type': str
         }
     }
 
-    required_options = ('copr-url', 'task-id')
+    required_options = ('copr-url', 'copr-web-url-template', 'task-id')
 
     shared_functions = ['primary_task', 'tasks', 'copr_api']
 
@@ -292,4 +309,4 @@ class Copr(gluetool.Module):
         self.task = CoprTask(build_task_id, self)
         self._tasks = [self.task]
 
-        self.info('Init using build task {}'.format(build_task_id))
+        self.info('Initialized with {}: {} ({})'.format(self.task.id, self.task.full_name, self.task.url))
