@@ -93,6 +93,12 @@ class NotifyRecipients(gluetool.Module):
                 'help': 'If set, it will override all recipient settings - all notifications will go to these people',
                 'metavar': 'NAMES'
             },
+            'recipients': {
+                'help': 'Generic, all-purpose list of recipients to notify (default: none).',
+                'metavar': 'NAMES',
+                'action': 'append',
+                'default': []
+            },
             'recipients-map': {
                 # pylint: disable=line-too-long
                 'help': "File with recipients mapping (default: %(default)s).",
@@ -127,6 +133,17 @@ class NotifyRecipients(gluetool.Module):
     shared_functions = ['notification_recipients']
 
     @cached_property
+    def generic_recipients(self):
+        # type: () -> List[str]
+        """
+        List of generic recipients.
+
+        :rtype: list(str)
+        """
+
+        return normalize_multistring_option(self.option('recipients'))
+
+    @cached_property
     def force_recipients(self):
         """
         List of forced recipients.
@@ -157,20 +174,22 @@ class NotifyRecipients(gluetool.Module):
 
         recipients = normalize_multistring_option(self.option('{}-notify'.format(result_type)))
         if recipients:
-            self.debug('overriding recipients with absolute notify')
+            self.debug('overriding recipients with result absolute notify')
             return recipients
 
-        self.debug('using default recipients')
+        self.debug('using result and generic recipients')
 
         default_recipients = normalize_multistring_option(self.option('{}-default-notify'.format(result_type)))
         add_recipients = normalize_multistring_option(self.option('{}-add-notify'.format(result_type)))
 
-        return default_recipients + add_recipients
+        return default_recipients + add_recipients + self.generic_recipients
 
     def _recipients_overall(self):
         self.debug('collecting all available recipients')
 
-        return sum([self._recipients_by_result(result_type) for result_type in self.supported_result_types], [])
+        return sum([
+            self._recipients_by_result(result_type) for result_type in self.supported_result_types
+        ], [])
 
     def _prepare_target_recipients(self, target, context):
         """
