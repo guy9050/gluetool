@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2018-11-30
+----------
+
+Added
+~~~~~
+
+- [brew] display link to Brew website, showing details of the artifact
+- [copr] display link to Copr website, showing details of the artifact
+- [koji] display link to Koji website, showing details of the artifact
+- [test-batch-planner] supports STI
+
+Changed
+~~~~~~~
+
+- [mbs] update the displayed link to MBS website to match other artifact modules
+
+
 2018-11-27
 ----------
 
