@@ -32,7 +32,8 @@ def fixture_configured_module(module, tmpdir):
         'covscan-default-notify': ['uvw'],
         'foo-notify': 'xyz',
         'foo-default-notify': ['def', 'ghi'],
-        'foo-add-notify': ['lkm', 'qwe, tgv']
+        'foo-add-notify': ['lkm', 'qwe, tgv'],
+        'recipients': ['generic recipient 1, generic recipient 2', '  generic recipient 3  ']
     })
 
     map_file = tmpdir.join('dummy-map.yml')
@@ -153,16 +154,21 @@ def test_recipients(configured_module):
     # pylint: disable=protected-access
     del configured_module._config['foo-notify']
 
-    assert configured_module._recipients_by_result('foo') == ['def', 'ghi', 'lkm', 'qwe', 'tgv']
+    assert configured_module._recipients_by_result('foo') == [
+        'def', 'ghi', 'lkm', 'qwe', 'tgv',
+        'generic recipient 1', 'generic recipient 2', 'generic recipient 3'
+    ]
 
 
 def test_notify_recipients(configured_module):
     """
-    Tests whether *-notify overrides *-default-notify and *-add-notify.
+    Tests whether ``*-notify`` overrides ``*-default-notify``, ``*-add-notify`` and ``recipients``.
     """
 
     # pylint: disable=protected-access
-    assert configured_module._recipients_by_result('foo') == ['xyz']
+    assert configured_module._recipients_by_result('foo') == [
+        'xyz'
+    ]
 
 
 def test_notify_force_recipients(configured_module):
@@ -173,18 +179,27 @@ def test_notify_force_recipients(configured_module):
     # pylint: disable=protected-access
     configured_module._config['force-recipients'] = ['even', 'more', 'powerful']
 
-    assert configured_module._recipients_by_result('foo') == ['even', 'more', 'powerful']
+    assert configured_module._recipients_by_result('foo') == [
+        'even', 'more', 'powerful'
+    ]
 
 
 def test_overall_recipients(configured_module):
     """
-    Testes whether it's possible to get recipients for all known result types.
+    Tests whether it's possible to get recipients for all known result types.
     """
 
     # pylint: disable=protected-access
-    assert configured_module._recipients_overall() == ['def', 'ghi', 'to-be-removed-by-map', 'pqr', 'stu', 'uvw',
-                                                       'mno', 'some-weird/recipient', 'jkl', 'abc', 'abc', 'jkl', 'abc',
-                                                       'abc']
+    assert configured_module._recipients_overall() == [
+        'def', 'ghi', 'to-be-removed-by-map', 'pqr', 'stu',
+        'generic recipient 1', 'generic recipient 2', 'generic recipient 3',
+        'uvw',
+        'generic recipient 1', 'generic recipient 2', 'generic recipient 3',
+        'mno', 'some-weird/recipient', 'jkl', 'abc', 'abc',
+        'generic recipient 1', 'generic recipient 2', 'generic recipient 3',
+        'jkl', 'abc', 'abc',
+        'generic recipient 1', 'generic recipient 2', 'generic recipient 3'
+    ]
 
 
 def test_finalize_recipients(log, configured_module, monkeypatch):
@@ -211,16 +226,19 @@ def test_finalize_recipients(log, configured_module, monkeypatch):
     (
         None,
         # pylint: disable=line-too-long
-        ['abc', 'def', 'from-map-always-bar', 'from-map-always-foo', 'ghi', 'jkl', 'mno', 'pqr', 'some-weird/recipient', 'stu', 'uvw']  # Ignore PEP8Bear
+        ['abc', 'def', 'from-map-always-bar', 'from-map-always-foo', 'generic recipient 1', 'generic recipient 2', 'generic recipient 3', 'ghi', 'jkl', 'mno', 'pqr', 'some-weird/recipient', 'stu', 'uvw']  # Ignore PEP8Bear
     ),
     # With specific type, return just its recipients
     ('beaker', ['def', 'from-map-always-bar', 'from-map-always-foo', 'ghi']),
     ('boc', ['from-map-always-bar', 'from-map-always-foo', 'pqr', 'stu']),
-    ('covscan', ['from-map-always-bar', 'from-map-always-foo', 'uvw']),
+    ('covscan', ['from-map-always-bar', 'from-map-always-foo',
+                 'generic recipient 1', 'generic recipient 2', 'generic recipient 3', 'uvw']),
     ('foo', ['from-map-always-bar', 'from-map-always-foo', 'xyz']),
     ('restraint', ['from-map-always-bar', 'from-map-always-foo', 'mno', 'some-weird/recipient']),
-    ('rpmdiff-analysis', ['abc', 'from-map-always-bar', 'from-map-always-foo', 'jkl']),
-    ('rpmdiff-comparison', ['abc', 'from-map-always-bar', 'from-map-always-foo', 'jkl'])
+    ('rpmdiff-analysis', ['abc', 'from-map-always-bar', 'from-map-always-foo',
+                          'generic recipient 1', 'generic recipient 2', 'generic recipient 3', 'jkl']),
+    ('rpmdiff-comparison', ['abc', 'from-map-always-bar', 'from-map-always-foo',
+                            'generic recipient 1', 'generic recipient 2', 'generic recipient 3', 'jkl'])
 ])
 def test_notification_recipients_overall(configured_module, monkeypatch, result_type, expected_recipients):
     """
