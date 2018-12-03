@@ -3,7 +3,7 @@ import re
 
 import gluetool
 from gluetool.utils import Command, from_json
-from gluetool.log import log_dict
+from gluetool.log import log_blob, log_dict
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 # possible python interpreters
@@ -144,11 +144,19 @@ class Ansible(gluetool.Module):
         except gluetool.GlueCommandError as exc:
             ansible_call = exc.output
 
+        def show_ansible_errors(output):
+            if ansible_call.stdout:
+                log_blob(self.error, 'Last 30 lines of Ansible stdout', '\n'.join(output.stdout.splitlines()[-30:]))
+
+            if ansible_call.stderr:
+                log_blob(self.error, 'Last 30 lines of Ansible stderr', '\n'.join(output.stderr.splitlines()[-30:]))
+
         if json_output:
             # With `-v` option, ansible-playbook produces additional output, placed before the JSON
             # blob. Find the first '{' on a new line, that should be the start of the actual JSON data.
             match = re.search(r'^{', ansible_call.stdout, flags=re.M)
             if not match:
+                show_ansible_errors(ansible_call)
                 raise gluetool.GlueError('Ansible did not produce JSON output')
 
             ansible_json_output = from_json(ansible_call.stdout[match.start():])
@@ -159,6 +167,8 @@ class Ansible(gluetool.Module):
             ansible_json_output = None
 
         if ansible_call.exit_code != 0:
+            show_ansible_errors(ansible_call)
+
             primary_task = self.shared('primary_task')
             if primary_task:
                 raise PlaybookError(primary_task, ansible_call)
