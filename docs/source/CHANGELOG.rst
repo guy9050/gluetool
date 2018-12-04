@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2018-12-04
+----------
+
+Added
+~~~~~
+
+- [notify-recipients] new option, ``--recipients``, adds generic recipients, not tied to any result type
+
+Changed
+~~~~~~~
+
+- [ansible] being more verbose when Ansible fails
+- [testing-thread] using full-blown template for thread ID generation
+
+
 2018-11-30
 ----------
 
