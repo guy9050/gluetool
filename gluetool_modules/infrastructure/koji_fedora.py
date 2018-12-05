@@ -2,7 +2,10 @@
 
 import collections
 import re
+import sys
+
 import koji
+import requests.exceptions
 
 from bs4 import BeautifulSoup
 from rpmUtils.miscutils import splitFilename
@@ -10,7 +13,11 @@ from rpmUtils.miscutils import splitFilename
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.log import Logging, log_dict
-from gluetool.utils import cached_property, dict_update, fetch_url, wait, normalize_multistring_option, render_template
+from gluetool.utils import cached_property, dict_update, wait, normalize_multistring_option, render_template
+
+
+DEFAULT_COMMIT_FETCH_TIMEOUT = 300
+DEFAULT_COMMIT_FETCH_TICKS = 30
 
 
 class NotBuildTaskError(SoftGlueError):
@@ -861,12 +868,66 @@ class BrewTask(KojiTask):
         for url in self.dist_git_commit_urls:
             url = url.format(component=component, commit=git_hash)
 
-            try:
-                _, content = fetch_url(url, logger=self.logger)
-                return BeautifulSoup(content, 'html.parser')
+            # Using `wait` for retries would be much easier if we wouldn't be interested
+            # in checking another URL - that splits errors into two sets, with different
+            # solutions: the first one are "accepted" errors (e.g. URL is wrong), and we
+            # want to move on and try another URL, the second set is not so good, and we
+            # have to retry once again for the same URL, hoping for better results.
 
-            except GlueError:
-                self.warn("Failed to fetch commit info from '{}'".format(url))
+            # We can safely ignore "Cell variable url defined in loop" warning - yes, `url`
+            # is updated by the loop and `_fetch` is called with the most actual value of
+            # `url`, but that is correct.
+            # pylint: disable=cell-var-from-loop
+            def _fetch():
+                try:
+                    with gluetool.utils.requests(logger=self.logger) as req:
+                        res = req.get(url, timeout=self._module.option('commit-fetch-timeout'))
+
+                    if res.ok:
+                        return BeautifulSoup(res.content, 'html.parser')
+
+                    # Special case - no such URL, we should stop dealing with this one and try another.
+                    # Tell `wait` control code to quit.
+                    if res.status_code == 404:
+                        return True
+
+                    # Ignore (possibly transient) HTTP errors 5xx - server knows it encountered an error
+                    # or is incapable of finishing the request now. Try again.
+                    if 500 <= res.status_code <= 599:
+                        return False
+
+                    # Other not-ok-ish codes should be reported, they probably are not going do disappear
+                    # on their own and signal something is really wrong.
+                    res.raise_for_status()
+
+                except (requests.exceptions.Timeout,
+                        requests.exceptions.ConnectionError,
+                        requests.exceptions.RequestException):
+
+                    # Report the exceptions, even if we want to ignore it and retry. We don't want errors
+                    # to be silently ignored.
+                    self._module.glue.sentry_submit_exception(
+                        gluetool.Failure(self, sys.exc_info()), logger=self.logger
+                    )
+
+                    self.error("Failed to fetch commit info from '{}'".format(url))
+
+                    return False
+
+                return False
+
+            commit_page = wait('fetching commit web page', _fetch,
+                               logger=self.logger,
+                               timeout=self._module.option('commit-fetch-timeout'),
+                               tick=self._module.option('commit-fetch-tick'))
+
+            # If our `_fetch` returned `True`, it means it failed to fetch the commit
+            # page *in the expected* manner - e.g. the page does not exist. Issues like
+            # flapping network would result in another spin of waiting loop.
+            if commit_page is True:
+                continue
+
+            return commit_page
 
         return None
 
@@ -1200,59 +1261,81 @@ class Koji(gluetool.Module):
     name = 'koji'
     description = 'Provide Koji task details to other modules'
 
-    options = {
-        'url': {
-            'help': 'Koji Hub instance base URL',
-        },
-        'pkgs-url': {
-            'help': 'Koji packages base URL',
-        },
-        'web-url': {
-            'help': 'Koji instance web ui URL',
-        },
-        'task-id': {
-            'help': 'Initialize from task ID (default: none).',
-            'action': 'append',
-            'default': [],
-            'type': int
-        },
-        'build-id': {
-            'help': 'Initialize from build ID (default: none).',
-            'action': 'append',
-            'default': [],
-            'type': int
-        },
-        'name': {
-            'help': """
-                    Initialize from package name, by choosing latest tagged build (requires ``--tag``)
-                    (default: none).
-                    """,
-            'action': 'append',
-            'default': []
-        },
-        'nvr': {
-            'help': 'Initialize from package NVR (default: none).',
-            'action': 'append',
-            'default': []
-        },
-        'tag': {
-            'help': 'Use given build tag.',
-        },
-        'valid-methods': {
-            'help': """
-                    List of task methods that are considered valid, e.g. ``build`` or ``buildContainer``
-                    (default: none, i.e. any method is considered valid).
-                    """,
-            'metavar': 'METHOD1,METHOD2,...',
-            'action': 'append',
-            'default': []
-        },
-        'wait': {
-            'help': 'Wait timeout for task to become non-waiting and closed (default: %(default)s)',
-            'type': int,
-            'default': 60,
-        }
-    }
+    options = (
+        ('General options', {
+            'url': {
+                'help': 'Koji Hub instance base URL',
+            },
+            'pkgs-url': {
+                'help': 'Koji packages base URL',
+            },
+            'web-url': {
+                'help': 'Koji instance web ui URL',
+            },
+            'task-id': {
+                'help': 'Initialize from task ID (default: none).',
+                'action': 'append',
+                'default': [],
+                'type': int
+            },
+            'build-id': {
+                'help': 'Initialize from build ID (default: none).',
+                'action': 'append',
+                'default': [],
+                'type': int
+            },
+            'name': {
+                'help': """
+                        Initialize from package name, by choosing latest tagged build (requires ``--tag``)
+                        (default: none).
+                        """,
+                'action': 'append',
+                'default': []
+            },
+            'nvr': {
+                'help': 'Initialize from package NVR (default: none).',
+                'action': 'append',
+                'default': []
+            },
+            'tag': {
+                'help': 'Use given build tag.',
+            },
+            'valid-methods': {
+                'help': """
+                        List of task methods that are considered valid, e.g. ``build`` or ``buildContainer``
+                        (default: none, i.e. any method is considered valid).
+                        """,
+                'metavar': 'METHOD1,METHOD2,...',
+                'action': 'append',
+                'default': []
+            },
+            'wait': {
+                'help': 'Wait timeout for task to become non-waiting and closed (default: %(default)s)',
+                'type': int,
+                'default': 60,
+            }
+        }),
+        ('Workarounds', {
+            'commit-fetch-timeout': {
+                'help': """
+                        The maximum time for trying to fetch one (dist-git) URL with commit info
+                        (default: %(default)s).
+                        """,
+                'metavar': 'SECONDS',
+                'type': int,
+                'default': DEFAULT_COMMIT_FETCH_TIMEOUT
+            },
+            'commit-fetch-tick': {
+                'help': """
+                        Delay between attempts to fetch one (dist-git) URL with commit info failed
+                        (default: %(default)s).
+                        """,
+                'metavar': 'SECONDS',
+                'type': int,
+                'default': DEFAULT_COMMIT_FETCH_TICKS
+            }
+        })
+    )
 
     options_note = """
     Options ``--task-id``, ``--build-id``, ``--name`` and ``--nvr`` can be used multiple times, and even mixed
@@ -1502,20 +1585,22 @@ class Brew(Koji, (gluetool.Module)):
 
     # Koji.options contain hard defaults
     # pylint: disable=gluetool-option-hard-default
-    options = dict_update({}, Koji.options, {
-        'automation-user-ids': {
-            'help': 'List of comma delimited user IDs that trigger resolving of issuer from dist git commit instead'
-        },
-        'dist-git-commit-urls': {
-            'help': 'List of comma delimited dist git commit urls used for resolving of issuer from commit'
-        },
-        'docker-image-url-template': {
-            'help': """
-                    Template for constructing URL of a Docker image. It is given a task (``TASK``)
-                    and an archive (``ARCHIVE``) describing the image, as returned by the Koji API.
-                    """
-        }
-    })
+    options = Koji.options + (
+        ('Brew options', {
+            'automation-user-ids': {
+                'help': 'List of comma delimited user IDs that trigger resolving of issuer from dist git commit instead'
+            },
+            'dist-git-commit-urls': {
+                'help': 'List of comma delimited dist git commit urls used for resolving of issuer from commit'
+            },
+            'docker-image-url-template': {
+                'help': """
+                        Template for constructing URL of a Docker image. It is given a task (``TASK``)
+                        and an archive (``ARCHIVE``) describing the image, as returned by the Koji API.
+                        """
+            }
+        }),  # yes, the comma is correct - `)` closes inner tuple, `,` says it is part of the outer tuple
+    )
 
     required_options = Koji.required_options + [
         'automation-user-ids', 'dist-git-commit-urls', 'docker-image-url-template'
