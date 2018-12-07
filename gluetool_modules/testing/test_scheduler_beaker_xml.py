@@ -65,7 +65,7 @@ class TestSchedulerWow(gluetool.Module):
         for schedule_entry in schedule:
             schedule_entry.log()
 
-    def _get_job_xmls(self, unsupported_arches):
+    def _get_job_xmls(self, testing_environment_constraints=None):
         """
         Use ``beaker_job_xml`` shared function - probably running ``workflow-tomorrow`` behind the curtain - to get
         XML descriptions of Beaker jobs, implementing the testing. Provides few basic options, necessary from "system"
@@ -77,6 +77,8 @@ class TestSchedulerWow(gluetool.Module):
 
         self.info('getting Beaker job descriptions')
 
+        log_dict(self.debug, 'given constraints', testing_environment_constraints)
+
         options = [
             '--single',  # ignore multihost tests
             '--no-reserve',  # don't reserve hosts
@@ -85,32 +87,9 @@ class TestSchedulerWow(gluetool.Module):
             '--suppress-install-task'
         ]
 
-        # To limit to just supported architectures, using --arch=foo would work fine
-        # until the testing runs into an artifact with incomplete set of arches, with
-        # foo present. Configuration would try to limit recipe sets to just those arches
-        # present, add --arch=foo. The scheduler would try to limit arches even more,
-        # to supported ones only, adding another --arch=foo, which would make wow construct
-        # *two* same recipeSets for arch foo, possibly leading to provisioning two boxes
-        # for this arch, running the exactly same set of tasks.
-        #
-        # On the other hand, multiple --no-arch=not-foo seem to be harmless, therefore we
-        # could try this approach instead. So, user must provide a list of arches not
-        # supported by the backing pool, and we add --no-arch for each of them, letting wow
-        # know we cannot run any tasks relevant just on those arches. It *still* may lead
-        # to multiple recipeSets: e.g. if our backend supports x86_64, it supports i686
-        # out of the box as well, and wow may split i686-only tasks to a separate box. But
-        # this is not that harmful as the original issue.
-        #
-        # This is far from ideal - in the ideal world, scheduler should not have its own
-        # list of unsupported, it should rely on provisioner features (what arches it can
-        # and cannot schedule); but that would require each provisioner to report not just
-        # supported arches, but unsupported as well, being aware of *all* existing arches,
-        # which smells weird :/ Needs a bit of thinking.
-        options += [
-            '--no-arch={}'.format(arch) for arch in unsupported_arches
-        ]
-
-        return self.shared('beaker_job_xml', options=options)
+        return self.shared('beaker_job_xml', options=options, extra_context={
+            'TESTING_ENVIRONMENT_CONSTRAINTS': testing_environment_constraints or []
+        })
 
     def _create_job_schedule(self, index, job):
         """
@@ -177,15 +156,21 @@ class TestSchedulerWow(gluetool.Module):
 
         return schedule
 
-    def create_test_schedule(self, unsupported_arches=None):
+    def create_test_schedule(self, testing_environment_constraints=None):
         """
         Create a test schedule based on call of ``beaker_job_xml`` shared function. XML job description
         is split into recipes, each is packed into one schedule entry.
 
+        :param list(gluetool_modules.libs.testing_environment.TestingEnvironment) testing_environment_constraints:
+            limitations put on us by the caller. In the form of testing environments - with some fields possibly
+            left unspecified - the list specifies what environments are expected to be used for testing.
+            At this moment, only ``arch`` property is obeyed.
         :returns: a test schedule - a list of test schedule entries as described
             in :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
         """
 
         self.require_shared('beaker_job_xml')
 
-        return self._create_jobs_schedule(self._get_job_xmls(unsupported_arches))
+        job_xmls = self._get_job_xmls(testing_environment_constraints=testing_environment_constraints)
+
+        return self._create_jobs_schedule(job_xmls)

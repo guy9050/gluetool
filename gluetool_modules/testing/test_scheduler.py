@@ -7,7 +7,10 @@ import gluetool
 from gluetool import utils, GlueError, SoftGlueError
 from gluetool.log import log_dict
 from libci.sentry import PrimaryTaskFingerprintsMixin
+
+from gluetool_modules.libs import ANY
 from gluetool_modules.libs.jobs import Job, run_jobs, handle_job_errors
+from gluetool_modules.libs.testing_environment import TestingEnvironment
 
 
 class NoTestableArtifactsError(PrimaryTaskFingerprintsMixin, SoftGlueError):
@@ -41,8 +44,11 @@ class RestraintScheduler(gluetool.Module):
 
     Schedule creation has following phases:
 
-        * test schedule entries are obtained by calling ``create_test_schedule`` shared function;
-        * for every testing environment, a guest is provisioned (processes all environments in parallel);
+        * scheduler prepares a set of `constraints` - what environments it is expected to run tests on;
+        * test schedule entries are obtained by calling ``create_test_schedule`` shared function, which
+          is given the constraints to be guided by them;
+        * for every test schedule entry - and its environment - a guest is provisioned (processes all
+          environments in parallel);
         * each guest is set up by calling ``setup_guest`` shared function indirectly (processes all guests
           in parallel as well).
     """
@@ -298,8 +304,10 @@ class RestraintScheduler(gluetool.Module):
 
             return shlex.split(opts)
 
-        # Remove any artifact arch that's also on an "unsupported arches" list. If no arch remains,
-        # we have nothing to test.
+        # To create a schedule, we need to set up few constraints. So far the only known is the list of architectures
+        # we'd like to see being used. For that, we match architectures present in the artifact with a list of
+        # architectures provisioner can provide, and we find out what architectures we need (or cannot get...).
+        # And, for example, whether there's anything left to test.
         artifact_arches = self.shared('primary_task').task_arches.arches
 
         provisioner_capabilities = self.shared('provisioner_capabilities')
@@ -310,30 +318,51 @@ class RestraintScheduler(gluetool.Module):
         log_dict(self.debug, 'artifact arches', artifact_arches)
         log_dict(self.debug, 'supported arches', supported_arches)
 
-        valid_arches = []
-        for arch in artifact_arches:
-            # artifact arch is supported
-            if arch in supported_arches:
-                valid_arches.append(arch)
-                continue
+        # When provisioner's so bold that it supports *any* architecture, give him every architecture present
+        # in the artifact, and watch it burn :)
+        if supported_arches is ANY:
+            valid_arches = artifact_arches
 
-            compatible_arches = self.arch_compatibility_map.get(arch, [])
+        else:
+            valid_arches = []
 
-            # there is an supported arch compatible with artifact arch
-            if any([compatible_arch in supported_arches for compatible_arch in compatible_arches]):
-                valid_arches.append(arch)
+            for arch in artifact_arches:
+                # artifact arch is supported directly
+                if arch in supported_arches:
+                    valid_arches.append(arch)
+                    continue
+
+                # It may be possible to find compatible architecture, e.g. it may be fine to test
+                # i686 artifacts on x86_64 boxes. Let's check the configuration.
+                compatible_arches = self.arch_compatibility_map.get(arch, [])
+
+                if any([compatible_arch in supported_arches for compatible_arch in compatible_arches]):
+                    valid_arches.append(arch)
 
         log_dict(self.debug, 'valid artifact arches', valid_arches)
 
         if not valid_arches:
             raise NoTestableArtifactsError(self.shared('primary_task'), supported_arches)
 
+        # `noarch` is supported naturally on all other arches, so, when we encounter an artifact with just
+        # the `noarch`, we "reset" the list of valid arches to let scheduler plugin know we'd like to get all
+        # arches - from empty `valid_arches`, no constraints are generated when calling the plugin.
+        if valid_arches == ['noarch']:
+            valid_arches = []
+
+        # When `noarch` is not the single valid arch, we should remove it from the list - provisioners cannot
+        # give us `noarch` guests, and we somehow silently expect testing process to test `noarch` packages as well
+        # when testing "arch" packages on given guests. Or they don't, but that fine as well - from our point
+        # of view - they *could*, that's all that matter to us. We want to keep other arch constraints, however.
+        elif 'noarch' in valid_arches:
+            valid_arches.remove('noarch')
+
+        log_dict(self.debug, 'valid artifact arches (no noarch)', valid_arches)
+
         # Call plugin to create the schedule
-        #
-        # Note: the link between us and the plugin, formed by giving it `unsupported_arches`,
-        # doesn't feel right - it will disappear some day, right now I'm going to keep it,
-        # leaving it for the next patch.
-        schedule = self.shared('create_test_schedule', unsupported_arches=self.unsupported_arches)
+        schedule = self.shared('create_test_schedule', testing_environment_constraints=[
+            TestingEnvironment(arch=arch, compose=TestingEnvironment.ANY) for arch in valid_arches
+        ])
 
         if not schedule:
             raise GlueError('Test schedule is empty')
