@@ -704,7 +704,8 @@ class OpenstackGuest(NetworkedGuest):
             variables['GUEST_DOMAINNAME'] = 'host.centralci.eng.rdu2.redhat.com'
 
         if 'IMAGE_NAME' not in variables:
-            variables['IMAGE_NAME'] = self.image.name
+            variables['IMAGE_NAME'] = self.image.name.name
+        self.debug("IMAGE_NAME is {}".format(variables['IMAGE_NAME']))
 
         super(OpenstackGuest, self).setup(variables=variables, **kwargs)
 
