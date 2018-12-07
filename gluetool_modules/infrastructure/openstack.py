@@ -603,9 +603,10 @@ class OpenstackGuest(NetworkedGuest):
         assert self._os_instance is not None
 
         img_id = self._os_instance.image['id']
+        resource = self._nova.images.findall(id=img_id)[0]
 
         try:
-            return OpenStackImage(self._module, self._nova.images.findall(id=img_id)[0])
+            return OpenStackImage(self._module, resource.name, resource)
 
         except IndexError:
             raise GlueError("Cannot find image by its ID '{}'".format(img_id))
@@ -704,8 +705,7 @@ class OpenstackGuest(NetworkedGuest):
             variables['GUEST_DOMAINNAME'] = 'host.centralci.eng.rdu2.redhat.com'
 
         if 'IMAGE_NAME' not in variables:
-            variables['IMAGE_NAME'] = self.image.name.name
-        self.debug("IMAGE_NAME is {}".format(variables['IMAGE_NAME']))
+            variables['IMAGE_NAME'] = self.image.name
 
         super(OpenstackGuest, self).setup(variables=variables, **kwargs)
 
