@@ -1,3 +1,4 @@
+import logging
 import shlex
 
 import bs4
@@ -105,6 +106,11 @@ class WorkflowTomorrow(gluetool.Module):
        # Avoid s390x everywhere
        - rule: BUILD_TARGET.match('.*')
          add-options: --no-arch s390x
+         add-note:
+           level: warning
+           text: |
+             Due to circumstances out of our control, there are no s390x boxes free, therefore we have to
+             skip the testing. Ping us if testing on s390x is crucial for you.
 
     Each set specifies a ``rule`` key which is evaluated by ``rules-engine`` module. If it evaluates to ``True``,
     the value of ``add-options`` is added to the set of ``wow`` options. It is first processed by Jinja
@@ -333,11 +339,20 @@ class WorkflowTomorrow(gluetool.Module):
             if options:
                 command.options += options
 
+            def _add_note(instruction, command, argument, context):
+                # pylint: disable=unused-argument
+
+                if 'text' not in argument:
+                    raise GlueError('Note text is not set')
+
+                self.shared('add_note', argument['text'], level=argument.get('level', logging.INFO))
+
             instruction_commands = {
                 'add-options': command.add_options,
                 'command': command.set_command,
                 'use-shell': command.set_use_shell,
-                'quote-args': command.set_quote_args
+                'quote-args': command.set_quote_args,
+                'add-note': _add_note
             }
 
             self.shared('evaluate_instructions', self.wow_options_map, instruction_commands, context=context)
