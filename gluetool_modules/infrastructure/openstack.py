@@ -606,7 +606,7 @@ class OpenstackGuest(NetworkedGuest):
         resource = self._nova.images.findall(id=img_id)[0]
 
         try:
-            return OpenStackImage(self._module, resource.name, resource)
+            return OpenStackImage(self._module, resource.name, resource=resource)
 
         except IndexError:
             raise GlueError("Cannot find image by its ID '{}'".format(img_id))
