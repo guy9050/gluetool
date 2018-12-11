@@ -435,7 +435,7 @@ class KojiTask(object):
         :rtype: str
         """
 
-        return self.latest_released.nvr
+        return self.latest_released.nvr if self.latest_released else None
 
     @cached_property
     def branch(self):
