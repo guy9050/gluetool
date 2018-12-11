@@ -603,13 +603,14 @@ class OpenstackGuest(NetworkedGuest):
         assert self._os_instance is not None
 
         img_id = self._os_instance.image['id']
-        resource = self._nova.images.findall(id=img_id)[0]
 
         try:
-            return OpenStackImage(self._module, resource.name, resource=resource)
+            resource = self._nova.images.findall(id=img_id)[0]
 
         except IndexError:
             raise GlueError("Cannot find image by its ID '{}'".format(img_id))
+
+        return OpenStackImage(self._module, resource.name, resource=resource)
 
     @property
     def floating_ip(self):
