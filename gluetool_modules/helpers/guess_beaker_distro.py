@@ -104,7 +104,7 @@ class CIGuessBeakerDistro(gluetool.Module):
 
             return _replace
 
-        return PatternMap(self.option('pattern-map'), spices={
+        return PatternMap(self.option('pattern-map'), allow_variables=True, spices={
             'BUC': _create_buc_repl,
             'NIGHTLY': _create_nightly_repl
         }, logger=self.logger)
