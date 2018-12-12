@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2018-12-11
+----------
+
+Added
+~~~~~
+
+- [guess-beaker-distro] enable use of variables in distro pattern map
+
+Changed
+~~~~~~~
+
+- [koji-fedora] retry for fetching commit web page
+- [koji-fedora] allow_releases can be None
+
+
 2018-12-04
 ----------
 
