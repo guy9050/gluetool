@@ -42,8 +42,7 @@ class InstallMBSBuild(gluetool.Module):
             'odcs',
             '--redhat', 'create',
             'module', module_nsvc,
-            '--sigkey', 'none',
-            '--flag', 'no_deps'
+            '--sigkey', 'none'
         ]
 
         # Inner list gather all arches, `set` gets rid of duplicities, and final `list` converts set to a list.
