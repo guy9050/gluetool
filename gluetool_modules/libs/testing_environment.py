@@ -1,8 +1,9 @@
 import collections
 
 import gluetool
-
 from gluetool.utils import normalize_multistring_option
+
+import gluetool_modules.libs
 
 
 BaseTestingEnvironment = collections.namedtuple('TestingEnvironment', [
@@ -34,6 +35,10 @@ class TestingEnvironment(BaseTestingEnvironment):
         such request.
     :param str arch: Architecture that should be used for testing.
     """
+
+    # Make special values available to templates, they are now reachable as class variables
+    # of each instance.
+    ANY = gluetool_modules.libs.ANY
 
     def __str__(self):
         return self.serialize_to_string()

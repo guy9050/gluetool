@@ -42,6 +42,7 @@ from gluetool.log import log_dict
 from gluetool.utils import cached_property, normalize_multistring_option, normalize_path, load_yaml, dict_update
 from libci.guest import NetworkedGuest
 
+import gluetool_modules.libs
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 
 
@@ -458,9 +459,7 @@ class BeakerProvisioner(gluetool.Module):
             )
 
         return ProvisionerCapabilities(
-            available_arches=[
-                'x86_64', 'aarch64', 'ppc64', 'ppc64le', 's390x'
-            ]
+            available_arches=gluetool_modules.libs.ANY
         )
 
     def _acquire_dynamic_guests_from_beaker(self, environment):
