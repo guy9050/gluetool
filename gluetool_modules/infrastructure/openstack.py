@@ -605,10 +605,12 @@ class OpenstackGuest(NetworkedGuest):
         img_id = self._os_instance.image['id']
 
         try:
-            return OpenStackImage(self._module, self._nova.images.findall(id=img_id)[0])
+            resource = self._nova.images.findall(id=img_id)[0]
 
         except IndexError:
             raise GlueError("Cannot find image by its ID '{}'".format(img_id))
+
+        return OpenStackImage(self._module, resource.name, resource=resource)
 
     @property
     def floating_ip(self):
