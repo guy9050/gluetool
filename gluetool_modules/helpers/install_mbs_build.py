@@ -2,18 +2,8 @@ import json
 import gluetool
 from gluetool.log import log_dict
 from gluetool.utils import Command
-from gluetool import SoftGlueError, GlueError
-from libci.sentry import PrimaryTaskFingerprintsMixin
-# pylint: disable=no-name-in-module
-from jq import jq
-
-
-class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
-    def __init__(self, task, guest, packages):
-        super(SUTInstallationFailedError, self).__init__(task, 'SUT installation failed')
-
-        self.guest = guest
-        self.packages = packages
+from gluetool import GlueError
+from gluetool_modules.libs.sut_installation_fail import check_ansible_sut_installation
 
 
 class InstallMBSBuild(gluetool.Module):
@@ -87,30 +77,6 @@ class InstallMBSBuild(gluetool.Module):
             }
         )
 
-        query = """
-              .plays[].tasks[]
-            | select(.task.name == "Install module")
-            | .hosts | to_entries[]
-            | {
-                host: .key,
-                packages: [
-                    .value.results[]
-                  | select(.failed == true)
-                  | .item
-                ]
-              }
-            | select(.packages != [])""".replace('\n', '')
-
-        failed_tasks = jq(query).transform(ansible_output, multiple_output=True)
-
-        log_dict(self.debug, 'ansible output after jq processing', failed_tasks)
-
-        if failed_tasks:
-            first_fail = failed_tasks[0]
-            guest = [guest for guest in guests if guest.hostname == first_fail['host']][0]
-            packages = first_fail['packages']
-
-            guest.warn('Modules {} have not been installed.'.format(','.join(packages)))
-            raise SUTInstallationFailedError(self.shared('primary_task'), guest, packages)
+        check_ansible_sut_installation(ansible_output, guests, self.shared('primary_task'))
 
         self.info('All modules have been successfully installed')
