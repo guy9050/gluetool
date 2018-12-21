@@ -1,5 +1,10 @@
 import collections
+import urllib
+
 import requests
+
+# pylint: disable=no-name-in-module
+from jq import jq
 
 import gluetool
 from gluetool.utils import cached_property
@@ -18,8 +23,16 @@ class MBSApi(object):
         self.mbs_ui_url = mbs_ui_url
         self.module = module
 
-    def _get_json(self, location):
+    def _get_json(self, location, verbose=False):
+        params = {}
+
+        if verbose:
+            params['verbose'] = '1'
+
         url = '{}/{}'.format(self.mbs_api_url, location)
+
+        if params:
+            url = '{}?{}'.format(url, urllib.urlencode(params))
 
         self.module.debug('[MBS API]: {}'.format(url))
 
@@ -31,8 +44,8 @@ class MBSApi(object):
         log_dict(self.module.debug, '[MBS API] output', output)
         return output
 
-    def get_module_build(self, build_id):
-        return self._get_json('module-build-service/1/module-builds/{}'.format(build_id))
+    def get_module_build(self, build_id, verbose=False):
+        return self._get_json('module-build-service/1/module-builds/{}'.format(build_id), verbose=verbose)
 
     def get_build_ui_url(self, build_id):
         return '{}/module/{}'.format(self.mbs_ui_url, build_id)
@@ -44,6 +57,9 @@ class MBSTask(object):
     ARTIFACT_NAMESPACE = 'redhat-module'
 
     def __init__(self, build_id, module):
+        self.logger = module.logger
+        module.logger.connect(self)
+
         # pylint: disable=invalid-name
         self.id = build_id
 
@@ -51,7 +67,7 @@ class MBSTask(object):
 
         mbs_api = module.mbs_api()
 
-        build_info = mbs_api.get_module_build(build_id)
+        self._build_info = build_info = mbs_api.get_module_build(build_id, verbose=True)
 
         self.name = build_info['name']
         self.component = self.name
@@ -71,13 +87,59 @@ class MBSTask(object):
         self.component_id = '{}:{}'.format(self.name, self.stream)
 
     @cached_property
+    def _modulemd(self):
+        """
+        Returns ``modulemd`` document if available in build info. Describes details of the artifacts
+        used to build the module. It is embedded in a form of string, containing the YAML document.
+        This function extracts the string and unpacks its YAML-ness into a data structure it represents.
+
+        :returns: ``modulemd`` structure of ``None`` if there's no ``modulemd`` key in the build info.
+        """
+
+        if 'modulemd' not in self._build_info:
+            return None
+
+        modulemd = gluetool.utils.from_yaml(self._build_info['modulemd'])
+
+        log_dict(self.debug, 'modulemd', modulemd)
+
+        return modulemd
+
+    @cached_property
     def task_arches(self):
         """
         :rtype: TaskArches
         :return: information about arches the task was building for
         """
 
-        return TaskArches([self.module.option('arches')])
+        if not self._modulemd:
+            # I'm curious how this can happen, and how common thing it is to not have modulemd
+            # available over MBS API.
+            self.warn('Artifact build info does not include modulemd document', sentry=True)
+
+            return TaskArches([self.module.option('arches')])
+
+        query = """
+              .data.components.rpms
+            | .[]
+            | .arches
+            | .[]
+        """
+
+        all_arches = jq(query).transform(self._modulemd, multiple_output=True)
+
+        log_dict(self.debug, 'gathered module arches', all_arches)
+
+        # Apparently, output from jq is unicode string, despite feeding it ascii-encoded. Encode each arch
+        # string to ascii before while we're getting rid of duplicates.
+        #
+        # ``set`` to filter out duplicities, ``list`` to convert the set back to a list of uniq arches,
+        # and ``sorted`` to make it easier to grab & read & test.
+        arches = sorted(list(set([arch.encode('ascii') for arch in all_arches])))
+
+        log_dict(self.debug, 'unique module arches', arches)
+
+        return TaskArches(arches)
 
     @cached_property
     def url(self):
