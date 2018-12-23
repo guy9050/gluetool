@@ -83,6 +83,12 @@ static-analysis-type-check:
   script:
     - tox -e type-check
 
+# Static analysis - type checks
+type-check:
+  stage: test
+  script:
+    - tox -e type-check
+
 # Run integration tests
 #
 # Note: integration tests have - so far - the configuration available. While making use

@@ -6,12 +6,22 @@ from gluetool.utils import Command, from_json
 from gluetool.log import log_blob, log_dict
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
+# Type annotations
+# pylint: disable=unused-import,wrong-import-order
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union  # noqa
+
+if TYPE_CHECKING:
+    import libci.guest  # noqa
+
+
 # possible python interpreters
 ANSIBLE_PYTHON_INTERPRETERS = ["/usr/bin/python3", "/usr/bin/python2", "/usr/libexec/platform-python"]
 
 
 class PlaybookError(PrimaryTaskFingerprintsMixin, gluetool.GlueError):
     def __init__(self, task, ansible_output):
+        # type: (Any, gluetool.utils.ProcessOutput) -> None
+
         super(PlaybookError, self).__init__(task, 'Failure during Ansible playbook execution')
 
         self.ansible_output = ansible_output
@@ -37,15 +47,18 @@ class Ansible(gluetool.Module):
         }
     }
 
-    shared_functions = ('run_playbook', 'detect_ansible_interpreter')
+    shared_functions = ['run_playbook', 'detect_ansible_interpreter']
 
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     @gluetool.utils.cached_property
     def additional_options(self):
+        # type: () -> List[str]
+
         return gluetool.utils.normalize_multistring_option(self.option('ansible-playbook-options'))
 
     def detect_ansible_interpreter(self, guest):
+        # type: (libci.guest.NetworkedGuest) -> List[str]
         """
         Detect Ansible's python interpreter on the given guest and return it.
 
@@ -53,7 +66,11 @@ class Ansible(gluetool.Module):
         :returns: List of paths to the auto-detected python interpreters. Empty list if auto-detection failed.
         """
 
-        available_interpreters = []
+        available_interpreters = []  # type: List[str]
+
+        assert guest.hostname is not None
+        assert guest.key is not None
+        assert guest.username is not None
 
         cmd = [
             'ansible',
@@ -70,6 +87,9 @@ class Ansible(gluetool.Module):
         try:
             ansible_call = Command(cmd, logger=guest.logger).run()
 
+            if not ansible_call.stdout:
+                raise gluetool.GlueError('Ansible did not produce usable output')
+
             available_interpreters = [
                 intrp for intrp in ansible_call.stdout.splitlines() if intrp in ANSIBLE_PYTHON_INTERPRETERS
             ]
@@ -83,7 +103,15 @@ class Ansible(gluetool.Module):
         return available_interpreters
 
     # pylint: disable=too-many-arguments
-    def run_playbook(self, playbook_paths, guests, variables=None, inventory=None, cwd=None, json_output=True):
+    def run_playbook(self,
+                     playbook_paths,  # type: Union[str, List[str]]
+                     guests,  # type: List[libci.guest.NetworkedGuest]
+                     variables=None,  # type: Optional[Dict[str, Any]]
+                     inventory=None,  # type: Optional[str]
+                     cwd=None,  # type: Optional[str]
+                     json_output=True  # type: bool
+                    ):  # noqa
+        # type: (...) -> Tuple[gluetool.utils.ProcessOutput, Optional[Any]]
         """
         Run Ansible playbook.
 
@@ -107,6 +135,8 @@ class Ansible(gluetool.Module):
 
         if not all([guest.key == guests[0].key for guest in guests]):
             raise gluetool.GlueError('SSH key must be the same for all guests')
+
+        assert guests[0].key is not None
 
         inventory = inventory or '{},'.format(','.join([guest.hostname for guest in guests]))  # note the comma
 
@@ -145,18 +175,26 @@ class Ansible(gluetool.Module):
             ansible_call = exc.output
 
         def show_ansible_errors(output):
-            if ansible_call.stdout:
+            # type: (gluetool.utils.ProcessOutput) -> None
+
+            if output.stdout:
                 log_blob(self.error, 'Last 30 lines of Ansible stdout', '\n'.join(output.stdout.splitlines()[-30:]))
 
-            if ansible_call.stderr:
+            if output.stderr:
                 log_blob(self.error, 'Last 30 lines of Ansible stderr', '\n'.join(output.stderr.splitlines()[-30:]))
 
         if json_output:
             # With `-v` option, ansible-playbook produces additional output, placed before the JSON
             # blob. Find the first '{' on a new line, that should be the start of the actual JSON data.
+            if not ansible_call.stdout:
+                show_ansible_errors(ansible_call)
+
+                raise gluetool.GlueError('Ansible did not produce usable output')
+
             match = re.search(r'^{', ansible_call.stdout, flags=re.M)
             if not match:
                 show_ansible_errors(ansible_call)
+
                 raise gluetool.GlueError('Ansible did not produce JSON output')
 
             ansible_json_output = from_json(ansible_call.stdout[match.start():])
