@@ -1,4 +1,5 @@
 import gluetool
+from gluetool.log import log_dict
 from gluetool.utils import new_xml_element
 
 
@@ -35,12 +36,18 @@ class BeahXUnit(gluetool.Module):
         def _add_package(packages, nvr):
             return new_xml_element('package', _parent=packages, nvr=nvr)
 
+        log_dict(self.verbose, 'serialize result', result.payload)
+
         cnt_tests = 0
 
         # Every instance (run) for every test case in result's payload will become
         # a single <testcase/> element under <testsuite/>.
-        for test_name, runs in result.payload.iteritems():
-            for run in runs:
+        for test_number, (test_name, runs) in enumerate(result.payload.iteritems()):
+            log_dict(self.verbose, '#{}: {}'.format(test_number, test_name), runs)
+
+            for run_number, run in enumerate(runs):
+                log_dict(self.verbose, '#{}:#{}'.format(test_number, run_number), run)
+
                 cnt_tests += 1
 
                 test_case = new_xml_element('testcase', _parent=test_suite, name=test_name, time=run['bkr_duration'])
