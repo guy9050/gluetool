@@ -2,6 +2,7 @@ import base64
 import ConfigParser
 import json
 import os
+import sys
 import urllib
 import urllib2
 
@@ -145,7 +146,7 @@ class CIJenkins(gluetool.Module):
         }
     }
     required_options = ['url']
-    shared_functions = ['jenkins', 'jenkins_rest']
+    shared_functions = ['jenkins', 'jenkins_rest', 'get_jenkins_build']
 
     def jenkins(self, reconnect=False):
         """ return jenkinsapi.Jenkins object instance """
@@ -200,6 +201,31 @@ class CIJenkins(gluetool.Module):
 
         return response, content
 
+    def get_jenkins_build(self, job_name=None, build_id=None):
+        """
+        Return (arbitrary) Jenkins build representation.
+
+        Without any options, returns the current Jenkins build.
+
+        :param str job_name: job whose build we're looking for. If not set, ``JOB_NAME`` env variable is used.
+        :param build_id: build ID we're looking for. If not set, ``BUILD_ID`` env variable is used.
+        """
+
+        if job_name is None:
+            job_name = os.getenv('JOB_NAME', None)
+
+        if build_id is None:
+            build_id = os.getenv('BUILD_ID', None)
+
+        self.debug('looking for Jenkins build of {}:{}'.format(job_name, build_id))
+
+        if not job_name or not build_id:
+            raise GlueError("Cannot search for the Jenkins build for '{}:{}'".format(job_name, build_id))
+
+        job = self.jenkins(reconnect=True)[job_name]
+
+        return job.get_build(int(build_id))
+
     def create_jjb_config(self):
         password = self.option('password')
         url = self.option('url')
@@ -226,6 +252,31 @@ class CIJenkins(gluetool.Module):
             config.write(f)
 
         self.info("created jjb configuration in '{}'".format(config_file))
+
+    @gluetool.utils.cached_property
+    def _jenkins_build_params(self):
+        """
+        Parameters used when the Jenkins build, running this pipeline, was triggered, or ``None`` if we
+        cannot acquire the data.
+
+        Params are not going to change, therefore the code is hidden behind a cached property to avoid
+        pointless API calls.
+        """
+
+        try:
+            jenkins_build = self.get_jenkins_build()
+
+            if not jenkins_build:
+                return None
+
+            return jenkins_build.get_params()
+
+        except gluetool.glue.GlueError:
+            self.glue.sentry_submit_exception(gluetool.Failure(self, sys.exc_info()), logger=self.logger)
+
+            self.error('Failed to download the Jenkins build for parameters')
+
+        return None
 
     @property
     def eval_context(self):
@@ -255,7 +306,12 @@ class CIJenkins(gluetool.Module):
                                URL of the Jenkins job the build running this module belongs to. If it
                                cannot be determined, the value is ``None``. ``JOB_URL`` environment variable
                                is the primary source of this information.
-                               """
+                               """,
+            'JENKINS_BUILD_PARAMS': """
+                                    Dictionary with parameters the Jenkins build was triggered with. If there's
+                                    no Jenkins build reachable - not ``JOB_NAME`` nor ``BUILD_ID`` environment
+                                    variables - then the value is ``None``.
+                                    """
         }
 
         return {
@@ -264,6 +320,7 @@ class CIJenkins(gluetool.Module):
             'JENKINS_BUILD_URL': os.getenv('BUILD_URL', None),
             'JENKINS_JOB_NAME': os.getenv('JOB_NAME', None),
             'JENKINS_JOB_URL': os.getenv('JOB_URL', None),
+            'JENKINS_BUILD_PARAMS': self._jenkins_build_params
         }
 
     def connect(self):

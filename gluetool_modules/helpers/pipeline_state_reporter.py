@@ -262,6 +262,21 @@ class PipelineStateReporter(gluetool.Module):
             'irc': self.option('ci-contact-irc')
         }
 
+    @gluetool.utils.cached_property
+    def _pipeline_info(self):
+        """
+        JSON reprezentation of the pipeline steps - modules, alias, and their parameters.
+
+        The pipeline is available in eval context, but that's objects and we'd have to serialize
+        them to JSON anyway. Taking the direct route.
+
+        :rtype: dict(str, object)
+        """
+
+        return [
+            step.serialize_to_json() for step in self.glue.current_pipeline
+        ]
+
     def _run_info(self):
         context = self.shared('eval_context')
 
@@ -270,7 +285,9 @@ class PipelineStateReporter(gluetool.Module):
                 'url': None,
                 'log': None,
                 'debug': None,
-                'rebuild': None
+                'rebuild': None,
+                'parameters': None,
+                'additional_info': self._pipeline_info
             }
 
         def _render_url(template):
@@ -280,7 +297,9 @@ class PipelineStateReporter(gluetool.Module):
             'url': _render_url('{{ JENKINS_BUILD_URL }}'),
             'log': _render_url('{{ JENKINS_BUILD_URL }}/console'),
             'debug': _render_url('{{ JENKINS_BUILD_URL }}/artifact/citool-debug.txt'),
-            'rebuild': _render_url('{{ JENKINS_BUILD_URL }}/rebuild/parameterized')
+            'rebuild': _render_url('{{ JENKINS_BUILD_URL }}/rebuild/parameterized'),
+            'parameters': context.get('JENKINS_BUILD_PARAMS', None),
+            'additional_info': self._pipeline_info
         }
 
     def _init_message(self, test_category, test_namespace, test_type, thread_id):
