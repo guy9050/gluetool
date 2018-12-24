@@ -48,7 +48,7 @@ class Events(gluetool.Module):
 
        - event: restraint-runner.test-set-finished
          execute-commands:
-           - scp -r {{ output.directory }} foo@bar.baz:/cold-storage/{{ guest.arch }}
+           - scp -r {{ output.directory }} foo@bar.baz:/cold-storage/{{ guest.environment.arch }}
     """
 
     name = 'events'

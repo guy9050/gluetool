@@ -90,10 +90,9 @@ class BeakerGuest(NetworkedGuest):
     Implements Beaker guest.
     """
 
-    def __init__(self, module, fqdn, environment=None, is_static=False, **kwargs):
+    def __init__(self, module, fqdn, is_static=False, **kwargs):
         super(BeakerGuest, self).__init__(module, fqdn, **kwargs)
 
-        self.environment = environment
         self._is_static = is_static
 
         # Lock guards access to the timer. If the timer is None, no use of the guest is allowed.
@@ -454,7 +453,7 @@ class BeakerProvisioner(gluetool.Module):
         if self.static_guests:
             return ProvisionerCapabilities(
                 available_arches=[
-                    guest.arch for guest in self.static_guests
+                    guest.environment.arch for guest in self.static_guests
                 ]
             )
 
@@ -545,8 +544,7 @@ class BeakerProvisioner(gluetool.Module):
                         name=fqdn,
                         username=ssh_user,
                         key=ssh_key,
-                        options=ssh_options,
-                        arch=environment.arch)
+                        options=ssh_options)
             for fqdn in systems
         ]
 
@@ -654,8 +652,7 @@ class BeakerProvisioner(gluetool.Module):
                             name=guest_info['fqdn'].encode('ascii'),
                             username=guest_info['ssh_user'].encode('ascii'),
                             key=guest_info['ssh_key'].encode('ascii'),
-                            options=[s.encode('ascii') for s in guest_info['ssh_options']],
-                            arch=guest_info['arch'].encode('ascii'))
+                            options=[s.encode('ascii') for s in guest_info['ssh_options']])
             ]
 
         # Empty cache, all guests in use, removed, whatever - we failed, return empty list and fall back
@@ -682,7 +679,7 @@ class BeakerProvisioner(gluetool.Module):
             'ssh_user': guest.username,
             'ssh_key': guest.key,
             'ssh_options': guest.options,
-            'arch': guest.arch
+            'arch': guest.environment.arch
         })
 
         # Set its in-use - if the guest is not yet in the cache, this key won't be checked because
@@ -908,8 +905,7 @@ class BeakerProvisioner(gluetool.Module):
                                 name=guest_def.fqdn,
                                 username=self.option('ssh-user'),
                                 key=normalize_path(self.option('ssh-key')),
-                                options=normalize_multistring_option(self.option('ssh-options')),
-                                arch=guest_def.arch)
+                                options=normalize_multistring_option(self.option('ssh-options')))
 
             guests.append(guest)
 
