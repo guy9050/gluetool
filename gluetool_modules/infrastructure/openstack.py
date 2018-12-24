@@ -1307,7 +1307,13 @@ class CIOpenstack(gluetool.Module):
             }
 
             log_dict(self.debug, 'creating guest with following details', details)
+
             guest = OpenstackGuest(self, details=details, arch=self.option('arch'))
+            # pylint: disable=attribute-defined-outside-init
+            guest.environment = environment.clone(compose=image.name)
+
+            # When `libci` gets patched, the environment would be given to guest's `__init__` method:
+            # guest = OpenstackGuest(self, details=details, environment=environment.clone(compose=image.name))
 
             self._all.append(guest)
             guests.append(guest)

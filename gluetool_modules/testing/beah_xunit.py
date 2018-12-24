@@ -87,6 +87,12 @@ class BeahXUnit(gluetool.Module):
                 elif run['bkr_result'].lower() not in ('pass', 'passed'):
                     new_xml_element('failure', _parent=test_case, message='Test failed')
 
+                for name, environment in run.get('testing-environments', {}).iteritems():
+                    testing_environment = new_xml_element('testing_environment', _parent=test_case, name=name)
+
+                    for field, value in environment.iteritems():
+                        new_xml_element('property', _parent=testing_environment, name=field, value=value)
+
                 # main_logs = [log for log in run['bkr_logs'] if log['name'].lower() in ('taskout.log',)]
                 # if main_logs:
                 #    output = gluetool.utils.run_command(['curl', '-s', '-u', ':', '--negotiate',
