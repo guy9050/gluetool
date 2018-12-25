@@ -7,9 +7,13 @@ class _UniqObject(object):
 
     # pylint: disable=too-few-public-methods
     def __init__(self, name):
+        # type: (str) -> None
+
         self.name = name
 
     def __repr__(self):
+        # type: () -> str
+
         return self.name
 
 

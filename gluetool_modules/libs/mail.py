@@ -1,5 +1,12 @@
 from gluetool.log import log_blob, log_dict
 
+# Type annotations
+# pylint: disable=unused-import,wrong-import-order
+from typing import TYPE_CHECKING, Dict, List, Optional, Union  # noqa
+
+if TYPE_CHECKING:
+    from gluetool.log import LoggingFunctionType # noqa
+
 
 class Message(object):
     """
@@ -46,6 +53,7 @@ class Message(object):
         self.xheaders = xheaders or {}
 
     def log(self, log_fn):
+        # type: (LoggingFunctionType) -> None
         """
         Log the message and its properties.
         """

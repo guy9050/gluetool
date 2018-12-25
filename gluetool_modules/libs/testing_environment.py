@@ -1,15 +1,17 @@
-import collections
-
 import gluetool
 from gluetool.utils import normalize_multistring_option
 
 import gluetool_modules.libs
 
+# Type annotations
+# pylint: disable=unused-import,wrong-import-order
+from typing import Any, Dict, List, NamedTuple  # noqa
 
-BaseTestingEnvironment = collections.namedtuple('TestingEnvironment', [
-    'compose',
-    'arch'
-])
+
+BaseTestingEnvironment = NamedTuple('TestingEnvironment', (
+    ('compose', str),
+    ('arch', str)
+))
 
 
 class TestingEnvironment(BaseTestingEnvironment):
@@ -41,6 +43,8 @@ class TestingEnvironment(BaseTestingEnvironment):
     ANY = gluetool_modules.libs.ANY
 
     def __str__(self):
+        # type: () -> str
+
         return self.serialize_to_string()
 
     def serialize_to_string(self):
@@ -71,6 +75,8 @@ class TestingEnvironment(BaseTestingEnvironment):
 
     @classmethod
     def _assert_env_properties(cls, env_properties):
+        # type: (List[str]) -> None
+
         for env_property in env_properties:
             if env_property in cls._fields:
                 continue
@@ -114,6 +120,7 @@ class TestingEnvironment(BaseTestingEnvironment):
         return TestingEnvironment(**serialized)
 
     def clone(self, **kwargs):
+        # type: (**Any) -> TestingEnvironment
         """
         Create - possibly modified - copy of the environment.
 

@@ -5,16 +5,30 @@ from libci.sentry import PrimaryTaskFingerprintsMixin
 # pylint: disable=no-name-in-module
 from jq import jq
 
+# Type annotations
+# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
+from typing import TYPE_CHECKING, Any, Dict, List, Optional  # noqa
+
+if TYPE_CHECKING:
+    import libci.guest # noqa
+
 
 class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
     def __init__(self, task, guest, items):
+        # type: (Any, libci.guest.Guest, Any) -> None
+
         super(SUTInstallationFailedError, self).__init__(task, 'SUT installation failed')
 
         self.guest = guest
         self.items = items
 
 
-def check_ansible_sut_installation(ansible_output, guests, primary_task, logger=None):
+def check_ansible_sut_installation(ansible_output,  # type: Dict[str, Any]
+                                   guests,  # type: List[libci.guest.NetworkedGuest]
+                                   primary_task,  # type: Any
+                                   logger=None  # type: Optional[gluetool.log.ContextAdapter]
+                                  ):  # noqa
+    # type: (...) -> None
     """
     Checks json output of ansible call. Raises ``SUTInstallationFailedError`` if some of
     ansible installation tasks failed.
@@ -27,7 +41,10 @@ def check_ansible_sut_installation(ansible_output, guests, primary_task, logger=
     """
 
     logger = logger or gluetool.log.Logging.get_logger()
-    log_dict(logger.debug, 'ansible output before jq processing', ansible_output)
+
+    log_dict(logger.debug,  # type: ignore  # logger.debug signature is compatible
+             'ansible output before jq processing',
+             ansible_output)
 
     query = """
           .plays[].tasks[].hosts
@@ -45,7 +62,9 @@ def check_ansible_sut_installation(ansible_output, guests, primary_task, logger=
 
     failed_tasks = jq(query).transform(ansible_output, multiple_output=True)
 
-    log_dict(logger.debug, 'ansible output after jq processing', failed_tasks)
+    log_dict(logger.debug,  # type: ignore  # logger.debug signature is compatible
+             'ansible output after jq processing',
+             failed_tasks)
 
     if not failed_tasks:
         return
