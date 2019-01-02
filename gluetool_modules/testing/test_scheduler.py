@@ -346,15 +346,29 @@ class RestraintScheduler(gluetool.Module):
 
         # `noarch` is supported naturally on all other arches, so, when we encounter an artifact with just
         # the `noarch`, we "reset" the list of valid arches to let scheduler plugin know we'd like to get all
-        # arches - from empty `valid_arches`, no constraints are generated when calling the plugin.
+        # arches possible. But we have to be careful and take into account what provisioner told us about itself,
+        # because we could mislead the scheduler plugin into thinking that every architecture is valid - if
+        # provisioner doesn't support "ANY" arch, we have to prepare constraints just for the supported arches.
+        # We can use all of them, true, because it's `noarch`, but we have to limit the testing to just them.
         if valid_arches == ['noarch']:
-            valid_arches = []
+            self.debug("'noarch' is the only valid arch")
+
+            # If provisioner boldly promised anything was possible, empty list of valid arches would result
+            # into us not placing any constraints on the environments, and we should get really everything.
+            if supported_arches is ANY:
+                valid_arches = []
+
+            # On the other hand, if provisioner can support just a limited set of arches, don't be greedy.
+            else:
+                valid_arches = supported_arches
 
         # When `noarch` is not the single valid arch, we should remove it from the list - provisioners cannot
         # give us `noarch` guests, and we somehow silently expect testing process to test `noarch` packages as well
         # when testing "arch" packages on given guests. Or they don't, but that fine as well - from our point
         # of view - they *could*, that's all that matter to us. We want to keep other arch constraints, however.
         elif 'noarch' in valid_arches:
+            self.debug("'noarch' is not the only valid arch")
+
             valid_arches.remove('noarch')
 
         log_dict(self.debug, 'valid artifact arches (no noarch)', valid_arches)
