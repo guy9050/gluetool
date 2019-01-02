@@ -236,6 +236,15 @@ class MBSTask(object):
         return modulemd
 
     @cached_property
+    def has_artifacts(self):
+        # pylint: disable=no-self-use
+
+        # We believe MBS - and Brew behind it keeps artifacts "forever" - or, at least, long enough to matter to us
+        # - therefore we don't even bother to check for their presence.
+
+        return True
+
+    @cached_property
     def task_arches(self):
         """
         :rtype: TaskArches

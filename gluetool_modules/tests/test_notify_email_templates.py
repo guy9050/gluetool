@@ -22,6 +22,8 @@ import pytest
 import gluetool
 import gluetool.utils
 
+import gluetool_modules.libs.artifacts
+
 import gluetool_modules.testing.testing_results
 import gluetool_modules.helpers.notify_email.notify_email
 
@@ -298,7 +300,7 @@ def fixture_result_modules(request, notify_email, monkeypatch):
         }
     ),
     (
-        gluetool_modules.infrastructure.koji_fedora.NoArtifactsError,
+        gluetool_modules.libs.artifacts.NoArtifactsError,
         ('dummy task ID',),
         {},
         asset('NoArtifactsError.yaml'),

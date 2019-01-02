@@ -5,6 +5,7 @@ import koji
 import functools
 
 import gluetool
+import gluetool_modules.libs.artifacts
 import gluetool_modules.infrastructure.koji_fedora
 
 from mock import MagicMock
@@ -124,12 +125,14 @@ def test_task_by_task_id_option(koji_session, module):
     # pylint: disable=protected-access
     module._config['task-id'] = [task_id]
 
+    module.execute()
+
     if has_artifacts:
-        module.execute()
+        gluetool_modules.libs.artifacts.has_artifacts(*module.tasks())
 
     else:
-        with pytest.raises(gluetool_modules.infrastructure.koji_fedora.NoArtifactsError):
-            module.execute()
+        with pytest.raises(gluetool_modules.libs.artifacts.NoArtifactsError):
+            gluetool_modules.libs.artifacts.has_artifacts(*module.tasks())
 
     assert_task_attributes(module, task_id)
 

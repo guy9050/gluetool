@@ -8,6 +8,7 @@ from gluetool import utils, GlueError, SoftGlueError
 from gluetool.log import log_dict
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
+import gluetool_modules.libs.artifacts
 from gluetool_modules.libs import ANY
 from gluetool_modules.libs.jobs import Job, run_jobs, handle_job_errors
 from gluetool_modules.libs.testing_environment import TestingEnvironment
@@ -283,7 +284,7 @@ class RestraintScheduler(gluetool.Module):
         self._log_schedule('final schedule', schedule)
 
     def execute(self):
-        self.require_shared('primary_task', 'restraint', 'create_test_schedule')
+        self.require_shared('primary_task', 'tasks', 'restraint', 'create_test_schedule')
 
         def _command_options(name):
             opts = self.option(name)
@@ -291,6 +292,9 @@ class RestraintScheduler(gluetool.Module):
                 return []
 
             return shlex.split(opts)
+
+        # Check whether we have *any* artifacts at all, before we move on to more fine-grained checks.
+        gluetool_modules.libs.artifacts.has_artifacts(*self.shared('tasks'))
 
         # To create a schedule, we need to set up few constraints. So far the only known is the list of architectures
         # we'd like to see being used. For that, we match architectures present in the artifact with a list of

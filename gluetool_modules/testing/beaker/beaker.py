@@ -13,6 +13,8 @@ from gluetool.utils import load_yaml, fetch_url, Command
 from libci.results import TestResult, publish_result
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
+import gluetool_modules.libs.artifacts
+
 
 REQUIRED_COMMANDS = ['bkr', 'beaker-jobwatch', 'tcms-results']
 
@@ -361,6 +363,9 @@ class Beaker(gluetool.Module):
     def execute(self):
         self.require_shared('wow_artifact_installation_options', 'tasks', 'primary_task', 'beaker_job_xml',
                             'parse_beah_result', 'beaker_jobwatch', 'submit_beaker_jobs')
+
+        # Check whether we have *any* artifacts at all, before we move on to more fine-grained checks.
+        gluetool_modules.libs.artifacts.has_artifacts(*self.shared('tasks'))
 
         # workflow-tomorrow
         jobs = self._run_wow()

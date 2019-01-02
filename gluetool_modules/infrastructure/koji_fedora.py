@@ -27,13 +27,6 @@ class NotBuildTaskError(SoftGlueError):
         self.task_id = task_id
 
 
-class NoArtifactsError(SoftGlueError):
-    def __init__(self, task_id):
-        super(NoArtifactsError, self).__init__('No artifacts found for task')
-
-        self.task_id = task_id
-
-
 #: Information about task architectures.
 #:
 #: :ivar bool complete: If ``True``, the task was not limited by its issuer to any particular set of architectures.
@@ -1564,10 +1557,6 @@ class Koji(gluetool.Module):
 
         for task in self._tasks:
             self.info('Initialized with {}: {} ({})'.format(task.id, task.full_name, task.url))
-
-        for task in self._tasks:
-            if not task.has_artifacts:
-                raise NoArtifactsError(task.id)
 
 
 class Brew(Koji, (gluetool.Module)):

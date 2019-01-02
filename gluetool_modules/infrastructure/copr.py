@@ -168,6 +168,14 @@ class CoprTask(object):
         self.component_id = '{}/{}/{}'.format(self.owner, self.project, self.component)
 
     @cached_property
+    def has_artifacts(self):
+        # pylint: disable=no-self-use
+
+        # We believe Copr keeps artifacts "forever" - or, at least, long enough to matter to us - therefore
+        # we don't even bother to check for their presence.
+        return True
+
+    @cached_property
     def rpm_names(self):
         return self.copr_api.get_rpm_names(self.task_id.build_id, self.task_id.chroot_name)
 
