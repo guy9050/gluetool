@@ -41,7 +41,7 @@ class InstallKojiDockerImage(gluetool.Module):
             # Find image archives, we'll grab the first one when constructing final XML
             image_archives = [
                 archive for archive in task.build_archives
-                if archive['btype'] == 'image' and archive['extra']['image']['arch'] == guest.arch
+                if archive['btype'] == 'image' and archive['extra']['image']['arch'] == guest.environment.arch
             ]
 
             if not image_archives:
@@ -75,9 +75,9 @@ class InstallKojiDockerImage(gluetool.Module):
             '--restraint',
             '--suppress-install-task',
         ] + [
-            '--no-arch={}'.format(no_arch) for no_arch in task.task_arches.arches if no_arch != guest.arch
+            '--no-arch={}'.format(no_arch) for no_arch in task.task_arches.arches if no_arch != guest.environment.arch
         ] + [
-            '--arch={}'.format(guest.arch)
+            '--arch={}'.format(guest.environment.arch)
         ], extra_context={
             'GUEST': guest,
             'PHASE': 'artifact-installation'

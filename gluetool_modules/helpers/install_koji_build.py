@@ -51,7 +51,7 @@ class InstallKojiBuild(gluetool.Module):
             '--no-reserve',
             '--restraint',
             '--suppress-install-task',
-            '--arch', guest.arch
+            '--arch', guest.environment.arch
         ], extra_context={
             'PHASE': 'artifact-installation'
         })

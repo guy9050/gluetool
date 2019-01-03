@@ -52,8 +52,7 @@ class StaticGuest(NetworkedGuest):
             raise GlueError("Error connecting to guest '{}': {}".format(self, error))
 
         # populate guest architecture from the OS`
-        self.environment = TestingEnvironment(arch=self.execute('arch').stdout.rstrip(), distro=None)
-        self.arch = self.environment.arch
+        self.environment = TestingEnvironment(arch=self.execute('arch').stdout.rstrip(), compose=None)
 
 
 class CIStaticGuest(gluetool.Module):
@@ -140,7 +139,7 @@ class CIStaticGuest(gluetool.Module):
         return ProvisionerCapabilities(
             available_arches=[
                 # note that arch returns with newline, we need to strip it
-                guest.arch for guest in self._guests
+                guest.environment.arch for guest in self._guests
             ]
         )
 

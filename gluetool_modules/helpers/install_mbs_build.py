@@ -36,7 +36,7 @@ class InstallMBSBuild(gluetool.Module):
         ]
 
         # Inner list gather all arches, `set` gets rid of duplicities, and final `list` converts set to a list.
-        for arch in list(set([guest.arch for guest in guests])):
+        for arch in list(set([guest.environment.arch for guest in guests])):
             command += [
                 '--arch', arch
             ]
