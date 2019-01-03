@@ -284,13 +284,24 @@ class RestraintRunner(gluetool.Module):
             if hasattr(schedule_entry.guest, 'hostname'):
                 connectable_hostname = schedule_entry.guest.hostname
 
-            # this is a dictionary with info on results...
+            # This is a dictionary with info on results...
             crunched_task_results = self.shared('parse_beah_result', task_results,
                                                 journal=journal, recipe=job_results.job.recipeSet,
                                                 artifact_path=artifact_path, connectable_hostname=connectable_hostname)
 
             # ... but we want to track few other bits, therefore re-packaging it as a `TaskRun` instance
             task_results = TaskRun(name=task_name, schedule_entry=schedule_entry, results=crunched_task_results)
+
+            # Since it's not possible to propagate the fields of TaskRun outside of this module - TaskRun
+            # and TaskSetResult instances are converted to builtin types before being published as a "result"
+            # - and since we are interested in seeing the testing environment the task ran in, let's
+            # export the environment into the result directly. Hopefully, in the future, we'd be more
+            # explicit on structures and their fields, and then we can easily remove this export, relying
+            # on this soon-to-apearch mechanism to propagate all relevant bits into results' payload.
+            crunched_task_results['testing-environments'] = {
+                'requested': schedule_entry.testing_environment.serialize_to_json(),
+                'provisioned': schedule_entry.guest.environment.serialize_to_json()
+            }
 
             results.tasks[task_name].append(task_results)
 

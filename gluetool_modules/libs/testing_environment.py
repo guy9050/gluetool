@@ -112,3 +112,18 @@ class TestingEnvironment(BaseTestingEnvironment):
         cls._assert_env_properties(serialized.keys())
 
         return TestingEnvironment(**serialized)
+
+    def clone(self, **kwargs):
+        """
+        Create - possibly modified - copy of the environment.
+
+        :param dict kwargs: if specified, each keyword argument represents a property of the environment,
+            and it is applied after making a copy, therefore overwriting the original property of the copied
+            environment.
+        """
+
+        model = self.serialize_to_json()
+
+        model.update(kwargs)
+
+        return self.unserialize_from_string(model)
