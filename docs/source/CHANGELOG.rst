@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2018-12-18
+----------
+
+Added
+~~~~~
+
+- [wow] add-note mapping command
+- [sut_installation_fail] new module for sharing error class
+- [notes] add level name property for levels of logging
+- [libs] new _UniqObject for better logging, <ANY> object
+
+
+Changed
+~~~~~~~
+
+- [openstack] fix weird IMAGE name value "<Image:...>"
+- [odcs] ask for repo including deps
+- [install-mbs-build] improve ansible output processing (error detection)
+- [testing_environment] Testing environment constraints, include into beaker and test_scheduler
+
+
 2018-12-11
 ----------
 
