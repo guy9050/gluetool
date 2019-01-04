@@ -126,4 +126,4 @@ class TestingEnvironment(BaseTestingEnvironment):
 
         model.update(kwargs)
 
-        return self.unserialize_from_string(model)
+        return self.unserialize_from_json(model)
