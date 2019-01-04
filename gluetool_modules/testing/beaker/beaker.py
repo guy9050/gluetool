@@ -9,7 +9,7 @@ import bs4
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError, utils
 from gluetool.log import BlobLogger
-from gluetool.utils import load_yaml, run_command, fetch_url
+from gluetool.utils import load_yaml, fetch_url, Command
 from libci.results import TestResult, publish_result
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
@@ -151,8 +151,10 @@ class Beaker(gluetool.Module):
             raise GlueError('Cannot import tcms-results')
 
         # These are acessed by TaskAggregator.recordResult, and processed results must be
-        # also accesible to other methods of this module.
+        # also accesible to other methods of this module. We cannot access module nor the logger directly
+        # because `self` inside `TaskAggregator` instance is not this module...
         citool_module = self
+        module_logger = self.logger
         processed_results = self._processed_results = collections.OrderedDict()
 
         class TaskAggregator(tcms_results.TaskAggregator):
@@ -189,7 +191,7 @@ class Beaker(gluetool.Module):
 
                     # Ask Beaker! It can return nice XML, with all those <logs> tags we like so much.
                     try:
-                        output = run_command(['bkr', 'job-results', 'T:{}'.format(task_id)])
+                        output = Command(['bkr', 'job-results', 'T:{}'.format(task_id)], logger=module_logger).run()
 
                         task_xml = bs4.BeautifulSoup(output.stdout, 'xml')
 
@@ -230,7 +232,7 @@ class Beaker(gluetool.Module):
         # pylint: disable=no-self-use
 
         try:
-            output = run_command(['bkr', 'job-clone', '--dryrun', '--xml', 'J:{}'.format(job_id)])
+            output = Command(['bkr', 'job-clone', '--dryrun', '--xml', 'J:{}'.format(job_id)], logger=self.logger).run()
 
         except GlueCommandError as exc:
             raise GlueError('Failed to re-create the job: {}'.format(exc.output.stderr))
