@@ -3,14 +3,16 @@ Simplyfies access to concurrently running jobs. Based on ``concurrent.futures``,
 to use callbacks to step into the whole process, it should take care of the heavy lifting.
 """
 
-import collections
-
 import concurrent.futures
 
 import gluetool
 import gluetool.log
 
 from six import reraise
+
+# Type annotations
+# pylint: disable=unused-import,wrong-import-order
+from typing import cast, Any, Callable, Dict, List, NamedTuple, Optional, Tuple  # noqa
 
 
 #: A job to run.
@@ -19,10 +21,20 @@ from six import reraise
 #: :param callable target: function to call to perform the job.
 #: :param tuple args: positional arguments of ``target``.
 #: :param dict kwargs: keyword arguments of ``target``.
-Job = collections.namedtuple('Job', ('logger', 'target', 'args', 'kwargs'))
+Job = NamedTuple('Job', (
+    ('logger', gluetool.log.ContextAdapter),
+    ('target', Callable[..., Any]),
+    ('args', Tuple[Any, ...]),
+    ('kwargs', Dict[str, Any])
+))
+
+
+# pylint: disable=invalid-name
+JobErrorType = Tuple[Job, gluetool.log.ExceptionInfoType]
 
 
 def handle_job_errors(errors, exception_message, logger=None):
+    # type: (List[JobErrorType], str, Optional[gluetool.log.ContextAdapter]) -> None
     """
     Take care of reporting exceptions gathered from futures, and re-raise one of them - or a new,
     generic one - to report a process, performed by jobs, failed.
@@ -38,6 +50,8 @@ def handle_job_errors(errors, exception_message, logger=None):
 
     # filter exceptions using given ``check`` callback, and raise the first suitable one - or return back
     def _raise_first(check):
+        # type: (Callable[[gluetool.log.ExceptionInfoType], bool]) -> None
+
         for _, exc_info in errors:
             if not check(exc_info):
                 continue
@@ -56,8 +70,16 @@ def handle_job_errors(errors, exception_message, logger=None):
 
 
 # pylint: disable=too-many-arguments
-def run_jobs(jobs, logger=None, max_workers=None, worker_name_prefix='worker',
-             on_job_start=None, on_job_complete=None, on_job_error=None, on_job_done=None):
+def run_jobs(jobs,  # type: List[Job]
+             logger=None,  # type: Optional[gluetool.log.ContextAdapter]
+             max_workers=None,  # type: Optional[int]
+             worker_name_prefix='worker',  # type: str
+             on_job_start=None,  # type: Optional[Callable[..., None]]
+             on_job_complete=None,  # type: Optional[Callable[..., None]]
+             on_job_error=None,  # type: Optional[Callable[..., None]]
+             on_job_done=None  # type: Optional[Callable[..., None]]
+            ):  # noqa
+    # type: (...) -> List[JobErrorType]
     """
     Run jobs in parallel.
 
@@ -82,10 +104,12 @@ def run_jobs(jobs, logger=None, max_workers=None, worker_name_prefix='worker',
     logger = logger or gluetool.log.Logging.get_logger()
     max_workers = max_workers or len(jobs)
 
-    gluetool.log.log_dict(logger.debug, 'running {} jobs with {} workers'.format(len(jobs), max_workers), jobs)
+    gluetool.log.log_dict(logger.debug,  # type: ignore  # logger.debug signature is compatible
+                          'running {} jobs with {} workers'.format(len(jobs), max_workers),
+                          jobs)
 
     futures = {}
-    errors = []
+    errors = []  # type: List[JobErrorType]
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers,
                                                thread_name_prefix=worker_name_prefix) as executor:
@@ -122,16 +146,18 @@ def run_jobs(jobs, logger=None, max_workers=None, worker_name_prefix='worker',
 
                 # Exception info returned by future does not contain exception class while the info returned
                 # by sys.exc_info() does and all users of it expect the first item to be exception class.
-                exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
+                full_exc_info = (exc_info[0].__class__, exc_info[0], exc_info[1])
 
-                errors.append((job, exc_info))
+                errors.append((job, full_exc_info))
 
                 if on_job_error:
-                    on_job_error(exc_info, *job.args, **job.kwargs)
+                    on_job_error(full_exc_info, *job.args, **job.kwargs)
 
             if on_job_done:
                 on_job_done(remaining_count, *job.args, **job.kwargs)
 
-    gluetool.log.log_dict(logger.debug, 'jobs produced errors', errors)
+    gluetool.log.log_dict(logger.debug,  # type: ignore  # logger.debug signature is compatible
+                          'jobs produced errors',
+                          errors)
 
     return errors
