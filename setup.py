@@ -32,7 +32,7 @@ INSTALL_REQUIRES = [
     # required to build documentation - workaround, this will end up in gluetool upstream
     "commonmark==0.8.0",
 
-    "ansible==2.5.8.0",
+    "ansible==2.7.5",
     "composeci",  # composetest
     "cmd2==0.8.6",
     "beautifulsoup4==4.6.3",
