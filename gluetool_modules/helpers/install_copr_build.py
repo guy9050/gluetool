@@ -46,13 +46,16 @@ class InstallCoprBuild(gluetool.Module):
         log_dict(self.debug, 'RPMs to install', rpm_names)
         log_dict(self.debug, 'RPMs install from', rpm_urls)
 
+        interpreters = self.shared('detect_ansible_interpreter', guests[0])
+
         _, ansible_output = self.shared(
             'run_playbook',
             gluetool.utils.normalize_path(self.option('playbook')),
             guests,
             variables={
                 'PACKAGE_URLS': rpm_urls,
-                'PACKAGE_NAMES': rpm_names
+                'PACKAGE_NAMES': rpm_names,
+                'ansible_python_interpreter': interpreters[0]
             },
             json_output=True
         )
