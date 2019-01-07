@@ -26,6 +26,7 @@ import gluetool_modules.libs.artifacts
 
 import gluetool_modules.testing.testing_results
 import gluetool_modules.helpers.notify_email.notify_email
+import gluetool_modules.helpers.dashboard
 
 import gluetool_modules.static_analysis.covscan.covscan
 import gluetool_modules.static_analysis.rpmdiff.rpmdiff
@@ -67,13 +68,23 @@ def fixture_notify_email(integration_config, monkeypatch):
 
     notify_email.parse_config()
 
+    dashboard = create_module(gluetool_modules.helpers.dashboard.Dashboard, name='dashboard', glue=glue)[1]
+    dashboard.parse_config()
+
     mock_task = MagicMock(ARTIFACT_NAMESPACE='brew-build', id=123456,
                           nvr='dummy-package-1.2.3-79.el7', owner='foo',
                           issuer='bar', branch='fixing-bz17', target='release-candidate')
 
-    patch_shared(monkeypatch, notify_email, {
+    patch_shared(monkeypatch, dashboard, {
         'eval_context': {
             'PRIMARY_TASK': mock_task
+        }
+    })
+
+    patch_shared(monkeypatch, notify_email, {
+        'eval_context': {
+            'PRIMARY_TASK': mock_task,
+            'DASHBOARD_URL': dashboard.dashboard_url
         },
         'primary_task': mock_task,
         'notification_recipients': ['dummy-recipient']

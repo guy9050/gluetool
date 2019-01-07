@@ -18,7 +18,7 @@ header: |-
   Build target:      release-candidate
   Brew task:         123456
   Build issuer:      bar@redhat.com
-  Test summary link: https://rpmdiff.engineering.redhat.com/run/151276
+  Test summary link: https://dashboard.osci.redhat.com/#/artifact/brew-build/aid/123456
 footer: |-
   --
   RPMdiff CI Test Plan: http://url.corp.redhat.com/rpmdiff-in-ci
