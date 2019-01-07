@@ -1,3 +1,4 @@
+import collections
 import os
 import sys
 import urlparse
@@ -152,7 +153,7 @@ class Beaker(gluetool.Module):
         # These are acessed by TaskAggregator.recordResult, and processed results must be
         # also accesible to other methods of this module.
         citool_module = self
-        processed_results = self._processed_results = {}
+        processed_results = self._processed_results = collections.OrderedDict()
 
         class TaskAggregator(tcms_results.TaskAggregator):
             # pylint: disable=too-few-public-methods

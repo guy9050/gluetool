@@ -97,17 +97,16 @@ TaskSetResults = collections.namedtuple('TaskSetResults', ('tasks'))
 
 def _to_builtins(task_set_results):
     """
-    Serialize task set results - a named tuple - into builtin types like dictionaries, tuple and lists.
+    Serialize task set results - a named tuple - into builtin types like dictionaries, tuples and lists.
     There is some loss of information - schedule entry info is lost, therefore its testing environment
     is gone as well - but nothing down the road is using or storing this kind of data, so until anything
     learns to do that, we can live happily with losing data.
     """
 
-    return {
-        task_name: [
-            task_run.results for task_run in task_runs
-        ] for task_name, task_runs in task_set_results.tasks.iteritems()
-    }
+    return collections.OrderedDict([
+        (task_name, [task_run.results for task_run in task_runs])
+        for task_name, task_runs in task_set_results.tasks.iteritems()
+    ])
 
 
 def _log_task_set_results(schedule_entry, label, task_set_results):
@@ -147,7 +146,7 @@ def _merge_task_set_results(*task_sets):
     :rtype: TaskSetResults
     """
 
-    merged = TaskSetResults(tasks={})
+    merged = TaskSetResults(tasks=collections.OrderedDict())
 
     for task_set in task_sets:
         for task_runs in task_set.tasks.itervalues():
@@ -249,7 +248,7 @@ class RestraintRunner(gluetool.Module):
 
             job_results = bs4.BeautifulSoup(f.read(), 'xml')
 
-        results = TaskSetResults(tasks={})
+        results = TaskSetResults(tasks=collections.OrderedDict())
 
         if 'BUILD_URL' in os.environ:
             def artifact_path(s):
