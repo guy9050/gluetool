@@ -23,6 +23,9 @@ from gluetool.log import format_dict, log_dict
 from gluetool.utils import cached_property, normalize_path, load_yaml, dict_update
 from libci.guest import NetworkedGuest
 
+from gluetool_modules.libs.testing_environment import TestingEnvironment
+
+
 DEFAULT_FLAVOR = 'm1.small'
 DEFAULT_NAME = 'citool'
 DEFAULT_RESERVE_DIR = '~/openstack-reservations'
@@ -1308,12 +1311,7 @@ class CIOpenstack(gluetool.Module):
 
             log_dict(self.debug, 'creating guest with following details', details)
 
-            guest = OpenstackGuest(self, details=details, arch=self.option('arch'))
-            # pylint: disable=attribute-defined-outside-init
-            guest.environment = environment.clone(compose=image.name)
-
-            # When `libci` gets patched, the environment would be given to guest's `__init__` method:
-            # guest = OpenstackGuest(self, details=details, environment=environment.clone(compose=image.name))
+            guest = OpenstackGuest(self, details=details, environment=environment.clone(compose=image.name))
 
             self._all.append(guest)
             guests.append(guest)
@@ -1350,7 +1348,9 @@ class CIOpenstack(gluetool.Module):
             .. warning::
 
                Currently, this parameter is ignored. It has been introduced this early to decouple
-               users of this module, and its actual use will follow in the near future.
+               users of this module, and its actual use will follow in the near future. But, still,
+               it has to be an object compatible with the protocol, i.e. it must provide necessary
+               fields.
 
         :param int count: number of openstack guests to create
         :param str name: box name (default: {default_name})
@@ -1439,7 +1439,12 @@ class CIOpenstack(gluetool.Module):
 
         # provision given number of guests right away
         if provision_count:
-            guests = self.provision('dummy_environment', count=provision_count)
+            # `provision` ignores the content of `environment`, but it still must be a valid
+            # environment object. We fill its properties as best as we can for direct provisioning.
+            # Hopefully, `openstack` will soon accept environment specification instead of this.
+            environment = TestingEnvironment(arch=self.option('arch'), compose=self.option('image'))
+
+            guests = self.provision(environment, count=provision_count)
 
             if self.option('setup-provisioned'):
                 for guest in guests:
