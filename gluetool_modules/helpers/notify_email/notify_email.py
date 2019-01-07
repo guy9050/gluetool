@@ -56,6 +56,7 @@ All templates are rendered with access to following variables:
 
     * any variable exposed by other modules via ``eval_context`` shared function,
     * ``OS`` - :py:mod:`os` module from Python's standard library
+    * ``RECIPIENTS`` - list of e-mail addresses the e-mail would be send to
 
 Some templates are given special extra variables:
 
@@ -213,9 +214,14 @@ class Notify((gluetool.Module)):
     def render_template(self, filename, **variables):
         """
         Helper method providing access to common variables we'd like to make available
-        to all templates (``notify-email`` module instance, primary task, and others).
-        It adds these variables to those given by a caller, and calls
-        :py:meth:`gluetool.utils.render_template` to do the rendering job.
+        to all templates:
+
+          * the whole eval context acquired from ``eval_context`` shared function,
+          * ``notify-email`` module instance,
+          * :py:mod:`os` module.
+
+        On top of these, variables given by the caller are added, and :py:meth:`gluetool.utils.render_template`
+        is called to do the rendering job.
 
         :param str filename: Path to file with the template. Relative to the template root
             set by ``template-root`` config option.
@@ -389,18 +395,24 @@ class Notify((gluetool.Module)):
 
         self.info('Sending {} result notifications to: {}'.format(result_type, ', '.join(recipients)))
 
+        def _render_template(filename, **variables):
+            """
+            YARF aka. Yet Another Render Function :)
+
+            We want to inject additional variables, ``RECIPIENTS`` and ``RESULT``, to all contexts. This
+            function does that, and calls :py:meth:`render_template` to inject even more variables and actually
+            render the template.
+            """
+
+            return self.render_template(filename, RECIPIENTS=recipients, RESULT=result, **variables)
+
         msg = Message(recipients=recipients, bcc=self.archive_bcc,
                       sender=self.option('sender'), reply_to=self.option('reply-to'),
-                      subject=self.render_template(self.option('subject-template'), **{
-                          'RESULT': result
-                      }),
-                      header=self.render_template(self.option('body-header-template'), **{
-                          'RESULT': result,
+                      subject=_render_template(self.option('subject-template')),
+                      header=_render_template(self.option('body-header-template'), **{
                           'SUMMARY_URL': self._get_summary_url(result)
                       }),
-                      footer=self.render_template(self.option('body-footer-template'), **{
-                          'RESULT': result
-                      }),
+                      footer=_render_template(self.option('body-footer-template')),
                       xheaders=self.xheaders)
 
         if formatter_name is not None:
@@ -431,14 +443,22 @@ class Notify((gluetool.Module)):
 
         self.info('Sending failure-state notifications to: {}'.format(', '.join(recipients)))
 
-        body_header = self.render_template(self.option('body-header-template'), **{
-            'FAILURE': failure,
+        def _render_template(filename, **variables):
+            """
+            YARF #2 aka. Yet Another Render Function, Part Deux :)
+
+            We want to inject additional variables, ``RECIPIENTS`` and ``FAILURE``, to all contexts. This
+            function does that, and calls :py:meth:`render_template` to inject even more variables and actually
+            render the template.
+            """
+
+            return self.render_template(filename, RECIPIENTS=recipients, FAILURE=failure, **variables)
+
+        body_header = _render_template(self.option('body-header-template'), **{
             'SUMMARY_URL': self._get_summary_url(libci.results.TestResult(self.glue, 'dummy', 'ERROR'))
         })
 
-        body_footer = self.render_template(self.option('body-footer-template'), **{
-            'FAILURE': failure
-        })
+        body_footer = _render_template(self.option('body-footer-template'))
 
         # Any subclass of CIError (which covers all soft errors by default) can provide its own templates
         # - but not the CIError or SoftCIError, these are way too generic.
@@ -448,7 +468,7 @@ class Notify((gluetool.Module)):
 
             klass_name = failure.exc_info[0].__name__
 
-            def _render_template(postfix, default=None):
+            def _render_exception_template(postfix, default=None):
                 template_filename = '{}-{}.j2'.format(klass_name, postfix)
 
                 if not os.path.exists(os.path.join(self.template_root, template_filename)):
@@ -459,26 +479,22 @@ class Notify((gluetool.Module)):
 
                     return default
 
-                return self.render_template(template_filename, **{
-                    'FAILURE': failure
-                })
+                return _render_template(template_filename)
 
-            body_header = _render_template('header', default=body_header)
-            failure_subject = _render_template('subject')
-            failure_body = _render_template('body')
-            body_footer = _render_template('footer', default=body_footer)
+            body_header = _render_exception_template('header', default=body_header)
+            failure_subject = _render_exception_template('subject')
+            failure_body = _render_exception_template('body')
+            body_footer = _render_exception_template('footer', default=body_footer)
 
         else:
             body_template = 'error-message-template'
             failure_subject, failure_body = '', ''
 
-        subject = self.render_template(self.option('subject-template'), **{
-            'FAILURE': failure,
+        subject = _render_template(self.option('subject-template'), **{
             'FAILURE_SUBJECT': failure_subject
         })
 
-        body = self.render_template(self.option(body_template), **{
-            'FAILURE': failure,
+        body = _render_template(self.option(body_template), **{
             'FAILURE_BODY': failure_body
         })
 
