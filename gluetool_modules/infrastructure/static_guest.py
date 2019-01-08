@@ -7,6 +7,8 @@ import gluetool
 from gluetool import GlueError
 from libci.guest import NetworkedGuest
 
+from gluetool_modules.libs.testing_environment import TestingEnvironment
+
 # SSH connection defaults
 DEFAULT_SSH_USER = 'root'
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
@@ -19,14 +21,6 @@ DEFAULT_ECHO_TIMEOUT = 10
 #: Generic provisioner capabilities.
 #: Follows :doc:`Provisioner Capabilities Protocol </protocols/provisioner-capabilities>`.
 ProvisionerCapabilities = collections.namedtuple('ProvisionerCapabilities', ['available_arches'])
-
-#: Testing environment description.
-#:
-#: Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
-TestingEnvironment = collections.namedtuple('TestingEnvironment', [
-    'distro',
-    'arch'
-])
 
 
 class StaticGuest(NetworkedGuest):
