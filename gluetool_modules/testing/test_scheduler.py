@@ -334,9 +334,28 @@ class RestraintScheduler(gluetool.Module):
 
                 # It may be possible to find compatible architecture, e.g. it may be fine to test
                 # i686 artifacts on x86_64 boxes. Let's check the configuration.
+
+                # Start with a list of arches compatible with `arch`.
                 compatible_arches = self.arch_compatibility_map.get(arch, [])
 
-                if any([compatible_arch in supported_arches for compatible_arch in compatible_arches]):
+                # Find which of these are supported.
+                compatible_and_supported_arches = [
+                    compatible_arch in supported_arches for compatible_arch in compatible_arches
+                ]
+
+                # If there are any compatible & supported, add the original `arch` to the list of valid arches,
+                # because we can test it.
+                if compatible_and_supported_arches:
+                    # Warning, because nothing else submits to Sentry, and Sentry because
+                    # problem of secondary arches doesn't fit well with nice progress of
+                    # testing environments, and I'd really like to observe the usage of
+                    # this feature, without grepping all existing logs :/ If it's being
+                    # used frequently, we can always silence the Sentry submission.
+
+                    self.warn('Artifact arch {} not supported but compatible with {}'.format(
+                        arch, ', '.join(compatible_and_supported_arches)
+                    ), sentry=True)
+
                     valid_arches.append(arch)
 
         log_dict(self.debug, 'valid artifact arches', valid_arches)
