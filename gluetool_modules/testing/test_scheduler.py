@@ -328,7 +328,7 @@ class RestraintScheduler(gluetool.Module):
 
                 # Find which of these are supported.
                 compatible_and_supported_arches = [
-                    compatible_arch in supported_arches for compatible_arch in compatible_arches
+                    compatible_arch for compatible_arch in compatible_arches if compatible_arch in supported_arches
                 ]
 
                 # If there are any compatible & supported, add the original `arch` to the list of valid arches,
