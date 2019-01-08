@@ -1,19 +1,68 @@
 import collections
 import urllib
 
+import re
+
+from concurrent.futures import ThreadPoolExecutor, wait
 import requests
 
 # pylint: disable=no-name-in-module
 from jq import jq
 
 import gluetool
-from gluetool.utils import cached_property
+from gluetool.utils import cached_property, normalize_multistring_option
 from gluetool.log import log_dict
 
 #: Information about task architectures.
 #:
 #: :ivar list(str) arches: List of architectures.
 TaskArches = collections.namedtuple('TaskArches', ['arches'])
+
+#: Information about MBS.
+#:
+#: :ivar str api_version: MBS API version.
+#: :ivar str auth_method: MBS authentication method.
+#: :ivar str version: MBS version.
+MBSAbout = collections.namedtuple('MBSAbout', 'api_version, auth_method, version')
+
+# regular expressions for nvr and nsvc of a module
+NSVC_REGEX = re.compile(r'^([^:]*):([^:]*):([^:]*):([^:]*)$')
+NVR_REGEX = re.compile(r'^([^-]*)-([^-]*)-([^\.]*)\.(.*)$')
+
+
+def nsvc_from_string(nsvc):
+    """
+    Helper function to return a tuple of NSVC from a string.
+
+    :param: str nsvc: NSVC string.
+    :rtype: tuple
+    :returns: Tuple of N, S, V, C.
+    :raises: gluetool.GlueError if NSVC not valid.
+    """
+    try:
+        return re.match(NSVC_REGEX, nsvc).groups()
+    except (AttributeError, IndexError):
+        raise gluetool.GlueError("'{}' is not a valid module nsvc".format(nsvc))
+
+
+def nsvc_from_nvr(nvr):
+    """
+    Helper function to return a tuple of NSVC from an Brew/Koji compatible module NVR.
+
+    :param: str nvr: NVR string.
+    :rtype: tuple
+    :returns: Tuple of N, S, V, C.
+    :raises: gluetool.GlueError if NVR not valid.
+    """
+
+    try:
+        (name, stream, version, context) = re.match(NVR_REGEX, nvr).groups()
+        # underscore in stream number must be converted to '-'
+        stream = stream.replace('_', '-')
+    except (AttributeError, IndexError):
+        raise gluetool.GlueError("'{}' is not a valid module nvr".format(nvr))
+
+    return (name, stream, version, context)
 
 
 class MBSApi(object):
@@ -23,11 +72,26 @@ class MBSApi(object):
         self.mbs_ui_url = mbs_ui_url
         self.module = module
 
-    def _get_json(self, location, verbose=False):
-        params = {}
+    @cached_property
+    def about(self):
+        """
+        Returns MBS about endpoint as a namedtuple.
 
-        if verbose:
-            params['verbose'] = '1'
+        :rtype: MBSAbout
+        :returns: MBS about namedtuple with fields api_version, auth_method and version.
+        """
+        return MBSAbout(**self._get_json('module-build-service/1/about'))
+
+    def _get_json(self, location, params=None):
+        """
+        Query MBS API endpoint location and return the JSON reply.
+
+        :param str location: API endpoint to query.
+        :param dict params: Query parameters
+        :rtype: dict
+        :returns: JSON output as a dictionary.
+        """
+        params = params or {}
 
         url = '{}/{}'.format(self.mbs_api_url, location)
 
@@ -42,12 +106,57 @@ class MBSApi(object):
             raise gluetool.GlueError('Unable to get: {}'.format(url))
 
         log_dict(self.module.debug, '[MBS API] output', output)
+
         return output
 
-    def get_module_build(self, build_id, verbose=False):
-        return self._get_json('module-build-service/1/module-builds/{}'.format(build_id), verbose=verbose)
+    def get_build_info_by_id(self, build_id, verbose=False):
+        """
+        Get MBS build information from build ID.
+
+        :param int build_id: MBS build ID.
+        :param boolean verbose: Verbose query.
+        :rtype: dict
+        :returns: JSON output with given build informations.
+        """
+        params = {'verbose': 1 if verbose else 0}
+
+        return self._get_json('module-build-service/1/module-builds/{}'.format(build_id), params=params)
+
+    def get_build_info_by_nsvc(self, nsvc_tuple, verbose=False):
+        """
+        Get MBS build information from NSVC tuple.
+
+        :param tuple nsvc_tuple: Build NSVC as a tuple.
+        :param boolean verbose: Verbose query.
+        :rtype: dict
+        :returns: JSON output with given build informations.
+        """
+
+        (name, stream, version, context) = nsvc_tuple
+
+        url = 'module-build-service/1/module-builds/'
+        params = {
+            'name': name,
+            'stream': stream,
+            'version': version,
+            'context': context,
+            'verbose': 1 if verbose else 0
+        }
+
+        try:
+            return self._get_json(url, params=params)['items'][0]
+        except (IndexError, KeyError):
+            # pylint: disable=line-too-long
+            raise gluetool.GlueError("Could not find module with nsvc '{}:{}:{}:{}'".format(name, stream, version, context))  # Ignore PEP8Bear
 
     def get_build_ui_url(self, build_id):
+        """
+        Returns URL to the MBS web interface for the given build ID.
+
+        :param int build_id: MBS build ID.
+        :rtype: str
+        :returns: URL to web interface of the MBS build.
+        """
         return '{}/module/{}'.format(self.mbs_ui_url, build_id)
 
 
@@ -56,19 +165,30 @@ class MBSTask(object):
 
     ARTIFACT_NAMESPACE = 'redhat-module'
 
-    def __init__(self, build_id, module):
+    def __init__(self, module, build_id=None, nsvc=None, nvr=None):
+        # pylint: disable=invalid-name
+
+        self.module = module
         self.logger = module.logger
         module.logger.connect(self)
 
-        # pylint: disable=invalid-name
-        self.id = build_id
-
-        self.module = module
-
         mbs_api = module.mbs_api()
 
-        self._build_info = build_info = mbs_api.get_module_build(build_id, verbose=True)
+        if sum([bool(param) for param in [build_id, nsvc, nvr]]) != 1:
+            raise gluetool.GlueError('module must be initialized only from one of build_id, nsvc or nvr')
 
+        if build_id:
+            build_info = mbs_api.get_build_info_by_id(build_id, verbose=True)
+
+        if nsvc:
+            build_info = mbs_api.get_build_info_by_nsvc(nsvc_from_string(nsvc), verbose=True)
+
+        if nvr:
+            build_info = mbs_api.get_build_info_by_nsvc(nsvc_from_nvr(nvr), verbose=True)
+
+        self._build_info = build_info
+
+        self.id = build_info['id']
         self.name = build_info['name']
         self.component = self.name
         self.stream = build_info['stream']
@@ -76,10 +196,15 @@ class MBSTask(object):
         self.context = build_info['context']
         self.issuer = build_info['owner']
         self.nsvc = '{}:{}:{}:{}'.format(self.name, self.stream, self.version, self.context)
-        # `nvr` is often used as unique id of task (e.g. in mail notifications)
-        # so this task sets `nvr` too, yet its value is not actually 'name', 'version' and 'release',
-        # but 'name', 'stream', 'version' and 'context'
-        self.nvr = self.nsvc
+
+        # `nvr` is:
+        # - often used as unique id of artifact (e.g. in mail notifications)
+        # - same as nvr of module in Brew/Koji
+        # - for modules the nvr is diffrent from NSVC, as it is delimited with '-' instead of ':'
+        #   and also in case of stream the character '-' is replaced with '_', see:
+        #   https://github.com/release-engineering/resultsdb-updater/pull/73#discussion_r235964781
+        self.nvr = '{}-{}-{}.{}'.format(self.name, self.stream.replace('-', '_'), self.version, self.context)
+
         # set by param for now
         self.target = self.module.option('target')
 
@@ -109,7 +234,7 @@ class MBSTask(object):
     def task_arches(self):
         """
         :rtype: TaskArches
-        :return: information about arches the task was building for
+        :returns: Information about arches the task was building for
         """
 
         if not self._modulemd:
@@ -150,44 +275,116 @@ class MBS(gluetool.Module):
     name = 'mbs'
     description = 'Provides information about MBS (Module Build Service) artifact'
 
-    options = {
-        'mbs-ui-url': {
-            'help': 'URL of mbs ui server.',
-            'type': str
-        },
-        'mbs-api-url': {
-            'help': 'URL of mbs api server.',
-            'type': str
-        },
-        'build-id': {
-            'help': 'MBS id',
-            'type': str
-        },
-        'target': {
-            'help': 'Value for property target (default: %(default)s).',
-            'type': str,
-            'default': 'module-rhel8'
-        },
-        'arches': {
-            'help': 'Value for property arches (default: %(default)s).',
-            'type': str,
-            'default': 'x86_64'
-        }
-    }
+    options = [
+        ('MBS options', {
+            'mbs-ui-url': {
+                'help': 'URL of mbs ui server.',
+                'type': str
+            },
+            'mbs-api-url': {
+                'help': 'URL of mbs api server.',
+                'type': str
+            }
+        }),
+        ('Build initialization options', {
+            'build-id': {
+                'help': 'Initialize build from MBS build ID (default: none).',
+                'action': 'append',
+                'default': [],
+            },
+            'nsvc': {
+                'help': 'Initialize build from NSVC (default: none).',
+                'action': 'append',
+                'default': [],
+            },
+            'nvr': {
+                'help': 'Initialize build from NVR (default: none).',
+                'action': 'append',
+                'default': [],
+            },
+        }),
+        ('Build defaults', {
+            'target': {
+                'help': 'Value for property target (default: %(default)s).',
+                'type': str,
+                'default': 'module-rhel8'
+            },
+            'arches': {
+                'help': 'Value for property arches (default: %(default)s).',
+                'type': str,
+                'default': 'x86_64'
+            }
+        })
+    ]
 
-    required_options = ('mbs-api-url', 'build-id')
+    required_options = ('mbs-api-url',)
 
     shared_functions = ['primary_task', 'tasks', 'mbs_api']
 
     def __init__(self, *args, **kwargs):
         super(MBS, self).__init__(*args, **kwargs)
-        self.task = None
-        self._tasks = None
+        self._tasks = []
 
     def primary_task(self):
-        return self.task
+        """
+        Returns a `primary` module build, the first build in the list of current nodules.
 
-    def tasks(self):
+        :rtype: :py:class:`MbsTask` or None
+        :returns: Instance of an object represeting a module buil or None, if no modules are avaiable.
+        """
+
+        log_dict(self.debug, 'primary task - current modules', self._tasks)
+
+        return self._tasks[0] if self._tasks else None
+
+    def _init_mbs_builds(self, build_ids=None, nsvcs=None, nvrs=None):
+        """
+        Initializes MBS builds in parallel.
+
+        :param list build_ids: List of module build IDs.
+        :param list nsvcs: List of module NSVCs.
+        :param list nvrs: List of NVRs of a module (compatible with brew/koji).
+
+        :retype: list(MBSTask)
+        :returns: List of initialized MBS builds.
+        """
+        build_ids = build_ids or []
+        nsvcs = nsvcs or []
+        nvrs = nvrs or []
+
+        with ThreadPoolExecutor(thread_name_prefix="api_thread") as executor:
+            # initialized from build IDs
+            futures = {executor.submit(MBSTask, self, build_id=build_id) for build_id in build_ids}
+
+            # initialized from NSVCs
+            futures.update({
+                executor.submit(MBSTask, self, nsvc=nsvc) for nsvc in nsvcs
+            })
+
+            # initialized from NVRs
+            futures.update({
+                executor.submit(MBSTask, self, nvr=nvr) for nvr in nvrs
+            })
+
+            for future in wait(futures).done:
+                self._tasks.append(future.result())
+
+    def tasks(self, build_ids=None, nsvcs=None, nvrs=None):
+        # type: (list, list, list) -> MBSTask
+        """
+        Returns list of module builds available. If any of the additional parameters
+        are provided, modules list is extended with them first.
+
+        :param list build_ids: List of module build IDs.
+        :param list nsvcs: List of module NSVCs.
+        :param list nvrs: List of NVRs of a module (compatible with brew/koji).
+
+        :rtype: list(MBSTask)
+        :returns: List of module builds.
+        """
+        if any([build_ids, nsvcs, nvrs]):
+            self._init_mbs_builds(build_ids=build_ids, nsvcs=nsvcs, nvrs=nvrs)
+
         return self._tasks
 
     @property
@@ -227,12 +424,22 @@ class MBS(gluetool.Module):
         return MBSApi(self.option('mbs-api-url'), self.option('mbs-ui-url'), self)
 
     def mbs_api(self):
+        # type: () -> MBSApi
+        """
+        Returns MBSApi instance.
+        """
         return self._mbs_api
 
     def execute(self):
-        build_id = self.option('build-id')
+        # pylint: disable=line-too-long
+        self.info("connected to MBS instance '{}' version '{}'".format(self.option('mbs-api-url'), self.mbs_api().about.version))  # Ignore PEP8Bear
 
-        self.task = MBSTask(build_id, self)
-        self._tasks = [self.task]
+        if any([self.option(opt) for opt in ['build-id', 'nsvc', 'nvr']]):
+            self._init_mbs_builds(
+                build_ids=normalize_multistring_option(self.option('build-id')),
+                nsvcs=normalize_multistring_option(self.option('nsvc')),
+                nvrs=normalize_multistring_option(self.option('nvr'))
+            )
 
-        self.info('Initialized with {}: {} ({})'.format(self.task.id, self.task.nsvc, self.task.url))
+        for task in self._tasks:
+            self.info('Initialized with {}: {} ({})'.format(task.id, task.nsvc, task.url))
