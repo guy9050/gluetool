@@ -65,24 +65,12 @@ class RestraintScheduler(gluetool.Module):
                     """,
             'metavar': 'FILE',
             'default': None
-        },
-        'unsupported-arches': {
-            'help': 'List of arches not supported by system pool (default: None).',
-            'metavar': 'ARCH1[,ARCH2...]',
-            'default': [],
-            'action': 'append'
         }
     }
-
-    required_options = ('unsupported-arches',)
 
     shared_functions = ['test_schedule']
 
     _schedule = None
-
-    @utils.cached_property
-    def unsupported_arches(self):
-        return utils.normalize_multistring_option(self.option('unsupported-arches'))
 
     @utils.cached_property
     def arch_compatibility_map(self):
