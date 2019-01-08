@@ -96,7 +96,12 @@ class MBSApi(object):
         url = '{}/{}'.format(self.mbs_api_url, location)
 
         if params:
-            url = '{}?{}'.format(url, urllib.urlencode(params))
+            # keep params sorted in the URL - makes testing possible
+            sorted_params = collections.OrderedDict([
+                (name, params[name]) for name in sorted(params.iterkeys())
+            ])
+
+            url = '{}?{}'.format(url, urllib.urlencode(sorted_params))
 
         self.module.debug('[MBS API]: {}'.format(url))
 
