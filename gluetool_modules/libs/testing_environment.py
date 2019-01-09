@@ -5,11 +5,11 @@ import gluetool_modules.libs
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order
-from typing import Any, Dict, List, NamedTuple  # noqa
+from typing import Any, Dict, List, NamedTuple, Union  # noqa
 
 
 BaseTestingEnvironment = NamedTuple('TestingEnvironment', (
-    ('compose', str),
+    ('compose', Union[str, gluetool_modules.libs._UniqObject]),  # pylint: disable=protected-access
     ('arch', str)
 ))
 

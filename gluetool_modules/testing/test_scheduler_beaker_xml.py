@@ -1,12 +1,21 @@
 import gluetool
 import gluetool.log
-from gluetool.log import log_dict, log_xml
+from gluetool.log import log_dict, log_xml, LoggingFunctionType, LoggingWarningFunctionType
 
 from gluetool_modules.libs.testing_environment import TestingEnvironment
+
+# Type annotations
+# pylint: disable=unused-import,wrong-import-order
+from typing import TYPE_CHECKING, cast, Any, List, Optional  # noqa
+
+if TYPE_CHECKING:
+    import libci.guest  # noqa
 
 
 class TestScheduleEntryAdapter(gluetool.log.ContextAdapter):
     def __init__(self, logger, entry_id):
+        # type: (gluetool.log.ContextAdapter, str) -> None
+
         super(TestScheduleEntryAdapter, self).__init__(logger, {
             'ctx_schedule_entry_index': (200, entry_id)
         })
@@ -27,18 +36,42 @@ class TestScheduleEntry(object):
     :param xml recipe_set: XML description of (Beaker) recipe set this entry handles.
     """
 
+    # Logging type stubs
+    #
+    # These methods are added dynamically, therefore without intruducing them to mypy, every use of `self.debug`
+    # would cause an error when checking types. We cannot simply set them to `None`, that makes pylint go crazy
+    # because `None` is apparently not callable, and we're calling `self.debug` often :) So, we use dummy method
+    # for initialization, to make pylint happy, but we wrap it with `cast` to enforce proper types to make mypy
+    # happy as well :) It must a full-fledge method, because lambda cannot take keyword arguments (like sentry),
+    # and pylint can discover that.
+    def _fake_log_fn(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+
+        pass
+
+    verbose = cast(LoggingFunctionType, _fake_log_fn)
+    debug = cast(LoggingFunctionType, _fake_log_fn)
+    info = cast(LoggingFunctionType, _fake_log_fn)
+    warn = cast(LoggingWarningFunctionType, _fake_log_fn)
+    error = cast(LoggingFunctionType, _fake_log_fn)
+    exception = cast(LoggingFunctionType, _fake_log_fn)
+
     def __init__(self, logger, job_index, recipe_set_index, recipe_set):
+        # type: (gluetool.log.ContextAdapter, int, int, Any) -> None
+
         # pylint: disable=C0103
         self.id = 'schedule entry J#{}-RS#{}'.format(job_index, recipe_set_index)
 
         self.logger = TestScheduleEntryAdapter(logger, self.id)
         self.logger.connect(self)
 
-        self.testing_environment = None
-        self.guest = None
+        self.testing_environment = None  # type: Optional[TestingEnvironment]
+        self.guest = None  # type: Optional[libci.guest.NetworkedGuest]
         self.package = self.recipe_set = recipe_set
 
     def log(self, log_fn=None):
+        # type: (Optional[gluetool.log.LoggingFunctionType]) -> None
+
         log_fn = log_fn or self.debug
 
         log_fn('testing environment: {}'.format(self.testing_environment))
@@ -57,15 +90,18 @@ class TestSchedulerWow(gluetool.Module):
                   shared function.
                   """
 
-    shared_functions = ('create_test_schedule',)
+    shared_functions = ['create_test_schedule']
 
     def _log_schedule(self, label, schedule):
+        # type: (str, List[TestScheduleEntry]) -> None
+
         self.debug('{}:'.format(label))
 
         for schedule_entry in schedule:
             schedule_entry.log()
 
     def _get_job_xmls(self, testing_environment_constraints=None):
+        # type: (Optional[List[TestingEnvironment]]) -> List[Any]
         """
         Use ``beaker_job_xml`` shared function - probably running ``workflow-tomorrow`` behind the curtain - to get
         XML descriptions of Beaker jobs, implementing the testing. Provides few basic options, necessary from "system"
@@ -87,11 +123,12 @@ class TestSchedulerWow(gluetool.Module):
             '--suppress-install-task'
         ]
 
-        return self.shared('beaker_job_xml', options=options, extra_context={
+        return cast(List[Any], self.shared('beaker_job_xml', options=options, extra_context={
             'TESTING_ENVIRONMENT_CONSTRAINTS': testing_environment_constraints or []
-        })
+        }))
 
     def _create_job_schedule(self, index, job):
+        # type: (int, Any) -> List[TestScheduleEntry]
         """
         For a given job XML, extract recipe sets and their corresponding testing environments.
 
@@ -136,6 +173,7 @@ class TestSchedulerWow(gluetool.Module):
         return schedule
 
     def _create_jobs_schedule(self, jobs):
+        # type: (List[Any]) -> List[TestScheduleEntry]
         """
         Create schedule for given set of jobs.
 
@@ -146,7 +184,7 @@ class TestSchedulerWow(gluetool.Module):
 
         self.info('creating schedule for {} jobs'.format(len(jobs)))
 
-        schedule = []
+        schedule = []  # type: List[TestScheduleEntry]
 
         # for each job, create a schedule entries for its recipe sets, and put them all on one pile
         for i, job in enumerate(jobs):
@@ -157,6 +195,7 @@ class TestSchedulerWow(gluetool.Module):
         return schedule
 
     def create_test_schedule(self, testing_environment_constraints=None):
+        # type: (Optional[List[TestingEnvironment]]) -> List[TestScheduleEntry]
         """
         Create a test schedule based on call of ``beaker_job_xml`` shared function. XML job description
         is split into recipes, each is packed into one schedule entry.
