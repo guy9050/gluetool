@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2019-01-09
+----------
+
+Fixed
+~~~~~
+
+- [beaker] in exported results, preserve the order of the tasks
+- [test-schedule-runner-restraint] in exported results, preserve the order of the tasks
+- [static-guest] testing environment replaced with the one provided by a library, fixing a ``distro`` vs ``compose`` issue
+
+Added
+~~~~~
+
+- test schedule entries' and guests' environment is now propagated into exported results
+- type annotations were added to common libraries
+- [ansible] type annotations were added
+- [install-copr-build] detect Python interpreter when calling Ansible
+- [jenkins] new shared function, ``get_jenkins_build``, providing Jenkins build API
+- [msb] it is possible to initialize build using new options, ``--nsvc`` and ``--nvr``
+- [notify-email] list of recipients is now available in templates
+- [pipeline-state-reporter] include serialized pipeline and Jenkins build parameters in the messages
+- [test-scheduler] log arch compatibility decisions
+
+Changed
+~~~~~~~
+
+- [ansible] version of Ansible bumped to 2.7.5
+- [beaker] obsolete ``run_command`` was replaced by ``Command.run``
+- [mbs] extract architectures from a ``modulemd`` property of build metadata
+
+Removed
+~~~~~~~
+
+- [test-scheduler] option ``--unsupported-arches`` removed
+
+
 2019-01-03
 ----------
 
