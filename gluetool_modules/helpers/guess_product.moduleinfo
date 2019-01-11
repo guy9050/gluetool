@@ -1,4 +1,0 @@
----
-
-name: guess-product
-description: "Guess product identification from a build target of a brew build."
