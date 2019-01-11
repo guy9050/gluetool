@@ -4,6 +4,6 @@ name: jenkins
 description: Connect to a jenkins instance via jenkinsapi
 dependencies:
   pip:
-    - jenkinsapi==0.3.3
+    - jenkinsapi==0.3.8
     - requests==2.19.1
     - requestsexceptions==1.2.0

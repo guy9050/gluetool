@@ -43,7 +43,7 @@ INSTALL_REQUIRES = [
     'futures==3.2.0; python_version == "2.7"',  # restraint-scheduler
     "inotify==0.2.10",  # sti
     "jenkins-job-builder==1.6.2",
-    "jenkinsapi==0.3.3",
+    "jenkinsapi==0.3.8",
     "jq==0.1.6",
     "koji",  # composetest
     "mako==1.0.6",
