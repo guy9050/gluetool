@@ -50,7 +50,7 @@ class Dashboard(gluetool.Module):
 
         if any([
                 (f[2] == 'eval_context' and os.path.splitext(f[0])[0] == file_split)
-                for f in traceback.extract_stack()
+                for f in traceback.extract_stack()[0:-1]
         ]):
             return {}
 
