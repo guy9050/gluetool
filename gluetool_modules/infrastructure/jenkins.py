@@ -15,6 +15,9 @@ from gluetool.log import format_dict
 from gluetool.proxy import Proxy
 
 
+DEFAULT_JENKINSAPI_TIMEOUT = 120
+
+
 class JenkinsProxy(Proxy):
     # pylint: disable=too-few-public-methods
 
@@ -143,6 +146,12 @@ class CIJenkins(gluetool.Module):
             'help': 'Do not verify HTTPS certificate (default: %(default)s).',
             'action': 'store_true',
             'default': 'no'
+        },
+        'jenkins-api-timeout': {
+            'help': 'Wait SECONDS for Jenkins to respond (default: %(default)s).',
+            'type': int,
+            'default': DEFAULT_JENKINSAPI_TIMEOUT,
+            'metavar': 'SECONDS'
         }
     }
     required_options = ['url']
@@ -331,7 +340,9 @@ class CIJenkins(gluetool.Module):
 
         # connect to the jenkins instance
         try:
-            jenkins = Jenkins(url, username=user, password=password, ssl_verify=ssl_verify)
+            jenkins = Jenkins(url, username=user, password=password,
+                              ssl_verify=ssl_verify,
+                              timeout=self.option('jenkins-api-timeout'))
 
         except RequestException as e:
             self.debug('Connection error: {}'.format(e))
