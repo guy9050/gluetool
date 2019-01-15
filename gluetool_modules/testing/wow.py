@@ -390,6 +390,14 @@ class WorkflowTomorrow(gluetool.Module):
                 if 'No recipe generated (no relevant tasks?)' in exc.output.stderr:
                     raise NoTestAvailableError(primary_task)
 
+                if 'No valid distro/variant/arch combination found' in exc.output.stderr:
+                    msg = 'Not possible to test the artifact on {}, no valid distro/arch combination.'.format(distro)
+
+                    self.warn(msg)
+                    self.shared('add_note', msg, level=logging.WARN)
+
+                    return None
+
                 raise GeneralWOWError(primary_task, exc.output)
 
         # For each distro and "body" option set, construct one wow command (producing a job)
@@ -397,6 +405,11 @@ class WorkflowTomorrow(gluetool.Module):
 
         for distro in distros:
             for wow_options in actual_body_options:
-                jobs.append(_plan_job(distro, wow_options))
+                job = _plan_job(distro, wow_options)
+
+                if not job:
+                    continue
+
+                jobs.append(job)
 
         return jobs
