@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2019-01-15
+----------
+
+Added
+~~~~~
+
+- [dashboard] new module - handles and displays Dashboard URL in the log
+- [jenkins] new option ``--jenkins-api-timeout`` for controlling ``jenkinsapi`` request timeout length
+
+Changed
+~~~~~~~
+
+- artifact providers no longer check whether the artifact has any testable artifact, this is now left to the consumers like ``test-scheduler``
+- [jenkins] bumped version of ``jenkinsapi`` to 0.3.8 - this should fix problem with fetching Jenkins build parameters for some build
+
+
 2019-01-09
 ----------
 
