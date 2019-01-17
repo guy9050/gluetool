@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2019-01-17
+----------
+
+Changed
+~~~~~~~
+
+- [jenkins] the module does not try to fetch Jenkins build parameters, in the current settings it's consuming too many resources
+
+
 2019-01-15
 ----------
 
