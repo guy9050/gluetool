@@ -2,7 +2,6 @@ import base64
 import ConfigParser
 import json
 import os
-import sys
 import urllib
 import urllib2
 
@@ -272,20 +271,29 @@ class CIJenkins(gluetool.Module):
         pointless API calls.
         """
 
-        try:
-            jenkins_build = self.get_jenkins_build()
+        # In theory, everything is perfectly valid. In real life, the production Jenkins stuggles to even provide
+        # a list of builds for the job, and often respond with Proxy Timeouts. Extending timeouts in such conditions
+        # makes no sense, it'd simply timeout later - and we're dealing with a reverse proxy, the actual Jenkins
+        # behind it still works on a pointless request whose output wouldn't be seen by anybody. Until we make
+        # Jenkins more responsive, attempts to download params make things worse :/
 
-            if not jenkins_build:
-                return None
+        # pylint: disable=no-self-use
+        return {}
 
-            return jenkins_build.get_params()
+        # try:
+        #    jenkins_build = self.get_jenkins_build()
 
-        except gluetool.glue.GlueError:
-            self.glue.sentry_submit_exception(gluetool.Failure(self, sys.exc_info()), logger=self.logger)
+        #    if not jenkins_build:
+        #        return None
 
-            self.error('Failed to download the Jenkins build for parameters')
+        #    return jenkins_build.get_params()
 
-        return None
+        # except gluetool.glue.GlueError:
+        #    self.glue.sentry_submit_exception(gluetool.Failure(self, sys.exc_info()), logger=self.logger)
+
+        #    self.error('Failed to download the Jenkins build for parameters')
+
+        # return None
 
     @property
     def eval_context(self):
