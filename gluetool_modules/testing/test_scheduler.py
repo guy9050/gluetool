@@ -5,7 +5,9 @@ from six import reraise
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
 from gluetool.log import log_dict
-from libci.sentry import PrimaryTaskFingerprintsMixin
+
+import libci.guest
+import libci.sentry
 
 import gluetool_modules.libs.artifacts
 from gluetool_modules.libs import ANY
@@ -17,11 +19,10 @@ from gluetool_modules.libs.testing_environment import TestingEnvironment
 from typing import TYPE_CHECKING, cast, Any, Dict, List  # noqa
 
 if TYPE_CHECKING:
-    import libci.guest
     from gluetool_modules.testing.test_scheduler_beaker_xml import TestScheduleEntry  # noqa
 
 
-class NoTestableArtifactsError(PrimaryTaskFingerprintsMixin, SoftGlueError):
+class NoTestableArtifactsError(libci.sentry.PrimaryTaskFingerprintsMixin, SoftGlueError):
     """
     Raised when the artifact we're given to test contains no usable RPMS we could actually test.
     E.g. when the artifact was build for arch A only, while our backend can handle just arches
