@@ -6,12 +6,16 @@ import functools
 import gzip
 import os
 import re
+import threading
 from time import gmtime, strftime
 from datetime import datetime, timedelta
 
 import dateutil.parser
 import pytz
 import six
+
+from keystoneclient.auth.identity import v3 as keystone_identity
+from keystoneauth1 import session as keystone_session
 
 import novaclient.exceptions
 from novaclient import client
@@ -277,6 +281,8 @@ class OpenstackGuest(NetworkedGuest):
 
         :param str resource: Resource type (``instance``, ``floating IP``, etc.).
         :param gluetool.log.ContextLogger logger: Logger used for logging.
+        :param int timeout: Timeout in seconds for acquiring the resource.
+        :param int tick: Tick in seconds before retrying.
         :param callable func: Function which, when called, will acquire the resource.
         :param tuple args: Positional arguments for ``func``.
         :param dict kwargs: Keyword arguments for ``func``.
@@ -318,20 +324,24 @@ class OpenstackGuest(NetworkedGuest):
         Acquire a name for this server.
         """
 
-        name = [
+        parts = [
             self._os_details['name'],
-            self.floating_ip
+            self._module.shared('thread_id')[0:12],
+            str(self._module.acquire_guest_index)
         ]
 
         if 'JOB_NAME' in os.environ:
-            name.append('{}-{}'.format(os.environ['JOB_NAME'], os.environ['BUILD_ID']))
+            parts.append('{}-{}'.format(os.environ['JOB_NAME'], os.environ['BUILD_ID']))
 
-        self._os_name = '-'.join(name)
+        # construct name from non empty values only
+        self._os_name = '-'.join([name for name in parts if name])
 
     def _acquire_floating_ip(self):
         """
-        Acquire floating IP.
+        Acquire floating IP
         """
+        if not self._os_details['ip_pool_name']:
+            return
 
         self._os_floating_ip = OpenstackGuest._acquire_os_resource('floating IP', self._module.logger,
                                                                    self._module.option('acquire-timeout'), 30,
@@ -340,7 +350,7 @@ class OpenstackGuest(NetworkedGuest):
 
     def _acquire_nics(self):
         """
-        Acquire list of networs.
+        Acquire list of networks.
         """
 
         if not self._os_details.get('network', None):
@@ -369,6 +379,36 @@ class OpenstackGuest(NetworkedGuest):
                                                                 key_name=self._os_details['key_name'],
                                                                 userdata=self._os_details['user_data'])
 
+    def _acquire_network_ip(self):
+        """
+        Acquired IP address from the network. Must be called after instance is ACTIVE. Acquired
+        only if a specific network was specified.
+        """
+        networks = self._os_details.get('network', None)
+
+        if not networks:
+            self._module.debug('skipped acquiring of network IP because no network was specified')
+            return
+
+        log_dict(self._module.debug, 'available networks', self._os_instance.networks)
+
+        def _find_ip():
+
+            # try to find a network IP, first wins
+            for network in networks:
+                try:
+                    self._os_network_ip = self._os_instance.networks[network.label][0]
+                    break
+
+                except (KeyError, IndexError, TypeError):
+                    pass
+
+            return self._os_network_ip
+
+        OpenstackGuest._acquire_os_resource('Network IP', self._module.logger,
+                                            self._module.option('acquire-timeout'), 30,
+                                            _find_ip)
+
     def _release_snapshots(self):
         """
         Removes all created snapshots.
@@ -383,6 +423,10 @@ class OpenstackGuest(NetworkedGuest):
         self._snapshots = []
 
     def _release_floating_ip(self):
+        if not self._os_floating_ip:
+            self.debug("skipped release of floating IP, because it is not available")
+            return
+
         try:
             self._os_floating_ip.delete()
 
@@ -540,6 +584,10 @@ class OpenstackGuest(NetworkedGuest):
         Assign floating IP.
         """
 
+        # bail out if there is no floating IP to be assigned
+        if not self.floating_ip:
+            return
+
         # The assignment of IP can fail if done too early. So retry if needed to be sure
         # that we do not hit this. Also retrying should improve a bit situation with shorter
         # outages happening regularly on Openstack.
@@ -571,17 +619,29 @@ class OpenstackGuest(NetworkedGuest):
         self._os_name = None
         self._os_instance = None
         self._os_floating_ip = None
+        self._os_network_ip = None
         self._os_nics = []
         self._os_details = details or {}
 
+        # provision a new instance
         if instance_id is None:
             self._acquire_floating_ip()
             self._acquire_name()
             self._acquire_nics()
             self._acquire_instance()
 
+            # we need to wait for an instance to become active before getting IP from network
+            if self._os_details.get('network', None):
+
+                # initialize logger early
+                self.init_logging(module.logger, name=self._os_name)
+
+                self._wait_active()
+                self._acquire_network_ip()
+
             self._assign_floating_ip()
 
+        # initialize from an existing instance
         else:
             self._os_details.update({
                 'username': module.option('ssh-user'),
@@ -593,8 +653,10 @@ class OpenstackGuest(NetworkedGuest):
             self._os_name = self._os_instance.to_dict()['name']
             self._os_nics = self._acquire_nics()
 
+            self._acquire_network_ip()
+
         super(OpenstackGuest, self).__init__(module,
-                                             self.floating_ip,
+                                             self.ip,
                                              name=self._os_name,
                                              username=self._os_details['username'],
                                              key=self._os_details['key'],
@@ -620,9 +682,33 @@ class OpenstackGuest(NetworkedGuest):
         """
         Property provides associated floating IP address as a string.
 
-        :returns: floating IP address of the guest
+        :returns: floating IP address of the guest or None if not available
         """
-        return str(self._os_floating_ip.ip)
+        return str(self._os_floating_ip.ip) if self._os_floating_ip else None
+
+    @property
+    def network_ip(self):
+        """
+        Property returns IP address from the instance's network as a string.
+
+        :returns: IP address or None if not available
+        """
+        return str(self._os_network_ip) if self._os_network_ip else None
+
+    @property
+    # pylint: disable=invalid-name
+    def ip(self):
+        """
+        Property returns an available IP address of the machine, floating IP is preferred over network IP.
+
+        :returns: An IP address available, floating IP is preferred over network IP.
+        :raises gluetool.glue.GlueError: If no IP address available.
+        """
+
+        if not any([self.floating_ip, self.network_ip]):
+            raise GlueError('No floating or network IP found, cannot continue')
+
+        return self.floating_ip or self.network_ip
 
     @property
     def instance_id(self):
@@ -703,7 +789,7 @@ class OpenstackGuest(NetworkedGuest):
         # workaround-openstack-hostname.yaml requires hostname and domainname.
         # If not set, create ones - some tests may depend on resolvable hostname.
         if 'GUEST_HOSTNAME' not in variables:
-            variables['GUEST_HOSTNAME'] = re.sub(r'10\.(\d+)\.(\d+)\.(\d+)', r'host-\1-\2-\3', self.floating_ip)
+            variables['GUEST_HOSTNAME'] = re.sub(r'10\.(\d+)\.(\d+)\.(\d+)', r'host-\1-\2-\3', self.ip)
 
         if 'GUEST_DOMAINNAME' not in variables:
             variables['GUEST_DOMAINNAME'] = 'host.centralci.eng.rdu2.redhat.com'
@@ -872,14 +958,31 @@ class CIOpenstack(gluetool.Module):
 
     # pylint: disable=gluetool-option-has-no-default
     options = [
-        ('Common options', {
+        ('Authentication options', {
             'api-version': {
-                'help': 'API version (default: %(default)s)',
-                'default': '2'
+                'help': 'Client API version (default: %(default)s)',
+                'default': '2',
             },
             'auth-url': {
                 'help': 'Auth URL'
             },
+            'project-domain-name': {
+                'help': 'Project domain name, required for OpenStack Identity API v3 authentication only',
+            },
+            'password': {
+                'help': 'Password'
+            },
+            'project-name': {
+                'help': 'Project/Tenant Name'
+            },
+            'username': {
+                'help': 'Username to use for authentication'
+            },
+            'user-domain-name': {
+                'help': 'User domain name, required for OpenStack Identity API v3 authentication only',
+            },
+        }),
+        ('Common options', {
             'cleanup': {
                 'help': 'Cleanup reserved machines which have expired timestamp',
                 'action': 'store_true',
@@ -909,12 +1012,6 @@ class CIOpenstack(gluetool.Module):
             'network': {
                 'help': 'Label of network to attach instance to',
             },
-            'password': {
-                'help': 'Password'
-            },
-            'project-name': {
-                'help': 'Project/Tenant Name'
-            },
             'provision': {
                 'help': 'Provision given number of guests',
                 'metavar': 'COUNT',
@@ -942,9 +1039,6 @@ class CIOpenstack(gluetool.Module):
                 'default': DEFAULT_RESERVE_TIME,
                 'metavar': 'HOURS',
                 'type': int,
-            },
-            'username': {
-                'help': 'Username to used for authentication'
             },
             'ssh-key': {
                 'help': 'Path to SSH public key file'
@@ -1035,7 +1129,7 @@ class CIOpenstack(gluetool.Module):
     ]
 
     required_options = (
-        'auth-url', 'password', 'project-name', 'username', 'ssh-key', 'ip-pool-name',
+        'auth-url', 'password', 'project-name', 'username', 'ssh-key',
         'arch'
     )
     shared_functions = ('openstack', 'provision', 'provisioner_capabilities')
@@ -1045,6 +1139,13 @@ class CIOpenstack(gluetool.Module):
 
     # all openstack guests
     _all = []
+
+    def __init__(self, *args, **kwargs):
+        super(CIOpenstack, self).__init__(*args, **kwargs)
+
+        # counter for guest instances, used in instance name, must be thread-safe
+        self._guest_counter_lock = threading.Lock()
+        self._guest_counter = 0
 
     @property
     def eval_context(self):
@@ -1059,6 +1160,27 @@ class CIOpenstack(gluetool.Module):
         return {
             'OPENSTACK_GUESTS': self._all
         }
+
+    @property
+    def guest_count(self):
+        """
+        Returns current guest count.
+
+        :return: Number of provisioned guests.
+        """
+        return self._guest_counter
+
+    @property
+    def acquire_guest_index(self):
+        """
+        Acquires and returns new index of the guest. Is thread-safe, uses locking.
+
+        :return: Provisioned guest index.
+        """
+        with self._guest_counter_lock:
+            self._guest_counter += 1
+
+            return self._guest_counter
 
     @cached_property
     def user_data(self):
@@ -1396,20 +1518,40 @@ class CIOpenstack(gluetool.Module):
     def execute(self):
         api_version = self.option('api-version')
         auth_url = self.option('auth-url')
+        project_domain_name = self.option('project-domain-name')
         project_name = self.option('project-name')
         password = self.option('password')
         username = self.option('username')
+        user_domain_name = self.option('user-domain-name')
         key_name = self.option('key-name')
         provision_count = self.option('provision')
         cleanup = self.option('cleanup')
         cleanup_force = self.option('cleanup-force')
 
-        # connect to openstack instance
-        self.nova = client.Client(api_version,
-                                  auth_url=auth_url,
-                                  username=username,
-                                  password=password,
-                                  project_name=project_name)
+        # If domain name is specified, we use for authentication keystone client, which supports v3 Client API.
+        # This was required for newer Openstack versions.
+        #
+        # https://stackoverflow.com/questions/33698861/openstack-novaclient-python-api-not-working
+        if project_domain_name and user_domain_name:
+            self.info('using OpenStack Identity API v3 for authentication')
+            auth = keystone_identity.Password(
+                auth_url=auth_url,
+                username=username,
+                password=password,
+                project_domain_name=project_domain_name,
+                project_name=project_name,
+                user_domain_name=user_domain_name)
+
+            self.nova = client.Client(api_version, session=keystone_session.Session(auth=auth))
+
+        # Use v2 Client API for authentication
+        else:
+            # connect to openstack instance
+            self.nova = client.Client(api_version,
+                                      auth_url=auth_url,
+                                      username=username,
+                                      password=password,
+                                      project_name=project_name)
 
         # test connection
         try:
