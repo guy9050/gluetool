@@ -209,6 +209,15 @@ class RestraintRunner(gluetool.Module):
                     Not compatible with ``--use-snapshots``.
                     """,
             'default': None
+        },
+        'artifacts-location-template': {
+            'help': """
+                    When set, it will be rendered to provide the **final** location of artifacts created
+                    during the testing. It has access to common eval context, with ``ARTIFACTS_LOCATION``
+                    representing the **current** location of artifacts - these may be local, on the machine
+                    running the pipeline, or remote, on some server (default: %(default)s).
+                    """,
+            'default': None
         }
     }
 
@@ -250,15 +259,18 @@ class RestraintRunner(gluetool.Module):
 
         results = TaskSetResults(tasks=collections.OrderedDict())
 
-        if 'BUILD_URL' in os.environ:
-            def artifact_path(s):
-                return '{}/artifact/{}/{}'.format(os.getenv('BUILD_URL'), output.directory, s)
+        if self.option('artifacts-location-template'):
+            def artifact_path(current_location):
+                return render_template(
+                    self.option('artifacts-location-template'),
+                    logger=self.logger,
+                    ARTIFACTS_LOCATION=current_location,
+                    **self.shared('eval_context')
+                )
 
         else:
-            def artifact_path(s):
-                path = gluetool.utils.normalize_path('{}/{}'.format(output.directory, s))
-
-                return 'file://localhost/{}'.format(path)
+            def artifact_path(current_location):
+                return current_location
 
         for task_results in job_results.recipeSet.recipe.find_all('task'):
             task_name = task_results['name']
