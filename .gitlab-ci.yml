@@ -44,6 +44,10 @@ before_script:
   - echo "$TOWER_CLI_CONFIG" > ~/.tower_cli.cfg
   - chmod u=rw,go= ~/.tower_cli.cfg
 
+  # virtualenv, running under tox, tries to download the most recent versions of several packages,
+  # including pip - and pip 19 removed --process-dependency-links option, which gluetool-modules
+  # use. Until we get rid of it, we need a workaround :/
+  - pip install tox-virtualenv-no-download
 
 #
 # TEST steps
