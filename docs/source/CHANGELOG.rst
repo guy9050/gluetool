@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2019-01-23
+----------
+
+Added
+~~~~~
+
+- [guess-openstack-image] supports variables in the mapping
+- [guess-product] supports variables in the mapping
+- [install-mbs-build-execute] new module, using direct commands instead of Ansible playbook to install MBS builds
+
+Fixed
+~~~~~
+
+- [wow] when no distro/arch/variant is possible, instead of failing, emit a warning and leave the decision to the caller
+
+
 2019-01-17
 ----------
 
