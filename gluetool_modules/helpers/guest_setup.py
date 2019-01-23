@@ -1,4 +1,5 @@
 import gluetool
+from gluetool.log import log_dict
 from gluetool.utils import normalize_path_option, render_template
 
 
@@ -126,12 +127,43 @@ class GuestSetup(gluetool.Module):
           module.
         """
 
+        self.require_shared('detect_ansible_interpreter')
+
         variables = variables or {}
 
         (playbooks, variables_from_map) = self._get_details_from_map()
 
         # updated variables with variables from mapping file
         variables.update(variables_from_map)
+
+        # Detect Python interpreter for Ansible - this depends on the guest, it cannot be based
+        # just on the artifact properties (some artifacts may need to be tested on a mixture
+        # of different composes with different Python interpreters), therefore detect - unless,
+        # of course, told otherwise by the caller.
+        if 'ansible_python_interpreter' not in variables:
+            guests_interpreters = [
+                self.shared('detect_ansible_interpreter', guest)
+                for guest in guests
+            ]
+
+            log_dict(self.debug, 'detected interpreters', guests_interpreters)
+
+            # If guests don't share the same set of interpreters, just give up - picking one common
+            # to all guests is pointless, the correct fix would be to attach this info to each guest,
+            # and let Ansible to consume it. On the other hand, Ansible module could detect it on
+            # its own...
+            if not all((interpreters == guests_interpreters[0] for interpreters in guests_interpreters)):
+                self.warn('Python interpreters differ on guests, cannot pick one', sentry=True)
+
+            # Corner case - detected list of interpreters is empty. On all guests, but still empty.
+            elif not guests_interpreters[0]:
+                # Using guest.warn to make the message guest-specific - after all, we were not
+                # able to detect any intepreter on this guest, that's perfectly valid. We were
+                # not able to detect them on *other* guests neither, but, well, who cares...
+                guests[0].warn('Cannot deduce Python interpreter for Ansible', sentry=True)
+
+            else:
+                variables['ansible_python_interpreter'] = guests_interpreters[0][0]
 
         # ``--playbooks`` option overrides playbooks from mapping file
         if self.option('playbooks'):

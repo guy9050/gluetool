@@ -77,6 +77,7 @@ def test_setup(log, module, local_guest):
     # pylint: disable=protected-access
     module._config['playbooks'] = ','.join(playbooks)
     module._config['extra-vars'] = ['key2=val2,key3=val3', 'key4=val4']
+    module.glue._add_shared('detect_ansible_interpreter', module, lambda guest: [])
     module.glue._add_shared('run_playbook', module, dummy_run_playbook)
 
     module.shared('setup_guest', guests, variables={'key1': 'val1'}, dummy_option=17)
@@ -87,9 +88,10 @@ def test_setup(log, module, local_guest):
 def test_playbook_map_guest_setup(module, monkeypatch):
     module._config['playbooks-map'] = 'map.yml'
 
+    module.glue._add_shared('detect_ansible_interpreter', module, lambda guest: [])
     monkeypatch.setattr(module, "_get_details_from_map", lambda: ([], {}))
 
-    module.shared('setup_guest', None)
+    module.shared('setup_guest', [MagicMock()])
 
 
 def test_playbook_map(module, monkeypatch):
