@@ -4,7 +4,7 @@ from six import reraise
 
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
-from gluetool.log import log_dict
+from gluetool.log import log_dict, log_table
 
 import libci.guest
 import libci.sentry
@@ -114,6 +114,41 @@ class RestraintScheduler(gluetool.Module):
         for schedule_entry in schedule:
             schedule_entry.log()
 
+    def _log_summary_table(self, schedule, remaining_count):
+        # type: (List[TestScheduleEntry], int) -> None
+        """
+        Log a table giving a nice, user-readable overview of the schedule progress. At this moment,
+        only environment and assigned guest are shown, in the future more information would be added
+        (passed the setup, running tests, finished tests, etc), but that will require a bit more info
+        being accessible via schedule entry, which is work for another patch.
+
+        :param list(TestScheduleEntry) schedule: schedule to format.
+        :param int remaining_count: number of entries left to process.
+        """
+
+        headers = [
+            'SE', 'Compose', 'Arch', 'Guest'
+        ]
+
+        rows = []
+
+        for schedule_entry in schedule:
+            if schedule_entry.testing_environment:
+                compose = str(schedule_entry.testing_environment.compose)
+                arch = str(schedule_entry.testing_environment.arch)
+
+            else:
+                compose, arch = '', ''
+
+            guest_name = schedule_entry.guest.name if schedule_entry.guest else ''
+
+            rows.append([
+                schedule_entry.id, compose, arch, guest_name
+            ])
+
+        log_table(self.info, '{} guests pending'.format(remaining_count), [headers] + rows,
+                  tablefmt='simple', headers='firstrow')
+
     def _provision_guests(self, schedule):
         # type: (List[TestScheduleEntry]) -> None
         """
@@ -175,7 +210,7 @@ class RestraintScheduler(gluetool.Module):
                 # deciding what exception to use to kill the pipeline.
                 reraise(*exc_info)
 
-        # Prepare list of jobs and callbacks for ``run_jobs``.
+        # Prepare list of jobs and callbacks for ``run_jobs``, and an info table for user.
         jobs = [
             # `se` instead of `schedule_entry` to avoid binding in the inner functions bellow
             Job(logger=se.logger, target=_provision_wrapper, args=(se,), kwargs={}) for se in schedule
@@ -208,8 +243,9 @@ class RestraintScheduler(gluetool.Module):
             # type: (int, TestScheduleEntry) -> None
 
             # pylint: disable=unused-argument
+            self._log_summary_table(schedule, remaining_count)
 
-            self.info('{} guests pending'.format(remaining_count))
+        self._log_summary_table(schedule, len(schedule))
 
         job_errors = run_jobs(
             jobs,
