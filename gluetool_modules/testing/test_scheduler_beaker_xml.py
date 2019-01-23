@@ -1,72 +1,33 @@
 import gluetool
 import gluetool.log
-from gluetool.log import log_dict, log_xml, LoggingFunctionType, LoggingWarningFunctionType
+from gluetool.log import log_dict, log_xml
 
 from gluetool_modules.libs.testing_environment import TestingEnvironment
+from gluetool_modules.libs.test_schedule import TestScheduleEntry as BaseTestScheduleEntry
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order
-from typing import TYPE_CHECKING, cast, Any, List, Optional  # noqa
-
-if TYPE_CHECKING:
-    import libci.guest  # noqa
+from typing import cast, Any, List, Optional  # noqa
 
 
-class TestScheduleEntryAdapter(gluetool.log.ContextAdapter):
-    def __init__(self, logger, entry_id):
-        # type: (gluetool.log.ContextAdapter, str) -> None
-
-        super(TestScheduleEntryAdapter, self).__init__(logger, {
-            'ctx_schedule_entry_index': (200, entry_id)
-        })
-
-
-class TestScheduleEntry(object):
+class TestScheduleEntry(BaseTestScheduleEntry):
     # pylint: disable=too-few-public-methods
 
-    """
-    Internal representation of stuff to run, where to run and other bits necessary for scheduling
-    all things the module was asked to perform.
+    def __init__(self, job_index, recipe_set_index, recipe_set, *args, **kwargs):
+        # type: (int, int, Any, *Any, **Any) -> None
+        """
+        Test schedule entry, suited for use with Restraint.
 
-    Follows :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
+        Follows :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
 
-    :param logger: logger used as a parent of this entry's own logger.
-    :param int job_index: index of job within all jobs this entry belongs to.
-    :param int recipe_set_index: index of recipe set within its job this entry belongs to.
-    :param xml recipe_set: XML description of (Beaker) recipe set this entry handles.
-    """
+        :param int job_index: index of job within all jobs this entry belongs to.
+        :param int recipe_set_index: index of recipe set within its job this entry belongs to.
+        :param xml recipe_set: XML description of (Beaker) recipe set this entry handles.
+        """
 
-    # Logging type stubs
-    #
-    # These methods are added dynamically, therefore without intruducing them to mypy, every use of `self.debug`
-    # would cause an error when checking types. We cannot simply set them to `None`, that makes pylint go crazy
-    # because `None` is apparently not callable, and we're calling `self.debug` often :) So, we use dummy method
-    # for initialization, to make pylint happy, but we wrap it with `cast` to enforce proper types to make mypy
-    # happy as well :) It must a full-fledge method, because lambda cannot take keyword arguments (like sentry),
-    # and pylint can discover that.
-    def _fake_log_fn(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
+        super(TestScheduleEntry, self).__init__(*args, **kwargs)
 
-        pass
-
-    verbose = cast(LoggingFunctionType, _fake_log_fn)
-    debug = cast(LoggingFunctionType, _fake_log_fn)
-    info = cast(LoggingFunctionType, _fake_log_fn)
-    warn = cast(LoggingWarningFunctionType, _fake_log_fn)
-    error = cast(LoggingFunctionType, _fake_log_fn)
-    exception = cast(LoggingFunctionType, _fake_log_fn)
-
-    def __init__(self, logger, job_index, recipe_set_index, recipe_set):
-        # type: (gluetool.log.ContextAdapter, int, int, Any) -> None
-
-        # pylint: disable=C0103
         self.id = 'schedule entry J#{}-RS#{}'.format(job_index, recipe_set_index)
-
-        self.logger = TestScheduleEntryAdapter(logger, self.id)
-        self.logger.connect(self)
-
-        self.testing_environment = None  # type: Optional[TestingEnvironment]
-        self.guest = None  # type: Optional[libci.guest.NetworkedGuest]
         self.package = self.recipe_set = recipe_set
 
     def log(self, log_fn=None):
@@ -74,8 +35,8 @@ class TestScheduleEntry(object):
 
         log_fn = log_fn or self.debug
 
-        log_fn('testing environment: {}'.format(self.testing_environment))
-        log_fn('guest: {}'.format(self.guest))
+        super(TestScheduleEntry, self).log(log_fn=log_fn)
+
         log_xml(log_fn, 'recipe set', self.recipe_set)
 
 
@@ -147,7 +108,7 @@ class TestSchedulerWow(gluetool.Module):
             # From each recipe, extract distro and architecture, and construct testing environment description.
             # That will be passed to the provisioning modules.
 
-            schedule_entry = TestScheduleEntry(gluetool.log.Logging.get_logger(), index, i, recipe_set)
+            schedule_entry = TestScheduleEntry(index, i, recipe_set, gluetool.log.Logging.get_logger())
 
             schedule_entry.testing_environment = TestingEnvironment(
                 compose=recipe_set.find('distroRequires').find('distro_name')['value'].encode('ascii'),
