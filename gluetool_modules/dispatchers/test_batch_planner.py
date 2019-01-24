@@ -47,6 +47,9 @@ class TestBatchPlanner(gluetool.Module):
     * ``static-config``: use a YAML file (set by ``--config`` option) to specify what jobs
       are supposed to be run for artifacts.
 
+    * ``basic-static-config``: use a YAML file (set by ``--config`` option) to specify what jobs
+      are supposed to be run. Entries with True-ish rule are triggered.
+
     * ``sti``: check if test/test.yaml is present in component repository. Jenkins job name
       is found in mapping file (set by ``--sti-job-map`` option).
     """
@@ -63,7 +66,7 @@ class TestBatchPlanner(gluetool.Module):
             'help': 'Comma-separated list of methods (default: none).',
             'metavar': 'METHOD',
             'action': 'append',
-            'choices': ['static-config', 'sti'],
+            'choices': ['basic-static-config', 'static-config', 'sti'],
             'default': []
         },
         'config': {
@@ -446,6 +449,27 @@ class TestBatchPlanner(gluetool.Module):
 
         return final_commands
 
+    def _plan_by_basic_static_config(self):
+        self.require_shared('evaluate_filter')
+
+        if not self.configs:
+            self.warn('Empty dispatcher configuration')
+
+        final_commands = []
+
+        for config_filepath in self.configs:
+            config = load_yaml(config_filepath, logger=self.logger)
+
+            for item in self.shared('evaluate_filter', config):
+
+                module = item['module']
+                args = item['args'] if item['args'] else []
+
+                self.info("module='{}', args='{}'".format(module, args))
+                final_commands.append((module, args))
+
+        return final_commands
+
     @cached_property
     def sti_job_map(self):
         return PatternMap(self.option('sti-job-map'), logger=self.logger)
@@ -505,20 +529,37 @@ class TestBatchPlanner(gluetool.Module):
 
     def sanity(self):
         self._planners = {
+            'basic-static-config': self._plan_by_basic_static_config,
             'static-config': self._plan_by_static_config,
             'sti': self._plan_by_sti
         }
 
         self._methods = gluetool.utils.normalize_multistring_option(self.option('methods'))
 
+        if 'static-config' in self._methods and 'basic-static-config' in self._methods:
+            raise gluetool.utils.IncompatibleOptionsError(
+                self,
+                "methods 'basic-static-config' and 'static-config' cannot be used together"
+            )
+
         for method in self._methods:
             if method not in self._planners:
                 raise GlueError("Unknown method '{}'".format(method))
 
             if method == 'static-config' and not self.option('config'):
-                raise gluetool.utils.IncompatibleOptionsError(self,
-                                                              "--config option is required with method 'static-config'")
+                raise gluetool.utils.IncompatibleOptionsError(
+                    self,
+                    "--config option is required with method 'static-config'"
+                )
+
+            if method == 'basic-static-config' and not self.option('config'):
+                raise gluetool.utils.IncompatibleOptionsError(
+                    self,
+                    "--config option is required with method 'basic-static-config'"
+                )
 
             if method == 'sti' and not self.option('sti-job-map'):
-                raise gluetool.utils.IncompatibleOptionsError(self,
-                                                              "--sti-job-map option is required with method 'sti'")
+                raise gluetool.utils.IncompatibleOptionsError(
+                    self,
+                    "--sti-job-map option is required with method 'sti'"
+                )
