@@ -58,15 +58,13 @@ dependencies:
 
     # bundle sclrun with wow
     - name: Clone RHSCL Apps tools repository
-      git:
-        repo: git://git.host.prod.eng.bos.redhat.com/RH_Software_Collections
-        dest: /usr/local/sclrun
-        version: master
-      when: BUILDING_DOCKER is defined
-
-    - name: Add schedulator location to $PATH
-      file:
-        src: /usr/local/sclrun/Scripts/schedulator/sclrun
-        dest: /usr/bin/sclrun
-        state: link
-      when: BUILDING_DOCKER is defined
+      lineinfile:
+        dest: "{{ DOCKERFILE }}"
+        regexp: "^# added by 'wow module$"
+        line: |
+          # added by 'wow' module
+          RUN git clone git://git.host.prod.eng.bos.redhat.com/RH_Software_Collections /usr/local/sclrun
+          RUN ln -s /usr/local/sclrun/Scripts/schedulator/sclrun /usr/bin/sclrun
+        state: present
+        insertafter: "^# TASK: POST-START"
+      when: BUILDING_DOCKERFILE is defined

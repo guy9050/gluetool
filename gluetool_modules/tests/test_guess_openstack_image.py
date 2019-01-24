@@ -107,7 +107,7 @@ def test_pattern_map(module, monkeypatch):
     module._config['pattern-map'] = 'dummy-map.yml'
 
     assert module.pattern_map == map_instance
-    map_class.assert_called_once_with('dummy-map.yml', logger=module.logger)
+    map_class.assert_called_once_with('dummy-map.yml', allow_variables=True, logger=module.logger)
 
 
 def test_force(module, log):

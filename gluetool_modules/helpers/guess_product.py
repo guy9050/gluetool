@@ -51,7 +51,7 @@ class GuessProduct(gluetool.Module):
 
     @cached_property
     def pattern_map(self):
-        return PatternMap(self.option('pattern-map'), logger=self.logger)
+        return PatternMap(self.option('pattern-map'), allow_variables=True, logger=self.logger)
 
     def _guess_force(self):
         self._product = self.option('product')

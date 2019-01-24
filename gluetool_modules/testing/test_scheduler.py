@@ -1,4 +1,3 @@
-import shlex
 import sys
 
 from six import reraise
@@ -6,15 +5,24 @@ from six import reraise
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
 from gluetool.log import log_dict
-from libci.sentry import PrimaryTaskFingerprintsMixin
+
+import libci.guest
+import libci.sentry
 
 import gluetool_modules.libs.artifacts
 from gluetool_modules.libs import ANY
 from gluetool_modules.libs.jobs import Job, run_jobs, handle_job_errors
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 
+# Type annotations
+# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
+from typing import TYPE_CHECKING, cast, Any, Dict, List  # noqa
 
-class NoTestableArtifactsError(PrimaryTaskFingerprintsMixin, SoftGlueError):
+if TYPE_CHECKING:
+    from gluetool_modules.testing.test_scheduler_beaker_xml import TestScheduleEntry  # noqa
+
+
+class NoTestableArtifactsError(libci.sentry.PrimaryTaskFingerprintsMixin, SoftGlueError):
     """
     Raised when the artifact we're given to test contains no usable RPMS we could actually test.
     E.g. when the artifact was build for arch A only, while our backend can handle just arches
@@ -27,6 +35,8 @@ class NoTestableArtifactsError(PrimaryTaskFingerprintsMixin, SoftGlueError):
     """
 
     def __init__(self, task, supported_arches):
+        # type: (Any, List[str]) -> None
+
         # pylint: disable=line-too-long
         self.task_arches = task.task_arches.arches
         self.supported_arches = supported_arches
@@ -71,16 +81,22 @@ class RestraintScheduler(gluetool.Module):
 
     shared_functions = ['test_schedule']
 
-    _schedule = None
+    _schedule = None  # type: List[TestScheduleEntry]
 
     @utils.cached_property
     def arch_compatibility_map(self):
+        # type: () -> Dict[str, List[str]]
+
         if not self.option('arch-compatibility-map'):
             return {}
 
-        return utils.load_yaml(self.option('arch-compatibility-map'), logger=self.logger)
+        return cast(
+            Dict[str, List[str]],
+            utils.load_yaml(self.option('arch-compatibility-map'), logger=self.logger)
+        )
 
     def test_schedule(self):
+        # type: () -> List[TestScheduleEntry]
         """
         Returns schedule for runners. It tells runner which recipe sets
         it should run on which guest.
@@ -91,12 +107,15 @@ class RestraintScheduler(gluetool.Module):
         return self._schedule
 
     def _log_schedule(self, label, schedule):
+        # type: (str, List[TestScheduleEntry]) -> None
+
         self.debug('{}:'.format(label))
 
         for schedule_entry in schedule:
             schedule_entry.log()
 
     def _provision_guests(self, schedule):
+        # type: (List[TestScheduleEntry]) -> None
         """
         Provision guests for schedule entries.
 
@@ -122,6 +141,8 @@ class RestraintScheduler(gluetool.Module):
         # entries (for free :).
 
         def _provision_wrapper(schedule_entry):
+            # type: (TestScheduleEntry) -> List[libci.guest.NetworkedGuest]
+
             # This is necessary - the output would tie the thread and the schedule entry in
             # the output. Modules used to actually provision the guest use their own module
             # loggers, therefore there's no connection between these two entities in the output
@@ -135,7 +156,10 @@ class RestraintScheduler(gluetool.Module):
             schedule_entry.info('starting guest provisioning thread')
 
             try:
-                return self.shared('provision', schedule_entry.testing_environment)
+                return cast(
+                    List[libci.guest.NetworkedGuest],
+                    self.shared('provision', schedule_entry.testing_environment)
+                )
 
             # pylint: disable=broad-except
             except Exception:
@@ -159,22 +183,30 @@ class RestraintScheduler(gluetool.Module):
 
         # called when provisioning jobs starts
         def _before_job_start(schedule_entry):
+            # type: (TestScheduleEntry) -> None
+
             schedule_entry.debug('planning guest for environment: {}'.format(schedule_entry.testing_environment))
 
         # called when provisioning job succeeded - store returned guest in the schedul eentry
         def _on_job_complete(result, schedule_entry):
+            # type: (List[libci.guest.NetworkedGuest], TestScheduleEntry) -> None
+
             schedule_entry.info('provisioning of guest finished')
 
             schedule_entry.guest = result[0]
 
         # called when provisioning job failed
         def _on_job_error(exc_info, schedule_entry):
+            # type: (Any, TestScheduleEntry) -> None
+
             # pylint: disable=unused-argument
 
             schedule_entry.error('provisioning of guest failed')
 
         # called when provisioning job finished
         def _on_job_done(remaining_count, schedule_entry):
+            # type: (int, TestScheduleEntry) -> None
+
             # pylint: disable=unused-argument
 
             self.info('{} guests pending'.format(remaining_count))
@@ -193,6 +225,7 @@ class RestraintScheduler(gluetool.Module):
             handle_job_errors(job_errors, 'At least one provisioning attempt failed')
 
     def _setup_guests(self, schedule):
+        # type: (List[TestScheduleEntry]) -> None
         """
         Setup all guests of a schedule.
 
@@ -206,6 +239,10 @@ class RestraintScheduler(gluetool.Module):
         self.info('setting up {} guests'.format(len(schedule)))
 
         def _guest_setup_wrapper(schedule_entry):
+            # type: (TestScheduleEntry) -> Any
+
+            assert schedule_entry.guest is not None
+
             schedule_entry.info('starting guest setup thread')
 
             try:
@@ -230,22 +267,30 @@ class RestraintScheduler(gluetool.Module):
 
         # called when setup jobs starts
         def _before_job_start(schedule_entry):
+            # type: (TestScheduleEntry) -> None
+
             schedule_entry.debug('planning setup of guest: {}'.format(schedule_entry.guest))
 
         # called when setup job succeeded
         def _on_job_complete(result, schedule_entry):
+            # type: (List[libci.guest.NetworkedGuest], TestScheduleEntry) -> None
+
             # pylint: disable=unused-argument
 
             schedule_entry.info('setup of guest finished')
 
         # called when setup job failed
         def _on_job_error(exc_info, schedule_entry):
+            # type: (Any, TestScheduleEntry) -> None
+
             # pylint: disable=unused-argument
 
             schedule_entry.error('setup of guest failed')
 
         # called when setup job finished
         def _on_job_done(remaining_count, schedule_entry):
+            # type: (int, TestScheduleEntry) -> None
+
             # pylint: disable=unused-argument
 
             self.info('{} guests pending'.format(remaining_count))
@@ -264,6 +309,7 @@ class RestraintScheduler(gluetool.Module):
             handle_job_errors(job_errors, 'At least one guest setup failed')
 
     def _assign_guests(self, schedule):
+        # type: (List[TestScheduleEntry]) -> None
         """
         Provision, setup and assign guests for entries in a given schedule.
 
@@ -284,14 +330,9 @@ class RestraintScheduler(gluetool.Module):
         self._log_schedule('final schedule', schedule)
 
     def execute(self):
+        # type: () -> None
+
         self.require_shared('primary_task', 'tasks', 'restraint', 'create_test_schedule')
-
-        def _command_options(name):
-            opts = self.option(name)
-            if opts is None or not opts:
-                return []
-
-            return shlex.split(opts)
 
         # Check whether we have *any* artifacts at all, before we move on to more fine-grained checks.
         gluetool_modules.libs.artifacts.has_artifacts(*self.shared('tasks'))

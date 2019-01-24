@@ -233,6 +233,11 @@ class MBSTask(object):
 
         log_dict(self.debug, 'modulemd', modulemd)
 
+        if not modulemd:
+            # I'm curious how this can happen, and how common thing it is to not have modulemd
+            # available over MBS API.
+            self.warn('Artifact build info does not include modulemd document', sentry=True)
+
         return modulemd
 
     @cached_property
@@ -252,10 +257,6 @@ class MBSTask(object):
         """
 
         if not self._modulemd:
-            # I'm curious how this can happen, and how common thing it is to not have modulemd
-            # available over MBS API.
-            self.warn('Artifact build info does not include modulemd document', sentry=True)
-
             return TaskArches([self.module.option('arches')])
 
         query = """
@@ -279,6 +280,21 @@ class MBSTask(object):
         log_dict(self.debug, 'unique module arches', arches)
 
         return TaskArches(arches)
+
+    @cached_property
+    def dependencies(self):
+        dependencies = []
+
+        try:
+            requires = self._modulemd['data']['dependencies'][0]['requires']
+        except IndexError:
+            raise gluetool.GlueError("API returned unexpected '_modulemd' structure")
+
+        for module_name, module_streams in requires.iteritems():
+            for stream in module_streams:
+                dependencies.append('{}:{}'.format(module_name, stream))
+
+        return dependencies
 
     @cached_property
     def url(self):
