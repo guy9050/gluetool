@@ -30,6 +30,7 @@ class TestScheduleEntry(object):
     Follows :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
 
     :param logger: logger used as a parent of this entry's own logger.
+    :param str entry_id: ID of the entry.
     """
 
     # Logging type stubs
@@ -52,11 +53,11 @@ class TestScheduleEntry(object):
     error = cast(LoggingFunctionType, _fake_log_fn)
     exception = cast(LoggingFunctionType, _fake_log_fn)
 
-    def __init__(self, logger):
-        # type: (gluetool.log.ContextAdapter) -> None
+    def __init__(self, logger, entry_id):
+        # type: (gluetool.log.ContextAdapter, str) -> None
 
         # pylint: disable=C0103
-        self.id = ''  # type: str
+        self.id = entry_id
 
         self.logger = TestScheduleEntryAdapter(logger, self.id)
         self.logger.connect(self)

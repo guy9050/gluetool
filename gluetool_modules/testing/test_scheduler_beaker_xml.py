@@ -13,21 +13,21 @@ from typing import cast, Any, List, Optional  # noqa
 class TestScheduleEntry(BaseTestScheduleEntry):
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, job_index, recipe_set_index, recipe_set, *args, **kwargs):
-        # type: (int, int, Any, *Any, **Any) -> None
+    def __init__(self, logger, job_index, recipe_set_index, recipe_set):
+        # type: (gluetool.log.ContextAdapter, int, int, Any) -> None
         """
         Test schedule entry, suited for use with Restraint.
 
         Follows :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
 
+        :param logger: logger used as a parent of this entry's own logger.
         :param int job_index: index of job within all jobs this entry belongs to.
         :param int recipe_set_index: index of recipe set within its job this entry belongs to.
         :param xml recipe_set: XML description of (Beaker) recipe set this entry handles.
         """
 
-        super(TestScheduleEntry, self).__init__(*args, **kwargs)
+        super(TestScheduleEntry, self).__init__(logger, 'schedule entry J#{}-RS#{}'.format(job_index, recipe_set_index))
 
-        self.id = 'schedule entry J#{}-RS#{}'.format(job_index, recipe_set_index)
         self.package = self.recipe_set = recipe_set
 
     def log(self, log_fn=None):
@@ -108,7 +108,7 @@ class TestSchedulerWow(gluetool.Module):
             # From each recipe, extract distro and architecture, and construct testing environment description.
             # That will be passed to the provisioning modules.
 
-            schedule_entry = TestScheduleEntry(index, i, recipe_set, gluetool.log.Logging.get_logger())
+            schedule_entry = TestScheduleEntry(gluetool.log.Logging.get_logger(), index, i, recipe_set)
 
             schedule_entry.testing_environment = TestingEnvironment(
                 compose=recipe_set.find('distroRequires').find('distro_name')['value'].encode('ascii'),
