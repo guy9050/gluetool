@@ -77,7 +77,6 @@ PROJECT_INFO = {
     }
 }
 
-
 BUILD_TASK_INFO = {
     '_links': {
         'build': {

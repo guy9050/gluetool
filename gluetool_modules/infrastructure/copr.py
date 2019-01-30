@@ -57,6 +57,11 @@ class CoprApi(object):
 
         return build_info['build']
 
+    def get_build_tasks(self, build_id):
+        build_info = self._get_build_info(build_id)
+
+        return self._get_json(build_info['_links']['build_tasks']['href'], 'build tasks')['build_tasks']
+
     def get_build_task_info(self, build_id, chroot_name):
         # pylint: disable=line-too-long
         build_task_info = self._get_json('api_2/build_tasks/{}/{}'.format(build_id, chroot_name), 'build tasks info')
@@ -71,16 +76,45 @@ class CoprApi(object):
 
         return build_task_info['build_task']
 
-    def get_project_info(self, build_id):
+    def get_project_id(self, build_id):
         build_info = self._get_build_info(build_id)
 
-        if not build_info.get('_links', ''):
-            return {
-                'owner': 'UNKNOWN-COPR-OWNER',
-                'name': 'UNKNOWN-COPR-PROJECT'
-            }
+        try:
+            project_id = build_info['_links']['project']['href'].split('/')[-1]
+        except KeyError:
+            project_id = None
 
-        return self._get_json(build_info['_links']['project']['href'], 'project info')['project']
+        return project_id
+
+    def _get_project_info(self, project_id):
+
+        if not project_id:
+            return None
+
+        return self._get_json('api_2/projects/{}'.format(project_id), 'project info')
+
+    def get_project_info(self, project_id):
+        unknown_project = {
+            'owner': 'UNKNOWN-COPR-OWNER',
+            'name': 'UNKNOWN-COPR-PROJECT'
+        }
+
+        if not project_id:
+            self.module.warn('No project info obtained - invalid `project_id`.')
+            return unknown_project
+
+        project_info = self._get_project_info(project_id)
+
+        if project_info.get('message', '') == 'Project with id `{}` not found'.format(project_id):
+            self.module.warn('Project {} not found'.format(project_id))
+            return unknown_project
+
+        return project_info['project']
+
+    def get_project_builds(self, project_id):
+        project_info = self._get_project_info(project_id)
+
+        return self._get_json(project_info['_links']['builds']['href'], 'project builds')['builds']
 
     def _result_dir_url(self, build_id, chroot_name):
         build_task_info = self.get_build_task_info(build_id, chroot_name)
@@ -164,7 +198,8 @@ class CoprTask(object):
 
         build = self.copr_api.get_build_info(task_id.build_id)
         build_task = self.copr_api.get_build_task_info(task_id.build_id, task_id.chroot_name)
-        project = self.copr_api.get_project_info(task_id.build_id)
+        project_id = self.copr_api.get_project_id(self.task_id.build_id)
+        project = self.copr_api.get_project_info(project_id)
 
         self.status = build_task['state']
         self.component = build['package_name']

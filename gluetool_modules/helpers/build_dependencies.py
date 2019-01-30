@@ -149,26 +149,35 @@ class BuildDependencies(gluetool.Module):
 
         copr_api = self.shared('copr_api')
         task = self.shared('primary_task')
+        project_id = copr_api.get_project_id(task.task_id.build_id)
 
         self.info('Looking for companions {}'.format(', '.join(self.companions)))
 
-        project_href = copr_api.get_build_info(task.task_id.build_id)['_links']['project']['href']
+        missing_companions = list(self.companions)
 
-        builds_href = copr_api.get_href(project_href)['_links']['builds']['href']
+        for build in copr_api.get_project_builds(project_id):
 
-        for build in copr_api.get_href(builds_href)['builds']:
-            package_name = build['build']['package_name']
-            if package_name in self.companions:
-                build_id = build['build']['id']
-                build_tasks_href = build['_links']['build_tasks']['href']
+            build = build['build']
 
-                for build_task in copr_api.get_href(build_tasks_href)['build_tasks']:
+            package_name = build['package_name']
+
+            if package_name in missing_companions:
+                build_id = build['id']
+
+                build_tasks = copr_api.get_build_tasks(build_id)
+
+                for build_task in build_tasks:
                     if build_task['build_task']['chroot_name'] == task.task_id.chroot_name:
                         chroot_name = build_task['build_task']['chroot_name']
+
+                        missing_companions.remove(package_name)
 
                         companions_ids.append('{}:{}'.format(build_id, chroot_name))
                         found_companions.append(package_name)
                         self.debug('{} bound - {}:{}'.format(build, build_id, chroot_name))
+
+            if not missing_companions:
+                break
 
         if len(self.companions) != len(found_companions):
             self.warn('Number of found companions are not equal to required one!', sentry=True)
