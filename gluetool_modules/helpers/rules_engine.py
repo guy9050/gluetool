@@ -7,6 +7,15 @@ from gluetool.log import log_dict
 
 import _ast
 
+# Type annotations
+# pylint: disable=unused-import,wrong-import-order,invalid-name
+from typing import cast, Any, Callable, Dict, Iterator, List, Match, Optional, Tuple, Union  # noqa
+
+EntryType = Dict[str, Any]  # noqa
+ContextType = Dict[str, Any]  # noqa
+ContextGetterType = Callable[[], ContextType]  # noqa
+CommandCallbackType = Callable[[EntryType, str, Any, ContextType], bool]  # noqa
+
 
 class RulesError(SoftGlueError):
     """
@@ -19,6 +28,8 @@ class RulesError(SoftGlueError):
     """
 
     def __init__(self, message, rules, intro, error):
+        # type: (str, str, str, str) -> None
+
         super(RulesError, self).__init__(message)
 
         self.rules = rules
@@ -28,6 +39,8 @@ class RulesError(SoftGlueError):
 
 class InvalidASTNodeError(RulesError):
     def __init__(self, rules, node):
+        # type: (str, ast.AST) -> None
+
         super(InvalidASTNodeError, self).__init__(
             "It is not allowed to use '{}' in rules".format(node.__class__.__name__),
             rules,
@@ -37,6 +50,8 @@ class InvalidASTNodeError(RulesError):
 
 class RulesSyntaxError(RulesError):
     def __init__(self, rules, exc):
+        # type: (str, SyntaxError) -> None
+
         super(RulesSyntaxError, self).__init__(
             'Cannot parse rules',
             rules,
@@ -46,6 +61,8 @@ class RulesSyntaxError(RulesError):
 
 class RulesTypeError(RulesError):
     def __init__(self, rules, exc):
+        # type: (str, Exception) -> None
+
         super(RulesTypeError, self).__init__(
             'Cannot parse rules',
             rules,
@@ -70,14 +87,19 @@ class RulesASTVisitor(ast.NodeTransformer):
         )
     ])
 
-    def __init__(self, rules, *args, **kwargs):
-        super(RulesASTVisitor, self).__init__(*args, **kwargs)
+    def __init__(self, rules):
+        # type: (Rules) -> None
+
+        super(RulesASTVisitor, self).__init__()
 
         self._rules = rules
 
     def generic_visit(self, node):
+        # type: (ast.AST) -> Any
+
         if not isinstance(node, RulesASTVisitor._valid_classes):
-            raise InvalidASTNodeError(self._rules, node)
+            # pylint: disable=protected-access
+            raise InvalidASTNodeError(self._rules._rules, node)
 
         return super(RulesASTVisitor, self).generic_visit(node)
 
@@ -90,9 +112,13 @@ class MatchableString(str):
 
     # pylint: disable=invalid-name
     def match(self, pattern, I=True):
+        # type: (str, bool) -> Optional[Match[Any]]
+
         return re.match(pattern, str(self), re.I if I is True else 0)
 
     def search(self, pattern, I=True):
+        # type: (str, bool) -> Optional[Match[Any]]
+
         return re.search(pattern, str(self), re.I if I is True else 0)
 
 
@@ -106,13 +132,18 @@ class Rules(object):
     """
 
     def __init__(self, rules):
+        # type: (str) -> None
+
         self._rules = rules
-        self._code = None
+        self._code = None  # type: Any
 
     def __repr__(self):
+        # type: () -> str
+
         return '<Rules: {}>'.format(self._rules)
 
     def _compile(self):
+        # type: () -> Any
         """
         Compile rule. Parse rule into an AST, perform its sanity checks,
         and then compile it into executable.
@@ -132,10 +163,14 @@ class Rules(object):
         try:
             return compile(tree, '<static-config-file>', 'eval')
 
+        # This bit will probably be left uncovered by unit tests - the best way forward seems to be patching
+        # `compile` and injecting an error, but `compile` is an builtin function and pytest might be using
+        # it internaly (or may start in the future...). Not a good idea to poke into that.
         except Exception as e:
             raise RulesTypeError(self._rules, e)
 
     def eval(self, our_globals, our_locals):
+        # type: (ContextType, ContextType) -> Any
         """
         Evaluate rule. User must provide both `locals` and `globals` dictionaries
         we use as a context for the rule.
@@ -197,11 +232,65 @@ class RulesEngine(gluetool.Module):
         }
     }
 
-    shared_functions = ('evaluate_rules', 'evaluate_filter', 'evaluate_instructions')
+    shared_functions = ['evaluate_rules', 'evaluate_filter', 'evaluate_instructions']
 
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
+    def _filter(self,
+                entries,  # type: List[EntryType]
+                context=None,  # type: Optional[Union[ContextType, ContextGetterType]]
+                default_rule='True',  # type: str
+                stop_at_first_hit=False  # type: bool
+               ):  # noqa
+        # type: (...) -> Iterator[Tuple[EntryType, ContextType]]
+        """
+        Yields entries that are allowed by their rules.
+
+        This is an internal implementation of a common functionality: find out what entries are valid
+        with respect to their rules. The method is used to simplify other - public - methods.
+
+        :param list(dict) entries: List of entries to filter.
+        :param context: Provider of context for rules and templating services. Either a dictionary or a callable
+            returning a dictionary. If callable is provided, it will be called before each entry to
+            refresh the context.
+        :param str default_rule: If there's no rule in the instruction, this will be used. For example, use ``"False"``
+            to skip instructions without rules.
+        :param bool stop_at_first_hit: If set, first entry whose rule evaluated true-ishly is returned immediately.
+        :rtype: Iterator[tuple(dict, dict)]
+        :returns: yields tuples of two items: the entry and the context used in its evaluation.
+        """
+
+        # If we don't have a context, get one from the core.
+        if context is None:
+            context = self.shared('eval_context')
+
+        # For the sake of simplicity, the loop over instructions will always call context_getter. It's either
+        # callable given by caller, or a simple anonymous function returning a dictionary - either the one
+        # given by caller or the default from above.
+        if callable(context):
+            context_getter = context
+
+        else:
+            context_getter = cast(ContextGetterType, lambda: context)
+
+        for entry in entries:
+            loop_context = context_getter()
+
+            log_dict(self.debug, 'entry', entry)
+
+            # Not calling `self.evaluate_rules` directly - other modules may have overload this shared function,
+            # let's use the correct implementation.
+            if not self.shared('evaluate_rules', entry.get('rule', default_rule), context=loop_context):
+                self.debug('denied by rules')
+                continue
+
+            yield entry, loop_context
+
+            if stop_at_first_hit:
+                break
+
     def evaluate_rules(self, rules, context=None):
+        # type: (str, Optional[ContextType]) -> Any
         """
         Evaluate rules to a single value (usualy bool-ish - ``True``/``False``, (non-)empty string, etc.),
         within a context provided by the caller via ``context`` mapping.
@@ -216,6 +305,8 @@ class RulesEngine(gluetool.Module):
         # pylint: disable=no-self-use
 
         def _enhance_strings(variables):
+            # type: (ContextType) -> ContextType
+
             return {
                 key: MatchableString(value) if isinstance(value, str) else value for key, value in variables.iteritems()
             }
@@ -236,6 +327,7 @@ class RulesEngine(gluetool.Module):
     # pylint: disable=too-many-arguments
     def evaluate_filter(self, entries, context=None, default_rule='True',
                         stop_at_first_hit=False):
+        # type: (List[EntryType], Optional[Union[ContextType, ContextGetterType]], str, bool) -> List[EntryType]
         """
         Find out what entries of the list are allowed by their rules, and return them.
 
@@ -260,40 +352,24 @@ class RulesEngine(gluetool.Module):
         :returns: List of entries that passed through the filter.
         """
 
-        # If we don't have a context, get one from the core.
-        if context is None:
-            context = self.shared('eval_context')
+        instruction_iterator = self._filter(
+            entries, context=context, default_rule=default_rule, stop_at_first_hit=stop_at_first_hit
+        )
 
-        # For the sake of simplicity, the loop over instructions will always call context_getter. It's either
-        # callable given by caller, or a simple anonymous function returning a dictionary - either the one
-        # given by caller or the default from above.
-        context_getter = context if callable(context) else lambda: context
-
-        suitable = []
-
-        for entry in entries:
-            loop_context = context_getter()
-
-            log_dict(self.debug, 'entry', entry)
-
-            # Not calling `self.evaluate_rules` directly - other modules may have overload this shared function,
-            # let's use the correct implementation.
-            if not self.shared('evaluate_rules', entry.get('rule', default_rule), context=loop_context):
-                self.debug('denied by rules')
-                continue
-
-            suitable.append(entry)
-
-            if stop_at_first_hit:
-                break
-
-        return suitable
+        return [
+            entry for entry, _ in instruction_iterator
+        ]
 
     # pylint: disable=too-many-arguments
-    def evaluate_instructions(self, instructions, commands, context=None,
-                              default_rule='True',
-                              stop_at_first_hit=False,
-                              ignore_unhandled_commands=False):
+    def evaluate_instructions(self,
+                              instructions,  # type: List[EntryType]
+                              commands,  # type: Dict[str, CommandCallbackType]
+                              context=None,  # type: Optional[Union[ContextType, ContextGetterType]]
+                              default_rule='True',  # type: str
+                              stop_at_first_hit=False,  # type: bool
+                              ignore_unhandled_commands=False  # type: bool
+                             ):  # noqa
+        # type: (...) -> None
         """
         Evaluate "instructions", using given callbacks to perform commands ordered by instructions.
 
@@ -343,26 +419,14 @@ class RulesEngine(gluetool.Module):
             an exception will be raised.
         """
 
-        # If we don't have a context, get one from the core.
-        if context is None:
-            context = self.shared('eval_context')
+        # Oops, `stop_at_first_hit` means something different to this method than to `_filter` :/
+        # `_filter`'s `stop_at_first_hit` cannot be expressed by parameters of this method,
+        # therefore defaulting to `False`, letting `_filter` process all instructions.
+        instruction_iterator = self._filter(
+            instructions, context=context, default_rule=default_rule, stop_at_first_hit=False
+        )
 
-        # For the sake of simplicity, the loop over instructions will always call context_getter. It's either
-        # callable given by caller, or a simple anonymous function returning a dictionary - either the one
-        # given by caller or the default from above.
-        context_getter = context if callable(context) else lambda: context
-
-        for instruction in instructions:
-            loop_context = context_getter()
-
-            log_dict(self.debug, 'instruction', instruction)
-
-            # Not calling `self.evaluate_rules` directly - other modules may have overload this shared function,
-            # let's use the correct implementation.
-            if not self.shared('evaluate_rules', instruction.get('rule', default_rule), context=loop_context):
-                self.debug('denied by rules')
-                continue
-
+        for instruction, instruction_context in instruction_iterator:
             for command, argument in instruction.iteritems():
                 if command == 'rule':
                     continue
@@ -378,13 +442,15 @@ class RulesEngine(gluetool.Module):
 
                     raise GlueError(msg)
 
-                result = callback(instruction, command, argument, loop_context)
+                result = callback(instruction, command, argument, instruction_context)
 
                 if result is True and stop_at_first_hit:
                     self.debug('command handled and we should stop at first hit')
                     break
 
     def execute(self):
+        # type: () -> None
+
         if not self.option('rules'):
             return
 
