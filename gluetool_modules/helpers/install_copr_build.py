@@ -1,33 +1,79 @@
+import collections
+import os
 import gluetool
-from gluetool.log import log_dict
-from gluetool import SoftGlueError
-from libci.sentry import PrimaryTaskFingerprintsMixin
-# pylint: disable=no-name-in-module
-from jq import jq
+from gluetool.log import log_blob
+from gluetool_modules.libs.sut_installation_fail import SUTInstallationFailedError
+
+#: Describes one command used to SUT installtion
+#:
+#: :ivar str label: Label used for logging.
+#: :ivar str command: Command to execute on the guest, executed once for each item from items.
+#:                    It can contain a placeholder ({}) which is substituted by the current item.
+#: :ivar list(str) items: Items to execute command withreplaced to `command`.
+#: :ivar bool ignore_exception: Indicates whether to raise `SUTInstallationFailedError` when command fails.
+SUTStep = collections.namedtuple('SUTStep', ['label', 'command', 'items', 'ignore_exception'])
 
 
-class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
-    def __init__(self, task, guest, packages):
-        super(SUTInstallationFailedError, self).__init__(task, 'SUT installation failed')
+class SUTInstallation(object):
 
-        self.guest = guest
-        self.packages = packages
+    def __init__(self, directory_name, primary_task):
+        self.directory_name = directory_name
+        self.primary_task = primary_task
+        self.steps = []
+
+    def add_step(self, label, command, items, ignore_exception):
+        if not isinstance(items, list):
+            items = [items]
+
+        self.steps.append(SUTStep(label, command, items, ignore_exception))
+
+    def run(self, guest):
+        log_dir_name = '{}-{}'.format(self.directory_name, guest.name)
+        os.mkdir(log_dir_name)
+
+        log_file = None
+
+        for i, step in enumerate(self.steps):
+            guest.info(step.label)
+
+            log_file_name = '{}-{}'.format(i, step.label.replace(' ', '-'))
+            log_file_path = os.path.join(log_dir_name, log_file_name)
+
+            for item in step.items:
+                # `step.command` contains `{}` to indicate place where item is substitute.
+                # e.g 'yum install -y {}'.format('ksh')
+                command = step.command.format(item)
+                try:
+                    output = guest.execute(command)
+                except gluetool.glue.GlueCommandError:
+                    if not step.ignore_exception:
+                        raise SUTInstallationFailedError(self.primary_task, guest, item)
+
+                with open(log_file_path, 'a') as log_file:
+                    # pylint: disable=unused-argument
+                    def write_cover(text, **kwargs):
+                        log_file.write('{}\n\n'.format(text))
+
+                    log_blob(write_cover, 'Command', command)
+                    log_blob(write_cover, 'Stdout', output.stdout)
+                    log_blob(write_cover, 'Stderr', output.stderr)
+
+        guest.info('All packages have been successfully installed')
 
 
 class InstallCoprBuild(gluetool.Module):
     """
-    Installs build packages on given guest. Calls given ansible playbook
-    and provides list of package names and list of urls to it.
+    Installs build packages on given guest.
     """
 
     name = 'install-copr-build'
     description = 'Install build packages on given guest'
 
     options = {
-        'playbook': {
-            'help': 'Ansible playbook, which installs given packages',
+        'log-dir-name': {
+            'help': 'Name of directory where outputs of installation commands will be stored (default: %(default)s).',
             'type': str,
-            'metavar': 'FILE'
+            'default': 'artifact-installation'
         }
     }
 
@@ -35,55 +81,29 @@ class InstallCoprBuild(gluetool.Module):
 
     def setup_guest(self, guests, **kwargs):
 
-        self.require_shared('run_playbook', 'primary_task')
+        self.require_shared('primary_task')
 
         self.overloaded_shared('setup_guest', guests, **kwargs)
 
-        tasks = self.shared('tasks')
-        rpm_urls = sum([task.rpm_urls for task in tasks], [])
-        rpm_names = sum([task.rpm_names for task in tasks], [])
+        primary_task = self.shared('primary_task')
 
-        log_dict(self.debug, 'RPMs to install', rpm_names)
-        log_dict(self.debug, 'RPMs install from', rpm_urls)
+        sut_installation = SUTInstallation(self.option('log-dir-name'), primary_task)
 
-        interpreters = self.shared('detect_ansible_interpreter', guests[0])
+        sut_installation.add_step('Download copr repository', 'curl {} --output /etc/yum.repos.d/copr_build.repo',
+                                  primary_task.repo_url, False)
 
-        _, ansible_output = self.shared(
-            'run_playbook',
-            gluetool.utils.normalize_path(self.option('playbook')),
-            guests,
-            variables={
-                'PACKAGE_URLS': rpm_urls,
-                'PACKAGE_NAMES': rpm_names,
-                'ansible_python_interpreter': interpreters[0]
-            },
-            json_output=True
-        )
+        # reinstall command has to be called for each rpm separately, hence list of rpms is used
+        sut_installation.add_step('Reinstall packages', 'yum -y reinstall {}', primary_task.rpm_urls, True)
 
-        query = """
-              .plays[].tasks[]
-            | select(.task.name == "NVR check")
-            | .hosts | to_entries[]
-            | {
-                host: .key,
-                packages: [
-                    .value.results[]
-                  | select(.failed == true)
-                  | .item
-                ]
-              }
-            | select(.packages != [])""".replace('\n', '')
+        # downgrade, update and install commands are called just once with all rpms followed, hence list of
+        # rpms is joined to one item
+        joined_rpm_urls = ' '.join(primary_task.rpm_urls)
 
-        failed_tasks = jq(query).transform(ansible_output, multiple_output=True)
+        sut_installation.add_step('Downgrade packages', 'yum -y downgrade {}', joined_rpm_urls, True)
+        sut_installation.add_step('Update packages', 'yum -y update {}', joined_rpm_urls, True)
+        sut_installation.add_step('Install packages', 'yum -y install {}', joined_rpm_urls, True)
 
-        log_dict(self.debug, 'ansible output after jq processing', failed_tasks)
+        sut_installation.add_step('Verify packages installed', 'rpm -q {}', primary_task.rpm_names, False)
 
-        if failed_tasks:
-            first_fail = failed_tasks[0]
-            guest = [guest for guest in guests if guest.hostname == first_fail['host']][0]
-            packages = first_fail['packages']
-
-            guest.warn('Packages {} have not been installed.'.format(','.join(packages)))
-            raise SUTInstallationFailedError(self.shared('primary_task'), guest, packages)
-
-        self.info('All packages have been successfully installed')
+        for guest in guests:
+            sut_installation.run(guest)
