@@ -66,7 +66,9 @@ class TestBatchPlanner(gluetool.Module):
             'default': []
         },
         'config': {
-            'help': 'Static configuration for components.'
+            'help': 'Static configuration(s) for components (default: none).',
+            'action': 'append',
+            'default': []
         },
         'sti-job-map': {
             'help': 'Path to a file with ``ARTIFACT_NAMESPACE`` => ``<jenkins_job_name>`` patterns.',
@@ -106,6 +108,12 @@ class TestBatchPlanner(gluetool.Module):
                 self.debug("job '{}' provides results of type '{}'".format(job, result_type))
 
         return mapping
+
+    @cached_property
+    def configs(self):
+        # type: () -> List[str]
+
+        return gluetool.utils.normalize_multistring_option(self.option('config'))
 
     def _reduce_section(self, commands, is_component=True, default_commands=None, all_commands=None):
         # pylint: disable=too-many-statements
@@ -375,50 +383,51 @@ class TestBatchPlanner(gluetool.Module):
     def _plan_by_static_config(self):
         self.require_shared('evaluate_rules', 'eval_context')
 
-        config = load_yaml(self.option('config'), logger=self.logger)
-
-        if config is None:
+        if not self.configs:
             self.warn('Empty dispatcher configuration')
-            config = {}
 
         task = self.shared('primary_task')
 
-        self.debug('find out which config section we should use')
-
-        matching_config = None
-
-        for section in config:
-            if 'rule' not in section:
-                self.warn("Section does not contain 'rule' key, ignored", sentry=True)
-                continue
-
-            if not self.shared('evaluate_rules', section['rule'], context=self.shared('eval_context')):
-                self.debug('denied by rules')
-                continue
-
-            matching_config = section
-            break
-
-        else:
-            self.warn('Cannot select any section, no rules matched current environment')
-            return None
-
-        # Find command sets for the component
-        commands = self._construct_command_sets(matching_config, task.component_id)
-        log_dict(self.debug, 'commands', commands)
-
         final_commands = []
 
-        for set_name, set_commands in commands.iteritems():
-            commands_desc = '\n'.join(['  {}'.format(command) for command in set_commands])
-            self.info("Set '{}':\n{}".format(set_name, commands_desc))
+        for config_filepath in self.configs:
+            config = load_yaml(config_filepath, logger=self.logger)
 
-            for command in set_commands:
-                module = shlex.split(command)[0]
-                args = shlex.split(command)[1:]
+            self.debug('find out which config section we should use')
 
-                self.debug("module='{}', args='{}'".format(module, args))
-                final_commands.append((module, args))
+            matching_section = None
+
+            for section in config:
+                if 'rule' not in section:
+                    self.warn("Section does not contain 'rule' key, ignored", sentry=True)
+                    continue
+
+                if not self.shared('evaluate_rules', section['rule'],
+                                   context=self.shared('eval_context')):
+                    self.debug('denied by rules')
+                    continue
+
+                matching_section = section
+                break
+
+            else:
+                self.warn('Cannot select any section, no rules matched current environment')
+                continue
+
+            # Find command sets for the component
+            commands = self._construct_command_sets(matching_section, task.component_id)
+            log_dict(self.debug, 'commands', commands)
+
+            for set_name, set_commands in commands.iteritems():
+                commands_desc = '\n'.join(['  {}'.format(command) for command in set_commands])
+                self.info("Set '{}':\n{}".format(set_name, commands_desc))
+
+                for command in set_commands:
+                    module = shlex.split(command)[0]
+                    args = shlex.split(command)[1:]
+
+                    self.debug("module='{}', args='{}'".format(module, args))
+                    final_commands.append((module, args))
 
         return final_commands
 
