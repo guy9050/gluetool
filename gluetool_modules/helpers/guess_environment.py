@@ -45,7 +45,7 @@ class CIGuess(gluetool.Module):
       ``RHEL-7.3-updates-20170405.0``.
     """
 
-    name = 'guess'
+    name = 'guess-environment'
     description = 'Guess distro/image/product from target artifacts'
 
     options = [
@@ -351,7 +351,7 @@ class CIGuess(gluetool.Module):
         ]
 
     @staticmethod
-    def _guess_force(self, source):
+    def _guess_force(source):
         # type: (Dict[str, Union[str, List[str]]]) -> None
         if source['type'] == 'distro':
             source['result'] = [s.strip() for s in source['specification']]

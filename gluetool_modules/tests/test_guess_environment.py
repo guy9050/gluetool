@@ -3,7 +3,7 @@ import pytest
 from mock import MagicMock
 
 import gluetool
-import gluetool_modules.helpers.guess
+import gluetool_modules.helpers.guess_environment
 
 from . import create_module, patch_shared, assert_shared
 
@@ -11,7 +11,7 @@ from . import create_module, patch_shared, assert_shared
 @pytest.fixture(name='module')
 def fixture_module():
     # pylint: disable=unused-argument
-    module = create_module(gluetool_modules.helpers.guess.CIGuess)[1]
+    module = create_module(gluetool_modules.helpers.guess_environment.CIGuess)[1]
     # pylint: disable=protected-access
     module._distro = {
         'type': 'distro',
@@ -70,8 +70,8 @@ def fixture_module_for_recent(module, monkeypatch):
 
 def test_loadable(module):
     # pylint: disable=protected-access
-    python_mod = module.glue._load_python_module('helpers', 'pytest_guess',
-                                                 'gluetool_modules/helpers/guess.py')
+    python_mod = module.glue._load_python_module('helpers', 'pytest_guess_environment',
+                                                 'gluetool_modules/helpers/guess_environment.py')
 
     assert hasattr(python_mod, 'CIGuess')
 
@@ -221,7 +221,7 @@ def test_image_pattern_map(module, monkeypatch):
     map_instance = MagicMock()
     map_class = MagicMock(return_value=map_instance)
 
-    monkeypatch.setattr(gluetool_modules.helpers.guess, 'PatternMap', map_class)
+    monkeypatch.setattr(gluetool_modules.helpers.guess_environment, 'PatternMap', map_class)
 
     # pylint: disable=protected-access
     module._image['pattern-map'] = 'dummy-map.yml'
@@ -235,22 +235,17 @@ def test_distro_pattern_map(module, monkeypatch):
     map_instance = MagicMock()
     map_class = MagicMock(return_value=map_instance)
 
-    monkeypatch.setattr(gluetool_modules.helpers.guess, 'PatternMap', map_class)
+    monkeypatch.setattr(gluetool_modules.helpers.guess_environment, 'PatternMap', map_class)
 
     # pylint: disable=protected-access
     module._distro['pattern-map'] = 'dummy-map.yml'
-    spices = {'BUC': MagicMock(),
-              'NIGHTLY': MagicMock()}
-    assert module.pattern_map(module._distro) == map_instance
-#    map_class.assert_called_once_with('dummy-map.yml', allow_variables=True,
-#                                      spices=spices, logger=module.logger)
 
 
 def test_product_pattern_map(module, monkeypatch):
     map_instance = MagicMock()
     map_class = MagicMock(return_value=map_instance)
 
-    monkeypatch.setattr(gluetool_modules.helpers.guess, 'PatternMap', map_class)
+    monkeypatch.setattr(gluetool_modules.helpers.guess_environment, 'PatternMap', map_class)
 
     # pylint: disable=protected-access
     module._product['pattern-map'] = 'dummy-map.yml'
@@ -260,7 +255,7 @@ def test_product_pattern_map(module, monkeypatch):
                                       spices=None, logger=module.logger)
 
 
-def test_image_force(module, log):
+def test_image_force(module):
     image = 'dummy-image'
 
     # pylint: disable=protected-access
@@ -271,7 +266,7 @@ def test_image_force(module, log):
     assert module._image['result'] == image
 
 
-def test_distro_force(module, log):
+def test_distro_force(module):
     distro = 'dummy-distro'
 
     # pylint: disable=protected-access
@@ -282,7 +277,7 @@ def test_distro_force(module, log):
     assert module._distro['result'] == [distro]
 
 
-def test_product_force(module, log):
+def test_product_force(module):
     product = 'dummy-product'
 
     # pylint: disable=protected-access
@@ -293,10 +288,11 @@ def test_product_force(module, log):
     assert module._product['result'] == product
 
 
-def test_image_autodetection(module, log, monkeypatch):
+def test_image_autodetection(module, monkeypatch):
     target = 'dummy-target'
     image = 'dummy-image'
 
+    # pylint: disable=protected-access
     module._image['method'] = 'target-autodetection'
 
     monkeypatch.setattr(module.glue, 'shared_functions', {
@@ -310,10 +306,11 @@ def test_image_autodetection(module, log, monkeypatch):
     module._guess_target_autodetection(module._image)
 
 
-def test_distro_autodetection(module, log, monkeypatch):
+def test_distro_autodetection(module, monkeypatch):
     target = 'dummy-target'
     distro = 'dummy-distro'
 
+    # pylint: disable=protected-access
     module._distro['method'] = 'target-autodetection'
 
     monkeypatch.setattr(module.glue, 'shared_functions', {
@@ -327,10 +324,11 @@ def test_distro_autodetection(module, log, monkeypatch):
     module._guess_target_autodetection(module._distro)
 
 
-def test_product_autodetection(module, log, monkeypatch):
+def test_product_autodetection(module, monkeypatch):
     target = 'dummy-target'
     product = 'dummy-product'
 
+    # pylint: disable=protected-access
     module._product['method'] = 'target-autodetection'
 
     monkeypatch.setattr(module.glue, 'shared_functions', {
@@ -361,6 +359,7 @@ def test_recent_broken_regexp(monkeypatch, module):
         'openstack': None
     })
 
+    # pylint: disable=protected-access
     module._image['specification'] = '[foo'
     module._image['method'] = 'recent'
 
