@@ -10,7 +10,7 @@ import zlib
 
 import gluetool
 from gluetool.log import log_dict
-from gluetool.utils import render_template, treat_url, normalize_bool_option
+from gluetool.utils import render_template, normalize_bool_option
 
 
 STATE_QUEUED = 'queued'
@@ -134,7 +134,10 @@ class PipelineStateReporter(gluetool.Module):
         }),
         ('Mapping options', {
             'artifact-map': {
-                'help': "File with description of items provided as artifact info."
+                'help': 'File with description of items provided as artifact info.'
+            },
+            'run-map': {
+                'help': 'File with description of items provided as run info.'
             },
             'final-state-map': {
                 'help': 'Instructions to decide the final state of the pipeline.'
@@ -211,47 +214,57 @@ class PipelineStateReporter(gluetool.Module):
         return gluetool.utils.load_yaml(self.option('artifact-map'), logger=self.logger)
 
     @gluetool.utils.cached_property
+    def run_map(self):
+        if not self.option('run-map'):
+            return []
+
+        return gluetool.utils.load_yaml(self.option('run-map'), logger=self.logger)
+
+    @gluetool.utils.cached_property
     def final_state_map(self):
         if not self.option('final-state-map'):
             return []
 
         return gluetool.utils.load_yaml(self.option('final-state-map'), logger=self.logger)
 
-    def _artifact_info(self):
+    def _subject_info(self, subject_name, instructions):
         self.require_shared('evaluate_instructions', 'evaluate_rules')
 
-        artifact_info = {}
+        subject_info = {}
 
-        # callback for 'artifact-details' command in artifact_map instructions, applies changes to artifact_info
-        def _artifact_details_callback(instruction, command, argument, context):
+        # Callback for 'details' command, applies changes to `subject_info`
+        def _details_callback(instruction, command, argument, context):
             # pylint: disable=unused-argument
 
             if instruction.get('eval-as-rule', False):
-                artifact_info.update({
+                subject_info.update({
                     detail: self.shared('evaluate_rules', value, context=context)
                     for detail, value in argument.iteritems()
                 })
 
             else:
-                artifact_info.update({
+                subject_info.update({
                     detail: render_template(value, **context) for detail, value in argument.iteritems()
                 })
 
-            log_dict(self.debug, 'artifact info', artifact_info)
+            log_dict(self.debug, '{} info'.format(subject_name), subject_info)
 
-        # callback for 'eval-as-rule' command in atifact_map instructions - it does nothing, this command
-        # is handled by _artifact_details callback, but we must provide it anyway to make rules-engine happy.
+        # Callback for 'eval-as-rule' command - it does nothing, it is handled by 'details' callback,
+        # but we must provide it anyway to make ``rules-engine`` happy (unhandled command).
         def _eval_as_rule_callback(instruction, command, argument, context):
             # pylint: disable=unused-argument
 
             pass
 
-        self.shared('evaluate_instructions', self.artifact_map, {
-            'artifact-details': _artifact_details_callback,
+        self.shared('evaluate_instructions', instructions, {
+            'details': _details_callback,
             'eval-as-rule': _eval_as_rule_callback
         })
 
-        return artifact_info
+        return subject_info
+
+    def _artifact_info(self):
+        return self._subject_info('artifact', self.artifact_map,)
 
     def _ci_info(self):
         return {
@@ -262,45 +275,8 @@ class PipelineStateReporter(gluetool.Module):
             'irc': self.option('ci-contact-irc')
         }
 
-    @gluetool.utils.cached_property
-    def _pipeline_info(self):
-        """
-        JSON reprezentation of the pipeline steps - modules, alias, and their parameters.
-
-        The pipeline is available in eval context, but that's objects and we'd have to serialize
-        them to JSON anyway. Taking the direct route.
-
-        :rtype: dict(str, object)
-        """
-
-        return [
-            step.serialize_to_json() for step in self.glue.current_pipeline
-        ]
-
     def _run_info(self):
-        context = self.shared('eval_context')
-
-        if not context.get('JENKINS_BUILD_URL', None):
-            return {
-                'url': None,
-                'log': None,
-                'debug': None,
-                'rebuild': None,
-                'parameters': None,
-                'additional_info': self._pipeline_info
-            }
-
-        def _render_url(template):
-            return treat_url(render_template(template, logger=self.logger, **context))
-
-        return {
-            'url': _render_url('{{ JENKINS_BUILD_URL }}'),
-            'log': _render_url('{{ JENKINS_BUILD_URL }}/console'),
-            'debug': _render_url('{{ JENKINS_BUILD_URL }}/artifact/citool-debug.txt'),
-            'rebuild': _render_url('{{ JENKINS_BUILD_URL }}/rebuild/parameterized'),
-            'parameters': context.get('JENKINS_BUILD_PARAMS', None),
-            'additional_info': self._pipeline_info
-        }
+        return self._subject_info('run', self.run_map)
 
     def _init_message(self, test_category, test_namespace, test_type, thread_id):
         headers = {}
