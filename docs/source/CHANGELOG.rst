@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2019-02-06
+----------
+
+Added
+~~~~~
+
+- [beaker-provisioner] when asked, show state of cached guests formatted as a table
+- [coldstore] new module - propagates and logs coldstore location of artifacts
+- [test-scheduler] after each change, show progress of provisioning formatted as a table
+
+Changed
+~~~~~~~
+
+- test schedule entry code moved into common libraries
+- [guest-setup] try to detect Python interpreter for Ansible when not told explicitly
+- [install-copr-build] refactored to use direct commands instead of Ansible playbook
+- [memcached] dump cache with ``DEBUG`` severity, not ``INFO``
+- [restraint] use template when emitting the final location of artifacts
+- [smtp] ``Sender`` and ``Reply-To`` checks updated to emit warnings in a later stage, giving ``smtp`` chance to set them
+- [test-schedule-runner-restraint] use template when emitting the final location of artifacts
+
+
 2019-01-23
 ----------
 
