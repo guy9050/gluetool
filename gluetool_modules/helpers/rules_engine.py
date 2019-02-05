@@ -4,6 +4,7 @@ import ast
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.log import log_dict
+from gluetool.utils import cached_property, load_yaml, normalize_multistring_option
 
 import _ast
 
@@ -231,6 +232,11 @@ class RulesEngine(gluetool.Module):
         'rules': {
             'help': 'Rules to evaluate when module is executed. Used for testing (default: %(default)s).',
             'default': None
+        },
+        'variables': {
+            'help': 'File(s) with additional context objects (default: none).',
+            'action': 'append',
+            'default': []
         }
     }
 
@@ -290,6 +296,17 @@ class RulesEngine(gluetool.Module):
 
             if stop_at_first_hit:
                 break
+    @cached_property
+    def variables(self):
+
+        configs = normalize_multistring_option(self.option('variables'))
+
+        variables = {}
+
+        for config in configs:
+            variables.update(load_yaml(config, logger=self.logger))
+
+        return variables
 
     def evaluate_rules(self, rules, context=None):
         # type: (str, Optional[ContextType]) -> Any
@@ -313,7 +330,11 @@ class RulesEngine(gluetool.Module):
                 key: MatchableString(value) if isinstance(value, str) else value for key, value in variables.iteritems()
             }
 
-        custom_locals = _enhance_strings(context or {})
+        context = context or {}
+
+        context.update(self.variables)
+
+        custom_locals = _enhance_strings(context)
 
         custom_locals['EXISTS'] = lambda name: name in custom_locals
 
