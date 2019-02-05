@@ -63,6 +63,15 @@ class Restraint(gluetool.Module):
             'type': int,
             'default': DEFAULT_RESTRAINTD_PORT,
             'metavar': 'PORT'
+        },
+        'artifacts-location-template': {
+            'help': """
+                    When set, it will be rendered to provide the **final** location of artifacts, generated
+                    by Restraint. It has access to common eval context, with ``ARTIFACTS_LOCATION`` representing
+                    **current** - local, on the machine running the pipeline - location of ``index.html``
+                    (default: %(default)s).
+                    """,
+            'default': None
         }
     }
 
@@ -203,15 +212,27 @@ class Restraint(gluetool.Module):
 
         # Construct location - path or URL - of the index.html
         index_location = '{}/index.html'.format(output_dir)
-        self.debug("index location is '{}'".format(index_location))
+        self.debug("local index location is '{}'".format(index_location))
 
-        # eval_context should probably be the source, needs a bit of unification over
-        # all our modules (future patch...)
-        if 'BUILD_URL' in os.environ:
-            index_location = gluetool.utils.treat_url('{}/artifact/{}'.format(os.getenv('BUILD_URL'), index_location),
-                                                      logger=self.logger)
+        if self.option('artifacts-location-template'):
+            index_location = gluetool.utils.render_template(
+                self.option('artifacts-location-template'),
+                logger=self.logger,
+                ARTIFACTS_LOCATION=index_location,
+                **self.shared('eval_context')
+            )
 
-            self.debug("with BUILD_URL, index location is '{}'".format(index_location))
+            # The rendered location may be URL, but also it may be something completely different.
+            # Try to treat it like the URL, but ignore failures - ``treat_url`` would fail when
+            # the string didn't start with schema, for example.
+            try:
+                index_location = gluetool.utils.treat_url(index_location, logger=self.logger)
+
+            # pylint: disable=bare-except
+            except:
+                pass
+
+        self.debug("final index location is '{}'".format(index_location))
 
         # If asked to do so, log index.html location
         label = label or 'restraint logs are in'

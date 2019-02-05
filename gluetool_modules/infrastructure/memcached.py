@@ -229,11 +229,6 @@ class Memcached(gluetool.Module):
         'server-port': {
             'help': 'Memcached server port.',
             'type': int
-        },
-        'show-content': {
-            'help': 'Dump content of the cache (default: %(default)s).',
-            'action': 'store_true',
-            'default': False
         }
     }
 
@@ -248,7 +243,11 @@ class Memcached(gluetool.Module):
 
     @gluetool.utils.cached_property
     def _cache(self):
-        return Cache(self, self._client)
+        cache = Cache(self, self._client)
+
+        log_dict(self.debug, 'cache content', cache.dump())
+
+        return cache
 
     def cache(self):
         """
@@ -258,7 +257,3 @@ class Memcached(gluetool.Module):
         """
 
         return self._cache
-
-    def execute(self):
-        if gluetool.utils.normalize_bool_option(self.option('show-content')):
-            log_dict(self.info, 'cache content', self._cache.dump())

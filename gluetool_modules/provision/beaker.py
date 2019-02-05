@@ -1,3 +1,5 @@
+# pylint: disable=too-many-lines
+
 """
 Guest cache
 -----------
@@ -38,7 +40,7 @@ import threading
 
 import gluetool
 from gluetool import GlueError
-from gluetool.log import log_dict
+from gluetool.log import log_dict, log_table
 from gluetool.utils import cached_property, normalize_multistring_option, normalize_path, load_yaml, dict_update
 from libci.guest import NetworkedGuest
 
@@ -312,6 +314,10 @@ class BeakerProvisioner(gluetool.Module):
                 'type': str,
                 'action': 'store',
                 'default': ''
+            },
+            'cache-show-guests': {
+                'help': 'Display table of cached guests and their properties.',
+                'action': 'store_true'
             }
         }),
         ('Guest options', {
@@ -952,6 +958,52 @@ class BeakerProvisioner(gluetool.Module):
 
             self._config['environment'] = TestingEnvironment.unserialize_from_string(self.option('environment'))
 
+    def _cache_show_guests(self):
+        cache_dump = self.shared('cache').dump()
+
+        guests = {}
+
+        section = cache_dump.get(self.option('cache-prefix'), {})
+        environments = section.get('environments', {})
+
+        for env_name, env_arches in environments.iteritems():
+            for arch, arch_guests in env_arches.iteritems():
+                for hostname in arch_guests['guests']:
+                    guests[hostname] = {
+                        'arch': arch,
+                        'env': env_name,
+                        'in-use': 'unknown',
+                        'use-by': 'unknown'
+                    }
+
+        for hostname, info in section.get('guests', {}).iteritems():
+            if hostname not in guests:
+                self.warn('Guest {} is known but not linked from any environment'.format(hostname))
+
+                guests[hostname] = {
+                    'arch': info.get('info', {}).get('arch', 'unknown'),
+                    'env': None
+                }
+
+            guests[hostname].update({
+                'in-use': info.get('in-use', None),
+                'use-by': info.get('use-by', 'unknown')
+            })
+
+        headers = ['Host', 'Env', 'Arch', 'In Use?', 'Use by']
+        rows = []
+
+        for host, info in guests.iteritems():
+            rows.append([
+                host,
+                info['env'],
+                info['arch'],
+                info['in-use'],
+                info['use-by']
+            ])
+
+        log_table(self.info, 'Cached guests', [headers] + sorted(rows), headers='firstrow', tablefmt='simple')
+
     def execute(self):
         if self.option('provision'):
             guests = self.provision(self.option('environment'),
@@ -960,6 +1012,9 @@ class BeakerProvisioner(gluetool.Module):
             if self.option('setup-provisioned'):
                 for guest in guests:
                     guest.setup()
+
+        if gluetool.utils.normalize_bool_option(self.option('cache-show-guests')):
+            self._cache_show_guests()
 
     def destroy(self, failure=None):
         if not self._dynamic_guests:

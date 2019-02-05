@@ -108,6 +108,17 @@ class CoprApi(object):
 
         return ['{}{}.rpm'.format(result_dir_url, rpm_name) for rpm_name in rpm_names]
 
+    def get_repo_url(self, owner, project, chroot):
+        # strip architecture - string following last dash
+        chroot = re.match('(.+)-.+', chroot).group(1)
+
+        return '{0}/coprs/{1}/{2}/repo/{3}/{1}-{2}-{3}.repo'.format(
+            self.copr_url,
+            owner,
+            project,
+            chroot
+        )
+
 
 class BuildTaskID(object):
     """
@@ -151,18 +162,19 @@ class CoprTask(object):
 
         self.copr_api = module.copr_api()
 
-        self._build = self.copr_api.get_build_info(task_id.build_id)
-        self._build_task = self.copr_api.get_build_task_info(task_id.build_id, task_id.chroot_name)
-        self._project = self.copr_api.get_project_info(task_id.build_id)
+        build = self.copr_api.get_build_info(task_id.build_id)
+        build_task = self.copr_api.get_build_task_info(task_id.build_id, task_id.chroot_name)
+        project = self.copr_api.get_project_info(task_id.build_id)
 
-        self.status = self._build_task['state']
-        self.component = self._build['package_name']
+        self.status = build_task['state']
+        self.component = build['package_name']
         self.target = task_id.chroot_name
-        self.nvr = '{}-{}'.format(self.component, self._build['package_version'])
-        self.owner = self._project['owner']
-        self.project = self._project['name']
+        self.nvr = '{}-{}'.format(self.component, build['package_version'])
+        self.owner = project['owner']
+        self.project = project['name']
         # issuer is optional item
-        self.issuer = self._build.get('submitter', 'UNKNOWN-COPR-ISSUER')
+        self.issuer = build.get('submitter', 'UNKNOWN-COPR-ISSUER')
+        self.repo_url = self.copr_api.get_repo_url(self.owner, self.project, self.task_id.chroot_name)
 
         # this string identifies component in static config file
         self.component_id = '{}/{}/{}'.format(self.owner, self.project, self.component)

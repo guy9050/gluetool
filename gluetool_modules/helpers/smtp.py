@@ -78,19 +78,19 @@ class SMTP((gluetool.Module)):
             self.warn('E-mail subject is not set')
 
         if not message.sender:
-            self.warn('E-mail sender is not set')
-
             if self.option('sender'):
                 message.sender = self.option('sender')
+            else:
+                self.warn('E-mail sender is not set')
 
         if not message.recipients:
             self.warn('E-mail recipients are not set')
 
         if not message.reply_to:
-            self.warn('E-mail Reply-To is not set')
-
             if self.option('reply-to'):
                 message.reply_to = self.option('reply-to')
+            else:
+                self.warn('E-mail Reply-To is not set')
 
         content = '{}\n\n{}\n\n{}'.format(message.header, message.body, message.footer)
 

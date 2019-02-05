@@ -225,7 +225,6 @@ def test_lower_message_with_sender_from_option(module, mock_messages, log):
     assert lowered_message['Reply-To'] is None
 
     assert log.match(levelno=logging.WARNING, message='E-mail subject is not set')
-    assert log.match(levelno=logging.WARNING, message='E-mail sender is not set')
     assert not log.match(levelno=logging.WARNING, message='E-mail recipients are not set')
 
 
