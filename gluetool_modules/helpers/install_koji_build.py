@@ -74,7 +74,7 @@ class InstallKojiBuild(gluetool.Module):
             raise SUTInstallationFailedError(self.shared('primary_task'), output.index_location)
 
     def setup_guest(self, guests, **kwargs):
-        self.require_shared('restraint', 'brew_build_task_params')
+        self.require_shared('restraint', 'brew_build_task_params', 'beaker_job_xml')
 
         self.overloaded_shared('setup_guest', guests, **kwargs)
 
