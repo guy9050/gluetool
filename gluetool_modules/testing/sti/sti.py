@@ -189,7 +189,7 @@ sut     ansible_host={} ansible_user=root {}
             self.info('starting execution of tests')
 
             return self.shared(
-                'run_playbook', playbooks, guests, inventory=inventory.name, cwd=artifact_dir,
+                'run_playbook', playbooks, guests, inventory=inventory.name, cwd=artifact_dir, json_output=False,
                 variables={
                     'artifacts': artifact_dir,
                     'ansible_ssh_common_args': ' '.join(['-o ' + option for option in guests[0].options]),
@@ -241,11 +241,6 @@ sut     ansible_host={} ansible_user=root {}
             future.result()
 
         except GlueError as exc:
-            if exc.__class__.__name__ == 'PlaybookError':
-                # pylint: disable=no-member
-                raise GlueError('Execution of ansible failed, json output follows:\n{}'.format(
-                    exc.ansible_output.stdout))
-
             # STI defines that Ansible MUST fail if any of the tests fail
             # To differentiate from a generic ansible error, we check if
             # required test.log was generated with at least one result
