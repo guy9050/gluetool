@@ -36,18 +36,26 @@ class SUTInstallation(object):
         for i, step in enumerate(self.steps):
             guest.info(step.label)
 
-            log_file_name = '{}-{}'.format(i, step.label.replace(' ', '-'))
+            log_file_name = '{}-{}.txt'.format(i, step.label.replace(' ', '-'))
             log_file_path = os.path.join(log_dir_name, log_file_name)
 
             for item in step.items:
+                # Set to `True` when the exception was raised by a command - we cannot immediately
+                # raise `SUTInstallationFailedError` because we want to log output of the command,
+                # and we cannot use `exc` and check whether it's not `None` because Python will
+                # unset `exc` when leaving `except` branch.
+                command_failed = False
+
                 # `step.command` contains `{}` to indicate place where item is substitute.
                 # e.g 'yum install -y {}'.format('ksh')
                 command = step.command.format(item)
+
                 try:
                     output = guest.execute(command)
-                except gluetool.glue.GlueCommandError:
-                    if not step.ignore_exception:
-                        raise SUTInstallationFailedError(self.primary_task, guest, item)
+
+                except gluetool.glue.GlueCommandError as exc:
+                    command_failed = True
+                    output = exc.output
 
                 with open(log_file_path, 'a') as log_file:
                     # pylint: disable=unused-argument
@@ -57,6 +65,14 @@ class SUTInstallation(object):
                     log_blob(write_cover, 'Command', command)
                     log_blob(write_cover, 'Stdout', output.stdout)
                     log_blob(write_cover, 'Stderr', output.stderr)
+
+                if not command_failed:
+                    continue
+
+                if step.ignore_exception:
+                    continue
+
+                raise SUTInstallationFailedError(self.primary_task, guest, item)
 
         guest.info('All packages have been successfully installed')
 
