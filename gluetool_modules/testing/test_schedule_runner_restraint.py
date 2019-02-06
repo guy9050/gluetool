@@ -264,13 +264,13 @@ class RestraintRunner(gluetool.Module):
                 return render_template(
                     self.option('artifacts-location-template'),
                     logger=self.logger,
-                    ARTIFACTS_LOCATION=current_location,
+                    ARTIFACTS_LOCATION=os.path.join(output.directory, current_location),
                     **self.shared('eval_context')
                 )
 
         else:
             def artifact_path(current_location):
-                return current_location
+                return os.path.join(output.directory, current_location)
 
         for task_results in job_results.recipeSet.recipe.find_all('task'):
             task_name = task_results['name']
