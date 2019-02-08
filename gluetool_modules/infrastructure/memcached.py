@@ -8,6 +8,10 @@ import gluetool
 from gluetool.log import log_dict
 
 
+DEFAULT_DUMP_FETCH_TIMEOUT = 60
+DEFAULT_DUMP_FETCH_TICK = 10
+
+
 # Our custom serializer/deserializer - memcached accepts strings, we switch between Python data structures
 # and strings using JSON library. Gluetool's support is not usable as it tends to replace Python objects
 # with their __repr__ which is usually not possible to deserialize. This way we can at least catch such
@@ -171,10 +175,23 @@ class Cache(object):
         # other metadata. We cut out all these keys, and then we ask cache to provide values. Then we split
         # keys to their bits, and we construct pile of nested dictionaries of keys and values.
 
-        with self._lock:
-            # pylint: disable=protected-access
+        def _fetch_metadump():
+            with self._lock:
+                # pylint: disable=protected-access
 
-            metadump = self._client._misc_cmd(['lru_crawler metadump all\r\n'], 'metadump all', False)
+                response = self._client._misc_cmd(['lru_crawler metadump all\r\n'], 'metadump all', False)
+
+            log_dict(self.debug, 'metadump response', response)
+
+            if response and response[0] == 'BUSY currently processing crawler request':
+                self.debug('remote server is busy')
+                return False
+
+            return response
+
+        metadump = gluetool.utils.wait('metadump available', _fetch_metadump,
+                                       timeout=self._module.option('dump-fetch-timeout'),
+                                       tick=self._module.option('dump-fetch-tick'))
 
         dump = {}
 
@@ -222,6 +239,16 @@ class Memcached(gluetool.Module):
     description = 'Provides access to Memcached server.'
 
     options = {
+        'dump-fetch-timeout': {
+            'help': 'Wait this many seconds for dump to become available (default: %(default)s).',
+            'metavar': 'SECONDS',
+            'default': DEFAULT_DUMP_FETCH_TIMEOUT
+        },
+        'dump-fetch-tick': {
+            'help': 'Wait this many seconds between attempts of fetching dump (default: %(default)s).',
+            'metavar': 'SECONDS',
+            'default': DEFAULT_DUMP_FETCH_TICK
+        },
         'server-hostname': {
             'help': 'Memcached server hostname.',
             'type': str
