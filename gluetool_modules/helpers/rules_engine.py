@@ -83,6 +83,7 @@ class RulesASTVisitor(ast.NodeTransformer):
             'Store',
             'Eq', 'NotEq', 'Lt', 'LtE', 'Gt', 'GtE', 'Is', 'IsNot', 'In', 'NotIn',
             'And', 'Or', 'Not',
+            'IfExp',
             'Attribute', 'Call'
         )
     ])
