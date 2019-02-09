@@ -33,4 +33,4 @@ class RpmdiffJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     required_options = ('type',)
 
     def execute(self):
-        self._dispatch('ci-rpmdiff-{}'.format(self.option('type')), self.build_params)
+        self.shared('jenkins').invoke_job('ci-rpmdiff-{}'.format(self.option('type')), self.build_params)

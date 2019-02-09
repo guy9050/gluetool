@@ -10,7 +10,7 @@ from requests.exceptions import RequestException
 
 import gluetool
 from gluetool import GlueError
-from gluetool.log import format_dict
+from gluetool.log import format_dict, log_dict
 from gluetool.proxy import Proxy
 
 
@@ -37,7 +37,7 @@ class JenkinsProxy(Proxy):
     :param jenkinsapi.jenkins jenkins: Jenkins API connection.
     """
 
-    _CUSTOM_METHODS = ('set_build_name', 'enable_quiet_mode', 'disable_quiet_mode')
+    _CUSTOM_METHODS = ('set_build_name', 'enable_quiet_mode', 'disable_quiet_mode', 'invoke_job')
 
     def __init__(self, jenkins, module):
         super(JenkinsProxy, self).__init__(jenkins)
@@ -107,6 +107,28 @@ class JenkinsProxy(Proxy):
 
         return module.jenkins_rest('{}/cancelQuietDown'.format(module.option('url')))
 
+    def invoke_job(self, job_name, build_params):
+        # type: (str, Dict[str, Any]) -> Any
+        """
+        Invoke the Jenkins build.
+
+        :param str job_name: name of the Jenkins job to invoke.
+        :param dict build_params: build parameters.
+        """
+
+        module = object.__getattribute__(self, '_module')
+
+        log_dict(module.debug, "invoking job '{}'".format(job_name), build_params)
+
+        if not module.dryrun_allows('Invoking a job'):
+            return None
+
+        queue_item = self[job_name].invoke(build_params=build_params)
+
+        module.info("invoked job '{}' with given parameters".format(job_name))
+
+        return queue_item
+
 
 class CIJenkins(gluetool.Module):
     """
@@ -114,11 +136,17 @@ class CIJenkins(gluetool.Module):
         https://jenkinsapi.readthedocs.io/en/latest/
 
     You can use the option '--create-jjb-config' to force creation of JJB config file.
+
+    This module is dry-run safe as long as its users stick functionality added by this module
+    on top of Jenkins API provided by the ``jenkinsapi`` library this module wraps.
+    Direct use of its functionality is still allowed and it is not controlled with respect to the dry-run mode.
     """
 
     name = 'jenkins'
     description = 'Connect to a jenkins instance via jenkinsapi'
     requires = 'jenkinsapi'
+    # dry mod not fully, it can be bypassed by self.shared('jenkins')['foo'].invoke(...)
+    supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     # shared jenkins object
     _jenkins = None
@@ -198,6 +226,9 @@ class CIJenkins(gluetool.Module):
 
         else:
             request = url
+
+        if not self.dryrun_allows('Submit REST request to jenkins'):
+            return None, None
 
         response = urllib2.urlopen(request, data)
         code, content = response.getcode(), response.read()
@@ -365,6 +396,10 @@ class CIJenkins(gluetool.Module):
         if self.option('create-jjb-config'):
             self.create_jjb_config()
 
+        # check if dry-run level is enabled, warn user
+        if self.dryrun_enabled:
+            self.warn(
+                "DRY mode supported for functionality provided by this module, without direct use of jenkins api")
         # connecto to jenkins
         self.connect()
 
