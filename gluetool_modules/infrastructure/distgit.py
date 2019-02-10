@@ -22,6 +22,7 @@ class DistGit(gluetool.Module):
 
     name = 'dist-git'
     description = 'Provide dist-git repository for an artifact.'
+    supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     options = [
         ('General options', {

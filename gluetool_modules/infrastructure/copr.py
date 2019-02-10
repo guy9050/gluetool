@@ -268,6 +268,7 @@ class Copr(gluetool.Module):
 
     name = 'copr'
     description = 'Copr'
+    supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     options = {
         'copr-url': {

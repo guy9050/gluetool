@@ -305,6 +305,8 @@ class MBS(gluetool.Module):
     name = 'mbs'
     description = 'Provides information about MBS (Module Build Service) artifact'
 
+    supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
+
     options = [
         ('MBS options', {
             'mbs-ui-url': {

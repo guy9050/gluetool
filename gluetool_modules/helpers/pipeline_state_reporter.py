@@ -94,6 +94,7 @@ class PipelineStateReporter(gluetool.Module):
 
     name = 'pipeline-state-reporter'
     description = 'Sends messages reporting the pipeline state.'
+    supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     options = [
         ('CI team options', {

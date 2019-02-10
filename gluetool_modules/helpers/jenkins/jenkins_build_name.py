@@ -10,6 +10,7 @@ class JenkinsBuildName(gluetool.Module):
 
     name = ['jenkins-build-name', 'brew-build-name', 'copr-build-name']
     description = 'Set Jenkins build name.'
+    supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     options = {
         'name': {

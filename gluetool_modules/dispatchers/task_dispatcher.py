@@ -13,6 +13,7 @@ class TaskDispatcher(gluetool.Module):
 
     name = ['task-dispatcher', 'brew-dispatcher', 'koji-dispatcher', 'copr-dispatcher']
     description = 'Configurable task dispatcher'
+    supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     options = {
         'pipeline-test-categories': {

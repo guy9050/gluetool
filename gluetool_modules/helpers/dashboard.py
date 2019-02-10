@@ -10,6 +10,7 @@ class Dashboard(gluetool.Module):
 
     name = 'dashboard'
     description = 'Provides "dashboard" URL'
+    supported_dryrun_level = gluetool.glue.DryRunLevels.ISOLATED
 
     options = {
         'dashboard-url-template': {

@@ -159,6 +159,8 @@ class TestHandler(proton.handlers.MessagingHandler):
             self.pending[delivery] = message
 
         event.sender.close()
+        if not self._module.dryrun_allows('Waiting for messages to be sent'):
+            self._stop(event)
 
     def update_pending(self, event):
         self.debug('update_pending: {}'.format(event))

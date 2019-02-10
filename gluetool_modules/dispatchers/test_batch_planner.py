@@ -56,6 +56,7 @@ class TestBatchPlanner(gluetool.Module):
 
     name = 'test-batch-planner'
     description = 'Configurable test batch planner.'
+    supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     options = {
         'methods': {

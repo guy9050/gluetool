@@ -29,6 +29,7 @@ class TestingThread(gluetool.Module):
 
     name = 'testing-thread'
     description = 'Simple testing-thread tagging.'
+    supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     shared_functions = ('thread_id',)
     required_options = ['id-template']

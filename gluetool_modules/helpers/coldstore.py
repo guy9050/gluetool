@@ -11,6 +11,7 @@ class ColdStore(gluetool.Module):
 
     name = 'coldstore'
     description = 'Provides "cold store" URL'
+    supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     options = {
         'coldstore-url-template': {

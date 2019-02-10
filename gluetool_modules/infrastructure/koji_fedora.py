@@ -1253,6 +1253,7 @@ class Koji(gluetool.Module):
 
     name = 'koji'
     description = 'Provide Koji task details to other modules'
+    supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     options = (
         ('General options', {
