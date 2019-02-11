@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2019-02-12
+----------
+
+Added
+~~~~~
+
+- [dist-git] add ``force`` method
+- [pipeline-state-reporter] uses instruction mapping for content of the ``run`` field
+- [rules-engine] test coverage & type annotations
+- [rules-engine] allow ``... if ... else ...`` expressions
+- [test-batch-planner] support for multiple ``--config`` files
+
+Fixed
+~~~~~
+
+- [build-dependencies] fix Copr variant
+- [install-koji-build] require shared function ``beaker_job_xml``
+- [memcached] fix rare conflict when fetching cache dump
+- [sti] fix spurious traceback with failed tests
+
+
 2019-02-06
 ----------
 
