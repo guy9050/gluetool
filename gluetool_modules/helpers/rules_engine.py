@@ -202,6 +202,7 @@ class RulesEngine(gluetool.Module):
         * comparisons: ``==``, ``<=``, ``not in``, etc.
         * strings, numbers, lists, tuples
         * logic operators: ``and``, ``or``, ``not``
+        * ``... if ... else ...`` expressions
         * calling a function or method
 
     Strings have two extra methods, providing access to regular expression functionality:
