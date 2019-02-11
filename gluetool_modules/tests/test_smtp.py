@@ -117,7 +117,7 @@ def test_send_email_private_error(module, mock_smtp, mock_messages, mock_excepti
     mock_smtp.sendmail.assert_called_once_with('dummy sender', ['foo', 'bar', 'baz'], 'dummy message')
     mock_smtp.quit.assert_not_called()
 
-    log.match(message='Cannot send e-mail, SMTP raised an exception: dummy exception', levelno=logging.WARN)
+    assert log.match(message='Cannot send e-mail, SMTP raised an exception: dummy exception', levelno=logging.WARN)
 
 
 def test_send_email(module, mock_messages, monkeypatch):
