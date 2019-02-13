@@ -63,10 +63,10 @@ class InstallKojiDockerImage(gluetool.Module):
         # to just a single task instead of using --taskparam & setting them globally.
         job_xmls = self.shared('beaker_job_xml', body_options=[
             '--task=/tools/toolchain-common/Install/configure-extras-repo',
-            '--task=/examples/sandbox/emachado/enable-docker',
-            '--task=/examples/sandbox/emachado/remove-docker-images',
-            '--task={} /examples/sandbox/emachado/install-docker-image'.format(source_options),
-            '--task=/examples/sandbox/emachado/install-docker-test-config'
+            '--task=/distribution/containers/enable-docker',
+            '--task=/distribution/containers/remove-images',
+            '--task={} /distribution/containers/install-image'.format(source_options),
+            '--task=/distribution/containers/install-test-config'
         ], options=[
             # These seem to be important for restraint - probably moving to wow-options-map is the right way,
             # if we could tell we're putting together a recipe for restraint instead of Beaker.
