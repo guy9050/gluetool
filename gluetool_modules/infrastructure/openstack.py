@@ -325,10 +325,18 @@ class OpenstackGuest(NetworkedGuest):
         """
 
         parts = [
-            self._os_details['name'],
-            self._module.shared('thread_id')[0:12],
-            str(self._module.acquire_guest_index)
+            self._os_details['name']
         ]
+
+        thread_id = self._module.shared('thread_id')
+
+        if thread_id:
+            parts.append(thread_id[0:12])
+
+        else:
+            parts.append('unknown_thread')
+
+        parts.append(str(self._module.acquire_guest_index))
 
         if 'JOB_NAME' in os.environ:
             parts.append('{}-{}'.format(os.environ['JOB_NAME'], os.environ['BUILD_ID']))
