@@ -32,6 +32,9 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         'build-dependencies-options': {
             'help': 'Additional options for ``build-dependencies-options`` module.'
         },
+        'dist-git-options': {
+            'help': 'Additional options for ``dist-git`` module.'
+        },
         'guess-product-options': {
             'help': 'Additional options for ``guess-product`` module.'
         },
@@ -103,6 +106,7 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
 
         return dict_update(super(OpenStackJob, self).build_params, {
             'build_dependencies_options': self.option('build-dependencies-options'),
+            'dist_git_options': self.option('dist-git-options'),
             'guess_product_options': self.option('guess-product-options'),
             'guess_beaker_distro_options': self.option('guess-beaker-distro-options'),
             'guess_openstack_image_options': self.option('guess-openstack-image-options'),

@@ -1,6 +1,7 @@
 import pytest
 
 import gluetool_modules.testing.openstack.openstack_job
+import gluetool_modules.testing.beaker.beaker_job
 
 from libci.tests.test_dispatch_job import create_build_params
 
@@ -26,7 +27,8 @@ def create_openstack_build_params(mod, **kwargs):
         ],
         'openstack_options': 'some openstack options',
         'test_schedule_runner_restraint_options': 'some test-schedule-runner-restraint options',
-        'brew_build_task_params_options': 'some brew-build options'
+        'brew_build_task_params_options': 'some brew-build options',
+        'dist_git_options': 'some dist-git options'
     }
 
     params.update(kwargs)
@@ -69,7 +71,8 @@ def test_build_params(module_with_primary_task, rpm_blacklist):
     # pylint: disable=protected-access
     mod._config.update({
         'install-rpms-blacklist': rpm_blacklist,
-        'wow-options-separator': gluetool_modules.testing.beaker.beaker_job.DEFAULT_WOW_OPTIONS_SEPARATOR
+        'wow-options-separator': gluetool_modules.testing.beaker.beaker_job.DEFAULT_WOW_OPTIONS_SEPARATOR,
+        'dist-git-options': 'some dist-git options'
     })
 
     expected_params = create_openstack_build_params(mod)
