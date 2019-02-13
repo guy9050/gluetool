@@ -4,8 +4,7 @@ import ast
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.log import log_dict
-from gluetool.utils import cached_property, load_yaml, normalize_multistring_option
-
+from gluetool.utils import cached_property, load_yaml, normalize_multistring_option, dict_update
 import _ast
 
 # Type annotations
@@ -296,12 +295,14 @@ class RulesEngine(gluetool.Module):
 
             if stop_at_first_hit:
                 break
+
     @cached_property
     def variables(self):
+        # type: () -> Any
 
         configs = normalize_multistring_option(self.option('variables'))
 
-        variables = {}
+        variables = {}  # type: Any
 
         for config in configs:
             variables.update(load_yaml(config, logger=self.logger))
@@ -330,9 +331,10 @@ class RulesEngine(gluetool.Module):
                 key: MatchableString(value) if isinstance(value, str) else value for key, value in variables.iteritems()
             }
 
-        context = context or {}
-
-        context.update(self.variables)
+        if context is None:
+            context = dict_update({}, self.variables)
+        else:
+            context = dict_update({}, self.variables, context)
 
         custom_locals = _enhance_strings(context)
 
