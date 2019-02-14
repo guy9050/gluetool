@@ -218,6 +218,9 @@ class CIJenkins(gluetool.Module):
 
         username, password = self.option('username'), self.option('password')
 
+        if not self.dryrun_allows('Submit REST request to jenkins'):
+            return None, None
+
         if username or password:
             request = urllib2.Request(url)
             base64string = base64.b64encode('{}:{}'.format(username, password))
@@ -226,9 +229,6 @@ class CIJenkins(gluetool.Module):
 
         else:
             request = url
-
-        if not self.dryrun_allows('Submit REST request to jenkins'):
-            return None, None
 
         response = urllib2.urlopen(request, data)
         code, content = response.getcode(), response.read()
