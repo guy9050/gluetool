@@ -41,7 +41,8 @@ import threading
 import gluetool
 from gluetool import GlueError
 from gluetool.log import log_dict, log_table
-from gluetool.utils import cached_property, normalize_multistring_option, normalize_path, load_yaml, dict_update
+from gluetool.utils import cached_property, normalize_bool_option, normalize_multistring_option, normalize_path, \
+    load_yaml, dict_update
 from libci.guest import NetworkedGuest
 
 import gluetool_modules.libs
@@ -72,7 +73,12 @@ DEFAULT_EXTENDTESTTIME_CHECK_TICK = 30
 DEFAULT_RESERVATION_EXTENSION = 97
 DEFAULT_REFRESHER_PERIOD = 4 * 3600  # 4 hours should be perfectly fine
 
-StaticGuestDefinition = collections.namedtuple('StaticGuestDefinition', ('fqdn', 'arch'))
+#: Represents a guest definition as specified by user on a command-line.
+#:
+#: :param str fqdn: guest name.
+#: :param gluetool_modules.libs.testing_environment.TestingEnvironment environment: environment
+#:     provided by the guest.
+GuestDefinition = collections.namedtuple('GuestDefinition', ('fqdn', 'environment'))
 
 #: Beaker provisioner capabilities.
 #: Follows :doc:`Provisioner Capabilities Protocol </protocols/provisioner-capabilities>`.
@@ -85,6 +91,24 @@ def _time_from_now(**kwargs):
     """
 
     return datetime.datetime.utcnow() + datetime.timedelta(**kwargs)
+
+
+def parse_guest_spec(guest_spec):
+    """
+    Parse guest command-line specification and return its internal representation.
+
+    :param str guest_spec: Specification of the guest, as accepted by command-line options,
+        consiting of FQDN and environment specification: ``FQDN:compose=...,arch=...,...```
+    :returns: instance of :py:class:`GuestDefinition`.
+    """
+
+    try:
+        fqdn, env_spec = guest_spec.strip().split(':')
+
+    except ValueError:
+        raise GlueError('Guest specification has invalid format: {}'.format(guest_spec))
+
+    return GuestDefinition(fqdn=fqdn.strip(), environment=TestingEnvironment.unserialize_from_string(env_spec))
 
 
 class BeakerGuest(NetworkedGuest):
@@ -201,20 +225,26 @@ class BeakerGuest(NetworkedGuest):
         Heart of the refresh timer - gets called, extends reservation and schedules its own call.
         """
 
+        self.debug('reservation refresh triggered')
+
         # First, we must grab the lock.
         with self._reservation_refresh_lock:
             # If there's no timer, the refresh has been canceled but this method was already started
             # by timer thread. Quit immediately.
             if self._reservation_refresh_timer is None:
+                self.debug('reservation refresh seems to be disabled')
+
                 return
 
             self._extend_reservation()
 
-            # Schedule the next tick.
+            # Schedule the next tick...
             self._reservation_refresh_timer = threading.Timer(self._module.option('reservation-extension-tick'),
                                                               self._refresh_reservation)
+            self._reservation_refresh_timer.start()
 
-        next_tick = _time_from_now(seconds=DEFAULT_REFRESHER_PERIOD)
+        # ... but log it without the lock, it's perfectly safe.
+        next_tick = _time_from_now(seconds=self._module.option('reservation-extension-tick'))
         self.debug('scheduled next reservation refresh tick to {}'.format(next_tick))
 
     def start_reservation_refresh(self):
@@ -261,7 +291,7 @@ class BeakerGuest(NetworkedGuest):
         # would see is consistent.
         with self._reservation_refresh_lock:
             # There's no timer pending? Perfect, quit.
-            if self._reservation_refresh_timer is None:
+            if self._reservation_refresh_timer is None or self._reservation_refresh_timer is True:
                 return
 
             # Cancel the timer - this should prevent it from firing...
@@ -318,6 +348,28 @@ class BeakerProvisioner(gluetool.Module):
             'cache-show-guests': {
                 'help': 'Display table of cached guests and their properties.',
                 'action': 'store_true'
+            },
+            'cache-add-guest': {
+                'help': 'Add guest to the cache.',
+                'type': str,
+                'action': 'store',
+                'metavar': 'FQDN:compose=COMPOSE,arch=ARCH,...'
+            },
+            'cache-remove-guest': {
+                'help': 'Remove a guest from the cache.',
+                'type': str,
+                'action': 'store',
+                'metavar': 'FQDN:compose=COMPOSE,arch=ARCH,...'
+            },
+            'cache-ping-guest': {
+                'help': 'Grab the guest from a cache, check whether it is alive, and return it back to the cache.',
+                'type': str,
+                'action': 'store',
+                'metavar': 'FQDN:compose=COMPOSE,arch=ARCH,...'
+            },
+            'cache-force': {
+                'help': 'Force cache action, e.g. to grab the guest that is marked as used but is not.',
+                'action': 'store_true'
             }
         }),
         ('Guest options', {
@@ -354,7 +406,7 @@ class BeakerProvisioner(gluetool.Module):
         ('Provisioning options', {
             'static-guest': {
                 'help': 'Wrap given machine and present it as "provisioned" guest (default: none).',
-                'metavar': '(FQDN|IP):ARCH',
+                'metavar': 'FQDN:compose=COMPOSE,arch=ARCH,...',
                 'action': 'append',
                 'default': []
             },
@@ -437,13 +489,9 @@ class BeakerProvisioner(gluetool.Module):
         guests = []
 
         for guest_spec in normalize_multistring_option(self.option('static-guest')):
-            try:
-                fqdn, arch = guest_spec.split(':')
+            guest_def = parse_guest_spec(guest_spec)
 
-            except ValueError:
-                raise GlueError("Static guest format is FQDN:ARCH, '{}' is not correct".format(guest_spec))
-
-            guests.append(StaticGuestDefinition(fqdn, arch))
+            guests.append(guest_def)
 
         log_dict(self.debug, 'static guest pool', guests)
 
@@ -466,6 +514,15 @@ class BeakerProvisioner(gluetool.Module):
         return ProvisionerCapabilities(
             available_arches=gluetool_modules.libs.ANY
         )
+
+    def _get_cache(self):
+        """
+        Helper method to simplify process of getting a cache instance a bit.
+        """
+
+        self.require_shared('cache')
+
+        return self.shared('cache')
 
     def _acquire_dynamic_guests_from_beaker(self, environment):
         """
@@ -566,6 +623,126 @@ class BeakerProvisioner(gluetool.Module):
 
         return '/'.join(args)
 
+    def _grab_guest_by_fqdn(self, cache, environment, fqdn, ignore_used=False, ignore_use_by=False):
+        # pylint: disable=too-many-arguments,too-many-return-statements
+        """
+        Try to grab one specific guest from the cache.
+
+        :param cache: cache API instance.
+        :param tuple environment: description of the environment caller wants to provision.
+            Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
+        :param str fqdn: name of the guest.
+        :param bool ignore_used: if set, it will ignore ``used`` values, and grab the guest anyway.
+            By default, guests currently in use are ignored and method returns ``None``.
+        :param bool ignore_use_by: if set, it will ignore unusable ``use_by`` values, and grab the guest anyway.
+            By default, guest with invalid ``use_by`` is removed and method returns ``None``.
+        :rtype: BeakerGuest
+        :returns: Guest instance or ``None`` if it wasn't possible to grab the guest.
+        """
+
+        self.debug('checking guest {} for availability'.format(fqdn))
+
+        guest_inuse_key = self._key('guests', fqdn, 'in-use')
+
+        # find current value of `in-use` sub-key
+        in_use, cas_tag = cache.gets(guest_inuse_key, default=None)
+
+        # we can get the default answer, `None` - between us getting list of guests and checking their
+        # state, someone may have removed a guest from the list, therefore `in-use` key would be missing.
+        if in_use is None:
+            self.debug('  in-use info is not available')
+
+            return None
+
+        # if the value is anything but `False`, the guest us being used
+        if ignore_used:
+            self.warn('  no used check performed, asked to ignore')
+
+        elif in_use is not False:
+            self.debug('  guest is being used')
+
+            return None
+
+        # It's not in use, nice. Let's change the value to "used". May fail if somebody else took
+        # it (or removed it) before we grab it - in that case we bail out and try another cached guest.
+        result = cache.cas(guest_inuse_key, True, cas_tag)
+        if not result:
+            self.debug('  failed to grab')
+
+            return None
+
+        # Good, it's ours! But we have to check its `use-by` stamp, it might be rotten.
+        self.debug('grabbing {} from cache'.format(fqdn))
+
+        use_by = cache.get(self._key('guests', fqdn, 'use-by'))
+
+        # This probably should not happen, I'm not 100% sure - we own the guest,
+        # no client should ever remove the `use-by` without owning the guest...
+        # Raise a warning and try another guest - leaving this one reserved so
+        # nobody else would touch it, our human overlords investigate the case.
+        if not result:
+            self.warn('Guest {} free for use but has no use-by flag'.format(fqdn), sentry=True)
+
+            return None
+
+        if ignore_use_by:
+            self.warn('  no use-by check performed, asked to ignore')
+
+        else:
+            try:
+                use_by = datetime.datetime.strptime(use_by, '%Y-%m-%d %H:%M:%S.%f')
+
+            except TypeError:
+                self.warn('Guest {} has malformed use-by value, {}'.format(fqdn, use_by), sentry=True)
+
+                return None
+
+            # We need some extra time to finish the provisioning, close the paperwork and so on,
+            # so let's pretend the first chance we get to extend guest reservation would happen
+            # an hour from now. Would the guest still be fine by that time?
+            not_actually_now = _time_from_now(hours=1)
+
+            self.debug('use-by {}, "now" {}'.format(use_by, not_actually_now))
+
+            if use_by <= not_actually_now:
+                self.debug('  use-by stamp is too old')
+
+                self._remove_dynamic_guest_from_cache(fqdn, environment)
+
+                return None
+
+        # Download the remaining info and create the guest instance.
+        guest_info = cache.get(self._key('guests', fqdn, 'info'))
+
+        return BeakerGuest(self, guest_info['fqdn'].encode('ascii'),
+                           environment=environment, is_static=False,
+                           name=guest_info['fqdn'].encode('ascii'),
+                           username=guest_info['ssh_user'].encode('ascii'),
+                           key=guest_info['ssh_key'].encode('ascii'),
+                           options=[s.encode('ascii') for s in guest_info['ssh_options']])
+
+    def _grab_guest_by_spec(self, cache, guest_spec, ignore_used=False, ignore_use_by=False):
+        """
+        Try to grab one specific guest from the cache.
+
+        This is a helper method, used to grab a guest specified on a command line. Uses ``_grab_guest_by_fqdn``
+        to do the work, but it must parse input first.
+
+        :param str guest_spec: Specification of the guest, as accepted by command-line options,
+            consisting of FQDN and environment specification: ``FQDN:compose=...,arch=...``
+        :returns: guest instance.
+        """
+
+        guest_def = parse_guest_spec(guest_spec)
+
+        guest = self._grab_guest_by_fqdn(cache, guest_def.environment, guest_def.fqdn,
+                                         ignore_used=ignore_used, ignore_use_by=ignore_use_by)
+
+        if not guest:
+            raise GlueError('Failed to grab the guest from the cache')
+
+        return guest
+
     def _acquire_dynamic_guests_from_cache(self, environment):
         """
         Provision guests by picking them from the cache.
@@ -578,9 +755,7 @@ class BeakerProvisioner(gluetool.Module):
 
         self.debug('acquire dynamic guests from cache for {}'.format(environment))
 
-        self.require_shared('cache')
-
-        cache = self.shared('cache')
+        cache = self._get_cache()
 
         # Check whether there's an entry for our environment. It's supposed to be a list of guest names,
         # but it may be missing, we might be the first one to check.
@@ -596,70 +771,12 @@ class BeakerProvisioner(gluetool.Module):
         # Check each guest in the list and find the first one not in use. Try to grab it by marking it
         # as being used, and if we succeed, build a guest on top of its info.
         for cached_fqdn in cached_guests:
-            self.debug('checking guest {} for availability'.format(cached_fqdn))
+            guest = self._grab_guest_by_fqdn(cache, environment, cached_fqdn)
 
-            guest_inuse_key = self._key('guests', cached_fqdn, 'in-use')
-
-            # find current value of `in-use` sub-key
-            in_use, cas_tag = cache.gets(guest_inuse_key, default=None)
-
-            # we can get the default answer, `None` - between us getting list of guests and checking their
-            # state, someone may have removed a guest from the list, therefore `in-use` key would be missing.
-            if in_use is None:
-                self.debug('  in-use info is not available')
+            if not guest:
                 continue
 
-            # if the value is anything but `False`, the guest us being used
-            if in_use is not False:
-                self.debug('  guest is being used')
-                continue
-
-            # It's not in use, nice. Let's change the value to "used". May fail if somebody else took
-            # it (or removed it) before we grab it - in that case we bail out and try another cached guest.
-            result = cache.cas(guest_inuse_key, True, cas_tag)
-            if not result:
-                self.debug('  failed to grab')
-                continue
-
-            # Good, it's ours! But we have to check its `use-by` stamp, it might be rotten.
-            self.debug('grabbing {} from cache'.format(cached_fqdn))
-
-            use_by = cache.get(self._key('guests', cached_fqdn, 'use-by'))
-
-            # This probably should not happen, I'm not 100% sure - we own the guest,
-            # no client should ever remove the `use-by` without owning the guest...
-            # Raise a warning and try another guest - leaving this one reserved so
-            # nobody else would touch it, our human overlords investigate the case.
-            if not result:
-                self.warn('Guest {} free for use byt has no use-by flag'.format(cached_fqdn), sentry=True)
-                continue
-
-            use_by = datetime.datetime.strptime(use_by, '%Y-%m-%d %H:%M:%S.%f')
-
-            # We need some extra time to finish the provisioning, close the paperwork and so on,
-            # so let's pretend the first chance we get to extend guest reservation would happen
-            # an hours from now. Would the guest still be fine by that time?
-            not_actually_now = _time_from_now(hours=1)
-
-            self.debug('use-by {}, "now" {}'.format(use_by, not_actually_now))
-
-            if use_by <= not_actually_now:
-                self.debug('  use-by stamp is too old')
-
-                self._remove_dynamic_guest_from_cache(cached_fqdn, environment)
-                continue
-
-            # Download the remaining info and create the guest instance.
-            guest_info = cache.get(self._key('guests', cached_fqdn, 'info'))
-
-            return [
-                BeakerGuest(self, guest_info['fqdn'].encode('ascii'),
-                            environment=environment, is_static=False,
-                            name=guest_info['fqdn'].encode('ascii'),
-                            username=guest_info['ssh_user'].encode('ascii'),
-                            key=guest_info['ssh_key'].encode('ascii'),
-                            options=[s.encode('ascii') for s in guest_info['ssh_options']])
-            ]
+            return [guest]
 
         # Empty cache, all guests in use, removed, whatever - we failed, return empty list and fall back
         # to the slow path.
@@ -672,9 +789,7 @@ class BeakerProvisioner(gluetool.Module):
         :param BeakerGuest guest: guest to release.
         """
 
-        self.require_shared('cache')
-
-        cache = self.shared('cache')
+        cache = self._get_cache()
 
         # Store info block first - even if it already exists, it's safe, the guest is still reserved by us,
         # nobody else can not even read its info.
@@ -756,11 +871,9 @@ class BeakerProvisioner(gluetool.Module):
         :param str name: guest FQDN.
         """
 
-        self.info("Removing guest '{}' from the cache".format(name))
+        self.info("Removing guest {} {} from the cache".format(name, environment))
 
-        self.require_shared('cache')
-
-        cache = self.shared('cache')
+        cache = self._get_cache()
 
         # We own the guest entry, therefore nobody should even try to reads its properties,
         # but when it comes to the list of cached guests, we must be more careful.
@@ -811,9 +924,7 @@ class BeakerProvisioner(gluetool.Module):
         :param str use_by: time when the guest should not be used anymore.
         """
 
-        self.require_shared('cache')
-
-        self.shared('cache').set(self._key('guests', guest.name, 'use-by'), use_by)
+        self._get_cache().set(self._key('guests', guest.name, 'use-by'), use_by)
 
     def _acquire_dynamic_guests(self, environment):
         """
@@ -900,7 +1011,7 @@ class BeakerProvisioner(gluetool.Module):
         for guest_def in self.static_guests:
             self.debug('possible static guest: {}'.format(guest_def))
 
-            if environment.arch != guest_def.arch:
+            if environment.arch != guest_def.environment.arch:
                 self.debug('  incompatible architecture')
                 continue
 
@@ -959,7 +1070,9 @@ class BeakerProvisioner(gluetool.Module):
             self._config['environment'] = TestingEnvironment.unserialize_from_string(self.option('environment'))
 
     def _cache_show_guests(self):
-        cache_dump = self.shared('cache').dump()
+        cache = self._get_cache()
+
+        cache_dump = cache.dump()
 
         guests = {}
 
@@ -1005,6 +1118,58 @@ class BeakerProvisioner(gluetool.Module):
         log_table(self.info, 'Cached guests', [headers] + sorted(rows),
                   headers='firstrow', tablefmt='psql')
 
+    def _cache_add_guest(self):
+        guest_def = parse_guest_spec(self.option('cache-add-guest'))
+
+        self.info('Adding guest {} {} to the cache'.format(guest_def.fqdn, guest_def.environment))
+
+        guest = BeakerGuest(self, guest_def.fqdn,
+                            environment=guest_def.environment, is_static=False,
+                            name=guest_def.fqdn,
+                            username=self.option('ssh-user'),
+                            key=normalize_path(self.option('ssh-key')),
+                            options=normalize_multistring_option(self.option('ssh-options')))
+
+        self._release_dynamic_guest_to_cache(guest)
+
+        # Set guest's `use-by` info by touching it - setting as it was just reserved by the provisioner,
+        # in the hope the user knows what he's doing :)
+        self._touch_dynamic_guest(guest, str(_time_from_now(hours=self.option('reservation-extension'))))
+
+    def _cache_remove_guest(self):
+        cache = self._get_cache()
+
+        guest = self._grab_guest_by_spec(cache, self.option('cache-remove-guest'),
+                                         ignore_used=normalize_bool_option(self.option('cache-force')),
+                                         ignore_use_by=True)
+
+        self._remove_dynamic_guest_from_cache(guest.name, guest.environment)
+
+    def _cache_ping_guest(self):
+        cache = self._get_cache()
+
+        guest = self._grab_guest_by_spec(cache, self.option('cache-ping-guest'),
+                                         ignore_used=normalize_bool_option(self.option('cache-force')),
+                                         ignore_use_by=True)
+
+        self.info('Pinging guest {} {}'.format(guest.name, guest.environment))
+
+        try:
+            # pylint: disable=protected-access
+            guest._wait_alive()
+
+        # pylint: disable=broad-except
+        except Exception as exc:
+            guest.error('Failed to respond: {}'.format(exc))
+
+        else:
+            guest.info('Alive and feeling well!')
+
+            # pylint: disable=protected-access
+            guest._extend_reservation()
+
+        self._release_dynamic_guest_to_cache(guest)
+
     def execute(self):
         if self.option('provision'):
             guests = self.provision(self.option('environment'),
@@ -1014,8 +1179,32 @@ class BeakerProvisioner(gluetool.Module):
                 for guest in guests:
                     guest.setup()
 
-        if gluetool.utils.normalize_bool_option(self.option('cache-show-guests')):
+        def _show_cache():
+            if not gluetool.utils.normalize_bool_option(self.option('cache-show-guests')):
+                return
+
             self._cache_show_guests()
+
+        # If we've been asked to show cache, do so.
+        _show_cache()
+
+        # Deal with methods manipulating the cache. If we've been asked to show cache, do so after each change,
+        # so user can follow the progress of changes as they apply.
+
+        if self.option('cache-add-guest'):
+            self._cache_add_guest()
+
+            _show_cache()
+
+        if self.option('cache-remove-guest'):
+            self._cache_remove_guest()
+
+            _show_cache()
+
+        if self.option('cache-ping-guest'):
+            self._cache_ping_guest()
+
+            _show_cache()
 
     def destroy(self, failure=None):
         if not self._dynamic_guests:
