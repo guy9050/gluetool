@@ -28,6 +28,12 @@ class SUTInstallation(object):
         self.steps.append(SUTStep(label, command, items, ignore_exception))
 
     def run(self, guest):
+        try:
+            guest.execute('command -v yum')
+            yum_present = True
+        except gluetool.glue.GlueCommandError:
+            yum_present = False
+
         log_dir_name = '{}-{}'.format(self.directory_name, guest.name)
         os.mkdir(log_dir_name)
 
@@ -49,6 +55,10 @@ class SUTInstallation(object):
                 # `step.command` contains `{}` to indicate place where item is substitute.
                 # e.g 'yum install -y {}'.format('ksh')
                 command = step.command.format(item)
+
+                # replace yum with dnf in case yum is not present on guest
+                if not yum_present and command.startswith('yum'):
+                    command = '{}{}'.format('dnf', command[3:])
 
                 try:
                     output = guest.execute(command)
