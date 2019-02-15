@@ -31,7 +31,7 @@ from gluetool_modules.libs.testing_environment import TestingEnvironment
 
 
 DEFAULT_FLAVOR = 'm1.small'
-DEFAULT_NAME = 'citool'
+DEFAULT_NAME_TEMPLATE = 'citool-{{ GUEST_INDEX }}'
 DEFAULT_RESERVE_DIR = '~/openstack-reservations'
 DEFAULT_REMOTE_RESERVE_FILE = '~/.openstack-reservation'
 DEFAULT_RESERVE_TIME = 24
@@ -318,31 +318,6 @@ class OpenstackGuest(NetworkedGuest):
                                    logger=logger,
                                    timeout=timeout,
                                    tick=tick)
-
-    def _acquire_name(self):
-        """
-        Acquire a name for this server.
-        """
-
-        parts = [
-            self._os_details['name']
-        ]
-
-        thread_id = self._module.shared('thread_id')
-
-        if thread_id:
-            parts.append(thread_id[0:12])
-
-        else:
-            parts.append('unknown_thread')
-
-        parts.append(str(self._module.acquire_guest_index))
-
-        if 'JOB_NAME' in os.environ:
-            parts.append('{}-{}'.format(os.environ['JOB_NAME'], os.environ['BUILD_ID']))
-
-        # construct name from non empty values only
-        self._os_name = '-'.join([name for name in parts if name])
 
     def _acquire_floating_ip(self):
         """
@@ -633,8 +608,9 @@ class OpenstackGuest(NetworkedGuest):
 
         # provision a new instance
         if instance_id is None:
+            self._os_name = details['name']
+
             self._acquire_floating_ip()
-            self._acquire_name()
             self._acquire_nics()
             self._acquire_instance()
 
@@ -1017,6 +993,14 @@ class CIOpenstack(gluetool.Module):
             'key-name': {
                 'help': 'Name of the keypair to inject into instance',
             },
+            'name-template': {
+                'help': """
+                        Template for guest names. It has access to the eval context, and ``GUEST_INDEX``
+                        variable which represents the order number of the guest in the current pipeline
+                        (default: %(default)s).
+                        """,
+                'default': DEFAULT_NAME_TEMPLATE
+            },
             'network': {
                 'help': 'Label of network to attach instance to',
             },
@@ -1389,7 +1373,7 @@ class CIOpenstack(gluetool.Module):
 
         return OpenStackImage.factory(self, image)
 
-    def provision(self, environment, count=1, name=DEFAULT_NAME, image=None, flavor=None, **kwargs):
+    def provision(self, environment, count=1, name=None, image=None, flavor=None, **kwargs):
         # pylint: disable=too-many-arguments,unused-argument
 
         assert count >= 1, 'count needs to >= 1'
@@ -1427,8 +1411,23 @@ class CIOpenstack(gluetool.Module):
         # create given number of guests
         guests = []
         for _ in range(count):
+            if name:
+                actual_name = name
+
+            else:
+                actual_name = gluetool.utils.render_template(
+                    self.option('name-template'),
+                    logger=self.logger,
+                    **dict_update(
+                        self.shared('eval_context'),
+                        {
+                            'GUEST_INDEX': self.acquire_guest_index
+                        }
+                    )
+                )
+
             details = {
-                'name': name,
+                'name': actual_name,
                 'image': image,
                 'flavor': flavor_ref,
                 'network': network_ref,
@@ -1483,10 +1482,11 @@ class CIOpenstack(gluetool.Module):
                fields.
 
         :param int count: number of openstack guests to create
-        :param str name: box name (default: {default_name})
+        :param str name: if set, it is used to name the instances, otherwise the template set by
+            ``name-template`` is used.
         :param str image: image to use (default: see above)
         :param str flavor: flavor to use for the instance (default: ``{default_flavor}``)
-        """.format(default_name=DEFAULT_NAME, default_flavor=DEFAULT_FLAVOR)
+        """.format(default_flavor=DEFAULT_FLAVOR)
 
     def provisioner_capabilities(self):
         """
