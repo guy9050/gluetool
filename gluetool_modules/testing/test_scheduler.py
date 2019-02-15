@@ -4,7 +4,7 @@ from six import reraise
 
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
-from gluetool.log import log_dict, log_table
+from gluetool.log import log_dict
 
 import libci.guest
 import libci.sentry
@@ -12,6 +12,7 @@ import libci.sentry
 import gluetool_modules.libs.artifacts
 from gluetool_modules.libs import ANY
 from gluetool_modules.libs.jobs import Job, run_jobs, handle_job_errors
+from gluetool_modules.libs.test_schedule import TestScheduleEntryStage, TestScheduleEntryState
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 
 # Type annotations
@@ -19,6 +20,7 @@ from gluetool_modules.libs.testing_environment import TestingEnvironment
 from typing import TYPE_CHECKING, cast, Any, Dict, List  # noqa
 
 if TYPE_CHECKING:
+    from gluetool_modules.libs.test_schedule import TestSchedule  # noqa
     from gluetool_modules.testing.test_scheduler_beaker_xml import TestScheduleEntry  # noqa
 
 
@@ -46,10 +48,10 @@ class NoTestableArtifactsError(libci.sentry.PrimaryTaskFingerprintsMixin, SoftGl
         super(NoTestableArtifactsError, self).__init__(task, message)
 
 
-class RestraintScheduler(gluetool.Module):
+class TestScheduler(gluetool.Module):
     """
     Prepares "test schedule" for other modules to perform. A schedule is a list of "test schedule entries"
-    (see :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry>`). To create the schedule,
+    (see :py:class:`libs.test_schdule.TestScheduleEntry`). To create the schedule,
     supporting modules are required, to extract test plans and package necessary information into
     test schedule entries. This module then provisions and sets up the necessary guests.
 
@@ -81,7 +83,7 @@ class RestraintScheduler(gluetool.Module):
 
     shared_functions = ['test_schedule']
 
-    _schedule = None  # type: List[TestScheduleEntry]
+    _schedule = None  # type: TestSchedule
 
     @utils.cached_property
     def arch_compatibility_map(self):
@@ -96,7 +98,7 @@ class RestraintScheduler(gluetool.Module):
         )
 
     def test_schedule(self):
-        # type: () -> List[TestScheduleEntry]
+        # type: () -> TestSchedule
         """
         Returns schedule for runners. It tells runner which recipe sets
         it should run on which guest.
@@ -106,55 +108,12 @@ class RestraintScheduler(gluetool.Module):
 
         return self._schedule
 
-    def _log_schedule(self, label, schedule):
-        # type: (str, List[TestScheduleEntry]) -> None
-
-        self.debug('{}:'.format(label))
-
-        for schedule_entry in schedule:
-            schedule_entry.log()
-
-    def _log_summary_table(self, schedule, remaining_count):
-        # type: (List[TestScheduleEntry], int) -> None
-        """
-        Log a table giving a nice, user-readable overview of the schedule progress. At this moment,
-        only environment and assigned guest are shown, in the future more information would be added
-        (passed the setup, running tests, finished tests, etc), but that will require a bit more info
-        being accessible via schedule entry, which is work for another patch.
-
-        :param list(TestScheduleEntry) schedule: schedule to format.
-        :param int remaining_count: number of entries left to process.
-        """
-
-        headers = [
-            'SE', 'Compose', 'Arch', 'Guest'
-        ]
-
-        rows = []
-
-        for schedule_entry in schedule:
-            if schedule_entry.testing_environment:
-                compose = str(schedule_entry.testing_environment.compose)
-                arch = str(schedule_entry.testing_environment.arch)
-
-            else:
-                compose, arch = '', ''
-
-            guest_name = schedule_entry.guest.name if schedule_entry.guest else ''
-
-            rows.append([
-                schedule_entry.id, compose, arch, guest_name
-            ])
-
-        log_table(self.info, '{} guests pending'.format(remaining_count), [headers] + rows,
-                  headers='firstrow', tablefmt='psql')
-
     def _provision_guests(self, schedule):
-        # type: (List[TestScheduleEntry]) -> None
+        # type: (TestSchedule) -> None
         """
         Provision guests for schedule entries.
 
-        :param list(ScheduleEntry) schedule: Schedule to provision guests for.
+        :param TestSchedule schedule: Schedule to provision guests for.
         """
 
         self.debug('provisioning guests')
@@ -221,6 +180,7 @@ class RestraintScheduler(gluetool.Module):
             # type: (TestScheduleEntry) -> None
 
             schedule_entry.debug('planning guest for environment: {}'.format(schedule_entry.testing_environment))
+            schedule_entry.stage = TestScheduleEntryStage.GUEST_PROVISIONING
 
         # called when provisioning job succeeded - store returned guest in the schedul eentry
         def _on_job_complete(result, schedule_entry):
@@ -229,6 +189,7 @@ class RestraintScheduler(gluetool.Module):
             schedule_entry.info('provisioning of guest finished')
 
             schedule_entry.guest = result[0]
+            schedule_entry.stage = TestScheduleEntryStage.GUEST_PROVISIONED
 
         # called when provisioning job failed
         def _on_job_error(exc_info, schedule_entry):
@@ -237,15 +198,16 @@ class RestraintScheduler(gluetool.Module):
             # pylint: disable=unused-argument
 
             schedule_entry.error('provisioning of guest failed')
+            schedule_entry.state = TestScheduleEntryState.ERROR
 
         # called when provisioning job finished
         def _on_job_done(remaining_count, schedule_entry):
             # type: (int, TestScheduleEntry) -> None
 
             # pylint: disable=unused-argument
-            self._log_summary_table(schedule, remaining_count)
+            schedule.log(self.info, label='{} guests pending'.format(remaining_count))
 
-        self._log_summary_table(schedule, len(schedule))
+        schedule.log(self.info, '{} guests pending'.format(len(schedule)))
 
         job_errors = run_jobs(
             jobs,
@@ -261,11 +223,11 @@ class RestraintScheduler(gluetool.Module):
             handle_job_errors(job_errors, 'At least one provisioning attempt failed')
 
     def _setup_guests(self, schedule):
-        # type: (List[TestScheduleEntry]) -> None
+        # type: (TestSchedule) -> None
         """
         Setup all guests of a schedule.
 
-        :param list(ScheduleEntry) schedule: Schedule listing guests to set up.
+        :param TestSchedule schedule: Schedule listing guests to set up.
         """
 
         self.debug('setting up the guests')
@@ -306,6 +268,7 @@ class RestraintScheduler(gluetool.Module):
             # type: (TestScheduleEntry) -> None
 
             schedule_entry.debug('planning setup of guest: {}'.format(schedule_entry.guest))
+            schedule_entry.stage = TestScheduleEntryStage.GUEST_SETUP
 
         # called when setup job succeeded
         def _on_job_complete(result, schedule_entry):
@@ -314,6 +277,7 @@ class RestraintScheduler(gluetool.Module):
             # pylint: disable=unused-argument
 
             schedule_entry.info('setup of guest finished')
+            schedule_entry.stage = TestScheduleEntryStage.PREPARED
 
         # called when setup job failed
         def _on_job_error(exc_info, schedule_entry):
@@ -322,6 +286,7 @@ class RestraintScheduler(gluetool.Module):
             # pylint: disable=unused-argument
 
             schedule_entry.error('setup of guest failed')
+            schedule_entry.state = TestScheduleEntryState.ERROR
 
         # called when setup job finished
         def _on_job_done(remaining_count, schedule_entry):
@@ -329,7 +294,9 @@ class RestraintScheduler(gluetool.Module):
 
             # pylint: disable=unused-argument
 
-            self.info('{} guests pending'.format(remaining_count))
+            schedule.log(self.info, label='{} guests pending'.format(remaining_count))
+
+        schedule.log(self.info, '{} guests pending'.format(len(schedule)))
 
         job_errors = run_jobs(
             jobs,
@@ -345,25 +312,26 @@ class RestraintScheduler(gluetool.Module):
             handle_job_errors(job_errors, 'At least one guest setup failed')
 
     def _assign_guests(self, schedule):
-        # type: (List[TestScheduleEntry]) -> None
+        # type: (TestSchedule) -> None
         """
         Provision, setup and assign guests for entries in a given schedule.
 
-        :param list(TestScheduleEntry) schedule: List of test schedule entries.
+        :param TestSchedule schedule: List of test schedule entries.
         """
 
         self.info('assigning guests to a test schedule')
 
-        self._log_schedule('schedule', schedule)
+        schedule.log(self.debug, label='schedule before guest assignment')
 
         # provision guests for schedule entries - use their testing environments and use provisioning modules
         self._provision_guests(schedule)
-        self._log_schedule('complete schedule with guests', schedule)
+
+        schedule.log(self.debug, label='schedule with assigned guests')
 
         # setup guests
         self._setup_guests(schedule)
 
-        self._log_schedule('final schedule', schedule)
+        schedule.log(self.debug, label='final schedule')
 
     def execute(self):
         # type: () -> None

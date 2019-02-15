@@ -1,6 +1,7 @@
+import enum
 import gluetool
 import gluetool.log
-from gluetool.log import LoggingFunctionType, LoggingWarningFunctionType
+from gluetool.log import LoggingFunctionType, LoggingWarningFunctionType, log_table
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order
@@ -9,6 +10,48 @@ from typing import TYPE_CHECKING, cast, Any, List, Optional  # noqa
 if TYPE_CHECKING:
     import libci.guest  # noqa
     import gluetool_modules.libs.testing_environment  # noqa
+
+
+class TestScheduleEntryStage(enum.Enum):
+    """
+    Enumerates different stages of a test schedule entry.
+
+    During its lifetime, entry progress from one stage to another. Unlike :py:ref:`TestScheduleEntryState`,
+    stage changes multiple times, and it may be even possible to return to previously visited stages.
+    """
+
+    #: Freshly created entry, nothing has happened yet to fulfil its goal.
+    CREATED = 'created'
+
+    #: A provisioning process started, to acquire a guest for the entry.
+    GUEST_PROVISIONING = 'guest-provisioning'
+
+    #: A guest has been provisioned.
+    GUEST_PROVISIONED = 'guest-provisioned'
+
+    #: A guest setup process started.
+    GUEST_SETUP = 'guest-setup'
+
+    #: The entry is prepared and tests can be executed.
+    PREPARED = 'prepared'
+
+    #: Test schedule runner began running tests of this entry.
+    RUNNING = 'running'
+
+    #: Tests finished, there is nothing left to perform.
+    COMPLETE = 'complete'
+
+
+class TestScheduleEntryState(enum.Enum):
+    """
+    Enumerates different possible (final) states of a test schedule entry.
+
+    Unlike :py:ref:`TestScheduleEntryStage`, state changes once and only once, representing
+    the final state of the entry.
+    """
+
+    OK = 'ok'
+    ERROR = 'error'
 
 
 class TestScheduleEntryAdapter(gluetool.log.ContextAdapter):
@@ -24,13 +67,21 @@ class TestScheduleEntry(object):
     # pylint: disable=too-few-public-methods
 
     """
-    Internal representation of stuff to run, where to run and other bits necessary for scheduling
+    Internal representation of stuff to run, where to run it and other bits necessary for scheduling
     all things the module was asked to perform.
-
-    Follows :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
 
     :param logger: logger used as a parent of this entry's own logger.
     :param str entry_id: ID of the entry.
+    :param str runner_capability: what runner capability is necessary to run the tests. Each runner
+        supports some cabilities, and it is therefore able to take care of compatible entries only.
+    :ivar str id: ID of the entry.
+    :ivar str runner_capability: what runner capability is necessary to run the tests.
+    :ivar TestScheduleEntryStage stage: current stage of the entry. It is responsibility of those
+        who consume the entry to update its stage properly.
+    :ivar TestScheduleEntryState state: current state of the entry. It is responsibility of those
+        who consume the entry to update its state properly.
+    :ivar TestingEnvironment testing_environment: environment required for the entry.
+    :ivar NetworkedGuest guest: guest assigned to this entry.
     """
 
     # Logging type stubs
@@ -53,18 +104,21 @@ class TestScheduleEntry(object):
     error = cast(LoggingFunctionType, _fake_log_fn)
     exception = cast(LoggingFunctionType, _fake_log_fn)
 
-    def __init__(self, logger, entry_id):
-        # type: (gluetool.log.ContextAdapter, str) -> None
+    def __init__(self, logger, entry_id, runner_capability):
+        # type: (gluetool.log.ContextAdapter, str, str) -> None
 
         # pylint: disable=C0103
         self.id = entry_id
+        self.runner_capability = runner_capability
 
         self.logger = TestScheduleEntryAdapter(logger, self.id)
         self.logger.connect(self)
 
+        self.stage = TestScheduleEntryStage.CREATED
+        self.state = TestScheduleEntryState.OK
+
         self.testing_environment = None  # type: Optional[gluetool_modules.libs.testing_environment.TestingEnvironment]
         self.guest = None  # type: Optional[libci.guest.NetworkedGuest]
-        self.package = None  # type: Any
 
     def log(self, log_fn=None):
         # type: (Optional[gluetool.log.LoggingFunctionType]) -> None
@@ -73,3 +127,69 @@ class TestScheduleEntry(object):
 
         log_fn('testing environment: {}'.format(self.testing_environment))
         log_fn('guest: {}'.format(self.guest))
+
+
+class TestSchedule(list):
+    """
+    Represents a test schedule - a list of entries, each describing what tests to run and the necessary
+    environment. Based on a list, supports basic sequence operations while adding convenience logging
+    helper.
+    """
+
+    def log(self, log_fn, label=None):
+        # type: (gluetool.log.LoggingFunctionType, Optional[str]) -> None
+        """
+        Log a table giving a nice, user-readable overview of the test schedule.
+
+        At this moment, public properties of schedule entries are logged - guest, environment, etc.
+        in the future more information would be added (passed the setup, running tests, finished tests,
+        etc., but that will require a bit more info being accessible via schedule entry, which is work
+        for the future patches.
+
+        :param callable log_fn: function to use for logging.
+        :param str label: if set, it is used as a label of the logged table.
+        """
+
+        label = label or 'test schedule'
+
+        headers = [
+            'SE', 'Stage', 'State', 'Environment', 'Guest', 'Runner'
+        ]
+
+        rows = []
+
+        # Helper - convert testing environment to a nice human-readable string.
+        # `serialize_to_string is not that nice, id adds field names and no spaces between fields,
+        # it is for machines mostly, and output of this function is supposed to be easily
+        # readable by humans.
+        def _env_to_str(testing_environment):
+            # type: (gluetool_modules.libs.testing_environment.TestingEnvironment) -> str
+
+            if not testing_environment:
+                return ''
+
+            # Use serialized form for quick access to fields and their values, omit keys
+            # and show values only - readable so far.
+            serialized = testing_environment.serialize_to_json()
+
+            return ', '.join([
+                str(serialized[field]) for field in sorted(serialized.iterkeys())
+            ])
+
+        # pylint: disable=invalid-name
+        for se in self:
+            se_environment = _env_to_str(se.testing_environment)
+
+            # if we have a guest, add provisioned environment and guest's name
+            if se.guest:
+                guest_info = '{}\n{}'.format(_env_to_str(se.guest.environment), se.guest.name)
+
+            else:
+                guest_info = ''
+
+            rows.append([
+                se.id, se.stage.name, se.state.name, se_environment, guest_info, se.runner_capability
+            ])
+
+        log_table(log_fn, label, [headers] + rows,
+                  tablefmt='psql', headers='firstrow')

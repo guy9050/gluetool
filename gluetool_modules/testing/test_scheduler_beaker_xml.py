@@ -3,7 +3,7 @@ import gluetool.log
 from gluetool.log import log_dict, log_xml
 
 from gluetool_modules.libs.testing_environment import TestingEnvironment
-from gluetool_modules.libs.test_schedule import TestScheduleEntry as BaseTestScheduleEntry
+from gluetool_modules.libs.test_schedule import TestSchedule, TestScheduleEntry as BaseTestScheduleEntry
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order
@@ -18,17 +18,19 @@ class TestScheduleEntry(BaseTestScheduleEntry):
         """
         Test schedule entry, suited for use with Restraint.
 
-        Follows :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
-
         :param logger: logger used as a parent of this entry's own logger.
         :param int job_index: index of job within all jobs this entry belongs to.
         :param int recipe_set_index: index of recipe set within its job this entry belongs to.
         :param xml recipe_set: XML description of (Beaker) recipe set this entry handles.
         """
 
-        super(TestScheduleEntry, self).__init__(logger, 'schedule entry J#{}-RS#{}'.format(job_index, recipe_set_index))
+        super(TestScheduleEntry, self).__init__(
+            logger,
+            'J#{} RS#{}'.format(job_index, recipe_set_index),
+            'restraint'
+        )
 
-        self.package = self.recipe_set = recipe_set
+        self.recipe_set = recipe_set
 
     def log(self, log_fn=None):
         # type: (Optional[gluetool.log.LoggingFunctionType]) -> None
@@ -40,7 +42,7 @@ class TestScheduleEntry(BaseTestScheduleEntry):
         log_xml(log_fn, 'recipe set', self.recipe_set)
 
 
-class TestSchedulerWow(gluetool.Module):
+class TestSchedulerBeakerXML(gluetool.Module):
     """
     Create test schedule entries for ``test-scheduler`` module by calling ``beaker_job_xml`` shared function.
     """
@@ -52,14 +54,6 @@ class TestSchedulerWow(gluetool.Module):
                   """
 
     shared_functions = ['create_test_schedule']
-
-    def _log_schedule(self, label, schedule):
-        # type: (str, List[TestScheduleEntry]) -> None
-
-        self.debug('{}:'.format(label))
-
-        for schedule_entry in schedule:
-            schedule_entry.log()
 
     def _get_job_xmls(self, testing_environment_constraints=None):
         # type: (Optional[List[TestingEnvironment]]) -> List[Any]
@@ -89,18 +83,18 @@ class TestSchedulerWow(gluetool.Module):
         }))
 
     def _create_job_schedule(self, index, job):
-        # type: (int, Any) -> List[TestScheduleEntry]
+        # type: (int, Any) -> TestSchedule
         """
         For a given job XML, extract recipe sets and their corresponding testing environments.
 
         :param int index: index of the ``job`` in greater scheme of things - used for logging purposes.
         :param xml job: job XML description.
-        :rtype: list(ScheduleEntry)
+        :rtype: TestSchedule
         """
 
         log_xml(self.debug, 'full job description', job)
 
-        schedule = []
+        schedule = TestSchedule()
 
         recipe_sets = job.find_all('recipeSet')
 
@@ -129,34 +123,34 @@ class TestSchedulerWow(gluetool.Module):
 
             schedule.append(schedule_entry)
 
-        self._log_schedule('job #{} schedule'.format(index), schedule)
+        schedule.log(self.debug, label='job #{} schedule'.format(index))
 
         return schedule
 
     def _create_jobs_schedule(self, jobs):
-        # type: (List[Any]) -> List[TestScheduleEntry]
+        # type: (List[Any]) -> TestSchedule
         """
         Create schedule for given set of jobs.
 
         :param list(xml) jobs: List of jobs - in their XML representation, as generated
             by ``workflow-tomorrow`` - to schedule.
-        :rtype: list(TestScheduleEntry)
+        :rtype: TestSchedule
         """
 
         self.info('creating schedule for {} jobs'.format(len(jobs)))
 
-        schedule = []  # type: List[TestScheduleEntry]
+        schedule = TestSchedule()
 
         # for each job, create a schedule entries for its recipe sets, and put them all on one pile
         for i, job in enumerate(jobs):
-            schedule += self._create_job_schedule(i, job)
+            schedule.extend(self._create_job_schedule(i, job))
 
-        self._log_schedule('complete schedule', schedule)
+        schedule.log(self.debug, label='complete schedule')
 
         return schedule
 
     def create_test_schedule(self, testing_environment_constraints=None):
-        # type: (Optional[List[TestingEnvironment]]) -> List[TestScheduleEntry]
+        # type: (Optional[List[TestingEnvironment]]) -> TestSchedule
         """
         Create a test schedule based on call of ``beaker_job_xml`` shared function. XML job description
         is split into recipes, each is packed into one schedule entry.
@@ -165,8 +159,7 @@ class TestSchedulerWow(gluetool.Module):
             limitations put on us by the caller. In the form of testing environments - with some fields possibly
             left unspecified - the list specifies what environments are expected to be used for testing.
             At this moment, only ``arch`` property is obeyed.
-        :returns: a test schedule - a list of test schedule entries as described
-            in :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
+        :returns: a test schedule - a list of :py:class:`libs.TestScheduleEntry` instances.
         """
 
         self.require_shared('beaker_job_xml')

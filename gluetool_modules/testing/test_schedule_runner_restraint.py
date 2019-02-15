@@ -42,6 +42,7 @@ from gluetool import GlueError
 from gluetool.log import log_blob, log_dict, format_xml
 from gluetool.utils import new_xml_element, normalize_bool_option, render_template
 from libci.results import TestResult, publish_result
+from gluetool_modules.libs.test_schedule import TestScheduleEntryStage, TestScheduleEntryState
 
 
 # The exit status values come from restraint sources: https://github.com/p3ck/restraint/blob/master/src/errors.h
@@ -80,8 +81,7 @@ class RestraintTestResult(TestResult):
 #: Represents a single run of a task and results of this run.
 #:
 #: :ivar str name: name of the task
-#: :ivar schedule_entry: test schedule entry the task belongs to, as defined in
-#:     :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
+#: :ivar libs.test_schedule.TestScheduleEntry schedule_entry: test schedule entry the task belongs to.
 #: :ivar dict results: results of the task run, as returned by ``parse_beah_result`` shared function.
 TaskRun = collections.namedtuple('TaskRun', ('name', 'schedule_entry', 'results'))
 
@@ -246,8 +246,7 @@ class RestraintRunner(gluetool.Module):
         return unified form of results in a form of dictionary. We don't really care what's inside the
         dictionary, we're just prepare all resources and pass the dictionary further.
 
-        :param schedule_entry: test schedule entry the results belongs to, as defined in
-            :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
+        :param libs.test_schedule.TestScheduleEntry schedule_entry: test schedule entry the results belongs to.
         :rtype: TaskSetResults
         """
 
@@ -323,8 +322,7 @@ class RestraintRunner(gluetool.Module):
         """
         Run a set of tasks on the guest.
 
-        :param schedule_entry: Test schedule entry, as defined in
-            :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
+        :param libs.test_schedule.TestScheduleEntry schedule_entry: Test schedule entry task set belongs to.
         :param task_set: list of <task/> elements, representing separate tasks.
         :param dict recipe_attrs: additional attributes to set on <recipe/> element.
         :param dict recipe_set_attrs: additional attributes to set on <recipe_set/> element.
@@ -459,8 +457,7 @@ class RestraintRunner(gluetool.Module):
         Run tasks from a schedule entry one by one, isolated from each other by restoring a base snapshot
         of the guest before running new task.
 
-        :param schedule_entry: Test schedule entry, as defined in
-            :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
+        :param libs.test_schedule.TestScheduleEntry schedule_entry: Test schedule entry.
         :rtype: TaskSetResults
         """
 
@@ -496,8 +493,7 @@ class RestraintRunner(gluetool.Module):
         """
         Run tasks from a schedule entry one by one - entry contains just a single task.
 
-        :param schedule_entry: Test schedule entry, as defined in
-            :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
+        :param libs.test_schedule.TestScheduleEntry schedule_entry: Test schedule entry.
         :rtype: TaskSetResults
         """
 
@@ -517,8 +513,7 @@ class RestraintRunner(gluetool.Module):
         Run tasks from a schedule entry one by one, isolated from each other by restoring a base snapshot
         of the guest before running new task.
 
-        :param schedule_entry: Test schedule entry, as defined in
-            :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
+        :param libs.test_schedule.TestScheduleEntry schedule_entry: Test schedule entry.
         :rtype: TaskSetResults
         """
 
@@ -532,8 +527,7 @@ class RestraintRunner(gluetool.Module):
         Run tasks from a schedule entry in a "classic" manner, running one by one
         on the same box.
 
-        :param schedule_entry: Test schedule entry, as defined in
-            :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
+        :param libs.test_schedule.TestScheduleEntry schedule_entry: Test schedule entry.
         :rtype: TaskSetResults
         """
 
@@ -548,8 +542,7 @@ class RestraintRunner(gluetool.Module):
         """
         Run tasks from a schedule entry.
 
-        :param schedule_entry: Test schedule entry, as defined in
-            :doc:`Test Schedule Entry Protocol </protocols/test-schedule-entry`.
+        :param libs.test_schedule.TestScheduleEntry schedule_entry: Test schedule entry.
         :rtype: TaskSetResults
         """
 
@@ -561,14 +554,29 @@ class RestraintRunner(gluetool.Module):
         assert len(schedule_entry.recipe_set.find_all('recipe')) == 1
 
         schedule_entry.info('starting to run tests')
+        schedule_entry.stage = TestScheduleEntryStage.RUNNING
         schedule_entry.log()
 
-        if schedule_entry.guest.supports_snapshots() is True and self.use_snapshots:
-            results = self._run_schedule_entry_isolated(schedule_entry)
+        # Catch everything just to get a chance to properly update the schedule entry,
+        # and re-raise the exception to continue in the natural flow of things.
 
-        else:
-            results = self._run_schedule_entry_whole(schedule_entry)
+        try:
+            if schedule_entry.guest.supports_snapshots() is True and self.use_snapshots:
+                results = self._run_schedule_entry_isolated(schedule_entry)
 
+            else:
+                results = self._run_schedule_entry_whole(schedule_entry)
+
+        # pylint: disable=broad-except
+        except Exception:
+            exc_info = sys.exc_info()
+
+            schedule_entry.stage = TestScheduleEntryStage.COMPLETE
+            schedule_entry.state = TestScheduleEntryState.ERROR
+
+            reraise(*exc_info)
+
+        schedule_entry.stage = TestScheduleEntryStage.COMPLETE
         schedule_entry.debug('finished')
         log_dict(schedule_entry.debug, 'results', results.tasks)
 
@@ -619,6 +627,13 @@ class RestraintRunner(gluetool.Module):
         self.require_shared('restraint')
 
         schedule = self.shared('test_schedule') or []
+
+        # pylint: disable=invalid-name
+        for se in schedule:
+            if se.runner_capability == 'restraint':
+                continue
+
+            raise GlueError("Cannot run schedule entry {}, requires '{}'".format(se.id, se.runner_capability))
 
         self.shared('trigger_event', 'test-schedule-runner-restraint.start',
                     schedule=schedule)

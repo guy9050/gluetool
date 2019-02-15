@@ -14,5 +14,4 @@ Known protocols
 
    cache
    provisioner-capabilities
-   test-schedule-entry
    testing-environment
