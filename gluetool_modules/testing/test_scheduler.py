@@ -147,7 +147,7 @@ class RestraintScheduler(gluetool.Module):
             ])
 
         log_table(self.info, '{} guests pending'.format(remaining_count), [headers] + rows,
-                  tablefmt='simple', headers='firstrow')
+                  headers='firstrow', tablefmt='psql')
 
     def _provision_guests(self, schedule):
         # type: (List[TestScheduleEntry]) -> None

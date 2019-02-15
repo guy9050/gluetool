@@ -1002,7 +1002,8 @@ class BeakerProvisioner(gluetool.Module):
                 info['use-by']
             ])
 
-        log_table(self.info, 'Cached guests', [headers] + sorted(rows), headers='firstrow', tablefmt='simple')
+        log_table(self.info, 'Cached guests', [headers] + sorted(rows),
+                  headers='firstrow', tablefmt='psql')
 
     def execute(self):
         if self.option('provision'):
