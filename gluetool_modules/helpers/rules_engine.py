@@ -4,7 +4,7 @@ import ast
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.log import log_dict
-from gluetool.utils import cached_property, load_yaml, normalize_multistring_option, dict_update
+from gluetool.utils import cached_property, load_yaml, normalize_multistring_option
 import _ast
 
 # Type annotations
@@ -243,6 +243,11 @@ class RulesEngine(gluetool.Module):
 
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
+    @property
+    def eval_context(self):
+        # type: () -> Any
+        return self.variables
+
     def _filter(self,
                 entries,  # type: List[EntryType]
                 context=None,  # type: Optional[Union[ContextType, ContextGetterType]]
@@ -331,11 +336,11 @@ class RulesEngine(gluetool.Module):
                 key: MatchableString(value) if isinstance(value, str) else value for key, value in variables.iteritems()
             }
 
+        # If we don't have a context, get one from the core.
         if context is None:
-            context = dict_update({}, self.variables)
-        else:
-            context = dict_update({}, self.variables, context)
+            context = self.shared('eval_context')
 
+        assert context is not None  # to make mypy happy
         custom_locals = _enhance_strings(context)
 
         custom_locals['EXISTS'] = lambda name: name in custom_locals
