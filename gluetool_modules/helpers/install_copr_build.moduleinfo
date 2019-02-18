@@ -2,17 +2,3 @@
 
 name: install-copr-build
 description: "Install build packages on given guest."
-
-dependencies:
-  yum:
-    - autoconf
-    - automake
-    - libtool
-    - python-devel
-    - redhat-rpm-config
-    - make
-    - gcc
-    - python
-
-  pip:
-    - jq
