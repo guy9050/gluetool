@@ -61,27 +61,39 @@ class InstallKojiDockerImage(gluetool.Module):
         # This belongs to some sort of config file... But setting source options
         # is probably a bit too complicated for config file, and it's better to arget it
         # to just a single task instead of using --taskparam & setting them globally.
-        job_xmls = self.shared('beaker_job_xml', body_options=[
-            '--task=/tools/toolchain-common/Install/configure-extras-repo',
-            '--task=/distribution/containers/enable-docker',
-            '--task=/distribution/containers/remove-images',
-            '--task={} /distribution/containers/install-image'.format(source_options),
-            '--task=/distribution/containers/install-test-config'
-        ], options=[
-            # These seem to be important for restraint - probably moving to wow-options-map is the right way,
-            # if we could tell we're putting together a recipe for restraint instead of Beaker.
-            '--single',
-            '--no-reserve',
-            '--restraint',
-            '--suppress-install-task',
-        ] + [
-            '--no-arch={}'.format(no_arch) for no_arch in task.task_arches.arches if no_arch != guest.environment.arch
-        ] + [
-            '--arch={}'.format(guest.environment.arch)
-        ], extra_context={
-            'GUEST': guest,
-            'PHASE': 'artifact-installation'
-        })
+        job_xmls = self.shared(
+            'beaker_job_xml',
+            # Force guest's compose as distro - otherwise, `distros` shared would get called,
+            # returning pretty much anything since it's out of our control and knows nothing
+            # abotu us, dealing with a particular guest.
+            distros=[
+                guest.environment.compose
+            ],
+            body_options=[
+                '--task=/tools/toolchain-common/Install/configure-extras-repo',
+                '--task=/distribution/containers/enable-docker',
+                '--task=/distribution/containers/remove-images',
+                '--task={} /distribution/containers/install-image'.format(source_options),
+                '--task=/distribution/containers/install-test-config'
+            ],
+            options=[
+                # These seem to be important for restraint - probably moving to wow-options-map is the right way,
+                # if we could tell we're putting together a recipe for restraint instead of Beaker.
+                '--single',
+                '--no-reserve',
+                '--restraint',
+                '--suppress-install-task',
+            ] + [
+                '--no-arch={}'.format(no_arch)
+                for no_arch in task.task_arches.arches if no_arch != guest.environment.arch
+            ] + [
+                '--arch={}'.format(guest.environment.arch)
+            ],
+            extra_context={
+                'GUEST': guest,
+                'PHASE': 'artifact-installation'
+            }
+        )
 
         # This is probably not true in general, but our Docker pipelines - in both beaker and openstack - deal
         # with just a single Beaker distro. To avoid any weird errors later, check number of XMLs, but it would
