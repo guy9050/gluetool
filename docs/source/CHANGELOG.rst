@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2019-02-19
+----------
+
+Added
+~~~~~
+
+- [beaker-provisioner] utility commands for cache control
+- [install-koji-docker-build] use relocated tasks
+- [jenkins] support for dry-run mode
+- [openstack] support for v3 authentication API
+- [openstack-job] new option, ``--dist-git``
+- [rules-engine] support for including variables
+
+Fixed
+~~~~~
+
+- [install-koji-docker-build] force compose when constructing installation recipe
+
+
 2019-02-12
 ----------
 
