@@ -20,6 +20,10 @@ class InstallMBSBuild(gluetool.Module):
     options = {
         'installation-workarounds': {
             'help': 'File with commands and rules, when used them.'
+        },
+        'use-devel-module': {
+            'help': 'Use -devel module when generating ODCS repo.',
+            'action': 'store_true'
         }
     }
 
@@ -83,7 +87,9 @@ class InstallMBSBuild(gluetool.Module):
             'commands': _add_commands_callback,
         })
 
-        nsvc = primary_task.nsvc
+        # Use devel module if requested
+        nsvc = '{}-devel'.format(primary_task.nsvc) if self.option('use-devel-module') else primary_task.nsvc
+
         repo_url = self._get_repo(nsvc, guests)
 
         for guest in guests:
