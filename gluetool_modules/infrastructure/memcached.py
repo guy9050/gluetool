@@ -263,18 +263,45 @@ class Memcached(gluetool.Module):
 
     shared_functions = ('cache',)
 
-    @gluetool.utils.cached_property
-    def _client(self):
-        return base.Client((self.option('server-hostname'), self.option('server-port')),
-                           serializer=_json_serializer, deserializer=_json_deserializer)
+    # `cached_property` is NOT thread-safe - when multiple threads try to access the property,
+    # they may get unpredictable number of different instances...
+    #
+    # Until a fix lands in upstream, we have to deal with it here by providing our own locks :/
+    def __init__(self, *args, **kwargs):
+        super(Memcached, self).__init__(*args, **kwargs)
 
-    @gluetool.utils.cached_property
-    def _cache(self):
-        cache = Cache(self, self._client)
+        self._lock = threading.RLock()
 
-        log_dict(self.debug, 'cache content', cache.dump())
+        self._client = None
+        self._cache = None
 
-        return cache
+    def _get_client(self):
+        with self._lock:
+            if not self._client:
+                self._client = base.Client((self.option('server-hostname'), self.option('server-port')),
+                                           serializer=_json_serializer, deserializer=_json_deserializer)
+
+            return self._client
+
+    def _get_cache(self):
+        with self._lock:
+            if not self._cache:
+                self._cache = Cache(self, self._get_client())
+
+            return self._cache
+
+#    @gluetool.utils.cached_property
+#    def _client(self):
+#        return base.Client((self.option('server-hostname'), self.option('server-port')),
+#                           serializer=_json_serializer, deserializer=_json_deserializer)
+
+#    @gluetool.utils.cached_property
+#    def _cache(self):
+#        cache = Cache(self, self._client)
+#
+#        log_dict(self.debug, 'cache content', cache.dump())
+#
+#        return cache
 
     def cache(self):
         """
@@ -283,4 +310,4 @@ class Memcached(gluetool.Module):
         Follows :doc:`Testing Environment Protocol </protocols/cache>`.
         """
 
-        return self._cache
+        return self._get_cache()
