@@ -32,14 +32,6 @@ class JenkinsBuildName(gluetool.Module):
 
         context = self.shared('eval_context')
 
-        thread_id = self.shared('thread_id')
-        context.update({
-            'THREAD_ID': thread_id
-        })
-
-        if thread_id is None:
-            self.warn('Testing thread ID not found')
-
         name = gluetool.utils.render_template(self.option('name'), logger=self.logger, **context)
 
         self.shared('jenkins').set_build_name(name)

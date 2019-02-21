@@ -5,6 +5,8 @@ import time
 import gluetool
 from gluetool.utils import render_template
 
+import gluetool_modules.libs
+
 
 DEFAULT_ID_FILE = 'testing-thread-id.json'
 
@@ -63,6 +65,22 @@ class TestingThread(gluetool.Module):
         super(TestingThread, self).__init__(*args, **kwargs)
 
         self._thread_id = None
+
+    @property
+    def eval_context(self):
+        if gluetool_modules.libs.is_recursion(__file__, 'eval_context'):
+            return {}
+
+        # pylint: disable=unused-variable
+        __content__ = {  # noqa
+            'THREAD_ID': """
+                         ID of the current testing thread.
+                         """
+        }
+
+        return {
+            'THREAD_ID': self._thread_id
+        }
 
     def thread_id(self):
         """

@@ -50,7 +50,8 @@ def test_run(log, module, monkeypatch):
     thread_id = 'dummy_thread_qid'
     eval_context = {
         'FIRST': 'dummy_item',
-        'SECOND': 'another_dummy_item'
+        'SECOND': 'another_dummy_item',
+        'THREAD_ID': thread_id
     }
 
     _, module = module
@@ -60,8 +61,7 @@ def test_run(log, module, monkeypatch):
 
     patch_shared(monkeypatch, module, {
         'eval_context': eval_context,
-        'jenkins': MagicMock(set_build_name=mocked_set_build_name),
-        'thread_id': thread_id
+        'jenkins': MagicMock(set_build_name=mocked_set_build_name)
     })
 
     monkeypatch.setenv('BUILD_URL', 'dummy_jenkins_url')
