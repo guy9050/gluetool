@@ -2,6 +2,7 @@ import hashlib
 import json
 import time
 
+import bs4
 import gluetool
 from gluetool.utils import render_template
 
@@ -131,11 +132,17 @@ class TestingThread(gluetool.Module):
 
         results = self.shared('results') or []
 
-        for result in results:
-            self.debug('result:\n{}'.format(result))
+        if results:
+            if isinstance(results, bs4.element.Tag):
+                # Already serialized in test-scheduler workflow.
+                pass
 
-            if 'testing-thread-id' in result.ids:
-                continue
+            else:
+                for result in results:
+                    self.debug('result:\n{}'.format(result))
 
-            self.debug('adding a testing thread ID')
-            result.ids['testing-thread-id'] = self._thread_id
+                    if 'testing-thread-id' in result.ids:
+                        continue
+
+                    self.debug('adding a testing thread ID')
+                    result.ids['testing-thread-id'] = self._thread_id

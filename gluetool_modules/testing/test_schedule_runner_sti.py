@@ -12,9 +12,7 @@ import gluetool
 from gluetool import GlueError
 from gluetool.log import format_blob, log_blob, log_dict
 
-import libci.results
-
-from gluetool_modules.libs.test_schedule import TestScheduleEntryStage, TestScheduleEntryState
+from gluetool_modules.libs.test_schedule import TestScheduleResult
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order
@@ -33,17 +31,6 @@ DEFAULT_WATCH_TIMEOUT = 5
 #: :ivar libs.test_schedule.TestScheduleEntry schedule_entry: test schedule entry the task belongs to.
 #: :ivar dict results: results of the test run, as reported by Ansible playbook log.
 TaskRun = collections.namedtuple('TaskRun', ('name', 'schedule_entry', 'result'))
-
-
-class StiTestResult(libci.results.TestResult):
-    """ STI test result data container """
-
-    def __init__(self, glue, overall_result, result_details, **kwargs):
-        # type: (gluetool.Glue, str, List[TaskRun], **Any) -> None
-
-        super(StiTestResult, self).__init__(glue, 'functional', overall_result, **kwargs)
-
-        self.payload = result_details
 
 
 def gather_test_results(schedule_entry, test_log_filename):
@@ -80,6 +67,8 @@ class STIRunner(gluetool.Module):
     For more information about Standard Test Interface see:
 
         `<https://fedoraproject.org/wiki/CI/Standard_Test_Interface>`
+
+    Plugin for the "test schedule" workflow.
     """
 
     name = 'test-schedule-runner-sti'
@@ -93,15 +82,17 @@ class STIRunner(gluetool.Module):
         }
     }
 
-    def _process_results(self, results):
-        # type: (List[TaskRun]) -> str
+    shared_functions = ['run_test_schedule_entry', 'serialize_test_schedule_entry_results']
+
+    def _set_schedule_entry_result(self, schedule_entry):
+        # type: (TestScheduleEntry) -> None
         """
         Try to find at least one task that didn't complete or didn't pass.
         """
 
         self.debug('Try to find any non-PASS task')
 
-        for task_run in results:
+        for task_run in schedule_entry.results:
             schedule_entry, task, result = task_run.schedule_entry, task_run.name, task_run.result
 
             schedule_entry.debug('  {}: {}'.format(task, result))
@@ -110,9 +101,10 @@ class STIRunner(gluetool.Module):
                 continue
 
             schedule_entry.debug('    We have our traitor!')
-            return 'FAIL'
+            schedule_entry.result = TestScheduleResult.FAILED
+            return
 
-        return 'PASS'
+        schedule_entry.result = TestScheduleResult.PASSED
 
     def _prepare_environment(self, schedule_entry):
         # type: (TestScheduleEntry) -> Tuple[str, str, str]
@@ -253,75 +245,39 @@ sut     ansible_host={} ansible_user=root {}
 
         return results
 
-    def _run_schedule_entry(self, schedule_entry):
-        # type: (TestScheduleEntry) -> List[TaskRun]
+    def run_test_schedule_entry(self, schedule_entry):
+        # type: (TestScheduleEntry) -> None
+
+        if schedule_entry.runner_capability != 'sti':
+            self.overloaded_shared('run_test_schedule_entry', schedule_entry)
+            return
 
         self.require_shared('run_playbook', 'detect_ansible_interpreter')
 
-        self.shared('trigger_event', 'test-schedule-runner-sti.schedule-entry.start',
+        self.shared('trigger_event', 'test-schedule-runner-sti.schedule-entry.started',
                     schedule_entry=schedule_entry)
 
-        schedule_entry.info('starting to run tests')
-        schedule_entry.stage = TestScheduleEntryStage.RUNNING
-        schedule_entry.log()
+        # We don't need the working directory actually - we need artifact directory, which is
+        # a subdirectory of working directory. But one day, who knows...
+        work_dirpath, artifact_dirpath, inventory_filepath = self._prepare_environment(schedule_entry)
 
-        # Catch everything just to get a chance to properly update the schedule entry,
-        # and re-raise the exception to continue in the natural flow of things.
+        results = self._run_playbook(schedule_entry, work_dirpath, artifact_dirpath, inventory_filepath)
 
-        try:
-            # We don't need the working directory actually - we need artifact directory, which is
-            # a subdirectory of working directory. But one day, who knows...
-            work_dirpath, artifact_dirpath, inventory_filepath = self._prepare_environment(schedule_entry)
+        schedule_entry.results = results
 
-            results = self._run_playbook(schedule_entry, work_dirpath, artifact_dirpath, inventory_filepath)
-
-        # pylint: disable=broad-except
-        except Exception:
-            exc_info = sys.exc_info()
-
-            schedule_entry.stage = TestScheduleEntryStage.COMPLETE
-            schedule_entry.state = TestScheduleEntryState.ERROR
-
-            self.shared('trigger_event', 'test-schedule-runner-sti.task-set.crashed',
-                        schedule_entry=schedule_entry, exc_info=exc_info)
-
-            six.reraise(*exc_info)
-
-        schedule_entry.stage = TestScheduleEntryStage.COMPLETE
-        schedule_entry.debug('finished')
         log_dict(schedule_entry.debug, 'results', results)
 
+        self._set_schedule_entry_result(schedule_entry)
+
         self.shared('trigger_event', 'test-schedule-runner-sti.schedule-entry.finished',
-                    schedule_entry=schedule_entry, results=results)
+                    schedule_entry=schedule_entry)
 
-        return results
+    # pylint: disable=invalid-name
+    def serialize_test_schedule_entry_results(self, schedule_entry, test_suite):
+        # type: (TestScheduleEntry, Any) -> None
 
-    def execute(self):
-        # type: () -> None
+        if schedule_entry.runner_capability != 'sti':
+            self.overloaded_shared('serialize_test_schedule_entry_results', schedule_entry, test_suite)
+            return
 
-        schedule = self.shared('test_schedule') or []
-
-        # pylint: disable=invalid-name
-        for se in schedule:
-            if se.runner_capability == 'sti':
-                continue
-
-            raise GlueError("Cannot run schedule entry {}, requires '{}'".format(se.id, se.runner_capability))
-
-        self.shared('trigger_event', 'test-schedule-runner-sti.start',
-                    schedule=schedule)
-
-        self.info('Scheduled {} items, running them one by one'.format(len(schedule)))
-
-        results = []
-        for schedule_entry in schedule:
-            results.extend(self._run_schedule_entry(schedule_entry))
-
-        overall_result = self._process_results(results)
-
-        self.info('Result of testing: {}'.format(overall_result))
-
-        self.shared('trigger_event', 'test-schedule-runner-sti.finished',
-                    schedule=schedule, results=results)
-
-        libci.results.publish_result(self, StiTestResult, overall_result, results)
+        # So far, nothing to do here

@@ -52,6 +52,7 @@ class TestScheduleEntry(BaseTestScheduleEntry):
         )
 
         self.playbook_filepath = playbook_filepath
+        self.results = None  # type: Any
 
     def log(self, log_fn=None):
         # type: (Optional[gluetool.log.LoggingFunctionType]) -> None
@@ -77,6 +78,8 @@ class TestSchedulerSTI(gluetool.Module):
     For more information about Standard Test Interface see:
 
         `<https://fedoraproject.org/wiki/CI/Standard_Test_Interface>`
+
+    Plugin for the "test schedule" workflow.
     """
 
     name = 'test-scheduler-sti'

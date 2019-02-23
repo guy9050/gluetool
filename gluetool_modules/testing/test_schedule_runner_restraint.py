@@ -7,9 +7,9 @@ Module focuses on working with `task sets` (`TS`). `TS` is nothing more than a l
  * each `TS` is wrapped by necessary XML elements to form a job description
  * the job is then given to ``restraint`` to perform it
  * when ``restraint`` reports back to us, we take all data left by ``restraint``
- * based on these data, a ``TaskSetResults`` instance (`TSR`) is crated
+ * based on these data, a ``TaskSetResults`` instance (`TSR`) is created
  * for each task ran, one ``TestRun`` (`TR`) instance is added to `TSR`. It bundles together task name,
-   `SE` the task comes from, and actual "results of the task run" - transparent blob of data whose
+   `SE` the task comes from, and actual "results of the task run" - opaque blob of data whose
    internal structure is not important.
 
 Each `SE` contains a pile of tasks, there often are multiple `SEs` in a schedule. To split them into `TS`s,
@@ -19,10 +19,7 @@ depending on module options, several methods are applied:
    as there are tasks in the `SE`, and produces as many `TSR`s
  * without snapshots, all tasks in `SE` are treated as a single `TS`.
 
-Given the split, `TS`s often share guests (when they originated from the same `SE`), these are ran sequentialy,
-otherwise - when enabled by module options - `TS`s using different guests can be running in parallel
-- ``restraint`` stores its data it conveniently named directories, not sharing any global state, therefore we can
-run it many times at the same moment.
+Given the split, `TS`s often share guests (when they originated from the same `SE`), these are ran sequentialy.
 
 All `TSR`s produced are then merged into a single one, carrying all results module got for all `SE`s and their tasks.
 """
@@ -41,8 +38,14 @@ import gluetool
 from gluetool import GlueError
 from gluetool.log import log_blob, log_dict, format_xml
 from gluetool.utils import new_xml_element, normalize_bool_option, render_template
-from libci.results import TestResult, publish_result
-from gluetool_modules.libs.test_schedule import TestScheduleEntryStage, TestScheduleEntryState
+import libci.guest
+import libci.results
+from gluetool_modules.libs.test_schedule import TestScheduleResult
+from gluetool_modules.testing.test_scheduler_beaker_xml import TestScheduleEntry
+
+# Type annotations
+# pylint: disable=unused-import,wrong-import-order
+from typing import cast, Any, Dict, List, NamedTuple, Optional  # noqa
 
 
 # The exit status values come from restraint sources: https://github.com/p3ck/restraint/blob/master/src/errors.h
@@ -54,36 +57,16 @@ class RestraintExitCodes(enum.IntEnum):
     RESTRAINT_SSH_ERROR = 14
 
 
-class RestraintTestResult(TestResult):
-    # pylint: disable=too-few-public-methods
-
-    def __init__(self, glue, overall_result, **kwargs):
-        super(RestraintTestResult, self).__init__(glue, 'restraint', overall_result, **kwargs)
-
-    def _serialize_to_xunit(self):
-        test_suite = super(RestraintTestResult, self)._serialize_to_xunit()
-
-        if self.glue.has_shared('beah_xunit_serialize'):
-            self.glue.shared('beah_xunit_serialize', test_suite, self)
-
-        else:
-            self.glue.warn("To serialize result to xUnit format, 'beah_xunit_serialize' shared function is required",
-                           sentry=True)
-
-        return test_suite
-
-    @classmethod
-    def _unserialize_from_json(cls, glue, input_data):
-        return RestraintTestResult(glue, input_data['overall_result'], ids=input_data['ids'], urls=input_data['urls'],
-                                   payload=input_data['payload'])
-
-
 #: Represents a single run of a task and results of this run.
 #:
 #: :ivar str name: name of the task
 #: :ivar libs.test_schedule.TestScheduleEntry schedule_entry: test schedule entry the task belongs to.
 #: :ivar dict results: results of the task run, as returned by ``parse_beah_result`` shared function.
-TaskRun = collections.namedtuple('TaskRun', ('name', 'schedule_entry', 'results'))
+TaskRun = NamedTuple('TaskRun', (
+    ('name', str),
+    ('schedule_entry', TestScheduleEntry),
+    ('results', Dict[str, Any])
+))
 
 #: Represents results of a set of tasks.
 #:
@@ -92,10 +75,13 @@ TaskRun = collections.namedtuple('TaskRun', ('name', 'schedule_entry', 'results'
 #: in different schedule entries in the same task set results instance.
 #:
 #: :ivar dict tasks: mapping between name of the task and a list of its runs.
-TaskSetResults = collections.namedtuple('TaskSetResults', ('tasks'))
+TaskSetResults = NamedTuple('TaskSetResults', (
+    ('tasks', Dict[str, List[TaskRun]]),
+))
 
 
 def _to_builtins(task_set_results):
+    # type: (TaskSetResults) -> Dict[str, List[Any]]
     """
     Serialize task set results - a named tuple - into builtin types like dictionaries, tuples and lists.
     There is some loss of information - schedule entry info is lost, therefore its testing environment
@@ -110,10 +96,13 @@ def _to_builtins(task_set_results):
 
 
 def _log_task_set_results(schedule_entry, label, task_set_results):
+    # type: (TestScheduleEntry, str, TaskSetResults) -> None
+
     log_dict(schedule_entry.debug, label, _to_builtins(task_set_results))
 
 
 def _merge_task_set_results(*task_sets):
+    # type: (*TaskSetResults) -> TaskSetResults
     """
     Multiple task set results may contain tasks of the same name. This methods merges results of the task, spread
     across multiple task set results, into a single list.
@@ -169,6 +158,8 @@ class RestraintRunner(gluetool.Module):
     The results are provided in the form similar to what ``beaker`` module does - short summary
     in console log, artifact file, and shared function to publish results for later
     modules as well.
+
+    Plugin for the "test schedule" workflow.
     """
 
     name = 'test-schedule-runner-restraint'
@@ -177,11 +168,6 @@ class RestraintRunner(gluetool.Module):
     options = {
         'use-snapshots': {
             'help': 'Enable or disable use of snapshots (if supported by guests) (default: %(default)s)',
-            'default': 'no',
-            'metavar': 'yes|no'
-        },
-        'parallelize-recipe-sets': {
-            'help': 'Enable or disable parallelization of recipe sets (default: %(default)s)',
             'default': 'no',
             'metavar': 'yes|no'
         },
@@ -212,25 +198,28 @@ class RestraintRunner(gluetool.Module):
         }
     }
 
-    _result_class = None
+    shared_functions = ['run_test_schedule_entry', 'serialize_test_schedule_entry_results']
 
     @gluetool.utils.cached_property
     def use_snapshots(self):
+        # type: () -> bool
+
         return normalize_bool_option(self.option('use-snapshots'))
 
     @gluetool.utils.cached_property
-    def parallelize_recipe_sets(self):
-        return normalize_bool_option(self.option('parallelize-recipe-sets'))
-
-    @gluetool.utils.cached_property
     def on_error_snapshot(self):
+        # type: () -> bool
+
         return normalize_bool_option(self.option('on-error-snapshot'))
 
     @gluetool.utils.cached_property
     def on_error_continue(self):
+        # type: () -> bool
+
         return normalize_bool_option(self.option('on-error-continue'))
 
     def _gather_task_set_results(self, schedule_entry, output):
+        # type: (TestScheduleEntry, Any) -> TaskSetResults
         """
         ``restraint`` produces `job.xml` which carries pile of logs, results and so on. We gather necessary
         resources, like ``job.xml``, journal and similar, and hand them to a Beah result parser. It will
@@ -241,6 +230,10 @@ class RestraintRunner(gluetool.Module):
         :rtype: TaskSetResults
         """
 
+        assert schedule_entry.testing_environment is not None
+        assert schedule_entry.guest is not None
+        assert schedule_entry.guest.environment is not None
+
         # XML produced by restraint
         with open(os.path.join(output.directory, 'job.xml'), 'r') as f:
             schedule_entry.debug('XML produced by restraint lies in {}'.format(f.name))
@@ -250,10 +243,15 @@ class RestraintRunner(gluetool.Module):
         results = TaskSetResults(tasks=collections.OrderedDict())
 
         def artifact_path(current_location):
-            return self.shared(
-                'artifacts_location',
-                os.path.join(output.directory, current_location),
-                logger=schedule_entry.logger
+            # type: (str) -> str
+
+            return cast(
+                str,
+                self.shared(
+                    'artifacts_location',
+                    os.path.join(output.directory, current_location),
+                    logger=schedule_entry.logger
+                )
             )
 
         for task_results in job_results.recipeSet.recipe.find_all('task'):
@@ -302,7 +300,14 @@ class RestraintRunner(gluetool.Module):
 
         return results
 
-    def _run_task_set(self, schedule_entry, task_set, recipe_attrs, recipe_set_attrs, actual_guest=None):
+    def _run_task_set(self,
+                      schedule_entry,  # type: TestScheduleEntry
+                      task_set,  # type: List[Any]
+                      recipe_attrs,  # type: Dict[str, str]
+                      recipe_set_attrs,  # type: Dict[str, str]
+                      actual_guest=None  # type: Optional[libci.guest.NetworkedGuest]
+                     ):  # noqa
+        # type: (...) -> TaskSetResults
         # pylint: disable=too-many-arguments
         """
         Run a set of tasks on the guest.
@@ -314,6 +319,11 @@ class RestraintRunner(gluetool.Module):
         :param libc.guest.Guest actual_guest: if set, it is used to host tests instead of ``schedule_entry.guest``.
         :rtype: TaskSetResults
         """
+
+        assert schedule_entry.guest is not None
+
+        self.shared('trigger_event', 'test-schedule-runner-restraint.task-set.started',
+                    schedule_entry=schedule_entry, task_set=task_set)
 
         guest = actual_guest or schedule_entry.guest
 
@@ -334,6 +344,8 @@ class RestraintRunner(gluetool.Module):
         log_blob(schedule_entry.debug, 'task set job', job_desc)
 
         def download_snapshot():
+            # type: () -> None
+
             # If snapshot downloads are not enabled, just do nothing and return.
             if not self.on_error_snapshot:
                 return
@@ -438,6 +450,7 @@ class RestraintRunner(gluetool.Module):
             exit_code, output.execution_output.stderr))
 
     def _run_schedule_entry_isolated_snapshots(self, schedule_entry):
+        # type: (TestScheduleEntry) -> TaskSetResults
         """
         Run tasks from a schedule entry one by one, isolated from each other by restoring a base snapshot
         of the guest before running new task.
@@ -445,6 +458,8 @@ class RestraintRunner(gluetool.Module):
         :param libs.test_schedule.TestScheduleEntry schedule_entry: Test schedule entry.
         :rtype: TaskSetResults
         """
+
+        assert schedule_entry.guest is not None
 
         guest, recipe_set = schedule_entry.guest, schedule_entry.recipe_set
         tasks = recipe_set.find_all('task')
@@ -467,7 +482,10 @@ class RestraintRunner(gluetool.Module):
             schedule_entry.info('running task #{} of {}'.format(i, len(tasks)))
 
             guest.debug("restoring snapshot '{}' before running next task".format(base_snapshot.name))
-            actual_guest = guest.restore_snapshot(base_snapshot)
+            actual_guest = cast(
+                libci.guest.NetworkedGuest,
+                guest.restore_snapshot(base_snapshot)
+            )
 
             results.append(self._run_task_set(schedule_entry, [task], recipe_attrs, recipe_set_attrs,
                                               actual_guest=actual_guest))
@@ -475,6 +493,7 @@ class RestraintRunner(gluetool.Module):
         return _merge_task_set_results(*results)
 
     def _run_schedule_entry_isolated_single(self, schedule_entry):
+        # type: (TestScheduleEntry) -> TaskSetResults
         """
         Run tasks from a schedule entry one by one - entry contains just a single task.
 
@@ -494,6 +513,7 @@ class RestraintRunner(gluetool.Module):
         return self._run_task_set(schedule_entry, tasks, recipe_attrs, recipe_set_attrs)
 
     def _run_schedule_entry_isolated(self, schedule_entry):
+        # type: (TestScheduleEntry) -> TaskSetResults
         """
         Run tasks from a schedule entry one by one, isolated from each other by restoring a base snapshot
         of the guest before running new task.
@@ -508,6 +528,7 @@ class RestraintRunner(gluetool.Module):
         return self._run_schedule_entry_isolated_snapshots(schedule_entry)
 
     def _run_schedule_entry_whole(self, schedule_entry):
+        # type: (TestScheduleEntry) -> TaskSetResults
         """
         Run tasks from a schedule entry in a "classic" manner, running one by one
         on the same box.
@@ -523,63 +544,18 @@ class RestraintRunner(gluetool.Module):
 
         return self._run_task_set(schedule_entry, task_set, recipe_set.find_all('recipe')[0].attrs, recipe_set.attrs)
 
-    def _run_schedule_entry(self, schedule_entry):
-        """
-        Run tasks from a schedule entry.
-
-        :param libs.test_schedule.TestScheduleEntry schedule_entry: Test schedule entry.
-        :rtype: TaskSetResults
-        """
-
-        # This makes situation easier - I decided to limit number of <recipe/>
-        # elements inside <recipeSet/> to exactly one. I don't know what options
-        # would make Beaker XML to have more recipes inside recipeSet, and I want
-        # to find out, but for the proof of concept, this makes my living easy
-        # to bear.
-        assert len(schedule_entry.recipe_set.find_all('recipe')) == 1
-
-        schedule_entry.info('starting to run tests')
-        schedule_entry.stage = TestScheduleEntryStage.RUNNING
-        schedule_entry.log()
-
-        # Catch everything just to get a chance to properly update the schedule entry,
-        # and re-raise the exception to continue in the natural flow of things.
-
-        try:
-            if schedule_entry.guest.supports_snapshots() is True and self.use_snapshots:
-                results = self._run_schedule_entry_isolated(schedule_entry)
-
-            else:
-                results = self._run_schedule_entry_whole(schedule_entry)
-
-        # pylint: disable=broad-except
-        except Exception:
-            exc_info = sys.exc_info()
-
-            schedule_entry.stage = TestScheduleEntryStage.COMPLETE
-            schedule_entry.state = TestScheduleEntryState.ERROR
-
-            reraise(*exc_info)
-
-        schedule_entry.stage = TestScheduleEntryStage.COMPLETE
-        schedule_entry.debug('finished')
-        log_dict(schedule_entry.debug, 'results', results.tasks)
-
-        self.shared('trigger_event', 'test-schedule-runner-restraint.schedule-entry.finished',
-                    schedule_entry=schedule_entry, results=results)
-
-        return results
-
-    def _process_results(self, results):
+    def _set_schedule_entry_result(self, schedule_entry):
+        # type: (TestScheduleEntry) -> None
+        # pylint: disable=no-self-use
         """
         Try to find at least one task that didn't complete or didn't pass.
         """
 
-        self.debug('Try to find any non-PASS task')
+        schedule_entry.debug('try to find any non-PASS task')
 
-        for _, task_runs in results.tasks.iteritems():
+        for _, task_runs in schedule_entry.recipe_set_results.tasks.iteritems():
             for task_run in task_runs:
-                schedule_entry, run_results = task_run.schedule_entry, task_run.results
+                run_results = task_run.results
 
                 schedule_entry.debug("    Status='{}', Result='{}'".format(run_results['bkr_status'],
                                                                            run_results['bkr_result']))
@@ -588,78 +564,79 @@ class RestraintRunner(gluetool.Module):
                     continue
 
                 schedule_entry.debug('      We have our traitor!')
-                return 'FAIL'
+                schedule_entry.result = TestScheduleResult.FAILED
+                return
 
-        return 'PASS'
+        schedule_entry.result = TestScheduleResult.PASSED
 
-    def sanity(self):
-        if self.option('results-directory-template') and self.use_snapshots:
-            raise GlueError('Cannot use --results-directory-template with --use-snapshots.')
+    def run_test_schedule_entry(self, schedule_entry):
+        # type: (TestScheduleEntry) -> None
+        """
+        Run tasks from a schedule entry.
 
-        if self.parallelize_recipe_sets:
-            self.info('Will run recipe sets in parallel')
+        :param gluetool_modules.libs.test_schedule.TestScheduleEntry schedule_entry: Test schedule entry.
+        :rtype: TaskSetResults
+        """
+
+        if schedule_entry.runner_capability != 'restraint':
+            self.overloaded_shared('run_test_schedule_entry', schedule_entry)
+            return
+
+        assert schedule_entry.guest is not None
+
+        self.shared('trigger_event', 'test-schedule-runner-restraint.schedule-entry.started',
+                    schedule_entry=schedule_entry)
+
+        # This makes situation easier - I decided to limit number of <recipe/>
+        # elements inside <recipeSet/> to exactly one. I don't know what options
+        # would make Beaker XML to have more recipes inside recipeSet, and I want
+        # to find out, but for the proof of concept, this makes my living easy
+        # to bear.
+        assert len(schedule_entry.recipe_set.find_all('recipe')) == 1
+
+        if schedule_entry.guest.supports_snapshots is True and self.use_snapshots:
+            results = self._run_schedule_entry_isolated(schedule_entry)
 
         else:
-            self.info('Will run recipe sets serially')
+            results = self._run_schedule_entry_whole(schedule_entry)
+
+        schedule_entry.recipe_set_results = results
+
+        log_dict(schedule_entry.debug, 'results', results.tasks)
+
+        self._set_schedule_entry_result(schedule_entry)
+
+        self.shared('trigger_event', 'test-schedule-runner-restraint.schedule-entry.finished',
+                    schedule_entry=schedule_entry)
+
+    # pylint: disable=invalid-name
+    def serialize_test_schedule_entry_results(self, schedule_entry, test_suite):
+        # type: (TestScheduleEntry, Any) -> None
+
+        if schedule_entry.runner_capability != 'restraint':
+            self.overloaded_shared('serialize_test_schedule_entry_results', schedule_entry, test_suite)
+            return
+
+        if self.glue.has_shared('beah_xunit_serialize'):
+            self.glue.shared(
+                'beah_xunit_serialize',
+                test_suite,
+                None,
+                payload=_to_builtins(schedule_entry.recipe_set_results)
+            )
+
+        else:
+            schedule_entry.warn("To serialize to xUnit format, 'beah_xunit_serialize' shared function is required",
+                                sentry=True)
+
+    def sanity(self):
+        # type: () -> None
+
+        if self.option('results-directory-template') and self.use_snapshots:
+            raise GlueError('Cannot use --results-directory-template with --use-snapshots.')
 
         if self.use_snapshots:
             self.info('Will run recipe set tasks serially, using snapshots')
 
         else:
             self.info('Will run recipe set tasks serially, without snapshots')
-
-    def execute(self):
-        self.require_shared('restraint')
-
-        schedule = self.shared('test_schedule') or []
-
-        # pylint: disable=invalid-name
-        for se in schedule:
-            if se.runner_capability == 'restraint':
-                continue
-
-            raise GlueError("Cannot run schedule entry {}, requires '{}'".format(se.id, se.runner_capability))
-
-        self.shared('trigger_event', 'test-schedule-runner-restraint.start',
-                    schedule=schedule)
-
-        if self.parallelize_recipe_sets:
-            self.info('Scheduled {} items, running them in parallel'.format(len(schedule)))
-
-            threads = []
-
-            for i, schedule_entry in enumerate(schedule):
-                thread = gluetool.utils.WorkerThread(self.logger, self._run_schedule_entry, fn_args=(schedule_entry,),
-                                                     name='recipe-set-runner-{}'.format(i))
-                threads.append(thread)
-
-                thread.start()
-
-            self.debug('wait for all recipe set threads to finish')
-            for thread in threads:
-                thread.join()
-
-            results = [thread.result for thread in threads]
-
-            if any((isinstance(result, Exception) for result in results)):
-                self.error('At least one recipe set raised an exception')
-                self.error('Note: see detailed exception in debug log for more information')
-
-                raise gluetool.GlueError('At least one recipe set raised an exception')
-
-        else:
-            self.info('Scheduled {} items, running them one by one'.format(len(schedule)))
-
-            results = [self._run_schedule_entry(schedule_entry) for schedule_entry in schedule]
-
-        results = _merge_task_set_results(*results)
-        log_dict(self.debug, 'Recipe sets results', results)
-
-        overall_result = self._process_results(results)
-
-        self.info('Result of testing: {}'.format(overall_result))
-
-        self.shared('trigger_event', 'test-schedule-runner-restraint.finished',
-                    schedule=schedule, results=results)
-
-        publish_result(self, RestraintTestResult, overall_result, payload=_to_builtins(results))

@@ -33,6 +33,7 @@ class TestScheduleEntry(BaseTestScheduleEntry):
         )
 
         self.recipe_set = recipe_set
+        self.recipe_set_results = None  # type: Any
 
     def log(self, log_fn=None):
         # type: (Optional[gluetool.log.LoggingFunctionType]) -> None
@@ -47,6 +48,8 @@ class TestScheduleEntry(BaseTestScheduleEntry):
 class TestSchedulerBeakerXML(gluetool.Module):
     """
     Create test schedule entries for ``test-scheduler`` module by calling ``beaker_job_xml`` shared function.
+
+    Plugin for the "test schedule" workflow.
     """
 
     name = 'test-scheduler-beaker-xml'

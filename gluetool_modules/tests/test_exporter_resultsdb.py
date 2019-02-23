@@ -6,7 +6,6 @@ from gluetool_modules.helpers.exporter_resultsdb import CIExporterResultsDB
 from gluetool_modules.static_analysis.covscan.covscan import CovscanTestResult
 from gluetool_modules.static_analysis.rpmdiff.rpmdiff import RpmdiffTestResult
 from gluetool_modules.testing.beaker.beaker import BeakerTestResult
-from gluetool_modules.testing.test_schedule_runner_restraint import RestraintTestResult
 from libci.results import TestResult
 from . import create_module, patch_shared, assert_shared
 
@@ -295,13 +294,6 @@ def test_beaker(module, monkeypatch):
     ci, _ = module
 
     test_result = BeakerTestResult(ci, 'PASS', 'some_matrix', payload=DUMMY_PAYLOAD)
-    functional_testing(test_result, module, monkeypatch)
-
-
-def test_restraint(module, monkeypatch):
-    ci, _ = module
-
-    test_result = RestraintTestResult(ci, 'PASS', payload=DUMMY_PAYLOAD)
     functional_testing(test_result, module, monkeypatch)
 
 

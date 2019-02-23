@@ -64,8 +64,28 @@ class TestScheduleEntryState(enum.Enum):
     the final state of the entry.
     """
 
+    #: Everything went well.
     OK = 'ok'
+
+    #: An error appeared while processing the entry.
     ERROR = 'error'
+
+
+class TestScheduleResult(enum.Enum):
+    """
+    Enumerates different possible results of both the tests performed by the entry and the schedule as whole.
+    """
+
+    #: We can tell nothing better about the result, as we don't have any relevant information (yet).
+    UNDEFINED = 'undefined'
+
+    #: Special value, should be used for the schedule as a whole. Signals at least one crashed schedule entry.
+    ERROR = 'error'
+
+    PASSED = 'passed'
+    FAILED = 'failed'
+    INFO = 'info'
+    NOT_APPLICABLE = 'not_applicable'
 
 
 class TestScheduleEntryAdapter(gluetool.log.ContextAdapter):
@@ -94,6 +114,7 @@ class TestScheduleEntry(object):
         who consume the entry to update its stage properly.
     :ivar TestScheduleEntryState state: current state of the entry. It is responsibility of those
         who consume the entry to update its state properly.
+    :ivar TestScheduleResult result: result of the tests performed by the entry.
     :ivar TestingEnvironment testing_environment: environment required for the entry.
     :ivar NetworkedGuest guest: guest assigned to this entry.
     """
@@ -130,6 +151,7 @@ class TestScheduleEntry(object):
 
         self.stage = TestScheduleEntryStage.CREATED
         self.state = TestScheduleEntryState.OK
+        self.result = TestScheduleResult.UNDEFINED
 
         self.testing_environment = None  # type: Optional[gluetool_modules.libs.testing_environment.TestingEnvironment]
         self.guest = None  # type: Optional[libci.guest.NetworkedGuest]
@@ -143,12 +165,21 @@ class TestScheduleEntry(object):
         log_fn('guest: {}'.format(self.guest))
 
 
-class TestSchedule(list):
+class TestSchedule(List[TestScheduleEntry]):
     """
     Represents a test schedule - a list of entries, each describing what tests to run and the necessary
     environment. Based on a list, supports basic sequence operations while adding convenience logging
     helper.
     """
+
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+
+        super(TestSchedule, self).__init__(*args, **kwargs)
+
+        self.result = TestScheduleResult.UNDEFINED
 
     def log(self, log_fn, label=None):
         # type: (gluetool.log.LoggingFunctionType, Optional[str]) -> None
@@ -167,7 +198,7 @@ class TestSchedule(list):
         label = label or 'test schedule'
 
         headers = [
-            'SE', 'Stage', 'State', 'Environment', 'Guest', 'Runner'
+            'SE', 'Stage', 'State', 'Result', 'Environment', 'Guest', 'Runner'
         ]
 
         rows = []
@@ -177,7 +208,7 @@ class TestSchedule(list):
         # it is for machines mostly, and output of this function is supposed to be easily
         # readable by humans.
         def _env_to_str(testing_environment):
-            # type: (gluetool_modules.libs.testing_environment.TestingEnvironment) -> str
+            # type: (Optional[gluetool_modules.libs.testing_environment.TestingEnvironment]) -> str
 
             if not testing_environment:
                 return ''
@@ -202,7 +233,7 @@ class TestSchedule(list):
                 guest_info = ''
 
             rows.append([
-                se.id, se.stage.name, se.state.name, se_environment, guest_info, se.runner_capability
+                se.id, se.stage.name, se.state.name, se.result.name, se_environment, guest_info, se.runner_capability
             ])
 
         log_table(log_fn, label, [headers] + rows,

@@ -8,6 +8,7 @@ import base64
 import datetime
 import zlib
 
+import bs4
 import gluetool
 from gluetool.log import log_dict
 from gluetool.utils import render_template, normalize_bool_option
@@ -336,7 +337,7 @@ class PipelineStateReporter(gluetool.Module):
             * ``os`` - identification of used distro, e.g. beaker distro name or OpenStack image name.
             * ``provider`` - what service provided the system, e.g. ``beaker`` or ``openstack``.
         :param str test_overall_result: Overall test result (``pass``, ``fail``, ``unknown``, ...).
-        :param test_results: Internal representation of gathered testing results. If provided,
+        :param element test_results: Internal representation of gathered testing results. If provided,
             it is serialized into the message.
         :param str error_message: Error message which can be presented to the common user.
         :param str error_url: URL of the issue in a tracking system which tracks the error. For example,
@@ -360,8 +361,7 @@ class PipelineStateReporter(gluetool.Module):
             body['status'] = test_overall_result
 
             if test_results is not None:
-                serialized = self.shared('serialize_results', 'xunit', test_results)
-                compressed = zlib.compress(str(serialized))
+                compressed = zlib.compress(str(test_results))
                 body['xunit'] = base64.b64encode(compressed)
 
             if self.has_shared('notification_recipients'):
@@ -424,11 +424,16 @@ class PipelineStateReporter(gluetool.Module):
                                               logger=self.logger,
                                               **context)
 
-    def _get_test_result(self):
-        if not self.has_shared('results'):
-            return 'unknown'
+    def _get_overall_result_xunit(self, test_results):
+        # pylint: disable=no-self-use
 
-        results = self.shared('results')
+        return test_results['overall-result']
+
+    def _get_overall_result_legacy(self, results):
+        # pylint: disable=no-self-use
+
+        if not results:
+            return 'unknown'
 
         if all([result.overall_result.lower() in ('pass', 'passed') for result in results]):
             return 'passed'
@@ -469,9 +474,24 @@ class PipelineStateReporter(gluetool.Module):
         self.info('reporting pipeline final state')
 
         kwargs = {
-            'test_overall_result': self._get_test_result(),
-            'test_results': self.shared('results')
+            'test_overall_result': None,
+            'test_results': None
         }
+
+        test_results = self.shared('results')
+
+        # If the result is already an XML tree, therefore serialized, do nothing.
+        if isinstance(test_results, bs4.element.Tag):
+            kwargs.update({
+                'test_results': test_results,
+                'test_overall_result': self._get_overall_result_xunit(test_results)
+            })
+
+        else:
+            kwargs.update({
+                'test_results': self.shared('serialize_results', 'xunit', test_results),
+                'test_overall_result': self._get_overall_result_legacy(test_results)
+            })
 
         if failure:
             kwargs.update({

@@ -25,6 +25,7 @@ def create_openstack_build_params(mod, **kwargs):
             'other w-t options'
         ],
         'openstack_options': 'some openstack options',
+        'test_schedule_runner_options': 'some test-schedule-runner options',
         'test_schedule_runner_restraint_options': 'some test-schedule-runner-restraint options',
         'brew_build_task_params_options': 'some brew-build options',
         'dist_git_options': 'some dist-git options'

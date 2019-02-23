@@ -311,7 +311,6 @@ def test_destroy_with_results_and_recipients(module, evaluate, mock_namespace, p
     'passed', 'failed'
 ])
 def test_get_test_results(module, result):
-    module.results = lambda: [MagicMock(overall_result=result)]
-    module.glue.add_shared('results', module)
+    results = [MagicMock(overall_result=result)]
 
-    assert module._get_test_result() == result
+    assert module._get_overall_result_legacy(results) == result

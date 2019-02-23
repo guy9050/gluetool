@@ -72,10 +72,12 @@ Some templates are given special extra variables:
         * ``FAILURE_BODY`` - formatted message, provided by the soft erorr. In the case of hard errors, this
           variable will not be defined.
 
-The result-specific bodies are rendered by helper modules, ``notify-email-*-formatter``. They use templates
-as well, and these templates are given the same variables just like all templates rendered directly by
-``notify-email`` module. What extra variables are available for these result-specific templates, depends
-on the actual formatter module used.
+The result-specific bodies are rendered by helper modules, ``notify-email-*-formatter``. They export shared functions
+named ``notify_email_${test_class}_formatter``, e.g. ``notify_email_beah_formatter``, which is called by
+``notify-email`` to provide formatted body. This also applies to results serialized to xUnit,
+``notify_email_xunit_formatter`` is called for this class of structure. Formatters use templates as well, and these
+templates are given the same variables just like all templates rendered directly by ``notify-email`` module.
+What extra variables are available for these result-specific templates, depends on the actual formatter module used.
 
 In the case of soft errors, it is possible to provide extra templates for a subject text and a message. Rendered
 subject text is passed to ``subject`` template, message is passed to ``soft-error-message`` template, which
@@ -86,6 +88,7 @@ providing templates ``<class name>-[header|footer].j2``.
 
 import os
 
+import bs4
 import jinja2
 
 import gluetool
@@ -318,26 +321,42 @@ class Notify((gluetool.Module)):
     def _format_result(self, result):
         self.debug('result:\n{}'.format(result))
 
-        result_type = result.test_type
+        # Already serialized results don't have any specific test class to use.
+        if isinstance(result, bs4.element.Tag):
+            recipients = self.shared('notification_recipients')
 
-        recipients = self.shared('notification_recipients', result_type=result_type)
-        if not recipients:
-            self.warn("Result of type '{}' does not provide any recipients".format(result_type))
-            return None
+        else:
+            result_type = result.test_type
+
+            recipients = self.shared('notification_recipients', result_type=result_type)
+
+            if not recipients:
+                self.warn("Result of type '{}' does not provide any recipients".format(result_type))
+                return None
 
         recipients = [self.email_map.match(name) for name in recipients]
 
-        formatter_name = 'notify_email_{}_formatter'.format(result_type.replace('-', '_'))
+        # Already serialized results have their own formatter
+        if isinstance(result, bs4.element.Tag):
+            formatter_name = 'notify_email_xunit_formatter'
+
+            overall_result = result['overall-result']
+
+        else:
+            formatter_name = 'notify_email_{}_formatter'.format(result_type.replace('-', '_'))
+
+            overall_result = result.overall_result
 
         if not self.has_shared(formatter_name):
             # reset formatter_name to signal we have no formatter
-            # pylint: disable=line-too-long
-            self.warn("Don't know how to format result of type '{}', formatter '{}' not available".format(result_type, formatter_name),
-                      sentry=True)
+            self.warn(
+                "Don't know how to format result, formatter '{}' not available".format(formatter_name),
+                sentry=True
+            )
 
             formatter_name = None
 
-        self.info('Sending {} result notifications to: {}'.format(result_type, ', '.join(recipients)))
+        self.info('Sending result notifications to: {}'.format(', '.join(recipients)))
 
         def _render_template(filename, **variables):
             """
@@ -348,7 +367,13 @@ class Notify((gluetool.Module)):
             render the template.
             """
 
-            return self.render_template(filename, RECIPIENTS=recipients, RESULT=result, **variables)
+            return self.render_template(
+                filename,
+                RECIPIENTS=recipients,
+                RESULT=result,
+                OVERALL_RESULT=overall_result,
+                **variables
+            )
 
         msg = Message(recipients=recipients, bcc=self.archive_bcc,
                       sender=self.option('sender'), reply_to=self.option('reply-to'),
@@ -365,15 +390,22 @@ class Notify((gluetool.Module)):
     def execute(self):
         self.require_shared('send_email')
 
-        results = self.shared('results') or []
-
-        for result in results:
+        def _dispatch_message(result):
             msg = self._format_result(result)
 
             if not msg:
-                continue
+                return
 
             self.shared('send_email', msg)
+
+        results = self.shared('results') or []
+
+        if isinstance(results, bs4.element.Tag):
+            _dispatch_message(results)
+
+        else:
+            for result in results:
+                _dispatch_message(result)
 
     def _format_failure(self, failure):
         recipients = [self.email_map.match(name) for name in self.shared('notification_recipients')]
