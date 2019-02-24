@@ -197,7 +197,21 @@ class TestBatchPlanner(gluetool.Module):
             if set_flags.get('recipients', None) is not None:
                 self.debug('set-wide recipients set to: {}'.format(set_flags['recipients']))
 
-                recipients = ','.join([s.strip() for s in set_flags['recipients'].split(',')])
+                # if `recipients` are specified as a string, split it into recipients,
+                # don't bother with strip, it's done later.
+                if isinstance(set_flags['recipients'], str):
+                    raw_recipients = set_flags['recipients'].split(',')
+
+                # if `recipients` is a list, we're pretty much done
+                elif isinstance(set_flags['recipients'], list):
+                    raw_recipients = set_flags['recipients']
+
+                else:
+                    raise GlueError('Recipients specified in a wrong format: {}'.format(set_flags['recipients']))
+
+                # Strip each recipient and join them into a single string we can pass down to other modules
+                # via some command-line option, i.e. commas and no spaces. Ugly.
+                recipients = ','.join([s.strip() for s in raw_recipients])
 
                 for i, command in enumerate(set_commands):
                     command = command.strip()
