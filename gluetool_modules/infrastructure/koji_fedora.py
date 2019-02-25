@@ -378,17 +378,63 @@ class KojiTask(object):
     @cached_property
     def task_arches(self):
         """
-        Return information about arches the task was building for.
+        Return information about arches the task was built for.
+
+        This helps following modules decide what architectures are necessary for testing this task.
 
         :rtype: TaskArches
         """
 
-        arches = self._task_request.options.get('arch_override', None)
+        # If user explicitly specified arch-limiting options, gather arches from the artifact
+        # and mark them as an incomplete set.
+        override_arches = self._task_request.options.get('arch_override', None)
 
-        if arches is not None:
-            return TaskArches(False, [arch.strip() for arch in arches.split(' ')])
+        if override_arches is not None:
+            return TaskArches(False, [arch.strip() for arch in override_arches.split(' ')])
 
-        return TaskArches(True, [child['arch'] for child in self._build_arch_subtasks])
+        child_arches = [
+            child['request'].arch for child in self._build_arch_subtasks
+        ]
+
+        log_dict(self.debug, 'child arches', child_arches)
+
+        # If there's just a 'noarch', it's pretty much a complete set of arches,
+        # in a sense that we can use any and all underlying architectures to test such artifact.
+        if len(child_arches) == 1 and child_arches[0] == 'noarch':
+            return TaskArches(True, child_arches)
+
+        # If we have no configuration, than this is the default behavior - there was no arch override we could
+        # examine, therefore let's believe the list is complete.
+
+        # pylint: disable=protected-access
+        if not self._module._complete_arch_map:
+            return TaskArches(True, child_arches)
+
+        # We have a configuration, let's find out what it thinks the complete list of arches should be
+        # for this task.
+        complete_arches = []
+
+        def _arches_callback(instruction, command, argument, context):
+            # pylint: disable=unused-argument
+
+            log_dict(self.debug, "setting expected 'complete' arches", argument)
+
+            complete_arches[:] = argument
+
+        # pylint: disable=protected-access
+        self._module.shared('evaluate_instructions', self._module._complete_arch_map, {
+            'arches': _arches_callback
+        })
+
+        log_dict(self.debug, 'configured complete arches', complete_arches)
+
+        missing_arches = [
+            arch for arch in complete_arches if arch not in child_arches
+        ]
+
+        log_dict(self.debug, 'missing in artifact', missing_arches)
+
+        return TaskArches(not bool(missing_arches), child_arches)
 
     @cached_property
     def url(self):
@@ -1307,6 +1353,14 @@ class Koji(gluetool.Module):
                 'help': 'Wait timeout for task to become non-waiting and closed (default: %(default)s)',
                 'type': int,
                 'default': 60,
+            },
+            'complete-arch-map': {
+                'help': """
+                        Mapping translating a build target of a task to a list of arches we should consider
+                        as 'complete' (default: %(default)s).
+                        """,
+                'metavar': 'FILE',
+                'default': None
             }
         }),
         ('Workarounds', {
@@ -1348,6 +1402,13 @@ class Koji(gluetool.Module):
     @cached_property
     def _valid_methods(self):
         return gluetool.utils.normalize_multistring_option(self.option('valid-methods'))
+
+    @cached_property
+    def _complete_arch_map(self):
+        if not self.option('complete-arch-map'):
+            return None
+
+        return gluetool.utils.load_yaml(self.option('complete-arch-map'))
 
     def task_factory(self, task_id, wait_timeout=None, details=None, task_class=None):
         task_class = task_class or KojiTask
