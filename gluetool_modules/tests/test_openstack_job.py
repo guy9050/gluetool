@@ -21,6 +21,7 @@ def create_openstack_build_params(mod, **kwargs):
         'guess_product_options': 'some guess-product options',
         'guess_beaker_distro_options': 'some guess-distro options',
         'guess_openstack_image_options': 'some guess-openstack-image options',
+        'install_mbs_build_options': 'some install mbs build options',
         'wow_options': [
             'some w-t options',
             'other w-t options'
@@ -72,7 +73,8 @@ def test_build_params(module_with_primary_task, rpm_blacklist):
     mod._config.update({
         'install-rpms-blacklist': rpm_blacklist,
         'wow-options-separator': gluetool_modules.testing.beaker.beaker_job.DEFAULT_WOW_OPTIONS_SEPARATOR,
-        'dist-git-options': 'some dist-git options'
+        'dist-git-options': 'some dist-git options',
+        'install-mbs-build-options': 'some install mbs build options'
     })
 
     expected_params = create_openstack_build_params(mod)

@@ -44,6 +44,9 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         'guess-openstack-image-options': {
             'help': 'Additional options for guess-openstack-image module.'
         },
+        'install-mbs-build-options': {
+            'help': 'Additional options for install-mbs-build or install-mbs-build-execute module.'
+        },
         'wow-options': {
             'help': 'Additional options for workflow-tomorrow.',
             'action': 'append',
@@ -110,6 +113,7 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             'guess_product_options': self.option('guess-product-options'),
             'guess_beaker_distro_options': self.option('guess-beaker-distro-options'),
             'guess_openstack_image_options': self.option('guess-openstack-image-options'),
+            'install_mbs_build_options': self.option('install-mbs-build-options'),
             'wow_options': wow_options,
             'openstack_options': self.option('openstack-options'),
             'brew_build_task_params_options': brew_build_task_params_options,
