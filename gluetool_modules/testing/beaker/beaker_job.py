@@ -31,11 +31,8 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         'build-dependencies-options': {
             'help': 'Additional options for ``build-dependencies-options`` module.'
         },
-        'guess-product-options': {
-            'help': 'Additional options for ``guess-product`` module.'
-        },
-        'guess-distro-options': {
-            'help': 'Additional options for ``guess-distro`` module.'
+        'guess-environment-options': {
+            'help': 'Additional options for ``guess-environment`` module.'
         },
         'wow-options': {
             'help': 'Additional options for ``workflow-tomorrow``.',
@@ -102,8 +99,7 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
 
         return dict_update(super(BeakerJob, self).build_params, {
             'build_dependencies_options': self.option('build-dependencies-options'),
-            'guess_product_options': self.option('guess-product-options'),
-            'guess_distro_options': self.option('guess-distro-options'),
+            'guess_environment_options': self.option('guess-environment-options'),
             'wow_options': wow_options,
             'jobwatch_options': self.option('jobwatch-options'),
             'beaker_options': self.option('beaker-options'),

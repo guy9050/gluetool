@@ -35,14 +35,8 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         'dist-git-options': {
             'help': 'Additional options for ``dist-git`` module.'
         },
-        'guess-product-options': {
-            'help': 'Additional options for ``guess-product`` module.'
-        },
-        'guess-beaker-distro-options': {
-            'help': 'Additional options for guess-beaker-distro module.'
-        },
-        'guess-openstack-image-options': {
-            'help': 'Additional options for guess-openstack-image module.'
+        'guess-environment-options': {
+            'help': 'Additional options for ``guess-environment`` module.'
         },
         'install-mbs-build-options': {
             'help': 'Additional options for install-mbs-build or install-mbs-build-execute module.'
@@ -110,10 +104,8 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         return dict_update(super(OpenStackJob, self).build_params, {
             'build_dependencies_options': self.option('build-dependencies-options'),
             'dist_git_options': self.option('dist-git-options'),
-            'guess_product_options': self.option('guess-product-options'),
-            'guess_beaker_distro_options': self.option('guess-beaker-distro-options'),
-            'guess_openstack_image_options': self.option('guess-openstack-image-options'),
             'install_mbs_build_options': self.option('install-mbs-build-options'),
+            'guess_environment_options': self.option('guess-environment-options'),
             'wow_options': wow_options,
             'openstack_options': self.option('openstack-options'),
             'brew_build_task_params_options': brew_build_task_params_options,

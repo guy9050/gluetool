@@ -15,8 +15,7 @@ def fixture_module():
 def create_beaker_build_params(mod, **kwargs):
     params = {
         'build_dependencies_options': 'some build-dependencies options',
-        'guess_product_options': 'some guess-product options',
-        'guess_distro_options': 'some guess-distro options',
+        'guess_environment_options': 'some guess-environment options',
         'wow_options': [
             'some w-t options',
             'other w-t options'
