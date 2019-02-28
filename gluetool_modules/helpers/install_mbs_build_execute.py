@@ -87,8 +87,21 @@ class InstallMBSBuild(gluetool.Module):
             'commands': _add_commands_callback,
         })
 
-        # Use devel module if requested
-        nsvc = '{}-devel'.format(primary_task.nsvc) if self.option('use-devel-module') else primary_task.nsvc
+        nsvc = primary_task.nsvc
+
+        # Include -devel module if requested, for more information see
+        #
+        #    https://projects.engineering.redhat.com/browse/COMPOSE-2993
+        #
+        # Note that -devel module can contain some packages people want to use in their tests
+        if self.option('use-devel-module'):
+            nsvc = '{} {}-devel:{}:{}:{}'.format(
+                primary_task.nsvc,
+                primary_task.name,
+                primary_task.stream,
+                primary_task.version,
+                primary_task.context
+            )
 
         repo_url = self._get_repo(nsvc, guests)
 
