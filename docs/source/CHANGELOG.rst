@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+
+2019-03-01
+----------
+
+Added
+~~~~~
+
+- [install-mbs-build-execute] new option, ``--use-devel-module``, to include ``foo-devel`` in the module repository as well
+- [test-batch-planner] support recipients syntax to be a YAML list of strings
+- [testing-thread-id] export thread ID over eval context
+
+
 2019-02-26
 ----------
 
