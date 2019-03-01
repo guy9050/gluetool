@@ -1,4 +1,5 @@
-from collections import namedtuple
+import collections
+import logging
 
 import pytest
 
@@ -6,9 +7,10 @@ from mock import MagicMock
 
 import gluetool
 import gluetool_modules.infrastructure.distgit
+from gluetool_modules.infrastructure.distgit import DistGitRepository
 from . import assert_shared, create_module, patch_shared
 
-DistGitRepository = namedtuple('DistGitRepository', ('url', 'branch', 'package'))
+Response = collections.namedtuple('Response', ['status_code', 'content'])
 
 
 @pytest.fixture(name='module')
@@ -31,7 +33,7 @@ def test_sanity_missing_required_options(module, method):
 
 
 def test_missing_primary_task(module):
-    assert_shared('primary_task', module.dist_git_repository)
+    assert_shared('primary_task', module.execute)
 
 
 def test_force(monkeypatch, module):
@@ -50,7 +52,7 @@ def test_force(monkeypatch, module):
     module._config['branch'] = None
     with pytest.raises(gluetool.glue.GlueError,
                        match="Could not translate target to dist-git branch or branch is empty"):
-        module.dist_git_repository()
+        module.execute()
 
     # pylint: disable=protected-access
     module._config['branch'] = 'some-branch'
@@ -59,14 +61,17 @@ def test_force(monkeypatch, module):
     module._config['repository'] = None
     with pytest.raises(gluetool.glue.GlueError,
                        match="Could not translate target to dist-git repository or repository is empty"):
-        module.dist_git_repository()
+        module.execute()
 
     # pylint: disable=protected-access
     module._config['repository'] = 'some-repo'
 
-    assert module.dist_git_repository() == DistGitRepository('some-repo', 'some-branch', 'some-component')
-    assert module.dist_git_repository(task=mock_other_task, branch='other-branch') == DistGitRepository(
-        'some-repo', 'other-branch', 'other-component')
+    module.execute()
+    repository = module.dist_git_repository()
+
+    assert repository.package == 'some-component'
+    assert repository.url == 'some-repo'
+    assert repository.branch == 'some-branch'
 
 
 def test_artifact(monkeypatch, module):
@@ -84,4 +89,95 @@ def test_artifact(monkeypatch, module):
     monkeypatch.setattr(gluetool_modules.infrastructure.distgit, 'PatternMap', pattern_map_mock)
     monkeypatch.setattr(gluetool_modules.infrastructure.distgit, 'render_template', lambda a: 'a-value')
 
-    assert module.dist_git_repository() == DistGitRepository('a-value', 'a-value', 'some-component')
+    module.execute()
+    repository = module.dist_git_repository()
+
+    assert repository.package == 'some-component'
+    assert repository.url == 'a-value'
+    assert repository.branch == 'a-value'
+
+
+def test_eval_context(module, monkeypatch):
+    monkeypatch.setattr(module, '_repository', 'fake-repository')
+
+    assert module.eval_context['DIST_GIT_REPOSITORY'] == 'fake-repository'
+
+
+def test_eval_context_recursion(module, monkeypatch):
+    monkeypatch.setattr(gluetool_modules.libs, 'is_recursion', MagicMock(return_value=True))
+
+    assert module.eval_context == {}
+
+
+def test_repr(module):
+    repository = DistGitRepository(module, 'some-url', 'some-branch', 'some-package')
+
+    assert repository.__repr__() == '<DistGitRepository(package="some-package", branch="some-branch")>'
+
+
+# pylint: disable=no-init,too-few-public-methods
+class MockRequests(object):
+    status_code = 200
+    response = '# recipients: batman, robin\ndata'
+
+    def __enter__(self, *args):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+    @staticmethod
+    def get(_):
+        return Response(MockRequests.status_code, MockRequests.response)
+
+
+def test_gating(module, monkeypatch, log):
+    repository = DistGitRepository(module, 'some-url', 'some-branch', 'some-package')
+
+    # gating configuration found
+    monkeypatch.setattr(gluetool.utils, 'requests', MockRequests)
+
+    assert repository.has_gating
+    assert log.match(message=(
+        "gating configuration 'some-url/raw/some-branch/f/gating.yaml':\n"
+        "---v---v---v---v---v---\n"
+        "# recipients: batman, robin\n"
+        "data\n"
+        "---^---^---^---^---^---"
+    ))
+
+
+def test_no_gating(module, monkeypatch, log):
+    repository = DistGitRepository(module, 'some-url', 'some-branch', 'some-package')
+
+    # gating configuration not found
+    monkeypatch.setattr(gluetool.utils, 'requests', MockRequests)
+    monkeypatch.setattr(MockRequests, 'status_code', 400)
+
+    assert repository.has_gating is False
+    assert log.match(message="dist-git repository has no gating.yaml 'some-url/raw/some-branch/f/gating.yaml'")
+
+
+def test_repository_persistance(module):
+    module._repository = 'repository'
+
+    assert module.dist_git_repository() == 'repository'
+
+
+def test_gating_recipients(module, monkeypatch):
+    repository = DistGitRepository(module, 'some-url', 'some-branch', 'some-package')
+
+    # gating configuration found
+    monkeypatch.setattr(gluetool.utils, 'requests', MockRequests)
+
+    assert repository.gating_recipients == ['batman', 'robin']
+
+
+def test_no_gating_recipients(module, monkeypatch):
+    repository = DistGitRepository(module, 'some-url', 'some-branch', 'some-package')
+
+    # gating configuration found
+    monkeypatch.setattr(gluetool.utils, 'requests', MockRequests)
+    monkeypatch.setattr(MockRequests, 'response', 'data')
+
+    assert repository.gating_recipients == []
