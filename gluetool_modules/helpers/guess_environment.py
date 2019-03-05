@@ -350,9 +350,9 @@ class CIGuess(gluetool.Module):
             self._find_buc_for_distro(s.strip()) for s in source['specification']
         ]
 
-    @staticmethod
-    def _guess_force(source):
+    def _guess_force(self, source):
         # type: (Dict[str, Union[str, List[str]]]) -> None
+        # pylint: disable=no-self-use
         if source['type'] == 'distro':
             source['result'] = [s.strip() for s in source['specification']]
 
