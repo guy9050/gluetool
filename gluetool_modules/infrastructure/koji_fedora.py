@@ -634,6 +634,19 @@ class KojiTask(object):
         return None
 
     @cached_property
+    def distgit_ref(self):
+        """
+        Distgit ref id from which package has been built or ``None`` if it's impossible to find it.
+
+        :rtype: str
+        """
+        try:
+            return self._task_request.source.split('#')[1].encode('ascii')
+        except IndexError:
+            self.debug('Distgit ref not found')
+        return None
+
+    @cached_property
     def srcrpm_url(self):
         """
         URL of the SRPM (:py:attr:`srcrpm`) or ``None`` if SRPM is not known.

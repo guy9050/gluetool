@@ -93,9 +93,16 @@ _   """
         :param DistGitRepository repository: Directory where dist-git will be downloaded to.
         """
         # clone the dist-git repository
+        if repository.distgit_ref:
+            git_clone_restriction = []
+        else:
+            git_clone_restriction = [
+                "-b", repository.branch,
+                "--depth", "1"
+            ]
         git_clone_command = [
-            "git", "clone", "-b", repository.branch,
-            "--depth", "1",
+            "git", "clone"] + git_clone_restriction
+        git_clone_command += [
             repository.url,
             workdir
         ]
@@ -105,6 +112,15 @@ _   """
             Command(git_clone_command).run()
         except gluetool.GlueCommandError as exc:
             raise GlueError('Could not clone git repository: {}'.format(exc.output.stderr))
+
+        # if there is git ref, checkout to it
+        if repository.distgit_ref:
+            git_checkout_command = ["git", "checkout", repository.distgit_ref]
+            try:
+                self.info('checkouting distgit ref')
+                Command(git_checkout_command).run(cwd=workdir)
+            except gluetool.GlueCommandError as exc:
+                raise GlueError('Could not git checkout to {}: {}'.format(repository.distgit_ref, exc.output.stderr))
 
         # check for playbooks (tests)
         playbooks = glob.glob('{}/tests/tests*.yml'.format(workdir))

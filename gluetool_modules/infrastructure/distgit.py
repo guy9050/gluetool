@@ -12,7 +12,8 @@ class DistGitRepository(object):
     Provides a dist-git repository.
     """
 
-    def __init__(self, module, url, branch, package):
+    def __init__(self, module, url, branch, package, distgit_ref=None):
+        # pylint: disable=too-many-arguments
         self._module = module
 
         module.logger.connect(self)
@@ -22,6 +23,7 @@ class DistGitRepository(object):
         self.branch = branch
         self.package = package
         self.url = url
+        self.distgit_ref = distgit_ref
 
     def __repr__(self):
         return '<DistGitRepository(package="{}", branch="{}")>'.format(self.package, self.branch)
@@ -116,6 +118,9 @@ class DistGit(gluetool.Module):
         ("Options for method 'force'", {
             'branch': {
                 'help': 'Dist-git branch'
+            },
+            'distgit_ref': {
+                'help': 'Dist-git ref'
             },
             'repository': {
                 'help': 'Dist-git repository url'
@@ -216,6 +221,10 @@ class DistGit(gluetool.Module):
 
         branch = render_template(branch, **self.shared('eval_context'))
 
+        git_ref = self.option('distgit_ref')
+        if not git_ref:
+            git_ref = task.distgit_ref
+
         # map repository according to artifact's namespace
         repository = self._methods_repository[self.option('method')](self, task)
 
@@ -225,4 +234,4 @@ class DistGit(gluetool.Module):
         url = render_template(repository, **self.shared('eval_context'))
         self.info("dist-git repository URL is '{}' branch '{}'".format(url, branch))
 
-        self._repository = DistGitRepository(self, url=url, branch=branch, package=task.component)
+        self._repository = DistGitRepository(self, url=url, branch=branch, package=task.component, distgit_ref=git_ref)

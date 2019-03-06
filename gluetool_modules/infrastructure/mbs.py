@@ -300,6 +300,19 @@ class MBSTask(object):
     def url(self):
         return self.module.mbs_api().get_build_ui_url(self.id)
 
+    @cached_property
+    def distgit_ref(self):
+        """
+        Distgit ref id from which package has been built or ``None`` if it's impossible to find it.
+
+        :rtype: str
+        """
+        try:
+            return self._build_info['scmurl'].split('#')[1].encode('ascii')
+        except IndexError:
+            self.debug('Distgit ref not found')
+        return None
+
 
 class MBS(gluetool.Module):
     name = 'mbs'
