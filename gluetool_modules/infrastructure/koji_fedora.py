@@ -962,7 +962,7 @@ class BrewTask(KojiTask):
 
                 # This is another good candidate for a mapping file - insert task, let configuration
                 # yield the component.
-                return '{}-containers'.format(component)
+                return '{}-container'.format(component)
 
         return super(BrewTask, self).component
 
