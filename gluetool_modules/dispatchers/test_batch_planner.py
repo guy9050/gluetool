@@ -408,6 +408,8 @@ class TestBatchPlanner(gluetool.Module):
 
         final_commands = []
 
+        context = self.shared('eval_context')
+
         for config_filepath in self.configs:
             config = load_yaml(config_filepath, logger=self.logger)
 
@@ -445,6 +447,12 @@ class TestBatchPlanner(gluetool.Module):
                     args = shlex.split(command)[1:]
 
                     self.debug("module='{}', args='{}'".format(module, args))
+
+                    # Last step: render command arguments
+                    args = gluetool.utils.render_template(args, logger=self.logger, **context)
+
+                    self.debug("module='{}', rendered args='{}'".format(module, args))
+
                     final_commands.append((module, args))
 
         return final_commands
