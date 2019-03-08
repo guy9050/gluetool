@@ -30,7 +30,7 @@ variables:
 
     [Documentation](${DOCS_URL}-${CI_COMMIT_REF_NAME}/) | [Coverage](${COVERAGE_URL}-${CI_COMMIT_REF_NAME}/)
 
-image: "docker-registry.engineering.redhat.com/baseos-ci/citool-gitlab-ci"
+image: "docker-registry.engineering.redhat.com/baseos-ci/baseosci-gitlab-cicd-centos7"
 
 
 #
@@ -83,7 +83,7 @@ static-analysis-coala:
 static-analysis-type-check:
   stage: test
   allow_failure: true
-  image: "docker-registry.engineering.redhat.com/baseos-ci/baseosci-gitlab-cicd-f26"
+  image: "docker-registry.engineering.redhat.com/baseos-ci/baseosci-gitlab-cicd-f28"
   script:
     - tox -e type-check
 
