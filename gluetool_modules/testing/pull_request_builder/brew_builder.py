@@ -58,7 +58,7 @@ class BrewBuilder(gluetool.Module):
 
         # wait until brew task finish
         command = ['brew', 'watch-task', task_id]
-        output = Command(command).run()
+        output = Command(command).run(inspect=True)
 
         if output.exit_code == 0:
             result = 'PASS'

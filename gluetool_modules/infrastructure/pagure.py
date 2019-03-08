@@ -35,11 +35,32 @@ class PagureApi(object):
     def get_clone_url(self, full_name):
         return '{}/{}.git'.format(self.pagure_url_port, full_name)
 
-    def get_patch_url(self, full_name, pull_request_id):
-        return '{}/{}/pull-request/{}.patch'.format(self.pagure_url_port, full_name, pull_request_id)
-
     def get_pr_ui_url(self, full_name, pull_request_id):
         return '{}/{}/pull-request/{}'.format(self.pagure_url, full_name, pull_request_id)
+
+
+class PullRequestID(object):
+    """
+    Pull Request ID consist of repository name, pull request id within project and optional comment id.
+    This class covers both values and provides them like one string, with following format:
+    '[repository_name]:[repository_pr_id]:[comment_id]'
+    """
+
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, repository_name, repository_pr_id, comment_id=None):
+        self.repository_name = repository_name
+        self.repository_pr_id = repository_pr_id
+        self.comment_id = comment_id
+
+    def __str__(self):
+        if self.comment_id:
+            return '{}:{}:{}'.format(self.repository_name, self.repository_pr_id, self.comment_id)
+
+        return '{}:{}'.format(self.repository_name, self.repository_pr_id)
+
+    def __repr__(self):
+        return self.__str__()
 
 
 class PagureProject(object):
@@ -65,37 +86,49 @@ class PagurePullRequest(object):
 
     ARTIFACT_NAMESPACE = 'dist-git-pr'
 
-    def __init__(self, module, project_name, pr_id, last_comment_id=None):
+    def __init__(self, module, pull_request_id):
         # pylint: disable=invalid-name
 
         self.module = module
         self.logger = module.logger
 
+        self.id = str(pull_request_id)
+        self.pull_request_id = pull_request_id
+
         pagure_api = self.module.pagure_api()
 
-        self.project = PagureProject(module, project_name)
+        self.project = PagureProject(module, self.pull_request_id.repository_name)
 
-        pull_request_info = pagure_api.get_pull_request_info(project_name, pr_id)
+        pull_request_info = pagure_api.get_pull_request_info(
+            self.pull_request_id.repository_name,
+            self.pull_request_id.repository_pr_id
+        )
 
-        self.pr_id = str(pull_request_info['id'])
-        self.id = str(pull_request_info['uid'])
+        self.uid = str(pull_request_info['uid'])
         self.source_branch = str(pull_request_info['branch_from'])
         self.destination_branch = str(pull_request_info['branch'])
         self.issuer = pull_request_info['user']['name']
         self.commit_start = pull_request_info['commit_start']
         self.commit_stop = pull_request_info['commit_stop']
 
-        if last_comment_id:
+        if self.pull_request_id.comment_id:
+            last_comment_id = self.pull_request_id.comment_id
+
             all_comments = pull_request_info['comments']
             self.comments = [comment for comment in all_comments if comment['id'] <= last_comment_id]
+
+            if last_comment_id != self.comments[-1]['id']:
+                raise gluetool.GlueError('Comment with id {} not found'.format(last_comment_id))
+
         else:
             self.comments = []
 
-        self.patch_url = pagure_api.get_patch_url(self.project.full_name, self.id)
-
     @cached_property
     def url(self):
-        return self.module.pagure_api().get_pr_ui_url(self.project.full_name, self.id)
+        return self.module.pagure_api().get_pr_ui_url(
+            self.pull_request_id.repository_name,
+            self.pull_request_id.repository_pr_id
+        )
 
 
 class Pagure(gluetool.Module):
@@ -188,11 +221,12 @@ class Pagure(gluetool.Module):
 
         for pull_request_option in normalize_multistring_option(self.option('pull-request')):
 
-            pull_request = PagurePullRequest(self, *pull_request_option.split(':'))
+            pull_request_id = PullRequestID(*pull_request_option.split(':'))
+            pull_request = PagurePullRequest(self, pull_request_id)
 
             self._pull_requests.append(pull_request)
 
             self.info('Initialized with {} ({})'.format(
-                pull_request_option,
+                pull_request.id,
                 pull_request.url
             ))
