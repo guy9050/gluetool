@@ -449,7 +449,10 @@ class TestBatchPlanner(gluetool.Module):
                     self.debug("module='{}', args='{}'".format(module, args))
 
                     # Last step: render command arguments
-                    args = gluetool.utils.render_template(args, logger=self.logger, **context)
+                    args = [
+                        gluetool.utils.render_template(arg, logger=self.logger, **context)
+                        for arg in args
+                    ]
 
                     self.debug("module='{}', rendered args='{}'".format(module, args))
 
