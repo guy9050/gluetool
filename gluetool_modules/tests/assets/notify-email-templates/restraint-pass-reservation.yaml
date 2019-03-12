@@ -10,7 +10,7 @@ header: |-
   Build target:      release-candidate
   Brew task:         123456
   Build issuer:      bar@redhat.com
-  Test summary link: https://dashboard.osci.redhat.com/#/artifact/brew-build/aid/123456
+  Test summary link: https://dashboard.osci.redhat.com/#/artifact/brew-build/aid/123456?focus=id:
 footer: |-
   --
   Troubleshooting Tips: http://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/Troubleshoot
