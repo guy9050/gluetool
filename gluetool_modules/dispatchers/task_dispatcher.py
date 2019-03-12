@@ -80,7 +80,7 @@ class TaskDispatcher(gluetool.Module):
             joined_args = ' '.join(args)
 
             # pylint: disable=line-too-long
-            match = re.search(r"""--pipeline-state-reporter-options\s*=?[\"']?\s*--test-{}\s*=?(.*?)[ \"']""".format(test_property), joined_args)  # Ignore PEP8Bear
+            match = re.search(r"""--pipeline-state-reporter-options\s*=?[\"']?.*--test-{}\s*=?(.*?)[ \"']""".format(test_property), joined_args)  # Ignore PEP8Bear
             if match is not None:
                 return match.group(1)
 
