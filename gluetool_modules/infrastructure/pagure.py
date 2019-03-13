@@ -51,7 +51,7 @@ class PullRequestID(object):
     def __init__(self, repository_name, repository_pr_id, comment_id=None):
         self.repository_name = repository_name
         self.repository_pr_id = repository_pr_id
-        self.comment_id = comment_id
+        self.comment_id = int(comment_id) if comment_id else None
 
     def __str__(self):
         if self.comment_id:
