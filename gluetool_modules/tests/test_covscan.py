@@ -179,11 +179,11 @@ def run(result, log, module, monkeypatch, tmpdir):
                 if result in ['FAIL']:
                     return MagicMock(stdout=TASK_INFO_FAIL)
 
-    def mocked_grabber(url):
+    def mocked_grabber(url, filename=None):
         if 'rpm' in url:
-            with open(url, 'w') as outfile:
+            with open(filename or url, 'w') as outfile:
                 outfile.write('')
-            return os.path.abspath(url)
+            return os.path.abspath(filename or url)
         else:
             pass
 

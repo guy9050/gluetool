@@ -8,7 +8,7 @@ from urlgrabber.grabber import urlgrab
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.glue import DryRunLevels
-from gluetool.log import log_blob, format_dict
+from gluetool.log import log_blob, log_dict, format_dict
 from gluetool.utils import cached_property, Command, check_for_commands, GlueCommandError, dict_update, Bunch, \
     PatternMap
 from libci.results import TestResult, publish_result
@@ -210,9 +210,12 @@ class CICovscan(gluetool.Module):
             self.info("Using '{}' (build task id: {}) as target".format(target.nvr, target.id))
             self.info("Using '{}' (build task id: {}) as baseline".format(baseline.nvr, baseline.id))
 
-            self.info('Obtaining source RPMs')
+            log_dict(self.info, 'Obtaining source RPMs', {
+                'target': target.srcrpm_url,
+                'baseline': "{} -> baseline.src.rpm".format(target.srcrpm_url)
+            })
             target_srpm = urlgrab(target.srcrpm_url)
-            baseline_srpm = urlgrab(baseline.srcrpm_url)
+            baseline_srpm = urlgrab(baseline.srcrpm_url, filename='baseline.src.rpm')
 
             self.info('Looking for covscan configuration in {}'.format(self.option('config-map')))
             configs = PatternMap(self.option('config-map'), logger=self.logger).match(self.task.target, multiple=True)
