@@ -1,6 +1,6 @@
 ---
 
-name: sti
+name: test-schedule-runner-sti
 description: Run Standard Test Interface tests on the provisioned guests
 dependencies:
   repo:
