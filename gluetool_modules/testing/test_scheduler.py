@@ -47,6 +47,12 @@ class NoTestableArtifactsError(libci.sentry.PrimaryTaskFingerprintsMixin, SoftGl
 
         super(NoTestableArtifactsError, self).__init__(task, message)
 
+    @property
+    def submit_to_sentry(self):
+        # type: () -> bool
+        # pylint: disable=no-self-use
+        return False
+
 
 class TestScheduler(gluetool.Module):
     """
