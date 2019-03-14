@@ -22,6 +22,12 @@ class CovscanFailedError(SoftGlueError):
 
         self.covscan_result_url = url
 
+    # do not send this entry to Sentry
+    @property
+    def submit_to_sentry(self):
+
+        return False
+
 
 class NoCovscanBaselineFoundError(SoftGlueError):
     STATUS = 'SKIP'
