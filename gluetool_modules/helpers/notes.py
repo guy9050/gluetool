@@ -71,5 +71,5 @@ class Notes(gluetool.Module):
         }
 
         return {
-            'NOTES': sorted(self._notes, key=lambda x: x.level, reversed=True)
+            'NOTES': sorted(self._notes, key=lambda x: x.level, reverse=True)
         }
