@@ -27,7 +27,9 @@ class PagureSRPM(gluetool.Module):
 
         os.chdir(pull_request.project.name)
 
-        fetch_cmd = ['git', 'fetch', 'origin', 'refs/pull/{}/head'.format(pull_request.pr_id)]
+        pr_id = pull_request.pull_request_id.repository_pr_id
+
+        fetch_cmd = ['git', 'fetch', 'origin', 'refs/pull/{}/head'.format(pr_id)]
         Command(fetch_cmd, logger=self.logger).run()
 
         merge_cmd = ['git', 'merge', 'FETCH_HEAD', '-m', 'ci pr merge']
@@ -42,7 +44,7 @@ class PagureSRPM(gluetool.Module):
 
         with open(spec_backup_name, 'r') as infile, open(spec_origin_name, 'w') as outfile:
             for line in infile.readlines():
-                line = line.replace('%{?dist}', '%{{?dist}}.pr.{}.c.{}'.format(pull_request.id, last_comment_id))
+                line = line.replace('%{?dist}', '%{{?dist}}.pr.{}.c.{}'.format(pr_id, last_comment_id))
                 outfile.writelines(line)
 
         command = ['rhpkg', 'srpm']
