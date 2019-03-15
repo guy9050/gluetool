@@ -9,8 +9,8 @@ import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.glue import DryRunLevels
 from gluetool.log import log_blob, log_dict, format_dict
-from gluetool.utils import cached_property, Command, check_for_commands, GlueCommandError, dict_update, Bunch, \
-    PatternMap
+from gluetool.utils import cached_property, Command, check_for_commands, new_xml_element, GlueCommandError, \
+    dict_update, Bunch, PatternMap
 from libci.results import TestResult, publish_result
 
 REQUIRED_CMDS = ['covscan']
@@ -91,6 +91,13 @@ class CovscanTestResult(TestResult):
             properties.pop('brew_url')
 
         super(CovscanTestResult, self)._serialize_to_xunit_property_dict(parent, properties, names)
+
+    def _serialize_to_xunit(self):
+        test_suite = super(CovscanTestResult, self)._serialize_to_xunit()
+
+        self.glue.shared('covscan_xunit_serialize', test_suite, self)
+
+        return test_suite
 
 
 class CovscanResult(object):
@@ -178,6 +185,8 @@ class CICovscan(gluetool.Module):
         }
     }
 
+    shared_functions = ('covscan_xunit_serialize',)
+
     def sanity(self):
         check_for_commands(REQUIRED_CMDS)
 
@@ -203,6 +212,30 @@ class CICovscan(gluetool.Module):
         finally:
             _unlink(task_id_filename)
         return CovscanResult(self, covscan_task_id)
+
+    def covscan_xunit_serialize(self, test_suite, result):
+        # pylint: disable=no-self-use
+        test_case = new_xml_element('testcase', _parent=test_suite, name=self.shared('primary_task').nvr,
+                                    added=result.added, fixed=result.fixed, baseline=result.baseline,
+                                    overall_result=result.overall_result, result_class=result.result_class,
+                                    test_type=result.test_type)
+
+        logs = new_xml_element('logs', _parent=test_case)
+
+        def _log_url(log_name):
+            return '{}/log/{}'.format(result.urls.get('covscan_url'), log_name)
+
+        logs_url = result.urls.get('covscan_url') + 'log/{}'
+
+        for log_type in ['added', 'fixed']:
+            for log_ext in ['err', 'html', 'js']:
+                log_name = "{}.{}".format(log_type, log_ext)
+                new_xml_element("log", _parent=logs, name=log_name, url=_log_url(log_name))
+
+        new_xml_element('log', _parent=logs, name='src.rpm', url=logs_url.format(result.baseline + '.src.rpm'))
+        new_xml_element('log', _parent=logs, name='tar.gz', url=logs_url.format(result.baseline + '.tar.gz'))
+
+        return test_suite
 
     def scan(self):
         covscan_result = None
