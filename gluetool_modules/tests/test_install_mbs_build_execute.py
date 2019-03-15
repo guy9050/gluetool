@@ -86,6 +86,7 @@ NAME = 'name'
 STREAM = 'stream'
 VERSION = 'version'
 CONTEXT = 'context'
+PROFILE = 'common'
 
 NSVC = '{}:{}:{}:{}'.format(
     NAME,
@@ -94,12 +95,12 @@ NSVC = '{}:{}:{}:{}'.format(
     CONTEXT
 )
 
-NSVC_DEVEL = '{} {}-devel:{}:{}:{}'.format(
-    NSVC,
+NSVC_DEVEL_WITH_PROFILE = '{}-devel:{}:{}:{}/{}'.format(
     NAME,
     STREAM,
     VERSION,
-    CONTEXT
+    CONTEXT,
+    PROFILE
 )
 
 
@@ -144,6 +145,7 @@ def test_guest_setup(module, monkeypatch):
 
     for _ in guests:
         calls.append(call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)))
+        calls.append(call('yum module reset -y {}'.format(NSVC)))
         calls.append(call('yum module enable -y {}'.format(NSVC)))
         calls.append(call('yum module install -y {}'.format(NSVC)))
 
@@ -151,8 +153,9 @@ def test_guest_setup(module, monkeypatch):
     assert execute_mock.call_count == len(calls)
 
 
-def test_use_devel_module(module, monkeypatch):
+def test_use_devel_module_and_profile(module, monkeypatch):
     module._config['use-devel-module'] = True
+    module._config['profile'] = 'common'
 
     primary_task_mock = MagicMock()
     primary_task_mock.nsvc = NSVC
@@ -184,8 +187,9 @@ def test_use_devel_module(module, monkeypatch):
 
     for _ in guests:
         calls.append(call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)))
-        calls.append(call('yum module enable -y {}'.format(NSVC_DEVEL)))
-        calls.append(call('yum module install -y {}'.format(NSVC_DEVEL)))
+        calls.append(call('yum module reset -y {}'.format(NSVC_DEVEL_WITH_PROFILE)))
+        calls.append(call('yum module enable -y {}'.format(NSVC_DEVEL_WITH_PROFILE)))
+        calls.append(call('yum module install -y {}'.format(NSVC_DEVEL_WITH_PROFILE)))
 
     execute_mock.assert_has_calls(calls)
     assert execute_mock.call_count == len(calls)
@@ -229,6 +233,7 @@ def test_workarounds(module, monkeypatch):
         calls.append(call('workaround command'))
         calls.append(call('other workaround command'))
         calls.append(call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)))
+        calls.append(call('yum module reset -y {}'.format(NSVC)))
         calls.append(call('yum module enable -y {}'.format(NSVC)))
         calls.append(call('yum module install -y {}'.format(NSVC)))
 

@@ -18,6 +18,9 @@ class InstallMBSBuild(gluetool.Module):
     shared_functions = ('setup_guest',)
 
     options = {
+        'profile': {
+            'help': 'Use given profile for module installation',
+        },
         'installation-workarounds': {
             'help': 'File with commands and rules, when used them.'
         },
@@ -87,23 +90,34 @@ class InstallMBSBuild(gluetool.Module):
             'commands': _add_commands_callback,
         })
 
-        nsvc = primary_task.nsvc
+        nsvc = nsvc_odcs = primary_task.nsvc
 
-        # Include -devel module if requested, for more information see
         #
-        #    https://projects.engineering.redhat.com/browse/COMPOSE-2993
+        # Include -devel module if requested, for more information see
+        #   https://projects.engineering.redhat.com/browse/COMPOSE-2993
         #
         # Note that -devel module can contain some packages people want to use in their tests
+        #
         if self.option('use-devel-module'):
-            nsvc = '{} {}-devel:{}:{}:{}'.format(
-                primary_task.nsvc,
+            # we will use devel module for installation
+            nsvc = '{}-devel:{}:{}:{}'.format(
                 primary_task.name,
                 primary_task.stream,
                 primary_task.version,
                 primary_task.context
             )
 
-        repo_url = self._get_repo(nsvc, guests)
+            # For ODCS request we need to include both modules, for installation we will use only -devel if requested
+            nsvc_odcs = '{} {}'.format(primary_task.nsvc, nsvc)
+
+        repo_url = self._get_repo(nsvc_odcs, guests)
+
+        #
+        # Some modules do not provide 'default' module and user needs to explicitely specify it, for more info see
+        #   https://projects.engineering.redhat.com/browse/OSCI-56
+        #
+        if self.option('profile'):
+            nsvc = '{}/{}'.format(nsvc, self.option('profile'))
 
         for guest in guests:
 
@@ -113,6 +127,7 @@ class InstallMBSBuild(gluetool.Module):
                     guest.execute(cmd)
 
                 guest.execute('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(repo_url))
+                guest.execute('yum module reset -y {}'.format(nsvc))
                 guest.execute('yum module enable -y {}'.format(nsvc))
                 guest.execute('yum module install -y {}'.format(nsvc))
 
