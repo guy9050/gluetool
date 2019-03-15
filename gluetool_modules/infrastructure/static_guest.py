@@ -62,6 +62,10 @@ class CIStaticGuest(gluetool.Module):
                 'help': "Guest connection details, in form '[user@]hostname[:port]. Default user is 'root' and port 22",
                 'action': 'append'
             },
+            'guest-setup': {
+                'help': 'Run guest setup after adding the guest. Useful for testing guest-setup related modules.',
+                'action': 'store_true'
+            },
             'ssh-key': {
                 'help': 'SSH key to use to connect to the guests.'
             }
@@ -164,5 +168,8 @@ class CIStaticGuest(gluetool.Module):
             for future in wait(futures).done:
                 guest = future.result()
                 self.info("added guest '{}' with architecture '{}'".format(guest, guest.environment.arch))
+
+                if self.option('guest-setup'):
+                    guest.setup()
 
                 self._guests.append(guest)
