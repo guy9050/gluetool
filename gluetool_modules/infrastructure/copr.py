@@ -339,7 +339,7 @@ class Copr(gluetool.Module):
         primary_task = self.primary_task()
 
         if not primary_task:
-            self.warn('No primary task available, cannot pass it to eval_context', sentry=True)
+            self.debug('No primary task available, cannot pass it to eval_context')
             return {}
 
         return {
