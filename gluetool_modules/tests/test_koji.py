@@ -105,7 +105,7 @@ def test_task_by_id(koji_session, module):
     Tasks are specified directly by their IDs.
     """
 
-    module.tasks([koji_session])
+    module.tasks(task_ids=[koji_session])
 
     assert_task_attributes(module, koji_session)
 
@@ -208,7 +208,7 @@ def test_invalid_task_id_type(module):
     """
 
     with pytest.raises(ValueError):
-        module.tasks(['invalid id'])
+        module.tasks(task_ids=['invalid id'])
 
 
 @pytest.mark.parametrize('koji_session', [
@@ -222,7 +222,7 @@ def test_not_valid_build_tasks(koji_session, module):
     module._config['valid-methods'] = ['build']
 
     with pytest.raises(gluetool.GlueError, match=r'Task is not a build task'):
-        module.tasks([koji_session])
+        module.tasks(task_ids=[koji_session])
 
 
 def test_missing_name_option(module):
@@ -259,7 +259,7 @@ def test_invalid_build(koji_session, module, log):
 ], indirect=True)
 def test_request_missing(koji_session, module):
     with pytest.raises(gluetool.GlueError, match=r'Task 10166983 has no request field in task info'):
-        module.tasks([koji_session])
+        module.tasks(task_ids=[koji_session])
 
 
 @pytest.mark.parametrize('koji_session', [
@@ -267,4 +267,4 @@ def test_request_missing(koji_session, module):
 ], indirect=True)
 def test_request_length_invalid(koji_session, module):
     with pytest.raises(gluetool.GlueError, match=r'Task 10166985 has unexpected number of items in request field'):
-        module.tasks([10166985])
+        module.tasks(task_ids=[10166985])

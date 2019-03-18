@@ -52,7 +52,7 @@ listBuilds:
       package_id: 1088
       build_id: 805705
       state: 1
-      source: 'fakeSource'
+      source: 'git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde'
       epoch:
       version: 4.3.43
       completion_ts: 1475224498.93573

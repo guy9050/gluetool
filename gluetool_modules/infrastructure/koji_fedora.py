@@ -60,6 +60,31 @@ BuildArchTaskRequest = collections.namedtuple('BuildArchTaskRequest',
 ImageRepository = collections.namedtuple('ImageRepository', ['arch', 'url', 'alternatives', 'manifest'])
 
 
+#: Represents data we need to initialize a Koji task. A task ID would be enough, but, for some tasks,
+#: we may need to override some data we'd otherwise get from Koji API.
+#:
+#: The specific use case: container builds. Container build B1 was built by Brew task T1. Later,
+#: there may be a rebuild of B1, thanks to change in the parent image, yielding B2. But: B2 would
+#: point to T1! Thankfully, we can initialize with build ID (starting with B2 then), but because
+#: our implementation would try to detect task behind B2 - which is, wrongly but officialy, T1 -
+#: and use this task for initialization. Task instance would then try to detect build attached to
+#: the task, which would be, according to API, B1... Therefore, we'd initialize with B2, but *nothing*
+#: in our state would have any connection to B2, because the task behind B2 would be T1, and build
+#: created by T1 would be B1.
+#:
+#: To solve this trap, we need to preserve information about build after we reduce it to a task,
+#: and when a task instance is initialized, we'd force this build to be the task is connected to.
+#: Most of our code tries to use build when providing artifact attributes like NVR or component,
+#: making it the information source number one.
+#:
+#: Therefore task initializer, to give us a single package we could pass between involved functions.
+#:
+#: :ivar int task_id: task ID.
+#: :ivar int build_id: if set, it as build we should assign to the task. Otherwise we query API
+#:     to find out which - if any - build belongs to the task.
+TaskInitializer = collections.namedtuple('TaskInitializer', ['task_id', 'build_id'])
+
+
 class KojiTask(object):
     # pylint: disable=too-many-public-methods
 
@@ -93,8 +118,23 @@ class KojiTask(object):
         if not all(key in details for key in required_instance_keys):
             raise GlueError('instance details do not contain all required keys')
 
+    def _assign_build(self, build_id):
+        # Helper method - if build_id is specified, don't give API a chance, use the given
+        # build, and emit a warning.
+
+        if build_id is None:
+            return
+
+        self._build = self.session.getBuild(build_id)
+
+        log_dict(self.debug, 'build for task ID {}'.format(self.id), self._build)
+
+        self.warn('for task {}, build was set explicitly to {}, {}'.format(
+            self.id, build_id, self._build.get('nvr', '<unknown NVR>')
+        ))
+
     # pylint: disable=too-many-arguments
-    def __init__(self, details, task_id, module, logger=None, wait_timeout=None):
+    def __init__(self, details, task_id, module, logger=None, wait_timeout=None, build_id=None):
         self._check_required_instance_keys(details)
 
         self.logger = logger or Logging.get_logger()
@@ -119,6 +159,8 @@ class KojiTask(object):
         # wait for task to be in CLOSED state
         # note that this can take some amount of time after it becomes non-waiting
         wait('waiting for task to be closed', self._check_closed_task, timeout=wait_timeout)
+
+        self._assign_build(build_id)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.id)
@@ -242,6 +284,7 @@ class KojiTask(object):
 
     @cached_property
     def _build(self):
+        # pylint: disable=method-hidden
         """
         Build info as returned by API, or ``None`` for scratch builds.
 
@@ -464,7 +507,7 @@ class KojiTask(object):
         else:
             build = builds[1] if builds and len(builds) > 1 else None
 
-        return self._module.task_factory(build['task_id']) if build else None
+        return self._module.task_factory(TaskInitializer(task_id=build['task_id'], build_id=None)) if build else None
 
     @cached_property
     def latest(self):
@@ -829,8 +872,11 @@ class BrewTask(KojiTask):
             raise GlueError('instance details do not contain all required keys')
 
     # pylint: disable=too-many-arguments
-    def __init__(self, details, task_id, module, logger=None, wait_timeout=None):
-        super(BrewTask, self).__init__(details, task_id, module, logger, wait_timeout)
+    def __init__(self, details, task_id, module, logger=None, wait_timeout=None, build_id=None):
+        super(BrewTask, self).__init__(details, task_id, module,
+                                       logger=logger,
+                                       wait_timeout=wait_timeout,
+                                       build_id=build_id)
 
         self.automation_user_ids = details['automation_user_ids']
         self.dist_git_commit_urls = details['dist_git_commit_urls']
@@ -839,12 +885,15 @@ class BrewTask(KojiTask):
             if not self._result:
                 raise GlueError('Container task {} does not have a result'.format(self.id))
 
-            if 'koji_builds' not in self._result or not self._result['koji_builds']:
-                self.warn('Container task {} does not have a build assigned'.format(self.id))
+            # Try to assign build for container task only when there was no build ID specified.
+            # If `build_id` is set, we already have a build, specified explicitly by the caller.
 
-            else:
-                self._build = self.session.getBuild(int(self._result['koji_builds'][0]))
-                log_dict(self.debug, 'build for task ID {}'.format(self.id), self._build)
+            if build_id is None:
+                if 'koji_builds' not in self._result or not self._result['koji_builds']:
+                    self.warn('Container task {} does not have a build assigned'.format(self.id))
+
+                else:
+                    self._assign_build(int(self._result['koji_builds'][0]))
 
     @cached_property
     def is_build_container_task(self):
@@ -1423,7 +1472,7 @@ class Koji(gluetool.Module):
 
         return gluetool.utils.load_yaml(self.option('complete-arch-map'))
 
-    def task_factory(self, task_id, wait_timeout=None, details=None, task_class=None):
+    def task_factory(self, task_initializer, wait_timeout=None, details=None, task_class=None):
         task_class = task_class or KojiTask
 
         details = dict_update({
@@ -1433,7 +1482,10 @@ class Koji(gluetool.Module):
             'web_url': self.option('web-url'),
         }, details or {})
 
-        task = task_class(details, task_id, self, logger=self.logger, wait_timeout=wait_timeout)
+        task = task_class(details, task_initializer.task_id, self,
+                          logger=self.logger,
+                          wait_timeout=wait_timeout,
+                          build_id=task_initializer.build_id)
 
         return task
 
@@ -1460,28 +1512,43 @@ class Koji(gluetool.Module):
 
         return builds
 
-    def _find_task_ids(self, task_ids=None, build_ids=None, nvrs=None, names=None):
+    def _find_task_initializers(self,
+                                task_initializers=None,
+                                task_ids=None,
+                                build_ids=None,
+                                nvrs=None,
+                                names=None):
+        # pylint: disable=too-many-arguments
         """
         Tries to gather all available task IDs for different given inputs - build IDs, NVRs, package names
         and actual task IDs as well. Some of these may be unknown to the backend, some of them may not lead
         to a task ID. This helper method will find as many task IDs as possible.
 
+        :param list(TaskInitializer) task_initializers: if set, it is a list of already found tasks. New ones
+            are added to this list.
         :param list(int) task_ids: Task IDs
         :param list(int) build_ids: Build IDs.
-        :param list(str) nvr: Package NVRs.
+        :param list(str) nvrs: Package NVRs.
         :param list(str) names: Package names. The latest build with a tag - given via module's ``--tag``
             option - is the possible solution.
-        :rtype: list(int)
-        :return: Gathered task IDs.
+        :rtype: list(TaskInitializer)
+        :return: Gathered task initializers.
         """
 
-        log_dict(self.debug, 'find task IDs - from task IDs', task_ids)
-        log_dict(self.debug, 'find task IDs - from build IDs', build_ids)
-        log_dict(self.debug, 'find task IDs - from NVRs', nvrs)
-        log_dict(self.debug, 'find task IDs - from names', names)
+        log_dict(self.debug, '[find task initializers] task initializers', task_initializers)
+        log_dict(self.debug, '[find task initializers] from task IDs', task_ids)
+        log_dict(self.debug, '[find task initializers] from build IDs', build_ids)
+        log_dict(self.debug, '[find task initializers] from NVRs', nvrs)
+        log_dict(self.debug, '[find task initializers] from names', names)
 
-        # Task IDs are easy - just use them as an initial value of the list we want to return.
+        task_initializers = task_initializers or []
+
+        # Task IDs are easy.
         task_ids = task_ids or []
+
+        task_initializers += [
+            TaskInitializer(task_id=task_id, build_id=None) for task_id in task_ids
+        ]
 
         # Other options represent builds, and from those builds we must extract their tasks. First, let's find
         # all those builds.
@@ -1497,12 +1564,16 @@ class Koji(gluetool.Module):
         # Now extract task IDs.
         for build in builds:
             if 'task_id' not in build or not build['task_id']:
-                log_dict(self.debug, 'Build does not provide build ID', build)
+                log_dict(self.debug, '[find task initializers] build does not provide task ID', build)
                 continue
 
-            task_ids.append(build['task_id'])
+            task_initializers.append(
+                TaskInitializer(task_id=int(build['task_id']), build_id=int(build['build_id']))
+            )
 
-        return [int(task_id) for task_id in task_ids]
+        log_dict(self.debug, '[find task initializers] found initializers', task_initializers)
+
+        return task_initializers
 
     def koji_session(self):
         return self._session
@@ -1511,7 +1582,8 @@ class Koji(gluetool.Module):
         if not self._tasks:
             self.warn('No tasks specified.', sentry=True)
 
-    def tasks(self, task_ids=None, build_ids=None, nvrs=None, names=None, **kwargs):
+    def tasks(self, task_initializers=None, task_ids=None, build_ids=None, nvrs=None, names=None, **kwargs):
+        # pylint: disable=too-many-arguments
         """
         Returns a list of current tasks. If options are specified, new set of tasks is created using
         the provided options to find all available tasks, and this set becomes new set of current tasks,
@@ -1519,6 +1591,7 @@ class Koji(gluetool.Module):
 
         Method either returns non-empty list of tasks, or raises an exception
 
+        :param list(TaskInitializer) task_initializers: Task initializers.
         :param list(int) task_ids: Task IDs
         :param list(int) build_ids: Build IDs.
         :param list(str) nvr: Package NVRs.
@@ -1532,10 +1605,19 @@ class Koji(gluetool.Module):
 
         # Re-initialize set of current tasks only when any of the options is set.
         # Otherwise leave it untouched.
-        if any([task_ids, build_ids, nvrs, names]):
+        task_initializers = task_initializers or []
+
+        if any([task_initializers, task_ids, build_ids, nvrs, names]):
+            task_initializers = self._find_task_initializers(
+                task_initializers=task_initializers,
+                task_ids=task_ids,
+                build_ids=build_ids,
+                nvrs=nvrs, names=names
+            )
+
             self._tasks = [
-                self.task_factory(task_id, **kwargs)
-                for task_id in self._find_task_ids(task_ids=task_ids, build_ids=build_ids, nvrs=nvrs, names=names)
+                self.task_factory(task_initializer, **kwargs)
+                for task_initializer in task_initializers
             ]
 
         self._assert_tasks()
@@ -1622,13 +1704,15 @@ class Koji(gluetool.Module):
         version = self._session.getAPIVersion()
         self.info('connected to {} instance \'{}\' API version {}'.format(self.unique_name, url, version))
 
-        task_ids = self._find_task_ids(task_ids=self.option('task-id'),
-                                       build_ids=self.option('build-id'),
-                                       nvrs=normalize_multistring_option(self.option('nvr')),
-                                       names=normalize_multistring_option(self.option('name')))
+        task_initializers = self._find_task_initializers(
+            task_ids=self.option('task-id'),
+            build_ids=self.option('build-id'),
+            nvrs=normalize_multistring_option(self.option('nvr')),
+            names=normalize_multistring_option(self.option('name'))
+        )
 
-        if task_ids:
-            self.tasks(task_ids=task_ids, wait_timeout=wait_timeout)
+        if task_initializers:
+            self.tasks(task_initializers=task_initializers, wait_timeout=wait_timeout)
 
         for task in self._tasks:
             self.info('Initialized with {}: {} ({})'.format(task.id, task.full_name, task.url))
@@ -1670,7 +1754,7 @@ class Brew(Koji, (gluetool.Module)):
         'automation-user-ids', 'dist-git-commit-urls', 'docker-image-url-template'
     ]
 
-    def task_factory(self, task_id, wait_timeout=None, details=None, task_class=None):
+    def task_factory(self, task_initializer, wait_timeout=None, details=None, task_class=None):
         # options checker does not handle multiple modules in the same file correctly, therefore it
         # raises "false" negative for the following use of parent's class options
         # pylint: disable=gluetool-unknown-option
@@ -1679,5 +1763,71 @@ class Brew(Koji, (gluetool.Module)):
             'dist_git_commit_urls': [url.strip() for url in self.option('dist-git-commit-urls').split(',')]
         }, details or {})
 
-        return super(Brew, self).task_factory(task_id, details=details, task_class=BrewTask,
+        return super(Brew, self).task_factory(task_initializer, details=details, task_class=BrewTask,
                                               wait_timeout=wait_timeout)
+
+    def _find_task_initializers(self, task_initializers=None, build_ids=None, **kwargs):
+        # pylint: disable=arguments-differ
+        """
+        Containers integration with Brew is messy.
+
+        Some container builds may not set their ``task_id`` property, instead there's
+        an ``extra.container_koji_task_id`` key. This method tries to extract task ID
+        from such builds.
+
+        If such build is detected, this method creates a task initializer, preserving
+        the build ID. The original ``_find_task_initializers`` is then called to deal
+        with the rest of arguments. Given that this method tries to extract data from
+        builds, extending list of task initializers, it is interested only in a limited
+        set of parameters its original accepts, therefore all remaining keyword arguments
+        are passed to the overriden ``_find_task_initializers``.
+
+        :param list(TaskInitializer) task_initializers: if set, it is a list of already found tasks. New ones
+            are added to this list.
+        :param list(int) build_ids: Build IDs.
+        :rtype: list(int)
+        :return: Gathered task IDs.
+        """
+
+        log_dict(self.debug, '[find task initializers - brew] task initializers', task_initializers)
+        log_dict(self.debug, '[find task initializers - brew] from build IDs', build_ids)
+        log_dict(self.debug, '[find task initializers - brew] other params', kwargs)
+
+        task_initializers = task_initializers or []
+        build_ids = build_ids or []
+
+        # Just like the original, fetch builds for given build IDs
+        builds = self._objects_to_builds('build', build_ids,
+                                         lambda build_id: [self._session.getBuild(build_id)])
+
+        # Check each build - if it does have task_id, it passes through. If it does not have task_id,
+        # but it does have extras.container_koji_task_id, we create an initializer (with the correct
+        # task and build IDs), but we drop the build from list of builds we were given - we don't
+        # want it there anymore because it was already converted to a task initializer.
+        #
+        # If there's no task ID at all, just let the build pass through, our parent will deal with
+        # it somehow, we don't have to care.
+        cleansed_build_ids = []
+
+        for build_id, build in zip(build_ids, builds):
+            if 'task_id' in build and build['task_id']:
+                cleansed_build_ids.append(build_id)
+                continue
+
+            if 'extra' not in build or not 'container_koji_task_id':
+                cleansed_build_ids.append(build_id)
+                continue
+
+            log_dict(self.debug, 'build provides container koji task ID', build)
+
+            task_initializers.append(
+                TaskInitializer(task_id=int(build['extra']['container_koji_task_id']), build_id=int(build_id))
+            )
+
+        log_dict(self.debug, '[find task initializers - brew] found task initializers', task_initializers)
+
+        return super(Brew, self)._find_task_initializers(
+            task_initializers=task_initializers,
+            build_ids=cleansed_build_ids,
+            **kwargs
+        )
