@@ -27,6 +27,8 @@ class Notes(gluetool.Module):
     name = 'notes'
     description = 'Store various notes and warnings, gahthered by other modules.'
 
+    supported_dryrun_level = gluetool.glue.DryRunLevels.ISOLATED
+
     shared_functions = ('add_note',)
 
     def __init__(self, *args, **kwargs):
