@@ -2,6 +2,7 @@ import os
 import shlex
 import gluetool
 from gluetool.utils import Command
+from gluetool_modules.libs.brew_build_fail import run_command
 
 
 class PagureSRPM(gluetool.Module):
@@ -40,7 +41,11 @@ class PagureSRPM(gluetool.Module):
             pull_request.project.clone_url
         ]
         clone_cmd.extend(shlex.split(self.option('git-clone-options')))
-        Command(clone_cmd, logger=self.logger).run()
+        run_command(
+            self,
+            Command(clone_cmd, logger=self.logger),
+            'Clone git repository'
+        )
 
         os.chdir(pull_request.project.name)
 
@@ -48,11 +53,19 @@ class PagureSRPM(gluetool.Module):
 
         fetch_cmd = ['git', 'fetch', 'origin', 'refs/pull/{}/head'.format(pr_id)]
         fetch_cmd.extend(shlex.split(self.option('git-fetch-options')))
-        Command(fetch_cmd, logger=self.logger).run()
+        run_command(
+            self,
+            Command(fetch_cmd, logger=self.logger),
+            'Fetch pull request changes'
+        )
 
         merge_cmd = ['git', 'merge', 'FETCH_HEAD', '-m', 'ci pr merge']
         merge_cmd.extend(shlex.split(self.option('git-merge-options')))
-        Command(merge_cmd, logger=self.logger).run(inspect=True)
+        run_command(
+            self,
+            Command(merge_cmd, logger=self.logger),
+            'merge pull request changes'
+        )
 
         last_comment_id = pull_request.comments[-1]['id'] if pull_request.comments else 0
 
@@ -66,8 +79,12 @@ class PagureSRPM(gluetool.Module):
                 line = line.replace('%{?dist}', '%{{?dist}}.pr.{}.c.{}'.format(pull_request.uid, last_comment_id))
                 outfile.writelines(line)
 
-        command = ['rhpkg', 'srpm']
-        output = Command(command).run()
+        rhpkg_cmd = ['rhpkg', 'srpm']
+        output = run_command(
+            self,
+            Command(rhpkg_cmd, logger=self.logger),
+            'Make srpm'
+        )
 
         src_rpm_name = output.stdout.split('/')[-1].strip()
 

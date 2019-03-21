@@ -2,12 +2,19 @@ import re
 import libci.results
 import gluetool
 from gluetool.utils import Command, normalize_multistring_option
+import gluetool_modules.libs
+from gluetool_modules.libs.brew_build_fail import run_command
 
 
-class BuildTestResult(libci.results.TestResult):
+class BrewBuildTestResult(libci.results.TestResult):
 
-    def __init__(self, glue, overall_result, **kwargs):
-        super(BuildTestResult, self).__init__(glue, 'functional', overall_result, **kwargs)
+    # pylint: disable=too-many-arguments
+    def __init__(self, glue, overall_result, build_url, comment, process_output, **kwargs):
+        super(BrewBuildTestResult, self).__init__(glue, 'brew-build', overall_result, **kwargs)
+
+        self.build_url = build_url
+        self.comment = comment
+        self.process_output = process_output
 
 
 class BrewBuilder(gluetool.Module):
@@ -23,7 +30,15 @@ class BrewBuilder(gluetool.Module):
         },
     }
 
-    def execute(self):
+    def report_result(self, result, build_url=None, exception=None):
+        self.info('Result of testing: {}'.format(result))
+
+        comment = exception.message if exception else None
+        process_output = exception.output if exception else None
+
+        libci.results.publish_result(self, BrewBuildTestResult, result, build_url, comment, process_output)
+
+    def _make_brew_build(self):
         self.require_shared('src_rpm')
 
         src_rpm_name = self.shared('src_rpm')
@@ -57,12 +72,21 @@ class BrewBuilder(gluetool.Module):
         self.info('Waiting for brew to finish task: {0}'.format(task_url))
 
         # wait until brew task finish
-        command = ['brew', 'watch-task', task_id]
-        output = Command(command).run(inspect=True)
+        brew_watch_cmd = ['brew', 'watch-task', task_id]
 
-        if output.exit_code == 0:
-            result = 'PASS'
-        else:
-            result = 'FAIL'
+        run_command(
+            self,
+            Command(brew_watch_cmd),
+            'Wait for brew build finish'
+        )
 
-        libci.results.publish_result(self, BuildTestResult, result)
+        return task_url
+
+    def execute(self):
+        try:
+            brew_task_url = self._make_brew_build()
+        except gluetool_modules.libs.brew_build_fail.BrewBuildFailedError as exc:
+            self.report_result('FAIL', exception=exc)
+            return
+
+        self.report_result('PASS', build_url=brew_task_url)
