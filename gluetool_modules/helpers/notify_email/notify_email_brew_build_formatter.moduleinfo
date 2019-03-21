@@ -1,0 +1,4 @@
+---
+
+name: notify-email-brew-build-formatter
+description: Notification module - e-mail formatting of Brew build results
