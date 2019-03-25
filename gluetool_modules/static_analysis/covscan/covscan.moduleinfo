@@ -37,14 +37,14 @@ dependencies:
       replace:
         dest: "{{ SPECFILE }}"
         regexp: "^# TASK: INSTALL-START"
-        replace: "# TASK: INSTALL-START\n\n# added by 'covscan' module\nexport PYCURL_SSL_LIBRARY=nss\n"
+        replace: "# TASK: INSTALL-START\n\n# added by 'covscan' module\n%{?fc26:export PYCURL_SSL_LIBRARY=nss}\n%{?fc29:export PYCURL_SSL_LIBRARY=openssl}"
       when: BUILDING_SPECFILE is defined
 
     - name: "%post: install pycurl with the correct backend"
       replace:
         dest: "{{ SPECFILE }}"
         regexp: "^# TASK: POST-START"
-        replace: "# TASK: POST-START\n\n# added by 'covscan' module\nexport PYCURL_SSL_LIBRARY=nss\n"
+        replace: "# TASK: POST-START\n\n# added by 'covscan' module\n%{?fc26:export PYCURL_SSL_LIBRARY=nss}\n%{?fc29:export PYCURL_SSL_LIBRARY=openssl}"
       when: BUILDING_SPECFILE is defined
 
     # when running citool/gluetool directly, without activating the virtualenv, just adding an export into activate

@@ -29,6 +29,15 @@ dependencies:
     - python-dateutil==2.6.1
 
   ansible_tasks:
+    - name: "Requires: pykickstart because of qa-tools-workstation"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^Requires: /usr/lib/python2.7/site-packages/pykickstart"
+        line: "# added by 'beaker' module\nRequires: /usr/lib/python2.7/site-packages/pykickstart\n"
+        state: present
+        insertbefore: "^# TASK: GLOBAL-BEFORE-DESCRIPTION"
+      when: BUILDING_SPECFILE is defined
+
     - name: "Requires: krb5-devel because of krb5.h"
       lineinfile:
         dest: "{{ SPECFILE }}"
