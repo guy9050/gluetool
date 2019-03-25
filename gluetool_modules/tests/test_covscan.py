@@ -141,7 +141,7 @@ def run(result, log, module, monkeypatch, tmpdir):
     mocked_task = MagicMock(target=target,
                             component=component_name,
                             srcrpm_url='dummy_target.src.rpm',
-                            latest_released=mocked_baseline)
+                            latest_released=MagicMock(return_value=mocked_baseline))
 
     # _, module = module
     module._config['target_pattern'] = enabled_target
@@ -246,7 +246,7 @@ def test_invalid_json(monkeypatch, tmpdir):
 def test_no_baseline(module):
     _, module = module
 
-    module.task = MagicMock(latest_released=None)
+    module.task = MagicMock(latest_released=MagicMock(return_value=None))
 
     with pytest.raises(NoCovscanBaselineFoundError):
         module.scan()

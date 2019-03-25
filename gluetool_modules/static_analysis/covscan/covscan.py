@@ -250,7 +250,7 @@ class CICovscan(gluetool.Module):
 
         if not covscan_result:
             target = self.task
-            baseline = self.task.latest_released
+            baseline = self.task.latest_released()
 
             if not baseline:
                 raise NoCovscanBaselineFoundError()

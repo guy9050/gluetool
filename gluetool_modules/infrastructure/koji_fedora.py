@@ -442,35 +442,51 @@ class KojiTask(object):
 
         return "{}/taskinfo?taskID={}".format(self.web_url, self.id)
 
-    @cached_property
-    def latest_released(self):
+    def latest_released(self, tag=None):
         """
-        Returns task of the latest released package with the same destination tag as returned by API,
-        or ``None`` if none found.
+        Returns task of the latest released package with the same build target or ``None`` if none found.
+
+        In case the released package is the same as this build, the previous relased is returned.
+
+        The tag for checking the latest package can be overriden with the tag parameter.
 
         :rtype: :py:class:`KojiTask`
         """
-        if self.destination_tag:
-            builds = self.session.listTagged(self.destination_tag, None, True, latest=2, package=self.component)
-        else:
-            builds = self.session.listTagged(self.target, None, True, latest=2, package=self.component)
+        tag = tag or self.target
 
+        builds = self.session.listTagged(tag, None, True, latest=2, package=self.component)
+
+        if not builds:
+            self.debug("no latest builds found for package '{}' on tag '{}'".format(self.component, tag))
+            return None
+
+        # for scratch builds the latest released package is the latest tagged
         if self.scratch:
-            build = builds[0] if builds else None
+            build = builds[0]
+
+        # for non scratch we return the latest released package, in case it is the same, the previously
+        # released package
         else:
-            build = builds[1] if builds and len(builds) > 1 else None
+            if self.nvr != builds[0]['nvr']:
+                build = builds[0]
+            else:
+                build = builds[1] if len(builds) > 1 else None
 
         return self._module.task_factory(TaskInitializer(task_id=build['task_id'], build_id=None)) if build else None
 
     @cached_property
     def latest(self):
         """
-        NVR of the latest released package with the same destination tag, or ``None`` if none found.
+        NVR of the latest released package with the same build target, or ``None`` if none found.
+
+        In case the latest package is the same as this task, the previosly released package's NVR is returned.
 
         :rtype: str
         """
 
-        return self.latest_released.nvr if self.latest_released else None
+        latest_released = self.latest_released()
+
+        return latest_released.nvr if latest_released else None
 
     @cached_property
     def branch(self):
