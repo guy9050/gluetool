@@ -16,6 +16,15 @@ from libci.results import TestResult, publish_result
 REQUIRED_CMDS = ['covscan']
 
 
+def _unlink(filepath):
+    try:
+        os.unlink(filepath)
+
+    # pylint: disable=broad-except
+    except Exception as exc:
+        raise GlueError('Unable to remove {}: {}'.format(filepath, exc))
+
+
 class CovscanFailedError(SoftGlueError):
     def __init__(self, url):
         super(CovscanFailedError, self).__init__('Covscan testing failed, task did not pass')
@@ -192,7 +201,7 @@ class CICovscan(gluetool.Module):
             with open(task_id_filename, 'r') as task_id_file:
                 covscan_task_id = int(task_id_file.readline())
         finally:
-            os.unlink(task_id_filename)
+            _unlink(task_id_filename)
         return CovscanResult(self, covscan_task_id)
 
     def scan(self):
@@ -238,8 +247,9 @@ class CICovscan(gluetool.Module):
                 covscan_result = self.version_diff_build(target_srpm, baseline_srpm, target_config, baseline_config)
             finally:
                 self.debug('Removing the downloaded source RPM')
-                os.unlink(target_srpm)
-                os.unlink(baseline_srpm)
+
+                _unlink(target_srpm)
+                _unlink(baseline_srpm)
 
         self.info('Covscan task url: {0}'.format(covscan_result.url))
 
