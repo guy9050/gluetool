@@ -4,7 +4,7 @@ import libci.dispatch_job
 
 class BrewBuildJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     """
-    Jenkins job module dispatching brew build, as defined in ``ci-pagure-brew-build.yaml`` file.
+    Jenkins job module dispatching brew build, as defined in ``ci-test-pagure-brew_build.yaml`` file.
 
     .. note::
 
@@ -13,6 +13,6 @@ class BrewBuildJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     """
 
     name = 'pagure-brew-build-job'
-    description = 'Create and run pagure-brew-build job'
+    description = 'Create and run ci-test-pagure-brew_build job'
 
-    job_name = 'ci-pagure-brew-build'
+    job_name = 'ci-test-pagure-brew_build'
