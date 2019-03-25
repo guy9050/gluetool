@@ -804,7 +804,7 @@ class BrewTask(KojiTask):
         ``url`` - a base URL for the koji instance
         ``pkgs_url`` - a base URL for the packages location
 
-`   This class extends :py:class:`KojiTask` with Brew only features.
+    This class extends :py:class:`KojiTask` with Brew only features.
 
     :param dict instance: Instance details, see ``required_instance_keys``
     :param int task_id: Initialize from given TaskID
