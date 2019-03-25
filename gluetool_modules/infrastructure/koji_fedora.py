@@ -8,7 +8,7 @@ import koji
 import requests.exceptions
 
 from bs4 import BeautifulSoup
-from rpmUtils.miscutils import splitFilename
+from rpmUtils.miscutils import compareEVR, splitFilename
 
 import gluetool
 from gluetool import GlueError, SoftGlueError
@@ -791,6 +791,28 @@ class KojiTask(object):
         """
 
         return self.component
+
+    def compare_nvr(self, nvr):
+        """
+        Do an NVR comparison with given nvr.
+
+        :rtype: int
+        :returns: 0 if NVRs are same, 1 if artifact has higher version, -1 if artifact has lower version
+        """
+
+        if not nvr:
+            return 1
+
+        try:
+            (name, version, release) = re.match(r'(.*)-(.*)-(.*)', nvr).groups()
+        except AttributeError:
+            raise GlueError("nvr '{}' seems to be invalid".format(nvr))
+
+        return compareEVR((self.component, self.version, self.release), (name, version, release))
+
+    @cached_property
+    def is_newer_than_latest(self):
+        return self.compare_nvr(self.latest) > 0
 
 
 class BrewTask(KojiTask):
