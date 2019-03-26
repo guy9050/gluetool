@@ -493,7 +493,7 @@ class TestBatchPlanner(gluetool.Module):
 
         # Construct URL to the dist-git repository of the component
         repository = self.shared('dist_git_repository')
-        sti_url = '{}/blob/{}/f/tests'.format(repository.url, repository.branch)
+        sti_url = '{}/blob/{}/f/tests'.format(repository.web_url, repository.branch)
 
         # Note that we currently support only Openstack
         with requests() as request:
