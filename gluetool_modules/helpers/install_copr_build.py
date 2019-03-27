@@ -115,7 +115,7 @@ class InstallCoprBuild(gluetool.Module):
 
         sut_installation = SUTInstallation(self.option('log-dir-name'), primary_task)
 
-        sut_installation.add_step('Download copr repository', 'curl {} --output /etc/yum.repos.d/copr_build.repo',
+        sut_installation.add_step('Download copr repository', 'curl -v {} --output /etc/yum.repos.d/copr_build.repo',
                                   primary_task.repo_url, False)
 
         # reinstall command has to be called for each rpm separately, hence list of rpms is used

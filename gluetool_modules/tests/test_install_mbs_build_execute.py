@@ -143,7 +143,7 @@ def test_guest_setup(module, monkeypatch):
     calls = []
 
     for _ in guests:
-        calls.append(call('curl {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)))
+        calls.append(call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)))
         calls.append(call('yum module enable -y {}'.format(NSVC)))
         calls.append(call('yum module install -y {}'.format(NSVC)))
 
@@ -183,7 +183,7 @@ def test_use_devel_module(module, monkeypatch):
     calls = []
 
     for _ in guests:
-        calls.append(call('curl {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)))
+        calls.append(call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)))
         calls.append(call('yum module enable -y {}'.format(NSVC_DEVEL)))
         calls.append(call('yum module install -y {}'.format(NSVC_DEVEL)))
 
@@ -228,7 +228,7 @@ def test_workarounds(module, monkeypatch):
     for _ in guests:
         calls.append(call('workaround command'))
         calls.append(call('other workaround command'))
-        calls.append(call('curl {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)))
+        calls.append(call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)))
         calls.append(call('yum module enable -y {}'.format(NSVC)))
         calls.append(call('yum module install -y {}'.format(NSVC)))
 

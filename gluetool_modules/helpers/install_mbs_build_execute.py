@@ -112,7 +112,7 @@ class InstallMBSBuild(gluetool.Module):
                     guest.debug('Executing "{} on {}"'.format(cmd, guest))
                     guest.execute(cmd)
 
-                guest.execute('curl {} --output /etc/yum.repos.d/mbs_build.repo'.format(repo_url))
+                guest.execute('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(repo_url))
                 guest.execute('yum module enable -y {}'.format(nsvc))
                 guest.execute('yum module install -y {}'.format(nsvc))
 

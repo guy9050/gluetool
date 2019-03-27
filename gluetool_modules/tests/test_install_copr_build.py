@@ -88,7 +88,7 @@ def test_setup_guest(module_shared_patched):
     calls = []
 
     for _ in guests:
-        calls.append(call('curl dummy_repo_url --output /etc/yum.repos.d/copr_build.repo'))
+        calls.append(call('curl -v dummy_repo_url --output /etc/yum.repos.d/copr_build.repo'))
         calls.append(call('yum -y reinstall dummy_rpm_url1'))
         calls.append(call('yum -y reinstall dummy_rpm_url2'))
         calls.append(call('yum -y downgrade dummy_rpm_url1 dummy_rpm_url2'))
@@ -117,7 +117,7 @@ def test_no_yum(module_shared_patched):
     calls = []
 
     for _ in guests:
-        calls.append(call('curl dummy_repo_url --output /etc/yum.repos.d/copr_build.repo'))
+        calls.append(call('curl -v dummy_repo_url --output /etc/yum.repos.d/copr_build.repo'))
         calls.append(call('dnf -y reinstall dummy_rpm_url1'))
         calls.append(call('dnf -y reinstall dummy_rpm_url2'))
         calls.append(call('dnf -y downgrade dummy_rpm_url1 dummy_rpm_url2'))
