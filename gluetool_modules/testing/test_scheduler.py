@@ -342,7 +342,7 @@ class TestScheduler(gluetool.Module):
     def execute(self):
         # type: () -> None
 
-        self.require_shared('primary_task', 'tasks', 'restraint', 'create_test_schedule')
+        self.require_shared('primary_task', 'tasks', 'create_test_schedule')
 
         # Check whether we have *any* artifacts at all, before we move on to more fine-grained checks.
         gluetool_modules.libs.artifacts.has_artifacts(*self.shared('tasks'))
