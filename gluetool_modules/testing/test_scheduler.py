@@ -347,32 +347,48 @@ class TestScheduler(gluetool.Module):
         # Check whether we have *any* artifacts at all, before we move on to more fine-grained checks.
         gluetool_modules.libs.artifacts.has_artifacts(*self.shared('tasks'))
 
+        # One day, all that arch constraint "guessing" would move into `guess-environment` (or similar module)
+        # who would be responsible for generating testing environments transparently for all arches and provisioners.
+
         # To create a schedule, we need to set up few constraints. So far the only known is the list of architectures
         # we'd like to see being used. For that, we match architectures present in the artifact with a list of
         # architectures provisioner can provide, and we find out what architectures we need (or cannot get...).
         # And, for example, whether there's anything left to test.
-        artifact_arches = self.shared('primary_task').task_arches.arches
+        #
+        # We need to account for architectures that are not support but which may be compatible with a supported
+        # architecture as well.
+
+        # These are arches which we'd use to constraint the schedule - we're going to add to this list later...
+        constraint_arches = []  # type: List[str]
 
         provisioner_capabilities = self.shared('provisioner_capabilities')
         log_dict(self.debug, 'provisioner capabilities', provisioner_capabilities)
 
-        supported_arches = provisioner_capabilities.available_arches if provisioner_capabilities else []
-
+        # ... these are arches available in the artifact...
+        artifact_arches = self.shared('primary_task').task_arches.arches
         log_dict(self.debug, 'artifact arches', artifact_arches)
+
+        # ... these are *valid* artifact arches - those supported by the provisioner...
+        valid_arches = []  # type: List[str]
+
+        # ... and these are arches supported by the provisioner.
+        supported_arches = provisioner_capabilities.available_arches if provisioner_capabilities else []
         log_dict(self.debug, 'supported arches', supported_arches)
 
         # When provisioner's so bold that it supports *any* architecture, give him every architecture present
         # in the artifact, and watch it burn :)
+        # Note that when the only artifact arch is `noarch`, it gets removed from constraints later, we have
+        # an extra step dealing with `noarch`. because obviously we can't get `noarch` guest from provisioner.
         if supported_arches is ANY:
             valid_arches = artifact_arches
+            constraint_arches = artifact_arches
 
         else:
-            valid_arches = []
-
             for arch in artifact_arches:
                 # artifact arch is supported directly
                 if arch in supported_arches:
                     valid_arches.append(arch)
+                    constraint_arches.append(arch)
                     continue
 
                 # It may be possible to find compatible architecture, e.g. it may be fine to test
@@ -386,8 +402,11 @@ class TestScheduler(gluetool.Module):
                     compatible_arch for compatible_arch in compatible_arches if compatible_arch in supported_arches
                 ]
 
-                # If there are any compatible & supported, add the original `arch` to the list of valid arches,
-                # because we can test it.
+                # If there are any compatible & supported, add the original arch to the list of valid arches,
+                # because we *can* test it, but use the compatible arches for constraints - we cannot ask
+                # provisioner (yet) to provide use the original arch, because it already explicitely said
+                # "not supported". We can test artifacts of this archtiecture, but using other arches as
+                # the environment.
                 if compatible_and_supported_arches:
                     # Warning, because nothing else submits to Sentry, and Sentry because
                     # problem of secondary arches doesn't fit well with nice progress of
@@ -395,19 +414,21 @@ class TestScheduler(gluetool.Module):
                     # this feature, without grepping all existing logs :/ If it's being
                     # used frequently, we can always silence the Sentry submission.
 
-                    self.warn('Artifact arch {} not supported but compatible with {}'.format(
+                    self.warn("Artifact arch '{}' not supported but compatible with '{}'".format(
                         arch, ', '.join(compatible_and_supported_arches)
                     ), sentry=True)
 
                     valid_arches.append(arch)
+                    constraint_arches += compatible_and_supported_arches
 
         log_dict(self.debug, 'valid artifact arches', valid_arches)
+        log_dict(self.debug, 'constraint arches', constraint_arches)
 
         if not valid_arches:
             raise NoTestableArtifactsError(self.shared('primary_task'), supported_arches)
 
         # `noarch` is supported naturally on all other arches, so, when we encounter an artifact with just
-        # the `noarch`, we "reset" the list of valid arches to let scheduler plugin know we'd like to get all
+        # the `noarch`, we "reset" the list of constraints to let scheduler plugin know we'd like to get all
         # arches possible. But we have to be careful and take into account what provisioner told us about itself,
         # because we could mislead the scheduler plugin into thinking that every architecture is valid - if
         # provisioner doesn't support "ANY" arch, we have to prepare constraints just for the supported arches.
@@ -418,26 +439,37 @@ class TestScheduler(gluetool.Module):
             # If provisioner boldly promised anything was possible, empty list of valid arches would result
             # into us not placing any constraints on the environments, and we should get really everything.
             if supported_arches is ANY:
-                valid_arches = []
+                constraint_arches = []
 
             # On the other hand, if provisioner can support just a limited set of arches, don't be greedy.
             else:
-                valid_arches = supported_arches
+                constraint_arches = supported_arches
 
-        # When `noarch` is not the single valid arch, we should remove it from the list - provisioners cannot
-        # give us `noarch` guests, and we somehow silently expect testing process to test `noarch` packages as well
-        # when testing "arch" packages on given guests. Or they don't, but that fine as well - from our point
-        # of view - they *could*, that's all that matter to us. We want to keep other arch constraints, however.
+        # When `noarch` is not the single valid arch, other arches dictate what constraints should we use.
+        # Imagine an arch-specific "main" RPM, with noarch plugins - we cannot just throw in other supported
+        # arches, because we'd not be able to test the "main" RPM, but thanks to "main" RPM, there should
+        # be - and obviously are - other arches in the list, not just noarch. So, we do nothing, but, out
+        # of curiosity, a warning would be nice to track this - it's a complicated topic, let's not get it
+        # unnoticed, the assumption above might be completely wrong.
         elif 'noarch' in valid_arches:
-            self.debug("'noarch' is not the only valid arch")
+            self.warn(
+                "Artifact has 'noarch' bits side by side with regular bits ({})".format(', '.join(valid_arches)),
+                sentry=True
+            )
 
-            valid_arches.remove('noarch')
+        log_dict(self.debug, 'constraint arches (noarch pruned)', constraint_arches)
 
-        log_dict(self.debug, 'valid artifact arches (no noarch)', valid_arches)
+        # Get rid of duplicities - when we found an unsupported arch, we added all its compatibles to the list.
+        # This would lead to us limiting scheduler to provide arches A, B, C, C, C, ... and so on, because usualy
+        # there's a primary arch A and secondary arch B, which is unsupported, leading to us having A in the list
+        # two times.
+        constraint_arches = list(set(constraint_arches))
+
+        log_dict(self.debug, 'constraint arches (duplicities pruned)', constraint_arches)
 
         # Call plugin to create the schedule
         schedule = self.shared('create_test_schedule', testing_environment_constraints=[
-            TestingEnvironment(arch=arch, compose=TestingEnvironment.ANY) for arch in valid_arches
+            TestingEnvironment(arch=arch, compose=TestingEnvironment.ANY) for arch in constraint_arches
         ])
 
         if not schedule:
