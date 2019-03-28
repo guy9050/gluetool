@@ -1,10 +1,12 @@
 import re
 import shlex
 
+import fmf
+
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.log import format_dict, log_dict
-from gluetool.utils import cached_property, load_yaml, PatternMap
+from gluetool.utils import cached_property, load_yaml, PatternMap, render_template
 
 
 class CommandsError(SoftGlueError):
@@ -66,7 +68,7 @@ class TestBatchPlanner(gluetool.Module):
             'help': 'Comma-separated list of methods (default: none).',
             'metavar': 'METHOD',
             'action': 'append',
-            'choices': ['basic-static-config', 'static-config', 'sti'],
+            'choices': ['basic-static-config', 'ci.fmf', 'static-config', 'sti'],
             'default': []
         },
         'config': {
@@ -82,6 +84,10 @@ class TestBatchPlanner(gluetool.Module):
             'help': 'List of comma-separated pairs <job>:<result type> (default: none).',
             'action': 'append',
             'default': []
+        },
+        'ci-fmf-dispatch-map': {
+            'help': 'Instructions for dispatching test commands based on their ci.fmf configuration.',
+            'metavar': 'FILE'
         }
     }
 
@@ -118,6 +124,13 @@ class TestBatchPlanner(gluetool.Module):
         # type: () -> List[str]
 
         return gluetool.utils.normalize_multistring_option(self.option('config'))
+
+    @cached_property
+    def _ci_fmf_dispatch_map(self):
+        if not self.option('ci-fmf-dispatch-map'):
+            return []
+
+        return load_yaml(self.option('ci-fmf-dispatch-map'), logger=self.logger)
 
     def _reduce_section(self, commands, is_component=True, default_commands=None, all_commands=None):
         # pylint: disable=too-many-statements
@@ -500,6 +513,75 @@ class TestBatchPlanner(gluetool.Module):
 
         return []
 
+    def _plan_by_ci_fmf(self):
+        # type: () -> List[Tuple[str, List[str]]]
+
+        self.require_shared('dist_git_repository')
+
+        distgit_repo = self.shared('dist_git_repository')
+
+        if not distgit_repo.has_ci_config:
+            return []
+
+        task = self.shared('primary_task')
+
+        repo_path = distgit_repo.clone(logger=self.logger)
+
+        ci_config = fmf.Tree(repo_path)
+        ci_config_section = ci_config.find('/ci/test/{}'.format(task.ARTIFACT_NAMESPACE))
+
+        commands = []
+
+        for _, testset in ci_config_section.children.iteritems():
+            discovery = testset.get('discover')
+            execution = testset.get('execute')
+
+            if not discovery or not execution:
+                continue
+
+            dispatch_command = {
+                'options': {}
+            }
+
+            def _dispatch_module(instruction, command, argument, context):
+                # pylint: disable=unused-argument,cell-var-from-loop
+
+                dispatch_command['dispatch-module'] = argument
+
+            def _add_options(instruction, command, argument, context):
+                # pylint: disable=unused-argument,cell-var-from-loop
+
+                dispatch_command['options'].update({
+                    detail: render_template(value, **context) for detail, value in argument.iteritems()
+                })
+
+            context = gluetool.utils.dict_update(
+                self.shared('eval_context'),
+                {
+                    'DISCOVER': discovery,
+                    'EXECUTE': execution
+                }
+            )
+
+            self.shared('evaluate_instructions', self._ci_fmf_dispatch_map, {
+                'dispatch-module': _dispatch_module,
+                'add-options': _add_options
+            }, context=context)
+
+            if 'dispatch-module' not in dispatch_command:
+                self.warn('Cannot handle {}/{}'.format(discovery.get('how', None), execution.get('how', None)))
+                continue
+
+            commands.append((
+                dispatch_command['dispatch-module'],
+                sum([
+                    [option_name, option_value]
+                    for option_name, option_value in dispatch_command['options'].iteritems()
+                ], [])
+            ))
+
+        return commands
+
     def plan_test_batch(self):
         """
         Returns list of modules and their options. These modules implement testing process
@@ -525,17 +607,20 @@ class TestBatchPlanner(gluetool.Module):
         for method in self._methods:
             self.debug("Plan test batch using '{}' method".format(method))
 
-            test_batch += self._planners[method]()
+            method_test_batch = self._planners[method]()
 
-            if not test_batch:
+            if not method_test_batch:
                 self.info("Method '{}' provided no tests, moving on".format(method))
                 continue
+
+            test_batch += method_test_batch
 
         return test_batch
 
     def sanity(self):
         self._planners = {
             'basic-static-config': self._plan_by_basic_static_config,
+            'ci.fmf': self._plan_by_ci_fmf,
             'static-config': self._plan_by_static_config,
             'sti': self._plan_by_sti
         }
