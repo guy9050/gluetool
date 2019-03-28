@@ -29,8 +29,41 @@ class DistGitRepository(gluetool_modules.libs.git.RemoteGitRepository):
         return '<DistGitRepository(package="{}", branch="{}")>'.format(self.package, self.branch)
 
     @cached_property
+    def ci_config_url(self):
+        """
+        URL of CI configuration entry point (``ci.fmf``).
+        """
+
+        # In the future, this must cover greater variety of options - FMF allows multiple
+        # ways how to specify "/ci" node.
+        return '{}/raw/{}/f/ci.fmf'.format(self.web_url, self.ref if self.ref else self.branch)
+
+    @cached_property
     def gating_config_url(self):
         return '{}/raw/{}/f/gating.yaml'.format(self.web_url, self.ref if self.ref else self.branch)
+
+    @cached_property
+    def ci_config(self):
+        """
+        CI configuration.
+
+        .. note::
+
+           Limited to a single file, ``ci.fmf`` - FMF allows different ways how to write such configuration,
+           as of now there's a hard limit on simple ``ci.fmf`` or nothing.
+        """
+
+        with gluetool.utils.requests() as request:
+            response = request.get(self.ci_config_url)
+
+        if response.status_code == 200:
+            self.info('contains CI configuration')
+
+            return response.text
+
+        self.info('does not contain CI configuration')
+
+        return None
 
     @cached_property
     def _gating_config_response(self):
@@ -45,6 +78,14 @@ class DistGitRepository(gluetool_modules.libs.git.RemoteGitRepository):
         self.info("dist-git repository has no gating.yaml '{}'".format(self.gating_config_url))
 
         return None
+
+    @cached_property
+    def has_ci_config(self):
+        """
+        :returns: ``True`` when dist-git repository contains CI configuration, ``False`` otherwise.
+        """
+
+        return bool(self.ci_config)
 
     @cached_property
     def has_gating(self):
