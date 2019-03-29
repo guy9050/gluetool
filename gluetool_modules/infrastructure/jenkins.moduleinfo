@@ -7,3 +7,4 @@ dependencies:
     - jenkinsapi==0.3.8
     - requests==2.19.1
     - requestsexceptions==1.2.0
+    - jq==0.1.6

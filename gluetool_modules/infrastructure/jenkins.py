@@ -4,7 +4,9 @@ import json
 import os
 import urllib
 import urllib2
+import sys
 
+import jq
 from jenkinsapi.jenkins import Jenkins
 from requests.exceptions import RequestException
 
@@ -305,26 +307,64 @@ class CIJenkins(gluetool.Module):
         # In theory, everything is perfectly valid. In real life, the production Jenkins stuggles to even provide
         # a list of builds for the job, and often respond with Proxy Timeouts. Extending timeouts in such conditions
         # makes no sense, it'd simply timeout later - and we're dealing with a reverse proxy, the actual Jenkins
-        # behind it still works on a pointless request whose output wouldn't be seen by anybody. Until we make
-        # Jenkins more responsive, attempts to download params make things worse :/
+        # behind it still works on a pointless request whose output wouldn't be seen by anybody.
+        #
+        # But: we can send request directly to the actual endpoint, without traversing its bunch of other structures
+        # (that's making the API way so slow).
 
-        # pylint: disable=no-self-use
-        return {}
+        try:
+            jenkins_build = self.get_jenkins_build()
 
-        # try:
-        #    jenkins_build = self.get_jenkins_build()
+            if not jenkins_build:
+                return None
 
-        #    if not jenkins_build:
-        #        return None
+            with gluetool.utils.requests() as req:
+                response = req.get('{}/job/{}/{}/api/json?pretty=true'.format(
+                    self.option('url'),
+                    jenkins_build.job.name,
+                    jenkins_build.buildno
+                ))
 
-        #    return jenkins_build.get_params()
+            if response.status_code != 200:
+                # Might be nice to track this condition, alhtough we can manage without the params, hence
+                # not an exception.
+                self.warn('Cannot fetch job info, server responsed with {}'.format(response.status_code), sentry=True)
 
-        # except gluetool.glue.GlueError:
-        #    self.glue.sentry_submit_exception(gluetool.Failure(self, sys.exc_info()), logger=self.logger)
+                return None
 
-        #    self.error('Failed to download the Jenkins build for parameters')
+            build_info = response.json()
 
-        # return None
+            log_dict(self.debug, 'raw build info', build_info)
+
+            query = """
+                  .actions
+                | .[]
+                | select( ._class == "hudson.model.ParametersAction" )
+                | .parameters
+                | .[]
+                | {"name": .name, "value": .value}
+            """
+
+            extracted_params = jq.jq(query).transform(build_info, multiple_output=True)
+
+            log_dict(self.debug, 'extracted build params', extracted_params)
+
+            # We have a list of dicts (name: value), that can be reduced to a single dict with all the params.
+            params = {
+                param['name']: param['value'] for param in extracted_params
+            }
+
+            log_dict(self.debug, 'build params', params)
+
+            return params
+
+        # pylint: disable=broad-except
+        except Exception:
+            self.glue.sentry_submit_exception(gluetool.Failure(self, sys.exc_info()), logger=self.logger)
+
+            self.error('Failed to download the Jenkins build for parameters')
+
+        return None
 
     @property
     def eval_context(self):
