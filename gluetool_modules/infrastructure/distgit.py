@@ -39,8 +39,31 @@ class DistGitRepository(gluetool_modules.libs.git.RemoteGitRepository):
         return '{}/raw/{}/f/ci.fmf'.format(self.web_url, self.ref if self.ref else self.branch)
 
     @cached_property
+    def sti_tests_url(self):
+        """
+        URL of STI tests.
+        """
+
+        # Currently we check only tests/ folder, which should be a pretty solid indication of STI tests.
+        # The STI tests can be tests/tests*.yml, which is a bit hard to check via URL as we would need to parse html.
+        return '{}/blob/{}/f/tests'.format(self.web_url, self.ref if self.ref else self.branch)
+
+    @cached_property
     def gating_config_url(self):
         return '{}/raw/{}/f/gating.yaml'.format(self.web_url, self.ref if self.ref else self.branch)
+
+    def _get_url(self, url, success_message, failure_message):
+        with gluetool.utils.requests() as request:
+            response = request.get(url)
+
+        if response.status_code == 200:
+            self.info(success_message)
+
+            return response.text
+
+        self.info(failure_message)
+
+        return None
 
     @cached_property
     def ci_config(self):
@@ -53,17 +76,15 @@ class DistGitRepository(gluetool_modules.libs.git.RemoteGitRepository):
            as of now there's a hard limit on simple ``ci.fmf`` or nothing.
         """
 
-        with gluetool.utils.requests() as request:
-            response = request.get(self.ci_config_url)
+        return self._get_url(self.ci_config_url, 'contains CI configuration', 'does not contain CI configuration')
 
-        if response.status_code == 200:
-            self.info('contains CI configuration')
+    @cached_property
+    def _sti_tests_folder(self):
+        """
+        STI tests folder, not interesting for the user, so keeping internal.
+        """
 
-            return response.text
-
-        self.info('does not contain CI configuration')
-
-        return None
+        return self._get_url(self.sti_tests_url, 'has STI tests', 'does not have STI tests')
 
     @cached_property
     def _gating_config_response(self):
@@ -86,6 +107,14 @@ class DistGitRepository(gluetool_modules.libs.git.RemoteGitRepository):
         """
 
         return bool(self.ci_config)
+
+    @cached_property
+    def has_sti_tests(self):
+        """
+        :returns: ``True`` when dist-git repository contains Standard Test Interface (STI) tests, ``False`` otherwise.
+        """
+
+        return bool(self._sti_tests_folder)
 
     @cached_property
     def has_gating(self):
