@@ -27,7 +27,7 @@ MBSAbout = collections.namedtuple('MBSAbout', 'api_version, auth_method, version
 
 # regular expressions for nvr and nsvc of a module
 NSVC_REGEX = re.compile(r'^([^:]*):([^:]*):([^:]*):([^:]*)$')
-NVR_REGEX = re.compile(r'^([^-]*)-([^-]*)-([^\.]*)\.(.*)$')
+NVR_REGEX = re.compile(r'^(.*)-([^-]*)-([^\.]*)\.(.*)$')
 
 
 def nsvc_from_string(nsvc):

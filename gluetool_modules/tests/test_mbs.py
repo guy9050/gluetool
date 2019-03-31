@@ -3,7 +3,7 @@ from mock import MagicMock
 
 import gluetool
 import gluetool_modules.infrastructure.mbs
-from gluetool_modules.infrastructure.mbs import MBS, TaskArches
+from gluetool_modules.infrastructure.mbs import MBS, TaskArches, nsvc_from_nvr
 from . import create_module
 
 TARGET = 'module-rhel8'
@@ -195,6 +195,14 @@ def test_shared(module, get):
 def test_mbs_task_invalid_init(module):
     with pytest.raises(gluetool.GlueError, match='module must be initialized only from one of build_id, nsvc or nvr'):
         gluetool_modules.infrastructure.mbs.MBSTask(module, build_id=2178, nvr='nvr')
+
+
+@pytest.mark.parametrize("nvr,nsvc", [
+    ('perl-bootstrap-5.24-2711.cdc', ('perl-bootstrap', '5.24', '2711', 'cdc')),
+    ('perl-bootstrap-5_24-2711.cdc', ('perl-bootstrap', '5-24', '2711', 'cdc'))
+])
+def test_nsvc_from_nvr(nvr, nsvc):
+    assert nsvc_from_nvr(nvr) == nsvc
 
 
 # pylint: disable=unused-argument
