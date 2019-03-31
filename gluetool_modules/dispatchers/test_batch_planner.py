@@ -4,7 +4,7 @@ import shlex
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.log import format_dict, log_dict
-from gluetool.utils import cached_property, load_yaml, PatternMap, requests
+from gluetool.utils import cached_property, load_yaml, PatternMap
 
 
 class CommandsError(SoftGlueError):
@@ -493,15 +493,10 @@ class TestBatchPlanner(gluetool.Module):
 
         # Construct URL to the dist-git repository of the component
         repository = self.shared('dist_git_repository')
-        sti_url = '{}/blob/{}/f/tests'.format(repository.web_url, repository.branch)
 
-        # Note that we currently support only Openstack
-        with requests() as request:
-            if request.get(sti_url).ok:
-                self.info('Found STI tests at following URL: {}'.format(sti_url))
-                return [('openstack-job', ['--job-name', job_name])]
-
-        self.info('No STI tests found at following URL: {}'.format(sti_url))
+        if repository.has_sti_tests:
+            # Note that we currently support only Openstack
+            return [('openstack-job', ['--job-name', job_name])]
 
         return []
 
