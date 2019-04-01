@@ -105,11 +105,23 @@ def test_state_reporter_unknown_options(module_run_module, monkeypatch):
     run_module_mock.assert_called_with(module_name, options)
 
 
-def test_state_reporter_options_from_args(module_run_module, monkeypatch):
+@pytest.mark.parametrize('args', [
+    '--pipeline-state-reporter-options="--test-category dummy_test_category --test-type dummy_test_type"',
+    '--pipeline-state-reporter-options="--test-type dummy_test_type --test-category dummy_test_category"',
+    '--pipeline-state-reporter-options="--test-category=dummy_test_category --test-type=dummy_test_type"',
+    '--pipeline-state-reporter-options="--test-type=dummy_test_type --test-category=dummy_test_category"',
+    '--pipeline-state-reporter-options=--test-category dummy_test_category --test-type dummy_test_type',
+    '--pipeline-state-reporter-options=--test-type dummy_test_type --test-category dummy_test_category',
+    '--pipeline-state-reporter-options=--test-category=dummy_test_category --test-type=dummy_test_type',
+    '--pipeline-state-reporter-options=--test-type=dummy_test_type --test-category=dummy_test_category',
+    '--pipeline-state-reporter-options=--test-category=dummy_test_category --test-type dummy_test_type',
+    '--pipeline-state-reporter-options=--test-category dummy_test_category --test-type=dummy_test_type'
+])
+def test_state_reporter_options_from_args(module_run_module, monkeypatch, args):
     module, run_module_mock = module_run_module
 
     module_name = 'module1'
-    options = ['--pipeline-state-reporter-options="--test-type dummy_test_type --test-category dummy_test_category"']
+    options = [args]
     test_batch = [(module_name, options)]
 
     topic = 'dummy_topic'
