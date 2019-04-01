@@ -3,6 +3,7 @@ import re
 import os
 import shlex
 import shutil
+import stat
 import tempfile
 
 import gluetool
@@ -108,7 +109,11 @@ class Restraint(gluetool.Module):
         port = port or self.option('restraintd-port')
 
         # Make sure restraintd is running and listens for connections
-        guest.execute('service restraintd start')
+        try:
+            guest.execute('service restraintd start')
+
+        except gluetool.GlueCommandError as exc:
+            raise gluetool.GlueError('Failed to start restraintd service: {}'.format(exc.output.stderr))
 
         def _check_restraintd_running():
             try:
@@ -204,7 +209,7 @@ class Restraint(gluetool.Module):
                 shutil.move(output_dir, rename_dir_to)
 
             except Exception as exc:
-                raise gluetool.GlueError('Failed to rename restraitn output directory: {}'.format(exc))
+                raise gluetool.GlueError('Failed to rename restraint output directory: {}'.format(exc))
 
             output_dir = rename_dir_to
 
@@ -213,6 +218,16 @@ class Restraint(gluetool.Module):
         # Construct location - path or URL - of the index.html
         index_location = '{}/index.html'.format(output_dir)
         self.debug("local index location is '{}'".format(index_location))
+
+        # Woraround time! Restraint creates some directories and files, accessible, everything but index.html.
+        # index.html has rw------- permissions.
+        try:
+            # rw-r--r-- should be perfectly fine
+            os.chmod(index_location, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+
+        # pylint: disable=broad-except
+        except Exception as exc:
+            raise gluetool.GlueError('Failed to change permissions of results index: {}'.format(exc))
 
         if self.option('artifacts-location-template'):
             index_location = gluetool.utils.render_template(
