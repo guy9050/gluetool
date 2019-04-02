@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2019-04-02
+----------
+
+Added
+~~~~~
+
+- [covscan] export result to xUnit
+- [dist-git] "has CI config" check
+- [install-copr-build] running curl in verbose mode
+- [koji-fedora] new task methods, ``compare_nvr`` and ``is_newer_than_latest``
+
+Changed
+~~~~~~~
+
+- [pagure-srpm] using ``uid`` instead of ``pr_id`` when constructing SRPM name
+- [sti] refactored to use test-scheduler workflow
+- [test-scheduler] keep separate list of constraitn arches instead of usign valid arches list for constraints
+
+Fixed
+~~~~~
+
+- [mbs] NVR regular expression fixed
+
 
 2019-03-01
 ----------
