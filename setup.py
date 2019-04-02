@@ -103,6 +103,7 @@ CATEGORIES = [
     'dispatchers',
     'helpers', 'helpers/jenkins', 'helpers/notify_email', 'helpers/beaker',
     'infrastructure',
+    'pipelines',
     'provision',
     'static_analysis', 'static_analysis/covscan', 'static_analysis/rpmdiff',
     'testing', 'testing/beaker', 'testing/composetest', 'testing/openstack', 'testing/pull_request_builder'
@@ -196,6 +197,7 @@ if __name__ == '__main__':
                   'static_analysis.covscan',
                   'static_analysis.rpmdiff',
                   'build_on_commit',
+                  'pipelines',
                   'provision'
               ]
           ],

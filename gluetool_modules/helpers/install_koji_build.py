@@ -1,5 +1,6 @@
 import gluetool
 from gluetool import SoftGlueError
+
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 
@@ -17,6 +18,13 @@ class InstallKojiBuild(gluetool.Module):
 
     name = 'install-koji-build'
     description = 'Prepare guests for testing process.'
+
+    options = {
+        'skip-overloaded-shared': {
+            'help': 'Skip calling of overloaded shared',
+            'action': 'store_true'
+        }
+    }
 
     shared_functions = ('setup_guest',)
 
@@ -76,7 +84,9 @@ class InstallKojiBuild(gluetool.Module):
     def setup_guest(self, guests, **kwargs):
         self.require_shared('restraint', 'brew_build_task_params', 'beaker_job_xml')
 
-        self.overloaded_shared('setup_guest', guests, **kwargs)
+        # prevent recursion in setup_guest
+        if not self.option('skip-overloaded-shared'):
+            self.overloaded_shared('setup_guest', guests, **kwargs)
 
         for guest in guests:
             self._setup_guest(guest)
