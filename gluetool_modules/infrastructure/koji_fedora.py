@@ -1520,7 +1520,8 @@ class Koji(gluetool.Module):
         builds += self._objects_to_builds('nvr', nvrs,
                                           lambda nvr: [self._session.getBuild(nvr)])
         builds += self._objects_to_builds('name', names,
-                                          lambda name: self._session.listTagged(self.option('tag'), package=name))
+                                          # pylint: disable=line-too-long
+                                          lambda name: self._session.listTagged(self.option('tag'), package=name, inherit=True, latest=True))  # Ignore PEP8Bear
 
         # Now extract task IDs.
         for build in builds:
