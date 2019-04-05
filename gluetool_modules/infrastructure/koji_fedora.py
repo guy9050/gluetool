@@ -1542,7 +1542,7 @@ class Koji(gluetool.Module):
 
     def _assert_tasks(self):
         if not self._tasks:
-            self.warn('No tasks specified.', sentry=True)
+            self.debug('No tasks specified.')
 
     def tasks(self, task_initializers=None, task_ids=None, build_ids=None, nvrs=None, names=None, **kwargs):
         # pylint: disable=too-many-arguments
