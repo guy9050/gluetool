@@ -602,11 +602,11 @@ class KojiTask(object):
         return None, None
 
     @cached_property
-    def srcrpm(self):
+    def srpm_names(self):
         """
-        Source RPM name or ``None`` if it's impossible to find it.
+        List of source RPM name or empty list if it's impossible to find it.
 
-        :rtype: str
+        :rtype: list(str)
         """
 
         if self._task_info['state'] != koji.TASK_STATES["CLOSED"]:
@@ -614,25 +614,25 @@ class KojiTask(object):
 
         # "build container" tasks have no SRPM
         if not self.is_build_task:
-            return None
+            return []
 
         # For standard (non-scratch) builds, we may fetch an associated build and dig info from it
         if self.has_build:
             self.debug('srpm name deduced from build')
-            return '{}.src.rpm'.format(self._build['nvr'])
+            return ['{}.src.rpm'.format(self._build['nvr'])]
 
         # Search all known artifacts for SRPM-like files
         _, srcrpm = self._srcrpm_subtask
 
         if srcrpm is not None:
             self.debug('srpm name deduced from a subtask artifact')
-            return srcrpm
+            return [srcrpm]
 
         # Maybe it's in Source option!
         source = self._task_request.options.get('Source', None)
         if source:
             self.debug('srpm name deduced from task Source option')
-            return source.split('/')[-1].strip()
+            return [source.split('/')[-1].strip()]
 
         # Or in one of the subtasks!
         for subtask in self._build_arch_subtasks:
@@ -640,10 +640,10 @@ class KojiTask(object):
                 continue
 
             self.debug('srpm name deduced from subtask Source option')
-            return subtask['request'].source.split('/')[-1].strip()
+            return [subtask['request'].source.split('/')[-1].strip()]
 
         # Nope, no SRPM anywhere.
-        return None
+        return []
 
     @cached_property
     def distgit_ref(self):
@@ -659,32 +659,32 @@ class KojiTask(object):
         return None
 
     @cached_property
-    def srcrpm_url(self):
+    def srpm_urls(self):
         """
-        URL of the SRPM (:py:attr:`srcrpm`) or ``None`` if SRPM is not known.
+        List of URL of the SRPM (:py:attr:`srcrpm`) or empty list if SRPM is not known.
         """
 
-        if not self.srcrpm:
-            return None
+        if not self.srpm_names:
+            return []
 
         if not self.scratch:
-            return "{}/packages/{}/{}/{}/src/{}.src.rpm".format(
+            return ["{}/packages/{}/{}/{}/src/{}.src.rpm".format(
                 self.pkgs_url,
                 self._build['package_name'],
                 self._build['version'],
                 self._build['release'],
                 self._build['nvr']
-            )
+            )]
 
         srcrpm_task, srcrpm = self._srcrpm_subtask
 
         # we have SRPM name but no parent task, i.e. it's not possible to construct URL
         if srcrpm_task is None:
-            return None
+            return []
 
         base_path = koji.pathinfo.taskrelpath(srcrpm_task)
 
-        return '/'.join(['{0}/work'.format(self.pkgs_url), base_path, srcrpm])
+        return ['/'.join(['{0}/work'.format(self.pkgs_url), base_path, srcrpm])]
 
     @cached_property
     def _split_srcrpm(self):
@@ -695,10 +695,10 @@ class KojiTask(object):
         :rtype: tuple(str)
         """
 
-        if not self.srcrpm:
+        if not self.srpm_names:
             raise GlueError('Cannot find SRPM name')
 
-        return splitFilename(self.srcrpm)
+        return splitFilename(self.srpm_names[0])
 
     @cached_property
     def nvr(self):

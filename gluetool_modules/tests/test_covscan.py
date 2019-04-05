@@ -137,10 +137,10 @@ def run(result, log, module, monkeypatch, tmpdir):
 
     baseline_config = testing_asset('covscan', 'example-config-map.yml')
 
-    mocked_baseline = MagicMock(target=target, component=component_name, srcrpm_url='dummy_baseline.src.rpm')
+    mocked_baseline = MagicMock(target=target, component=component_name, srpm_urls=['dummy_baseline.src.rpm'])
     mocked_task = MagicMock(target=target,
                             component=component_name,
-                            srcrpm_url='dummy_target.src.rpm',
+                            srpm_urls=['dummy_target.src.rpm'],
                             latest_released=MagicMock(return_value=mocked_baseline))
 
     # _, module = module

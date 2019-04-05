@@ -120,27 +120,32 @@ class CoprApi(object):
         build_task_info = self.get_build_task_info(build_id, chroot_name)
         return build_task_info.get('result_dir_url', 'UNKNOWN-COPR-RESULT-DIR-URL')
 
-    def get_rpm_names(self, build_id, chroot_name, result_dir_url=None):
-        if not result_dir_url:
-            result_dir_url = self._result_dir_url(build_id, chroot_name)
-
-        if result_dir_url == 'UNKNOWN-COPR-RESULT-DIR-URL':
-            return []
-
-        result_dir_url = '{}/builder-live.log'.format(result_dir_url)
-
-        builder_live_log = self._get_text(result_dir_url, 'builder live log', full_url=True)
-
-        rpm_names = re.findall(r'Wrote: /builddir/build/RPMS/(.*)\.rpm', builder_live_log)
-
-        return rpm_names
-
-    def get_rpm_urls(self, build_id, chroot_name):
+    def _get_builder_live_log(self, build_id, chroot_name):
         result_dir_url = self._result_dir_url(build_id, chroot_name)
 
-        rpm_names = self.get_rpm_names(build_id, chroot_name, result_dir_url)
+        if result_dir_url == 'UNKNOWN-COPR-RESULT-DIR-URL':
+            return None
 
-        return ['{}{}.rpm'.format(result_dir_url, rpm_name) for rpm_name in rpm_names]
+        result_dir_url = '{}/builder-live.log'.format(result_dir_url)
+        return self._get_text(result_dir_url, 'builder live log', full_url=True)
+
+    def _find_in_log(self, regex, build_id, chroot_name):
+        builder_live_log = self._get_builder_live_log(build_id, chroot_name)
+
+        if not builder_live_log:
+            return []
+
+        return list(set(re.findall(regex, builder_live_log)))
+
+    def get_rpm_names(self, build_id, chroot_name):
+        return self._find_in_log(r'Wrote: /builddir/build/RPMS/(.*)\.rpm', build_id, chroot_name)
+
+    def get_srpm_names(self, build_id, chroot_name):
+        return self._find_in_log(r'Wrote: /builddir/build/SRPMS/(.*)\.src\.rpm', build_id, chroot_name)
+
+    def add_result_dir_url(self, build_id, chroot_name, file_names):
+        result_dir_url = self._result_dir_url(build_id, chroot_name)
+        return ['{}{}.rpm'.format(result_dir_url, file_name) for file_name in file_names]
 
     def get_repo_url(self, owner, project, chroot):
         # strip architecture - string following last dash
@@ -227,8 +232,16 @@ class CoprTask(object):
         return self.copr_api.get_rpm_names(self.task_id.build_id, self.task_id.chroot_name)
 
     @cached_property
+    def srpm_names(self):
+        return self.copr_api.get_srpm_names(self.task_id.build_id, self.task_id.chroot_name)
+
+    @cached_property
     def rpm_urls(self):
-        return self.copr_api.get_rpm_urls(self.task_id.build_id, self.task_id.chroot_name)
+        return self.copr_api.add_result_dir_url(self.task_id.build_id, self.task_id.chroot_name, self.rpm_names)
+
+    @cached_property
+    def srpm_urls(self):
+        return self.copr_api.add_result_dir_url(self.task_id.build_id, self.task_id.chroot_name, self.srpm_names)
 
     @cached_property
     def task_arches(self):

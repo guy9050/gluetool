@@ -13,8 +13,10 @@ release: '4.fc25'
 scratch: false
 short_name: '15869828:bash-4.3.43-4.fc25'
 source: 'git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde'
-srcrpm: 'bash-4.3.43-4.fc25.src.rpm'
-srcrpm_url: 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/src/bash-4.3.43-4.fc25.src.rpm'
+srpm_names:
+  - 'bash-4.3.43-4.fc25.src.rpm'
+srpm_urls:
+  - 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/src/bash-4.3.43-4.fc25.src.rpm'
 target: 'f25-candidate'
 id: 15869828
 url: 'https://koji.fedoraproject.org/koji/taskinfo?taskID=15869828'

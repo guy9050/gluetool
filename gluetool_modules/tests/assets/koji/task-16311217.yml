@@ -16,8 +16,10 @@ release: 3.el7_3
 scratch: true
 short_name: '16311217:S:flex-2.5.37-3.el7_3'
 source: cli-build/1526458933.094723.gjtyjVKt/flex-2.5.37-3.el7_3.src.rpm
-srcrpm: flex-2.5.37-3.el7_3.src.rpm
-srcrpm_url: https://kojipkgs.fedoraproject.org/work/tasks/1218/16311218/flex-2.5.37-3.el7_3.src.rpm
+srpm_names:
+  - flex-2.5.37-3.el7_3.src.rpm
+srpm_urls:
+  - https://kojipkgs.fedoraproject.org/work/tasks/1218/16311218/flex-2.5.37-3.el7_3.src.rpm
 target: rhel-7.3-z-candidate
 id: 16311217
 url: https://koji.fedoraproject.org/koji/taskinfo?taskID=16311217

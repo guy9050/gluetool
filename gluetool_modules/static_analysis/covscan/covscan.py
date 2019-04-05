@@ -258,12 +258,21 @@ class CICovscan(gluetool.Module):
             self.info("Using '{}' (build task id: {}) as target".format(target.nvr, target.id))
             self.info("Using '{}' (build task id: {}) as baseline".format(baseline.nvr, baseline.id))
 
+            target_srpm_name = target.srpm_urls[0] if target.srpm_urls else None
+            baseline_srpm_name = baseline.srpm_urls[0] if baseline.srpm_urls else None
+
+            if not target_srpm_name:
+                raise GlueError('Target srpm is missing')
+
+            if not baseline_srpm_name:
+                raise GlueError('Baseline srpm is missing')
+
             log_dict(self.info, 'Obtaining source RPMs', {
-                'target': target.srcrpm_url,
-                'baseline': "{} -> baseline.src.rpm".format(target.srcrpm_url)
+                'target': target_srpm_name,
+                'baseline': "{} -> baseline.src.rpm".format(target_srpm_name)
             })
-            target_srpm = urlgrab(target.srcrpm_url)
-            baseline_srpm = urlgrab(baseline.srcrpm_url, filename='baseline.src.rpm')
+            target_srpm = urlgrab(target_srpm_name)
+            baseline_srpm = urlgrab(baseline_srpm_name, filename='baseline.src.rpm')
 
             self.info('Looking for covscan configuration in {}'.format(self.option('config-map')))
             configs = PatternMap(self.option('config-map'), logger=self.logger).match(self.task.target, multiple=True)
