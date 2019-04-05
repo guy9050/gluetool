@@ -2,7 +2,6 @@
 
 import collections
 import re
-import sys
 
 import koji
 import requests.exceptions
@@ -981,13 +980,8 @@ class BrewTask(KojiTask):
                         requests.exceptions.ConnectionError,
                         requests.exceptions.RequestException):
 
-                    # Report the exceptions, even if we want to ignore it and retry. We don't want errors
-                    # to be silently ignored.
-                    self._module.glue.sentry_submit_exception(
-                        gluetool.Failure(self, sys.exc_info()), logger=self.logger
-                    )
-
-                    self.error("Failed to fetch commit info from '{}'".format(url))
+                    # warn as we needed to retry
+                    self.warn("Failed to fetch commit info from '{}' (retrying)".format(url))
 
                     return False
 
