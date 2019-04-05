@@ -1145,7 +1145,12 @@ class BrewTask(KojiTask):
         if owner_id not in self.automation_user_ids:
             return self.owner
 
+        if self.source.endswith('.src.rpm'):
+            self.info('Build was built from src.rpm, skipping detection from dist-git as commit is unknown')
+            return self.owner
+
         self.info("Automation user detected, need to get git commit issuer")
+
         if self._parsed_commit_html is None:
             self.warn('could not find git commit issuer', sentry=True)
             return self.owner
