@@ -10,6 +10,7 @@ import gluetool
 from gluetool.log import log_xml, ContextAdapter
 from gluetool.utils import Bunch, Command
 
+
 DEFAULT_RESTRAINTD_PORT = 8081
 
 DEFAULT_RESTRAINTD_START_TIMEOUT = 30
@@ -21,8 +22,9 @@ DEFAULT_RESTRAINTD_START_TIMEOUT_TICK = 10
 #: :ivar gluetool.utils.ProcessOutput execution_output: raw output of the command
 #:     as returned by :py:meth:`gluetool.utils.Command.run`.
 #: :ivar str directory: path to a directory with ``restraint`` files.
-#: :ivar str index_location: path - or URL if ``BUILD_URL`` env var exists - to the ``index.html``
-#:     report page. Used for logging and reporting, to provide user access to this file.
+#: :ivar str index_location: final user-accessible location of ``index.html``. It may be a local file path, or remote
+#:     URL, anything we get from ``artifacts_location`` shared function. Used for logging and reporting, to provide
+#:     user access to this file.
 RestraintOutput = collections.namedtuple('RestraintOutput', ('execution_output', 'directory', 'index_location'))
 
 
@@ -64,15 +66,6 @@ class Restraint(gluetool.Module):
             'type': int,
             'default': DEFAULT_RESTRAINTD_PORT,
             'metavar': 'PORT'
-        },
-        'artifacts-location-template': {
-            'help': """
-                    When set, it will be rendered to provide the **final** location of artifacts, generated
-                    by Restraint. It has access to common eval context, with ``ARTIFACTS_LOCATION`` representing
-                    **current** - local, on the machine running the pipeline - location of ``index.html``
-                    (default: %(default)s).
-                    """,
-            'default': None
         }
     }
 
@@ -229,28 +222,12 @@ class Restraint(gluetool.Module):
         except Exception as exc:
             raise gluetool.GlueError('Failed to change permissions of results index: {}'.format(exc))
 
-        if self.option('artifacts-location-template'):
-            index_location = gluetool.utils.render_template(
-                self.option('artifacts-location-template'),
-                logger=self.logger,
-                ARTIFACTS_LOCATION=index_location,
-                **self.shared('eval_context')
-            )
+        final_index_location = self.shared('artifacts_location', index_location, logger=self.logger)
 
-            # The rendered location may be URL, but also it may be something completely different.
-            # Try to treat it like the URL, but ignore failures - ``treat_url`` would fail when
-            # the string didn't start with schema, for example.
-            try:
-                index_location = gluetool.utils.treat_url(index_location, logger=self.logger)
-
-            # pylint: disable=bare-except
-            except:
-                pass
-
-        self.debug("final index location is '{}'".format(index_location))
+        self.debug("final index location is '{}'".format(final_index_location))
 
         # If asked to do so, log index.html location
         label = label or 'restraint logs are in'
-        self.info('{} {}'.format(label, index_location))
+        self.info('{} {}'.format(label, final_index_location))
 
-        return RestraintOutput(output, output_dir, index_location)
+        return RestraintOutput(output, output_dir, final_index_location)

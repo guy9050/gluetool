@@ -18,7 +18,7 @@ from gluetool_modules.libs.test_schedule import TestScheduleEntryStage, TestSche
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order
-from typing import Any, Callable, Dict, List, Optional, Tuple  # noqa
+from typing import cast, Any, Callable, Dict, List, Optional, Tuple  # noqa
 from gluetool_modules.testing.test_scheduler_sti import TestScheduleEntry  # noqa
 
 
@@ -156,8 +156,8 @@ sut     ansible_host={} ansible_user=root {}
 
         return work_dir, artifact_dir, inventory.name
 
-    def _run_playbook(self, schedule_entry, artifact_dirpath, inventory_filepath):
-        # type: (TestScheduleEntry, str, str) -> List[TaskRun]
+    def _run_playbook(self, schedule_entry, work_dirpath, artifact_dirpath, inventory_filepath):
+        # type: (TestScheduleEntry, str, str, str) -> List[TaskRun]
         """
         Run an STI playbook, observe and report results.
         """
@@ -167,7 +167,8 @@ sut     ansible_host={} ansible_user=root {}
 
             assert schedule_entry.guest is not None
 
-            return self.shared(
+            # `run_playbook` always returns a process output, no need to catch the exception an extract the output
+            output, _ = self.shared(
                 'run_playbook',
                 schedule_entry.playbook_filepath,
                 [schedule_entry.guest],
@@ -178,6 +179,22 @@ sut     ansible_host={} ansible_user=root {}
                     'artifacts': artifact_dirpath,
                     'ansible_ssh_common_args': ' '.join(['-o ' + option for option in schedule_entry.guest.options])
                 })
+
+            log_filepath = os.path.join(work_dirpath, 'ansible-output.txt')
+            log_location = self.shared('artifacts_location', log_filepath, logger=schedule_entry.logger)
+
+            with open(log_filepath, 'w') as f:
+                def _write(s):
+                    # type: (str) -> None
+
+                    f.write('{}\n\n'.format(s))
+
+                log_blob(cast(gluetool.log.LoggingFunctionType, _write), 'stdout', output.stdout)
+                log_blob(cast(gluetool.log.LoggingFunctionType, _write), 'stderr', output.stderr)
+
+                f.flush()
+
+            schedule_entry.info('Ansible logs are in {}'.format(log_location))
 
         # monitor artifact directory
         notify = inotify.adapters.Inotify()
@@ -254,9 +271,9 @@ sut     ansible_host={} ansible_user=root {}
         try:
             # We don't need the working directory actually - we need artifact directory, which is
             # a subdirectory of working directory. But one day, who knows...
-            _, artifact_dirpath, inventory_filepath = self._prepare_environment(schedule_entry)
+            work_dirpath, artifact_dirpath, inventory_filepath = self._prepare_environment(schedule_entry)
 
-            results = self._run_playbook(schedule_entry, artifact_dirpath, inventory_filepath)
+            results = self._run_playbook(schedule_entry, work_dirpath, artifact_dirpath, inventory_filepath)
 
         # pylint: disable=broad-except
         except Exception:
