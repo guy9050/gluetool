@@ -82,7 +82,6 @@ static-analysis-coala:
 # Static analysis - type checking
 static-analysis-type-check:
   stage: test
-  allow_failure: true
   image: "docker-registry.engineering.redhat.com/baseos-ci/baseosci-gitlab-cicd-f28"
   script:
     - tox -e type-check
