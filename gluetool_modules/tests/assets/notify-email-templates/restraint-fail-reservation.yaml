@@ -37,7 +37,6 @@ header: |-
   Test summary link: https://dashboard.osci.redhat.com/#/artifact/brew-build/aid/123456?focus=id:
 footer: |-
   --
-  Troubleshooting Tips: http://wiki.test.redhat.com/BaseOs/Projects/CI/Doc/Troubleshoot
   CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation
   IRC: #baseosci
 recipients:
