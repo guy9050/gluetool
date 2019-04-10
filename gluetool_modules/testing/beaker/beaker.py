@@ -267,7 +267,7 @@ class Beaker(gluetool.Module):
         if self.option('reserve'):
             options += [
                 '--last-task="/distribution/utils/dummy"',
-                '--last-task="RESERVETIME={}h /distribution/reservesys"'.format(self.option('reserve-time'))
+                '--last-task=RESERVETIME={}h /distribution/reservesys'.format(self.option('reserve-time'))
             ]
         else:
             options += ['--no-reserve']
