@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2019-04-10
+----------
+
+Added
+~~~~~
+
+- [dist-git] add has_tests check
+- [test-batch-planner] ci.fmf support
+
+Changed
+~~~~~~~
+
+- [install-mbs-execute-execute] reset module, optionally install profile
+- [koji] do not report to sentry failures of retries
+- [koji] do not report no tasks to Sentry
+- [pagure] errors during build report as a test fail
+- [test-batch-planner] make use of new has_sti_tests check
+
+Fixed
+~~~~~
+
+- [koji] do not use destination tag for latest released
+- [koji] do not detect git commit issuer if built from source rpm
+- [koji] fix name/tag option
+- [restraint] rough edges of index.html permissions and service start
+- [task-dispatcher] enhance test type and category obtaining
+
+
 2019-04-02
 ----------
 
