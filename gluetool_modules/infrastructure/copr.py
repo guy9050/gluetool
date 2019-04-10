@@ -196,7 +196,7 @@ class CoprTask(object):
         # as an "official ID", use string representation - some users might be confused by the object,
         # despite it has proper __str__ and __repr__
         # pylint: disable=invalid-name
-        self.id = str(task_id)
+        self.id = self.dispatch_id = str(task_id)
         self.task_id = task_id
 
         self.module = module

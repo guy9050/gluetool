@@ -186,6 +186,8 @@ def test_execute(module, monkeypatch):
     assert eval_context['PRIMARY_TASK'] == primary_task
     assert eval_context['TASKS'] == module.tasks()
 
+    assert primary_task.id == '802020:fedora-28-x86_64'
+    assert primary_task.dispatch_id == '802020:fedora-28-x86_64'
     assert primary_task.status == 'succeeded'
     assert primary_task.component == 'pycho'
     assert primary_task.target == 'fedora-28-x86_64'

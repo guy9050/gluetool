@@ -58,8 +58,8 @@ def fixture_koji_session(request, monkeypatch):
     return request.param
 
 
-@pytest.fixture(name='module')
-def fixture_module(monkeypatch):
+@pytest.fixture(name='koji_module')
+def fixture_koji_module(monkeypatch):
     # pylint: disable=unused-argument
     ci, mod = create_module(gluetool_modules.infrastructure.koji_fedora.Koji)
 
@@ -72,6 +72,31 @@ def fixture_module(monkeypatch):
         'url': 'https://koji.fedoraproject.org/kojihub',
         'pkgs-url': 'https://kojipkgs.fedoraproject.org',
         'web-url': 'https://koji.fedoraproject.org/koji',
+    }
+
+    #  make sure the module is loaded without a task specified
+    mod.execute()
+
+    return mod
+
+
+@pytest.fixture(name='brew_module')
+def fixture_brew_module(monkeypatch):
+    # pylint: disable=unused-argument
+    ci, mod = create_module(gluetool_modules.infrastructure.koji_fedora.Brew)
+
+    # make sure task has required share function
+    assert ci.has_shared('tasks')
+    assert ci.has_shared('primary_task')
+
+    # pylint: disable=protected-access
+    mod._config = {
+        'url': 'https://brewhub.engineering.redhat.com/brewhub',
+        'pkgs-url': 'http://download.eng.bos.redhat.com/brewroot',
+        'web-url': 'https://brewweb.engineering.redhat.com/brew',
+        'automation-user-ids': '2863',
+        'dist-git-commit-urls': 'http://pkgs.devel.redhat.com/cgit/rpms/{component}/commit/?id={commit},http://pkgs.devel.redhat.com/cgit/rpms/{component}.git/commit/?id={commit}',
+        'docker-image-url-template': "{{ MODULE.option('pkgs-url') }}/packages/{{ TASK.component }}/{{ TASK.version }}/{{ TASK.release }}/images/{{ ARCHIVE['filename'] }}"
     }
 
     #  make sure the module is loaded without a task specified
@@ -100,14 +125,27 @@ def assert_task_attributes(module, task_id):
     20166983,
     16311217
 ], indirect=True)
-def test_task_by_id(koji_session, module):
+def test_task_by_id(koji_session, koji_module):
     """
     Tasks are specified directly by their IDs.
     """
 
-    module.tasks(task_ids=[koji_session])
+    koji_module.tasks(task_ids=[koji_session])
 
-    assert_task_attributes(module, koji_session)
+    assert_task_attributes(koji_module, koji_session)
+
+
+@pytest.mark.parametrize('koji_session', [
+    21018165
+], indirect=True)
+def test_task_by_id_brew(koji_session, brew_module):
+    """
+    Tasks are specified directly by their IDs.
+    """
+
+    brew_module.tasks(task_ids=[koji_session])
+
+    assert_task_attributes(brew_module, koji_session)
 
 
 @pytest.mark.parametrize('koji_session', [
@@ -115,7 +153,7 @@ def test_task_by_id(koji_session, module):
     (20166983, False),
     (16311217, True)
 ], indirect=True)
-def test_task_by_task_id_option(koji_session, module):
+def test_task_by_task_id_option(koji_session, koji_module):
     """
     Tasks are specified via module's ``--task-id`` option.
     """
@@ -123,24 +161,24 @@ def test_task_by_task_id_option(koji_session, module):
     task_id, has_artifacts = koji_session
 
     # pylint: disable=protected-access
-    module._config['task-id'] = [task_id]
+    koji_module._config['task-id'] = [task_id]
 
-    module.execute()
+    koji_module.execute()
 
     if has_artifacts:
-        gluetool_modules.libs.artifacts.has_artifacts(*module.tasks())
+        gluetool_modules.libs.artifacts.has_artifacts(*koji_module.tasks())
 
     else:
         with pytest.raises(gluetool_modules.libs.artifacts.NoArtifactsError):
-            gluetool_modules.libs.artifacts.has_artifacts(*module.tasks())
+            gluetool_modules.libs.artifacts.has_artifacts(*koji_module.tasks())
 
-    assert_task_attributes(module, task_id)
+    assert_task_attributes(koji_module, task_id)
 
 
 @pytest.mark.parametrize('koji_session', [
     (15869828, 'bash-4.3.43-4.fc25')
 ], indirect=True)
-def test_task_by_nvr_option(koji_session, module):
+def test_task_by_nvr_option(koji_session, koji_module):
     """
     Tasks are specified via module's ``--nvr`` option.
     """
@@ -148,17 +186,17 @@ def test_task_by_nvr_option(koji_session, module):
     task_id, nvr = koji_session
 
     # pylint: disable=protected-access
-    module._config['nvr'] = [nvr]
+    koji_module._config['nvr'] = [nvr]
 
-    module.execute()
+    koji_module.execute()
 
-    assert_task_attributes(module, task_id)
+    assert_task_attributes(koji_module, task_id)
 
 
 @pytest.mark.parametrize('koji_session', [
     (15869828, 805705)
 ], indirect=True)
-def test_task_by_build_id_option(koji_session, module):
+def test_task_by_build_id_option(koji_session, koji_module):
     """
     Tasks are specified via module's ``--build-id`` option.
     """
@@ -166,17 +204,17 @@ def test_task_by_build_id_option(koji_session, module):
     task_id, build_id = koji_session
 
     # pylint: disable=protected-access
-    module._config['build-id'] = [build_id]
+    koji_module._config['build-id'] = [build_id]
 
-    module.execute()
+    koji_module.execute()
 
-    assert_task_attributes(module, task_id)
+    assert_task_attributes(koji_module, task_id)
 
 
 @pytest.mark.parametrize('koji_session', [
     (15869828, 'bash', 'f25')
 ], indirect=True)
-def test_task_by_name_and_tag_options(koji_session, module):
+def test_task_by_name_and_tag_options(koji_session, koji_module):
     """
     Tasks are specified via module's ``--name`` and ``--tag`` options.
     """
@@ -184,87 +222,87 @@ def test_task_by_name_and_tag_options(koji_session, module):
     task_id, name, tag = koji_session
 
     # pylint: disable=protected-access
-    module._config.update({
+    koji_module._config.update({
         'name': name,
         'tag': tag
     })
 
-    module.execute()
+    koji_module.execute()
 
-    assert_task_attributes(module, task_id)
+    assert_task_attributes(koji_module, task_id)
 
 
-def test_no_koji_task(module):
+def test_no_koji_task(koji_module):
     """
     Module haven't been told to represent any tasks yet, however someone already asks for them.
     """
 
-    assert module.tasks() == []
+    assert koji_module.tasks() == []
 
 
-def test_invalid_task_id_type(module):
+def test_invalid_task_id_type(koji_module):
     """
     Invalid task ID passed to the module.
     """
 
     with pytest.raises(ValueError):
-        module.tasks(task_ids=['invalid id'])
+        koji_module.tasks(task_ids=['invalid id'])
 
 
 @pytest.mark.parametrize('koji_session', [
     20171466
 ], indirect=True)
-def test_not_valid_build_tasks(koji_session, module):
+def test_not_valid_build_tasks(koji_session, koji_module):
     """
     Tasks IDs represent tasks that are not valid build tasks.
     """
 
-    module._config['valid-methods'] = ['build']
+    koji_module._config['valid-methods'] = ['build']
 
     with pytest.raises(gluetool.GlueError, match=r'Task is not a build task'):
-        module.tasks(task_ids=[koji_session])
+        koji_module.tasks(task_ids=[koji_session])
 
 
-def test_missing_name_option(module):
+def test_missing_name_option(koji_module):
     # pylint: disable=protected-access
-    module._config['tag'] = 'f25'
+    koji_module._config['tag'] = 'f25'
 
     with pytest.raises(gluetool.GlueError, match=r"You need to specify package name with '--name' option"):
-        module.sanity()
+        koji_module.sanity()
 
 
-def test_missing_tag_option(module):
+def test_missing_tag_option(koji_module):
     # pylint: disable=protected-access
-    module._config['name'] = 'bash'
+    koji_module._config['name'] = 'bash'
 
     with pytest.raises(gluetool.GlueError, match=r"You need to specify 'tag' with package name"):
-        module.sanity()
+        koji_module.sanity()
 
 
 @pytest.mark.parametrize('koji_session', [
     705705
 ], indirect=True)
-def test_invalid_build(koji_session, module, log):
+def test_invalid_build(koji_session, koji_module, log):
     # pylint: disable=protected-access
-    module._config['build-id'] = [koji_session]
+    koji_module._config['build-id'] = [koji_session]
 
-    module.execute()
+    koji_module.execute()
 
     log.match(levelno=logging.WARN, message='Looking for build 705705, remote server returned None - skipping this ID')
-    assert module._tasks == []
+    assert koji_module._tasks == []
 
 
 @pytest.mark.parametrize('koji_session', [
     10166983
 ], indirect=True)
-def test_request_missing(koji_session, module):
+def test_request_missing(koji_session, koji_module):
     with pytest.raises(gluetool.GlueError, match=r'Task 10166983 has no request field in task info'):
-        module.tasks(task_ids=[koji_session])
+        koji_module.tasks(task_ids=[koji_session])
 
 
 @pytest.mark.parametrize('koji_session', [
     10166985
 ], indirect=True)
-def test_request_length_invalid(koji_session, module):
+def test_request_length_invalid(koji_session, koji_module):
     with pytest.raises(gluetool.GlueError, match=r'Task 10166985 has unexpected number of items in request field'):
-        module.tasks(task_ids=[10166985])
+        koji_module.tasks(task_ids=[10166985])

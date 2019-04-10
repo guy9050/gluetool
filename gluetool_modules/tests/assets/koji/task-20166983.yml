@@ -19,6 +19,7 @@ srpm_names:
 srpm_urls: []
 target: rawhide
 id: 20166983
+dispatch_id: 20166983
 url: 'https://koji.fedoraproject.org/koji/taskinfo?taskID=20166983'
 version: '4.4.12'
 

@@ -111,6 +111,7 @@ def test_pagure_pull_request(module, monkeypatch):
     pagure_pull_request = pagure.PagurePullRequest(module, pull_request_id)
 
     assert pagure_pull_request.id == 'repository-name:repository-pr-id'
+    assert pagure_pull_request.dispatch_id == 'repository-name:repository-pr-id'
     assert pagure_pull_request.source_branch == 'json-branch-from'
     assert pagure_pull_request.destination_branch == 'json-branch'
     assert pagure_pull_request.issuer == 'json-user-name'

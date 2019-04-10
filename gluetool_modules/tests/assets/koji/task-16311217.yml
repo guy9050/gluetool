@@ -22,5 +22,6 @@ srpm_urls:
   - https://kojipkgs.fedoraproject.org/work/tasks/1218/16311218/flex-2.5.37-3.el7_3.src.rpm
 target: rhel-7.3-z-candidate
 id: 16311217
+dispatch_id: 16311217
 url: https://koji.fedoraproject.org/koji/taskinfo?taskID=16311217
 version: 2.5.37

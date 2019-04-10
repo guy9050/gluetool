@@ -171,6 +171,8 @@ def test_execute(module, get):
     assert eval_context['PRIMARY_TASK'] == primary_task
     assert eval_context['TASKS'] == module.tasks()
 
+    assert primary_task.id == 2178
+    assert primary_task.dispatch_id == 2178
     assert primary_task.name == 'rust-toolset'
     assert primary_task.component == 'rust-toolset'
     assert primary_task.stream == 'rhel8'

@@ -142,7 +142,7 @@ class KojiTask(object):
         self._module = module
 
         # pylint: disable=invalid-name
-        self.id = int(task_id)
+        self.id = self.dispatch_id = int(task_id)
         self.api_url = details['url']
         self.web_url = details['web_url']
         self.pkgs_url = details['pkgs_url']
@@ -885,6 +885,11 @@ class BrewTask(KojiTask):
 
                 else:
                     self._assign_build(int(self._result['koji_builds'][0]))
+
+            # Container builds need specific dispatch ID - given how broken is the integration
+            # between Brew and image building service, build ID nor task ID are not enough.
+            if self.build_id:
+                self.dispatch_id = '{}:{}'.format(self.build_id, self.id)
 
     @cached_property
     def is_build_container_task(self):

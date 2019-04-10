@@ -193,7 +193,7 @@ class MBSTask(object):
 
         self._build_info = build_info
 
-        self.id = build_info['id']
+        self.id = self.dispatch_id = build_info['id']
         self.name = build_info['name']
         self.component = self.name
         self.stream = build_info['stream']

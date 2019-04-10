@@ -92,7 +92,7 @@ class PagurePullRequest(object):
         self.module = module
         self.logger = module.logger
 
-        self.id = str(pull_request_id)
+        self.id = self.dispatch_id = str(pull_request_id)
         self.pull_request_id = pull_request_id
 
         pagure_api = self.module.pagure_api()

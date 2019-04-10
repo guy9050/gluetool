@@ -1,0 +1,584 @@
+---
+
+# Represents common task for a non-scratch build.
+
+getAPIVersion: Mock Koji Session 1.0
+
+getBuildTarget:
+
+getTaskInfo:
+  21018165:
+    arch: "noarch"
+    awaited: null
+    channel_id: 20
+    completion_time: "2019-04-09 13:10:34.276985"
+    completion_ts: 1554815434.27698
+    create_time: "2019-04-09 09:38:11.979929"
+    create_ts: 1554802691.97993
+    host_id: 282
+    id: 21018165
+    label: null
+    method: "buildContainer"
+    owner: 4119
+    parent: null
+    priority: 20
+    request:
+      - "git://pkgs.devel.redhat.com/containers/go-toolset#fb678d6c9a532e98a1eddb255c579c0c43a00c8e"
+      - "devtools-2019.1-go-toolset-rhel-7-container-candidate"
+      - arch_override: "x86_64 s390x ppc64le"
+        git_branch: "devtools-2019.1-go-toolset-rhel-7"
+        isolated: true
+        koji_parent_build: "s2i-base-container-1-73.1554788708"
+        release: "3.1554788828"
+        scratch: false
+    start_time: "2019-04-09 12:42:48.626260"
+    start_ts: 1554813768.62626
+    state: 2
+    waiting: null
+    weight: 2.0
+
+listBuilds:
+  21018165:
+    - build_id: 876056
+      completion_time: "2019-04-09 13:05:36"
+      completion_ts: 1554815136.0
+      creation_event_id: 24022776
+      creation_time: "2019-04-09 13:05:40.599969"
+      creation_ts: 1554815140.59997
+      epoch: null
+      extra:
+          container_koji_task_id: 21018165
+          image:
+              autorebuild: false
+              help: null
+              index:
+                  digests:
+                      application/vnd.docker.distribution.manifest.list.v2+json: "sha256:e246d7c0e8a9de04bfaf560000645043e998dbf2e2e9030c66ad02036a7f73dc"
+                  pull:
+                    - "brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7@sha256:e246d7c0e8a9de04bfaf560000645043e998dbf2e2e9030c66ad02036a7f73dc"
+                    - "brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7:1.11.5-3.1554788828"
+                  tags:
+                    - "1.11.5-3.1554788828"
+              isolated: true
+              media_types:
+                - "application/json"
+                - "application/vnd.docker.distribution.manifest.list.v2+json"
+                - "application/vnd.docker.distribution.manifest.v1+json"
+                - "application/vnd.docker.distribution.manifest.v2+json"
+              odcs:
+                  compose_ids:
+                    - 87832
+                    - 87833
+                    - 87834
+                    - 87835
+                  signing_intent: "release"
+                  signing_intent_overridden: false
+              parent_build_id: 875855
+              parent_image_builds:
+                  rhscl/s2i-base-rhel7:latest:
+                      id: 875855
+                      nvr: "s2i-base-container-1-73.1554788708"
+              parent_images:
+                - "rhscl/s2i-base-rhel7:latest"
+          submitter: "osbs"
+      id: 876056
+      name: "go-toolset-container"
+      nvr: "go-toolset-container-1.11.5-3.1554788828"
+      owner_id: 4119
+      owner_name: "freshmaker"
+      package_id: 70479
+      package_name: "go-toolset-container"
+      release: "3.1554788828"
+      source: "git://pkgs.devel.redhat.com/containers/go-toolset#fb678d6c9a532e98a1eddb255c579c0c43a00c8e"
+      start_time: "2019-04-09 12:43:07"
+      start_ts: 1554813787.0
+      state: 1
+      task_id: null
+      version: "1.11.5"
+      volume_id: 0
+      volume_name: "DEFAULT"
+
+
+getTaskChildren:
+
+getUser:
+  4119:
+    status: 0
+    usertype: 0
+    id: 4119
+    name: freshmaker
+    krb_principal:
+
+getTaskResult:
+  21018165:
+    koji_builds:
+      - "876056"
+    repositories:
+      - "brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7:devtools-2019.1-go-toolset-rhel-7-container-candidate-69760-20190409124259"
+      - "brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7:1.11.5-3.1554788828"
+
+getBuild:
+  876056:
+    build_id: 876056
+    completion_time: "2019-04-09 13:05:36"
+    completion_ts: 1554815136.0
+    creation_event_id: 24022776
+    creation_time: "2019-04-09 13:05:40.599969"
+    creation_ts: 1554815140.59997
+    epoch: null
+    extra:
+        container_koji_task_id: 21018165
+        image:
+            autorebuild: false
+            help: null
+            index:
+                digests:
+                    application/vnd.docker.distribution.manifest.list.v2+json: "sha256:e246d7c0e8a9de04bfaf560000645043e998dbf2e2e9030c66ad02036a7f73dc"
+                pull:
+                  - "brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7@sha256:e246d7c0e8a9de04bfaf560000645043e998dbf2e2e9030c66ad02036a7f73dc"
+                  - "brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7:1.11.5-3.1554788828"
+                tags:
+                  - "1.11.5-3.1554788828"
+            isolated: true
+            media_types:
+              - "application/json"
+              - "application/vnd.docker.distribution.manifest.list.v2+json"
+              - "application/vnd.docker.distribution.manifest.v1+json"
+              - "application/vnd.docker.distribution.manifest.v2+json"
+            odcs:
+                compose_ids:
+                  - 87832
+                  - 87833
+                  - 87834
+                  - 87835
+                signing_intent: "release"
+                signing_intent_overridden: false
+            parent_build_id: 875855
+            parent_image_builds:
+                rhscl/s2i-base-rhel7:latest:
+                    id: 875855
+                    nvr: "s2i-base-container-1-73.1554788708"
+            parent_images:
+              - "rhscl/s2i-base-rhel7:latest"
+        submitter: "osbs"
+    id: 876056
+    name: "go-toolset-container"
+    nvr: "go-toolset-container-1.11.5-3.1554788828"
+    owner_id: 4119
+    owner_name: "freshmaker"
+    package_id: 70479
+    package_name: "go-toolset-container"
+    release: "3.1554788828"
+    source: "git://pkgs.devel.redhat.com/containers/go-toolset#fb678d6c9a532e98a1eddb255c579c0c43a00c8e"
+    start_time: "2019-04-09 12:43:07"
+    start_ts: 1554813787.0
+    state: 1
+    task_id: null
+    version: "1.11.5"
+    volume_id: 0
+    volume_name: "DEFAULT"
+
+listArchives:
+    - btype: image
+      btype_id: 4
+      build_id: 876056
+      buildroot_id: 4846848
+      checksum: e6b235a9b7c22055aab5faf8f6a82b0c
+      checksum_type: 0
+      extra:
+        docker:
+          config:
+            architecture: ppc64le
+            config:
+              ArgsEscaped: true
+              AttachStderr: false
+              AttachStdin: false
+              AttachStdout: false
+              Cmd:
+              - "/bin/sh"
+              - "-c"
+              - "$STI_SCRIPTS_PATH/usage"
+              Domainname: ''
+              Entrypoint:
+              - container-entrypoint
+              Env:
+              - PATH=/opt/app-root/src/bin:/opt/app-root/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              - container=oci
+              - SUMMARY=Platform for building and running Go 1.11.5 based applications
+              - DESCRIPTION=Go 1.11.5 available as a container is a base platform for
+                building and running various Go 1.11.5 applications and frameworks. Go
+                is an easy to learn, powerful, statically typed language in the C/C++
+                tradition with garbage collection, concurrent programming support, and
+                memory safety features.
+              - STI_SCRIPTS_URL=image:///usr/libexec/s2i
+              - STI_SCRIPTS_PATH=/usr/libexec/s2i
+              - APP_ROOT=/opt/app-root
+              - HOME=/opt/app-root/src
+              - BASH_ENV=/opt/app-root/etc/scl_enable
+              - ENV=/opt/app-root/etc/scl_enable
+              - PROMPT_COMMAND=. /opt/app-root/etc/scl_enable
+              - NODEJS_SCL=rh-nodejs10
+              - NAME=golang
+              - VERSION=1.11.5
+              Hostname: 2d74b7e7c559
+              Image: 706f144d3312a53d2de8044de390c584c04f53272ce2c9524db6b2d40b28b103
+              Labels:
+                architecture: ppc64le
+                authoritative-source-url: registry.access.redhat.com
+                build-date: '2019-04-09T12:47:14.040530'
+                com.redhat.build-host: ppc64le-c2-vm-02.prod.osbs.eng.bos.redhat.com
+                com.redhat.component: go-toolset-container
+                description: Go 1.11.5 available as a container is a base platform for
+                  building and running various Go 1.11.5 applications and frameworks.
+                  Go is an easy to learn, powerful, statically typed language in the C/C++
+                  tradition with garbage collection, concurrent programming support, and
+                  memory safety features.
+                distribution-scope: public
+                io.k8s.description: Go 1.11.5 available as a container is a base platform
+                  for building and running various Go 1.11.5 applications and frameworks.
+                  Go is an easy to learn, powerful, statically typed language in the C/C++
+                  tradition with garbage collection, concurrent programming support, and
+                  memory safety features.
+                io.k8s.display-name: Go 1.11.5
+                io.openshift.expose-services: ''
+                io.openshift.s2i.scripts-url: image:///usr/libexec/s2i
+                io.openshift.tags: builder,golang,golang111,rh-golang111,go
+                io.s2i.scripts-url: image:///usr/libexec/s2i
+                maintainer: Red Hat, Inc.
+                name: devtools/go-toolset-rhel7
+                release: '3.1554788828'
+                summary: Platform for building and running Go 1.11.5 based applications
+                url: https://access.redhat.com/containers/#/registry.access.redhat.com/devtools/go-toolset-rhel7/images/1.11.5-3.1554788828
+                usage: This image is very generic and does not serve a single use case.
+                  Use it as a base to build your own images.
+                vcs-ref: fb678d6c9a532e98a1eddb255c579c0c43a00c8e
+                vcs-type: git
+                vendor: Red Hat, Inc.
+                version: 1.11.5
+              OnBuild: []
+              OpenStdin: false
+              StdinOnce: false
+              Tty: false
+              User: '1001'
+              Volumes: 
+              WorkingDir: "/opt/app-root/src"
+            created: '2019-04-09T12:51:16.495076Z'
+            docker_version: 1.13.1
+            history:
+            - comment: Imported from -
+              created: '2019-04-09T06:01:56.536715377Z'
+            - created: '2019-04-09T06:02:09.781099Z'
+            - created: '2019-04-09T06:29:35.187665Z'
+            - created: '2019-04-09T09:19:51.189325Z'
+            - comment: ''
+              created: '2019-04-09T12:51:16.495076Z'
+            os: linux
+            rootfs:
+              diff_ids:
+              - sha256:108d1df2ea9b8355ea21c7f739a1bbb87e5b328497b25d7a2efca2b2856ec99d
+              - sha256:f53eb851c44598caa3a25678e35ef6c95c674f9c1f9b34d3a297a236f3f36dac
+              - sha256:369647a70eeacb270649e9def295778938c29281d52167240893c25313d3b1c9
+              - sha256:65fa700bd9fec1724c04dfe09bd9f0d79abc60d93742ce110a8d98fbaad90b3e
+              - sha256:7903a404494f0a6b47440ceb40b5d2c3e278c517926e89df8528a7a7a2e5e915
+              type: layers
+          digests:
+            application/vnd.docker.distribution.manifest.v1+json: sha256:6d582a9165fc4c0e67bd44350458c43fa33914901d384ac6f66e83c6996cbfb2
+            application/vnd.docker.distribution.manifest.v2+json: sha256:4e2cb8757b257c5acd80e376ca462f95dc75408622253fa37ac9e1e62d4e684b
+          id: sha256:9a88a6939538be27075d99fe7f222933ed33488349a016ab7ee2f68226a7eae6
+          layer_sizes:
+          - diff_id: sha256:108d1df2ea9b8355ea21c7f739a1bbb87e5b328497b25d7a2efca2b2856ec99d
+            size: 260832646
+          - diff_id: sha256:f53eb851c44598caa3a25678e35ef6c95c674f9c1f9b34d3a297a236f3f36dac
+            size: 2921
+          - diff_id: sha256:369647a70eeacb270649e9def295778938c29281d52167240893c25313d3b1c9
+            size: 25316163
+          - diff_id: sha256:65fa700bd9fec1724c04dfe09bd9f0d79abc60d93742ce110a8d98fbaad90b3e
+            size: 266364220
+          - diff_id: sha256:7903a404494f0a6b47440ceb40b5d2c3e278c517926e89df8528a7a7a2e5e915
+            size: 473533943
+          parent_id: sha256:c9a65fd69b369b9edd4ba1790a0e99c19701301a64d25d640dc5928a24a97287
+          repositories:
+          - brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7:devtools-2019.1-go-toolset-rhel-7-container-candidate-91736-20190409124738-ppc64le
+          - brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7@sha256:6d582a9165fc4c0e67bd44350458c43fa33914901d384ac6f66e83c6996cbfb2
+          - brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7@sha256:4e2cb8757b257c5acd80e376ca462f95dc75408622253fa37ac9e1e62d4e684b
+          tags:
+          - devtools-2019.1-go-toolset-rhel-7-container-candidate-91736-20190409124738-ppc64le
+        image:
+          arch: ppc64le
+      filename: docker-image-sha256:9a88a6939538be27075d99fe7f222933ed33488349a016ab7ee2f68226a7eae6.ppc64le.tar.gz
+      id: 3010392
+      metadata_only: false
+      size: 323091453
+      type_description: Tar file
+      type_extensions: tar tar.gz tar.bz2 tar.xz tgz
+      type_id: 4
+      type_name: tar
+    - btype: image
+      btype_id: 4
+      build_id: 876056
+      buildroot_id: 4846847
+      checksum: 811383205a36e38270d3ee97853fe309
+      checksum_type: 0
+      extra:
+        docker:
+          config:
+            architecture: s390x
+            config:
+              ArgsEscaped: true
+              AttachStderr: false
+              AttachStdin: false
+              AttachStdout: false
+              Cmd:
+              - "/bin/sh"
+              - "-c"
+              - "$STI_SCRIPTS_PATH/usage"
+              Domainname: ''
+              Entrypoint:
+              - container-entrypoint
+              Env:
+              - PATH=/opt/app-root/src/bin:/opt/app-root/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              - container=oci
+              - SUMMARY=Platform for building and running Go 1.11.5 based applications
+              - DESCRIPTION=Go 1.11.5 available as a container is a base platform for
+                building and running various Go 1.11.5 applications and frameworks. Go
+                is an easy to learn, powerful, statically typed language in the C/C++
+                tradition with garbage collection, concurrent programming support, and
+                memory safety features.
+              - STI_SCRIPTS_URL=image:///usr/libexec/s2i
+              - STI_SCRIPTS_PATH=/usr/libexec/s2i
+              - APP_ROOT=/opt/app-root
+              - HOME=/opt/app-root/src
+              - BASH_ENV=/opt/app-root/etc/scl_enable
+              - ENV=/opt/app-root/etc/scl_enable
+              - PROMPT_COMMAND=. /opt/app-root/etc/scl_enable
+              - NODEJS_SCL=rh-nodejs10
+              - NAME=golang
+              - VERSION=1.11.5
+              Hostname: 42a8a6d9e53c
+              Image: 2e31c35346f9db0562bd2c5825e2cc60953c6468fb4e42e0b5a52de5d14e433b
+              Labels:
+                architecture: s390x
+                authoritative-source-url: registry.access.redhat.com
+                build-date: '2019-04-09T12:47:43.995618'
+                com.redhat.build-host: s390-osbs-03.prod.osbs.eng.bos.redhat.com
+                com.redhat.component: go-toolset-container
+                description: Go 1.11.5 available as a container is a base platform for
+                  building and running various Go 1.11.5 applications and frameworks.
+                  Go is an easy to learn, powerful, statically typed language in the C/C++
+                  tradition with garbage collection, concurrent programming support, and
+                  memory safety features.
+                distribution-scope: public
+                io.k8s.description: Go 1.11.5 available as a container is a base platform
+                  for building and running various Go 1.11.5 applications and frameworks.
+                  Go is an easy to learn, powerful, statically typed language in the C/C++
+                  tradition with garbage collection, concurrent programming support, and
+                  memory safety features.
+                io.k8s.display-name: Go 1.11.5
+                io.openshift.expose-services: ''
+                io.openshift.s2i.scripts-url: image:///usr/libexec/s2i
+                io.openshift.tags: builder,golang,golang111,rh-golang111,go
+                io.s2i.scripts-url: image:///usr/libexec/s2i
+                maintainer: Red Hat, Inc.
+                name: devtools/go-toolset-rhel7
+                release: '3.1554788828'
+                summary: Platform for building and running Go 1.11.5 based applications
+                url: https://access.redhat.com/containers/#/registry.access.redhat.com/devtools/go-toolset-rhel7/images/1.11.5-3.1554788828
+                usage: This image is very generic and does not serve a single use case.
+                  Use it as a base to build your own images.
+                vcs-ref: fb678d6c9a532e98a1eddb255c579c0c43a00c8e
+                vcs-type: git
+                vendor: Red Hat, Inc.
+                version: 1.11.5
+              OnBuild: []
+              OpenStdin: false
+              StdinOnce: false
+              Tty: false
+              User: '1001'
+              Volumes: 
+              WorkingDir: "/opt/app-root/src"
+            created: '2019-04-09T12:51:21.565293Z'
+            docker_version: 1.13.1
+            history:
+            - comment: Imported from -
+              created: '2019-04-09T06:02:30.479392942Z'
+            - created: '2019-04-09T06:02:44.722036Z'
+            - created: '2019-04-09T06:32:00.203763Z'
+            - created: '2019-04-09T09:21:32.324212Z'
+            - comment: ''
+              created: '2019-04-09T12:51:21.565293Z'
+            os: linux
+            rootfs:
+              diff_ids:
+              - sha256:426222fa337bc933b6a543216d862dfda99ee18bb5d960f3d2e0f6f880365f77
+              - sha256:72daea0e4fd5cdc3fc9793694aa2fe44b673f9c69e25bb38edb7adaa25174d2a
+              - sha256:3505f38372d72f58b54455aff08a58f7052e122ac5ff392c042cbb0690557e7c
+              - sha256:d9ac559a8e0f6b778ace14df1cab2ef87a831fa98679e48ec6f66f2df6aec16e
+              - sha256:632d6d30e83457992666437dfe6e618260406cf439f148de7f2856378a6e5fd0
+              type: layers
+          digests:
+            application/vnd.docker.distribution.manifest.v1+json: sha256:21e81f36c20a4fa9408dd5746c66794dd9288cf267bf50c0953f5442f2318c89
+            application/vnd.docker.distribution.manifest.v2+json: sha256:1778b4643e1d63c529575597e4fdff8f11e4fb16362700cecdbb5ae1419a204c
+          id: sha256:f37b81368000f2e0609afbffb791da9cf46b23e1be23e9e5a55da3f6b6fd7b22
+          layer_sizes:
+          - diff_id: sha256:426222fa337bc933b6a543216d862dfda99ee18bb5d960f3d2e0f6f880365f77
+            size: 200154604
+          - diff_id: sha256:72daea0e4fd5cdc3fc9793694aa2fe44b673f9c69e25bb38edb7adaa25174d2a
+            size: 2915
+          - diff_id: sha256:3505f38372d72f58b54455aff08a58f7052e122ac5ff392c042cbb0690557e7c
+            size: 23687413
+          - diff_id: sha256:d9ac559a8e0f6b778ace14df1cab2ef87a831fa98679e48ec6f66f2df6aec16e
+            size: 237275669
+          - diff_id: sha256:632d6d30e83457992666437dfe6e618260406cf439f148de7f2856378a6e5fd0
+            size: 490456059
+          parent_id: sha256:b7ad0f75b50be9238d06c9fe1a72e80da618b981235beffd9c4f855af61344d6
+          repositories:
+          - brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7:devtools-2019.1-go-toolset-rhel-7-container-candidate-33685-20190409124737-s390x
+          - brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7@sha256:21e81f36c20a4fa9408dd5746c66794dd9288cf267bf50c0953f5442f2318c89
+          - brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7@sha256:1778b4643e1d63c529575597e4fdff8f11e4fb16362700cecdbb5ae1419a204c
+          tags:
+          - devtools-2019.1-go-toolset-rhel-7-container-candidate-33685-20190409124737-s390x
+        image:
+          arch: s390x
+      filename: docker-image-sha256:f37b81368000f2e0609afbffb791da9cf46b23e1be23e9e5a55da3f6b6fd7b22.s390x.tar.gz
+      id: 3010391
+      metadata_only: false
+      size: 320984896
+      type_description: Tar file
+      type_extensions: tar tar.gz tar.bz2 tar.xz tgz
+      type_id: 4
+      type_name: tar
+    - btype: image
+      btype_id: 4
+      build_id: 876056
+      buildroot_id: 4846846
+      checksum: 308d019e36916c99ef53e42ee5f9427a
+      checksum_type: 0
+      extra:
+        docker:
+          config:
+            architecture: amd64
+            config:
+              ArgsEscaped: true
+              AttachStderr: false
+              AttachStdin: false
+              AttachStdout: false
+              Cmd:
+              - "/bin/sh"
+              - "-c"
+              - "$STI_SCRIPTS_PATH/usage"
+              Domainname: ''
+              Entrypoint:
+              - container-entrypoint
+              Env:
+              - PATH=/opt/app-root/src/bin:/opt/app-root/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              - container=oci
+              - SUMMARY=Platform for building and running Go 1.11.5 based applications
+              - DESCRIPTION=Go 1.11.5 available as a container is a base platform for
+                building and running various Go 1.11.5 applications and frameworks. Go
+                is an easy to learn, powerful, statically typed language in the C/C++
+                tradition with garbage collection, concurrent programming support, and
+                memory safety features.
+              - STI_SCRIPTS_URL=image:///usr/libexec/s2i
+              - STI_SCRIPTS_PATH=/usr/libexec/s2i
+              - APP_ROOT=/opt/app-root
+              - HOME=/opt/app-root/src
+              - BASH_ENV=/opt/app-root/etc/scl_enable
+              - ENV=/opt/app-root/etc/scl_enable
+              - PROMPT_COMMAND=. /opt/app-root/etc/scl_enable
+              - NODEJS_SCL=rh-nodejs10
+              - NAME=golang
+              - VERSION=1.11.5
+              Hostname: f8f52fae6eae
+              Image: c7e6e1d2563fe223f570adaeffca549549b40244e0eafab49d8b55ae5e1e7247
+              Labels:
+                architecture: x86_64
+                authoritative-source-url: registry.access.redhat.com
+                build-date: '2019-04-09T12:47:41.365102'
+                com.redhat.build-host: cpt-0009.osbs.prod.upshift.rdu2.redhat.com
+                com.redhat.component: go-toolset-container
+                description: Go 1.11.5 available as a container is a base platform for
+                  building and running various Go 1.11.5 applications and frameworks.
+                  Go is an easy to learn, powerful, statically typed language in the C/C++
+                  tradition with garbage collection, concurrent programming support, and
+                  memory safety features.
+                distribution-scope: public
+                io.k8s.description: Go 1.11.5 available as a container is a base platform
+                  for building and running various Go 1.11.5 applications and frameworks.
+                  Go is an easy to learn, powerful, statically typed language in the C/C++
+                  tradition with garbage collection, concurrent programming support, and
+                  memory safety features.
+                io.k8s.display-name: Go 1.11.5
+                io.openshift.expose-services: ''
+                io.openshift.s2i.scripts-url: image:///usr/libexec/s2i
+                io.openshift.tags: builder,golang,golang111,rh-golang111,go
+                io.s2i.scripts-url: image:///usr/libexec/s2i
+                maintainer: Red Hat, Inc.
+                name: devtools/go-toolset-rhel7
+                release: '3.1554788828'
+                summary: Platform for building and running Go 1.11.5 based applications
+                url: https://access.redhat.com/containers/#/registry.access.redhat.com/devtools/go-toolset-rhel7/images/1.11.5-3.1554788828
+                usage: This image is very generic and does not serve a single use case.
+                  Use it as a base to build your own images.
+                vcs-ref: fb678d6c9a532e98a1eddb255c579c0c43a00c8e
+                vcs-type: git
+                vendor: Red Hat, Inc.
+                version: 1.11.5
+              OnBuild: []
+              OpenStdin: false
+              StdinOnce: false
+              Tty: false
+              User: '1001'
+              Volumes: 
+              WorkingDir: "/opt/app-root/src"
+            created: '2019-04-09T12:50:19.836139Z'
+            docker_version: 1.13.1
+            history:
+            - comment: Imported from -
+              created: '2019-04-09T06:02:23.771349088Z'
+            - created: '2019-04-09T06:02:29.140431Z'
+            - created: '2019-04-09T06:31:52.305738Z'
+            - created: '2019-04-09T09:22:13.716045Z'
+            - comment: ''
+              created: '2019-04-09T12:50:19.836139Z'
+            os: linux
+            rootfs:
+              diff_ids:
+              - sha256:472721478dc513dcd3b8d89482f9a48aca4f391a50bc95da4b51b463b1b2256b
+              - sha256:b0176b436fa4e59296da60b504956044a16152bf00541b59e3414edd30c98d08
+              - sha256:44e905c9ec48d124e257a8d864b6503a7042c8dfacabbb2e9b74110c07f42f48
+              - sha256:549423d72db240eca2ee32af957d13df39d346fbe426a82a633b35a23d065049
+              - sha256:41ba28fa607d508953f7b891750f3232051ce41546a9756275b50d4e56576bd3
+              type: layers
+          digests:
+            application/vnd.docker.distribution.manifest.v1+json: sha256:157b0f82e7a7bb1c0ad41446b60d3550917c692e48843cf667d700aaba30e612
+            application/vnd.docker.distribution.manifest.v2+json: sha256:cdee59d8a3d62d4344cc53e8366708e2b0dba7ad2568eb131087296ebcf15fbf
+          id: sha256:ddbf71a79e14000dce855248c0339490d24f50efbb86a425956921ca5ef6ad58
+          layer_sizes:
+          - diff_id: sha256:472721478dc513dcd3b8d89482f9a48aca4f391a50bc95da4b51b463b1b2256b
+            size: 203511601
+          - diff_id: sha256:b0176b436fa4e59296da60b504956044a16152bf00541b59e3414edd30c98d08
+            size: 2917
+          - diff_id: sha256:44e905c9ec48d124e257a8d864b6503a7042c8dfacabbb2e9b74110c07f42f48
+            size: 20962760
+          - diff_id: sha256:549423d72db240eca2ee32af957d13df39d346fbe426a82a633b35a23d065049
+            size: 240095498
+          - diff_id: sha256:41ba28fa607d508953f7b891750f3232051ce41546a9756275b50d4e56576bd3
+            size: 481717817
+          parent_id: sha256:592dc83dff6dfa5ab8ff5a0c18e7c252e3901e7756971fb369589b443736ad4e
+          repositories:
+          - brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7:devtools-2019.1-go-toolset-rhel-7-container-candidate-82009-20190409124737-x86_64
+          - brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7@sha256:157b0f82e7a7bb1c0ad41446b60d3550917c692e48843cf667d700aaba30e612
+          - brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/devtools/go-toolset-rhel7@sha256:cdee59d8a3d62d4344cc53e8366708e2b0dba7ad2568eb131087296ebcf15fbf
+          tags:
+          - devtools-2019.1-go-toolset-rhel-7-container-candidate-82009-20190409124737-x86_64
+        image:
+          arch: x86_64
+      filename: docker-image-sha256:ddbf71a79e14000dce855248c0339490d24f50efbb86a425956921ca5ef6ad58.x86_64.tar.gz
+      id: 3010390
+      metadata_only: false
+      size: 325572106
+      type_description: Tar file
+      type_extensions: tar tar.gz tar.bz2 tar.xz tgz
+      type_id: 4
+      type_name: tar
+
