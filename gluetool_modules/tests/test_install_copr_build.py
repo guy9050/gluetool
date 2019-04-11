@@ -5,7 +5,7 @@ import shutil
 from mock import MagicMock
 from mock import call
 from gluetool_modules.helpers.install_copr_build import InstallCoprBuild
-from gluetool_modules.libs.sut_installation_fail import SUTInstallationFailedError
+from gluetool_modules.libs.sut_installation import SUTInstallationFailedError
 from . import create_module, patch_shared
 
 LOG_DIR_NAME = 'dummy_log_dir_name'
@@ -59,7 +59,7 @@ def fixture_module_shared_patched(module, monkeypatch):
     primary_task_mock.rpm_urls = ['dummy_rpm_url1', 'dummy_rpm_url2']
     primary_task_mock.rpm_names = ['dummy_rpm_names1', 'dummy_rpm_names2']
 
-    module._config['log-dir-name'] = 'dummy_log_dir_name'
+    module._config['log-dir-name'] = LOG_DIR_NAME
 
     patch_shared(monkeypatch, module, {
         'primary_task': primary_task_mock,

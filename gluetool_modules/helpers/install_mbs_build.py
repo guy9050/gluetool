@@ -3,7 +3,7 @@ import gluetool
 from gluetool.log import log_dict
 from gluetool.utils import Command
 from gluetool import GlueError
-from gluetool_modules.libs.sut_installation_fail import check_ansible_sut_installation
+from gluetool_modules.libs.sut_installation import check_ansible_sut_installation
 
 
 class InstallMBSBuild(gluetool.Module):

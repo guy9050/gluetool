@@ -3,7 +3,7 @@ import gluetool
 from gluetool.log import log_dict
 from gluetool.utils import Command
 from gluetool import GlueError
-from gluetool_modules.libs.sut_installation_fail import SUTInstallationFailedError
+from gluetool_modules.libs.sut_installation import SUTInstallation
 
 
 class InstallMBSBuild(gluetool.Module):
@@ -27,6 +27,11 @@ class InstallMBSBuild(gluetool.Module):
         'use-devel-module': {
             'help': 'Use -devel module when generating ODCS repo.',
             'action': 'store_true'
+        },
+        'log-dir-name': {
+            'help': 'Name of directory where outputs of installation commands will be stored (default: %(default)s).',
+            'type': str,
+            'default': 'artifact-installation'
         }
     }
 
@@ -77,19 +82,6 @@ class InstallMBSBuild(gluetool.Module):
 
         primary_task = self.shared('primary_task')
 
-        workaround_commands = []
-
-        # callback for 'commands' item in installation_workarounds
-        # pylint: disable=unused-argument
-        def _add_commands_callback(instruction, command, argument, context):
-            log_dict(self.info, 'using following commands', argument)
-
-            workaround_commands.extend(argument)
-
-        self.shared('evaluate_instructions', self.installation_workarounds, {
-            'commands': _add_commands_callback,
-        })
-
         nsvc = nsvc_odcs = primary_task.nsvc
 
         #
@@ -113,23 +105,31 @@ class InstallMBSBuild(gluetool.Module):
         repo_url = self._get_repo(nsvc_odcs, guests)
 
         #
-        # Some modules do not provide 'default' module and user needs to explicitely specify it, for more info see
+        # Some modules do not provide 'default' module and user needs to explicitly specify it, for more info see
         #   https://projects.engineering.redhat.com/browse/OSCI-56
         #
         if self.option('profile'):
             nsvc = '{}/{}'.format(nsvc, self.option('profile'))
 
+        sut_installation = SUTInstallation(self.option('log-dir-name'), primary_task)
+
+        # callback for 'commands' item in installation_workarounds
+        # pylint: disable=unused-argument
+        def _add_step_callback(instruction, command, argument, context):
+            for step in argument:
+                sut_installation.add_step(step['label'], step['command'])
+
+        self.shared('evaluate_instructions', self.installation_workarounds, {
+            'steps': _add_step_callback,
+        })
+
+        sut_installation.add_step(
+            'Download ODCS repo', 'curl -v {} --output /etc/yum.repos.d/mbs_build.repo',
+            items=repo_url
+        )
+        sut_installation.add_step('Reset module', 'yum module reset -y {}', items=nsvc)
+        sut_installation.add_step('Enable module', 'yum module enable -y {}', items=nsvc)
+        sut_installation.add_step('Install module', 'yum module install -y {}', items=nsvc)
+
         for guest in guests:
-
-            try:
-                for cmd in workaround_commands:
-                    guest.debug('Executing "{} on {}"'.format(cmd, guest))
-                    guest.execute(cmd)
-
-                guest.execute('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(repo_url))
-                guest.execute('yum module reset -y {}'.format(nsvc))
-                guest.execute('yum module enable -y {}'.format(nsvc))
-                guest.execute('yum module install -y {}'.format(nsvc))
-
-            except gluetool.glue.GlueCommandError:
-                raise SUTInstallationFailedError(primary_task, guest, nsvc)
+            sut_installation.run(guest)
