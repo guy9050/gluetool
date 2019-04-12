@@ -89,6 +89,8 @@ class ColdStore(gluetool.Module):
             **context
         )
 
+        logger.debug("mapping artifacts location '{}' => {}".format(local_path, final_path))
+
         # The rendered location may be URL, but also it may be something completely different.
         # Try to treat it like the URL, but ignore failures - ``treat_url`` would fail when
         # the string didn't start with schema, for example.

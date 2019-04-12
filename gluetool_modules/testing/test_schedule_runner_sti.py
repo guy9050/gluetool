@@ -10,7 +10,7 @@ import six
 
 import gluetool
 from gluetool import GlueError
-from gluetool.log import log_blob, log_dict
+from gluetool.log import format_blob, log_blob, log_dict
 
 import libci.results
 
@@ -184,13 +184,13 @@ sut     ansible_host={} ansible_user=root {}
             log_location = self.shared('artifacts_location', log_filepath, logger=schedule_entry.logger)
 
             with open(log_filepath, 'w') as f:
-                def _write(s):
-                    # type: (str) -> None
+                def _write(label, s):
+                    # type: (str, str) -> None
 
-                    f.write('{}\n\n'.format(s))
+                    f.write('{}\n{}\n\n'.format(label, s))
 
-                log_blob(cast(gluetool.log.LoggingFunctionType, _write), 'stdout', output.stdout)
-                log_blob(cast(gluetool.log.LoggingFunctionType, _write), 'stderr', output.stderr)
+                _write('# STDOUT:', format_blob(output.stdout))
+                _write('# STDERR:', format_blob(output.stderr))
 
                 f.flush()
 
