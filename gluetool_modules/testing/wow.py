@@ -330,15 +330,6 @@ class WorkflowTomorrow(gluetool.Module):
                 '--decision'  # show desicions about including/not including task in the job
             ], logger=self.logger)
 
-            #
-            # add "body" workflow-options (prepared by caller)
-            command.options += wow_options
-
-            #
-            # add additional options
-            if options:
-                command.options += options
-
             def _add_note(instruction, command, argument, context):
                 # pylint: disable=unused-argument
 
@@ -356,6 +347,15 @@ class WorkflowTomorrow(gluetool.Module):
             }
 
             self.shared('evaluate_instructions', self.wow_options_map, instruction_commands, context=context)
+
+            #
+            # add additional options
+            if options:
+                command.options += options
+
+            #
+            # add "body" workflow-options (prepared by caller)
+            command.options += wow_options
 
             #
             # add environment if available
