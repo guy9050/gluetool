@@ -140,7 +140,9 @@ class GuestSetup(gluetool.Module):
         # just on the artifact properties (some artifacts may need to be tested on a mixture
         # of different composes with different Python interpreters), therefore detect - unless,
         # of course, told otherwise by the caller.
-        if 'ansible_python_interpreter' not in variables:
+        #
+        # Also if user is specifying it's own playbooks, always autodetect ansible_python_interpreter
+        if 'ansible_python_interpreter' not in variables or self.option('playbooks'):
             guests_interpreters = [
                 self.shared('detect_ansible_interpreter', guest)
                 for guest in guests
