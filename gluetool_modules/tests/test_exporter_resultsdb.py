@@ -68,9 +68,10 @@ def test_covscan(module, monkeypatch):
     covscan_url = 'dummy_covscan_url'
     overall_results = 'dummy_overall_results'
 
-    mocked_task = MagicMock(nvr=nvr, scratch=True, id=task_id, url=brew_url, latest=baseline_nvr)
+    mocked_task = MagicMock(nvr=nvr, scratch=True, id=task_id, url=brew_url)
     mocked_covscan_result = MagicMock(url=covscan_url, add=[], fixed=[])
-    mocked_result = CovscanTestResult(module.glue, overall_results, mocked_covscan_result, mocked_task)
+    mocked_result = CovscanTestResult(module.glue, overall_results, mocked_covscan_result,
+                                      mocked_task, baseline=baseline_nvr)
     mocked_publish = MagicMock()
 
     patch_shared(monkeypatch, module, {

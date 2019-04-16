@@ -54,7 +54,8 @@ class NoCovscanBaselineFoundError(SoftGlueError):
 class CovscanTestResult(TestResult):
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, glue, overall_result, covscan_result, task, **kwargs):
+    # pylint: disable=too-many-arguments
+    def __init__(self, glue, overall_result, covscan_result, task, baseline, **kwargs):
         urls = kwargs.pop('urls', {})
         urls.update({
             'covscan_url': covscan_result.url,
@@ -65,7 +66,7 @@ class CovscanTestResult(TestResult):
 
         self.fixed = len(covscan_result.fixed)
         self.added = len(covscan_result.added)
-        self.baseline = task.latest
+        self.baseline = baseline
 
     @classmethod
     def _unserialize_from_json(cls, glue, input_data):
@@ -73,10 +74,14 @@ class CovscanTestResult(TestResult):
                                fixed=range(0, input_data['fixed']),
                                added=range(0, input_data['added']))
 
-        task = Bunch(url=input_data['urls']['brew_url'], latest=input_data['baseline'])
+        task = Bunch(url=input_data['urls']['brew_url'])
 
-        return CovscanTestResult(glue, input_data['overall_result'], covscan_result, task,
-                                 ids=input_data['ids'], urls=input_data['urls'], payload=input_data['payload'])
+        return CovscanTestResult(
+            glue, input_data['overall_result'],
+            covscan_result, task,
+            baseline=input_data['baseline'], ids=input_data['ids'],
+            urls=input_data['urls'], payload=input_data['payload']
+        )
 
     def _serialize_to_json(self):
         serialized = super(CovscanTestResult, self)._serialize_to_json()
@@ -193,6 +198,11 @@ class CICovscan(gluetool.Module):
 
     shared_functions = ('covscan_xunit_serialize',)
 
+    def __init__(self, *args, **kwargs):
+        super(CICovscan, self).__init__(*args, **kwargs)
+
+        self._baseline = None
+
     def sanity(self):
         check_for_commands(REQUIRED_CMDS)
 
@@ -245,6 +255,7 @@ class CICovscan(gluetool.Module):
 
     def scan(self):
         covscan_result = None
+        baseline = self._baseline
 
         task_id = self.option('task-id')
         if task_id:
@@ -256,7 +267,6 @@ class CICovscan(gluetool.Module):
 
         if not covscan_result:
             target = self.task
-            baseline = self.task.latest_released()
 
             if not baseline:
                 raise NoCovscanBaselineFoundError()
@@ -275,7 +285,7 @@ class CICovscan(gluetool.Module):
 
             log_dict(self.info, 'Obtaining source RPMs', {
                 'target': target_srpm_name,
-                'baseline': "{} -> baseline.src.rpm".format(target_srpm_name)
+                'baseline': "{} -> baseline.src.rpm".format(baseline_srpm_name)
             })
             target_srpm = urlgrab(target_srpm_name)
             baseline_srpm = urlgrab(baseline_srpm_name, filename='baseline.src.rpm')
@@ -317,7 +327,7 @@ class CICovscan(gluetool.Module):
         # Log in format expected by postbuild scripting
         self.info('Result of testing: {}'.format(overall_result))
 
-        publish_result(self, CovscanTestResult, overall_result, covscan_result, self.task)
+        publish_result(self, CovscanTestResult, overall_result, covscan_result, self.task, baseline)
 
     def execute(self):
         self.require_shared('primary_task')
@@ -334,6 +344,11 @@ class CICovscan(gluetool.Module):
         target = self.task.target
         enabled_targets = self.option('target_pattern')
         self.verbose('enabled targets: {}'.format(enabled_targets))
+
+        # Legacy: in case destination tag is available, use it to lookup the latest released package
+        #         instead of build target
+        baseline_tag = self.task.destination_tag if self.task.destination_tag else self.task.build_target
+        self._baseline = self.task.latest_released(tag=baseline_tag)
 
         if enabled_targets and any((re.compile(regex.strip()).match(target) for regex in enabled_targets.split(','))):
             self.info('Running covscan for {} on {}'.format(self.task.component, target))
