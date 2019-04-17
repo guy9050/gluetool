@@ -200,18 +200,22 @@ class RulesEngine(gluetool.Module):
     Python constructs are allowed:
 
         * comparisons: ``==``, ``<=``, ``not in``, etc.
-        * strings, numbers, lists, tuples
-        * logic operators: ``and``, ``or``, ``not``
-        * ``... if ... else ...`` expressions
-        * calling a function or method
+        * strings, numbers, lists, tuples;
+        * logic operators: ``and``, ``or``, ``not``;
+        * ``... if ... else ...`` expressions;
+        * calling a function or method;
+        * list, tuples, dicts and list comprehensions.
 
     Strings have two extra methods, providing access to regular expression functionality:
 
         * ``match(pattern, I=True)``
         * ``search(pattern, I=True)``
 
-    Helper function ``EXISTS`` is provided as well, returning ``True`` when the given
-    variable name exists in the context.
+    Few helper functions are available as well:
+
+        * ``ALL(iterable)``, returning ``True`` when all items of iterable are true-ish;
+        * ``ANY(iterable)``, returning ``True`` when any item of iterable is true-ish;
+        * ``EXISTS('foo')``, returning ``True`` when the variable named ``foo`` exists.
 
     Users of this module would simply specify what objects are available to rules in their
     domain, and then provides these objects when asking ``rules-engine`` (via the shared
@@ -343,7 +347,11 @@ class RulesEngine(gluetool.Module):
         assert context is not None  # to make mypy happy
         custom_locals = _enhance_strings(context)
 
-        custom_locals['EXISTS'] = lambda name: name in custom_locals
+        custom_locals.update({
+            'ALL': all,
+            'ANY': any,
+            'EXISTS': lambda name: name in custom_locals
+        })
 
         self.debug('rules: {}'.format(rules))
         log_dict(self.verbose, 'locals', custom_locals)

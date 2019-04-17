@@ -131,6 +131,27 @@ def test_exists(module, rule, context, result):
     assert module.evaluate_rules(rule, context=context) is result
 
 
+@pytest.mark.parametrize('rule, context, result', [
+    ("ANY([True, False])", {}, True),
+    ("not ANY([True, False])", {}, False),
+    ("ANY([False, False])", {}, False),
+    ("ANY(foo)", {'foo': [True, False]}, True)
+])
+def test_any(module, rule, context, result):
+    assert module.evaluate_rules(rule, context=context) is result
+
+
+@pytest.mark.parametrize('rule, context, result', [
+    ("ALL([True, False])", {}, False),
+    ("not ALL([True, False])", {}, True),
+    ("ALL([True, True])", {}, True),
+    ("ALL(foo)", {'foo': [True, True]}, True),
+    ("ALL(foo)", {'foo': [True, False]}, False)
+])
+def test_all(module, rule, context, result):
+    assert module.evaluate_rules(rule, context=context) is result
+
+
 FILTER_CASES = [
     # simple case, single entry with matching rule
     (
