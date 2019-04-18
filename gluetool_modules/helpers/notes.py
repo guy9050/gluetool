@@ -59,7 +59,13 @@ class Notes(gluetool.Module):
 
             level = logging._levelNames[level_name]
 
-        self._notes.append(Note(text=text, level=level, level_name=logging._levelNames.get(level, None)))
+        note = Note(text=text, level=level, level_name=logging._levelNames.get(level, None))
+
+        if note in self._notes:
+            gluetool.log.log_dict(self.debug, 'already noted', note)
+            return
+
+        self._notes.append(note)
 
     @property
     def eval_context(self):

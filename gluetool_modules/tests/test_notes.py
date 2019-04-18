@@ -66,3 +66,11 @@ def test_int_level(module, level_int, level):
 def test_str_level_error(module):
     with pytest.raises(GlueError, match="Cannot deduce note level from 'dummy-level'"):
         module.add_note('dummy-text', level='dummy-level')
+
+
+def test_duplicates(module):
+    assert len(module.eval_context['NOTES']) == 0
+    module.add_note('dummy-test', level=79)
+    assert len(module.eval_context['NOTES']) == 1
+    module.add_note('dummy-test', level=79)
+    assert len(module.eval_context['NOTES']) == 1
