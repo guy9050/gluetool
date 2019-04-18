@@ -44,6 +44,12 @@ class NoCovscanBaselineFoundError(SoftGlueError):
     def __init__(self):
         super(NoCovscanBaselineFoundError, self).__init__('Could not find baseline for this build')
 
+    # do not send this error to Sentry, this must be handled by the user
+    @property
+    def submit_to_sentry(self):
+
+        return False
+
 
 class CovscanTestResult(TestResult):
     # pylint: disable=too-few-public-methods
