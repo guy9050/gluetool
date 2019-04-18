@@ -326,8 +326,7 @@ class WorkflowTomorrow(gluetool.Module):
             )
 
             command = WowCommand(['bkr', 'workflow-tomorrow'], [
-                '--dry-run',  # this will make wow to print job description in XML
-                '--decision'  # show desicions about including/not including task in the job
+                '--dry-run'  # this will make wow to print job description in XML
             ], logger=self.logger)
 
             def _add_note(instruction, command, argument, context):
