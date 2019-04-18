@@ -32,7 +32,9 @@ class CoprApi(object):
         return request
 
     def _get_text(self, url, label, full_url=None):
-        output = self._api_request(url, label, full_url=full_url).text
+        # Using `.content` instead of `.text` - `text` provides unicode string, and we'd have to encode them
+        # anyway.
+        output = self._api_request(url, label, full_url=full_url).content
         log_blob(self.module.debug, '[copr API] {} output'.format(label), output)
         return output
 
