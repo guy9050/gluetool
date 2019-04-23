@@ -114,13 +114,12 @@ class WorkflowTomorrow(gluetool.Module):
 
     Each set specifies a ``rule`` key which is evaluated by ``rules-engine`` module. If it evaluates to ``True``,
     the value of ``add-options`` is added to the set of ``wow`` options. It is first processed by Jinja
-    templating engine. ``wow`` module provides few variables to both rules and options, thus making
-    module's runtime context available to the config file writer. Following variables are available:
+    templating engine.
 
-        * ``DISTRO``
-        * ``BUILD_TARGET``
-        * ``PRIMARY_TASK``
-        * ``TASKS``
+    Rules and commands have access to full eval context, with few additional variables:
+
+        * ``DISTRO`` - distro to create job for;
+        * ``SCHEDULER`` - instance of :py:class:`gluetool.utils.Command` ``wow`` uses to build the command.
     """
 
     name = 'wow'
@@ -317,17 +316,18 @@ class WorkflowTomorrow(gluetool.Module):
 
             self.debug("constructing options distro '{}'".format(distro))
 
-            context = gluetool.utils.dict_update(
-                self.shared('eval_context'),
-                {
-                    'DISTRO': distro
-                },
-                extra_context
-            )
-
             command = WowCommand(['bkr', 'workflow-tomorrow'], [
                 '--dry-run'  # this will make wow to print job description in XML
             ], logger=self.logger)
+
+            context = gluetool.utils.dict_update(
+                self.shared('eval_context'),
+                {
+                    'DISTRO': distro,
+                    'SCHEDULER': command
+                },
+                extra_context
+            )
 
             def _add_note(instruction, command, argument, context):
                 # pylint: disable=unused-argument
