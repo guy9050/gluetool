@@ -13,7 +13,7 @@ body: |-
   If you have any questions, feel free to ask at Red Hat IRC channel #coverity or coverity-users@redhat.com
 
   Covscan url:          http://cov01.lab.eng.brq.redhat.com/covscanhub/task/56967/
-  Covscan wiki:         https://engineering.redhat.com/trac/CoverityScan/wiki/covscan
+  Covscan wiki:         https://gitlab.cee.redhat.com/covscan/covscan/wikis/covscan
   Covscan CI Test Plan: https://url.corp.redhat.com/covscan-in-ci
 header: |-
   Tested package:    dummy-package-1.2.3-79.el7
