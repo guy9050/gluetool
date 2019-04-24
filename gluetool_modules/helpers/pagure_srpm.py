@@ -40,7 +40,9 @@ class PagureSRPM(gluetool.Module):
             '-b', pull_request.destination_branch,
             pull_request.project.clone_url
         ]
-        clone_cmd.extend(shlex.split(self.option('git-clone-options')))
+
+        if self.option('git-clone-options'):
+            clone_cmd.extend(shlex.split(self.option('git-clone-options')))
         run_command(
             self,
             Command(clone_cmd, logger=self.logger),
@@ -52,7 +54,10 @@ class PagureSRPM(gluetool.Module):
         pr_id = pull_request.pull_request_id.repository_pr_id
 
         fetch_cmd = ['git', 'fetch', 'origin', 'refs/pull/{}/head'.format(pr_id)]
-        fetch_cmd.extend(shlex.split(self.option('git-fetch-options')))
+
+        if self.option('git-fetch-options'):
+            fetch_cmd.extend(shlex.split(self.option('git-fetch-options')))
+
         run_command(
             self,
             Command(fetch_cmd, logger=self.logger),
@@ -60,7 +65,10 @@ class PagureSRPM(gluetool.Module):
         )
 
         merge_cmd = ['git', 'merge', 'FETCH_HEAD', '-m', 'ci pr merge']
-        merge_cmd.extend(shlex.split(self.option('git-merge-options')))
+
+        if self.option('git-merge-options'):
+            merge_cmd.extend(shlex.split(self.option('git-merge-options')))
+
         run_command(
             self,
             Command(merge_cmd, logger=self.logger),
