@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+
+2019-04-25
+----------
+
+Added
+~~~~~
+
+- [coldstore] artifacts location rendering
+
+Changed
+~~~~~~~
+
+- instead of plain artifact ID, new "dispatch ID" is used when dispatching jobs to workaround OSBS/Brew integration flaws
+- unified code behind Copr and MBS installation
+- unify ``srpm_names`` and ``srpm_urls`` properties of koji and copr modules
+- [covscan] do not send no baselibe error to Sentry
+- [guest-setup] always autodetect ansible_python_intepreter with playbooks
+- [wow] moving --decision option to configuration
+- [wow] use --dry-run instead of --dry
+- [wow] overwrite options from wow-options-map with command line options
+
+Fixed
+~~~~~
+
+- [beaker] remove superfluous quotes around reservesys task
+- [copr] use non-unicode version of Copr API response
+- [covscan] fix for RHEL-6 failures
+- [notes] avoid adding duplicit notes
+
+
 2019-04-10
 ----------
 
