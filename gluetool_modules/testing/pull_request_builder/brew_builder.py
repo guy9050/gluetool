@@ -1,12 +1,12 @@
 import re
-import libci.results
+from libci.results import TestResult, publish_result
 import gluetool
 from gluetool.utils import Command, normalize_multistring_option
 import gluetool_modules.libs
 from gluetool_modules.libs.brew_build_fail import run_command
 
 
-class BrewBuildTestResult(libci.results.TestResult):
+class BrewBuildTestResult(TestResult):
 
     # pylint: disable=too-many-arguments
     def __init__(self, glue, overall_result, build_url, comment, process_output, **kwargs):
@@ -36,7 +36,7 @@ class BrewBuilder(gluetool.Module):
         comment = exception.message if exception else None
         process_output = exception.output if exception else None
 
-        libci.results.publish_result(self, BrewBuildTestResult, result, build_url, comment, process_output)
+        publish_result(self, BrewBuildTestResult, result, build_url, comment, process_output)
 
     def _make_brew_build(self):
         self.require_shared('src_rpm')
