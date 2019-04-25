@@ -41,9 +41,12 @@ class InstallCoprBuild(gluetool.Module):
         # rpms is joined to one item
         joined_rpm_urls = ' '.join(primary_task.rpm_urls)
 
-        sut_installation.add_step('Downgrade packages', 'yum -y downgrade {}', items=joined_rpm_urls, ignore_exception=True)
-        sut_installation.add_step('Update packages', 'yum -y update {}', items=joined_rpm_urls, ignore_exception=True)
-        sut_installation.add_step('Install packages', 'yum -y install {}', items=joined_rpm_urls, ignore_exception=True)
+        sut_installation.add_step('Downgrade packages', 'yum -y downgrade {}',
+                                  items=joined_rpm_urls, ignore_exception=True)
+        sut_installation.add_step('Update packages', 'yum -y update {}',
+                                  items=joined_rpm_urls, ignore_exception=True)
+        sut_installation.add_step('Install packages', 'yum -y install {}',
+                                  items=joined_rpm_urls, ignore_exception=True)
 
         sut_installation.add_step('Verify packages installed', 'rpm -q {}', items=primary_task.rpm_names)
 
