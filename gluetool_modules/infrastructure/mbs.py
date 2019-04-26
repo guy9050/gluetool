@@ -166,7 +166,7 @@ class MBSApi(object):
 
 
 class MBSTask(object):
-    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-few-public-methods,too-many-instance-attributes
 
     ARTIFACT_NAMESPACE = 'redhat-module'
 
@@ -210,11 +210,31 @@ class MBSTask(object):
         #   https://github.com/release-engineering/resultsdb-updater/pull/73#discussion_r235964781
         self.nvr = '{}-{}-{}.{}'.format(self.name, self.stream.replace('-', '_'), self.version, self.context)
 
-        # set by param for now
-        self.target = self.module.option('target')
+        # build tags from brew
+        self.tags = [tag['name'] for tag in self.module.shared('koji_session').listTags(self.nvr)]
 
         # this string identifies component in static config file
         self.component_id = '{}:{}'.format(self.name, self.stream)
+
+        # the target for modules uses platform stream, which nicely reflects the fact for which
+        # release the module is built for, similarly to what build target in Brew/Koji does
+        self.target = self.platform_stream
+
+    @cached_property
+    def platform_stream(self):
+        """
+        :rtype: str
+        :returns: Platform stream from the modulemd document.
+        """
+
+        query = ".data.xmd.mbs.buildrequires.platform.stream"
+
+        platform_stream = jq(query).transform(self._modulemd)
+
+        if not platform_stream:
+            raise gluetool.GlueError('Could not detect platform stream in modulemd document')
+
+        return platform_stream
 
     @cached_property
     def _modulemd(self):
@@ -227,16 +247,11 @@ class MBSTask(object):
         """
 
         if 'modulemd' not in self._build_info:
-            return None
+            raise gluetool.GlueError('Artifact build info does not include modulemd document')
 
         modulemd = gluetool.utils.from_yaml(self._build_info['modulemd'])
 
         log_dict(self.debug, 'modulemd', modulemd)
-
-        if not modulemd:
-            # I'm curious how this can happen, and how common thing it is to not have modulemd
-            # available over MBS API.
-            self.warn('Artifact build info does not include modulemd document', sentry=True)
 
         return modulemd
 
@@ -255,9 +270,6 @@ class MBSTask(object):
         :rtype: TaskArches
         :returns: Information about arches the task was building for
         """
-
-        if not self._modulemd:
-            return TaskArches([self.module.option('arches')])
 
         query = """
               .data.components.rpms
@@ -287,8 +299,10 @@ class MBSTask(object):
 
         try:
             requires = self._modulemd['data']['dependencies'][0]['requires']
-        except IndexError:
-            raise gluetool.GlueError("API returned unexpected '_modulemd' structure")
+        except (AttributeError, KeyError) as error:
+            raise gluetool.GlueError('Could not detect module dependecies: {}'.format(error))
+
+        self.info(requires)
 
         for module_name, module_streams in requires.iteritems():
             for stream in module_streams:
@@ -306,11 +320,12 @@ class MBSTask(object):
         Distgit ref id from which package has been built or ``None`` if it's impossible to find it.
 
         :rtype: str
+        :returns: Dist-git ref of the build source.
         """
         try:
             return self._build_info['scmurl'].split('#')[1].encode('ascii')
         except IndexError:
-            self.debug('Distgit ref not found')
+            self.debug('Distgit ref not found in scmurl: {}'.format(self._build_info['scmurl']))
         return None
 
 
@@ -347,18 +362,6 @@ class MBS(gluetool.Module):
                 'action': 'append',
                 'default': [],
             },
-        }),
-        ('Build defaults', {
-            'target': {
-                'help': 'Value for property target (default: %(default)s).',
-                'type': str,
-                'default': 'module-rhel8'
-            },
-            'arches': {
-                'help': 'Value for property arches (default: %(default)s).',
-                'type': str,
-                'default': 'x86_64'
-            }
         })
     ]
 
@@ -440,11 +443,14 @@ class MBS(gluetool.Module):
                              Type of the artifact, ``mbs-build`` in the case of ``mbs`` module.
                              """,
             'BUILD_TARGET': """
-                            Build target of the primary task, as known to Koji/Beaker.
+                            Build target for modules is the platform module stream name (e.g. el8, el8.1.0, etc).
                             """,
             'PRIMARY_TASK': """
                             Primary task, represented as ``MBSTask`` instance.
                             """,
+            'TAGS': """
+                    Module Brew/Koji build tags.
+                    """,
             'TASKS': """
                      List of all tasks known to this module instance.
                      """
@@ -461,6 +467,7 @@ class MBS(gluetool.Module):
             'ARTIFACT_TYPE': primary_task.ARTIFACT_NAMESPACE,
             'BUILD_TARGET': primary_task.target,
             'PRIMARY_TASK': primary_task,
+            'TAGS': primary_task.tags,
             'TASKS': self.tasks()
         }
 
@@ -478,6 +485,9 @@ class MBS(gluetool.Module):
     def execute(self):
         # pylint: disable=line-too-long
         self.info("connected to MBS instance '{}' version '{}'".format(self.option('mbs-api-url'), self.mbs_api().about.version))  # Ignore PEP8Bear
+
+        # koji/brew is required to get module tags
+        self.require_shared('koji_session')
 
         if any([self.option(opt) for opt in ['build-id', 'nsvc', 'nvr']]):
             self._init_mbs_builds(
