@@ -533,10 +533,11 @@ class TestBatchPlanner(gluetool.Module):
         commands = []
 
         for _, testset in ci_config_section.children.iteritems():
-            discovery = testset.get('discover')
-            execution = testset.get('execute')
+            discover_config = testset.get('discover')
+            execute_config = testset.get('execute')
+            report_config = testset.get('report')
 
-            if not discovery or not execution:
+            if not discover_config or not execute_config:
                 continue
 
             dispatch_command = {
@@ -552,14 +553,15 @@ class TestBatchPlanner(gluetool.Module):
                 # pylint: disable=unused-argument,cell-var-from-loop
 
                 dispatch_command['options'].update({
-                    detail: render_template(value, **context) for detail, value in argument.iteritems()
+                    '--{}'.format(detail): render_template(value, **context) for detail, value in argument.iteritems()
                 })
 
             context = gluetool.utils.dict_update(
                 self.shared('eval_context'),
                 {
-                    'DISCOVER': discovery,
-                    'EXECUTE': execution
+                    'DISCOVER': discover_config,
+                    'EXECUTE': execute_config,
+                    'REPORT': report_config
                 }
             )
 
@@ -569,13 +571,16 @@ class TestBatchPlanner(gluetool.Module):
             }, context=context)
 
             if 'dispatch-module' not in dispatch_command:
-                self.warn('Cannot handle {}/{}'.format(discovery.get('how', None), execution.get('how', None)))
+                self.warn(
+                    'Cannot handle {}/{}'.format(discover_config.get('how', None), execute_config.get('how', None))
+                )
+
                 continue
 
             commands.append((
                 dispatch_command['dispatch-module'],
                 sum([
-                    [option_name, option_value]
+                    ['{}={}'.format(option_name, option_value)]
                     for option_name, option_value in dispatch_command['options'].iteritems()
                 ], [])
             ))
