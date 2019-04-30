@@ -232,7 +232,7 @@ class CICovscan(gluetool.Module):
     def covscan_xunit_serialize(self, test_suite, result):
         # pylint: disable=no-self-use
         test_case = new_xml_element('testcase', _parent=test_suite, name=self.shared('primary_task').nvr,
-                                    added=result.added, fixed=result.fixed, baseline=result.baseline,
+                                    added=result.added, fixed=result.fixed, baseline=result.baseline.nvr,
                                     overall_result=result.overall_result, result_class=result.result_class,
                                     test_type=result.test_type)
 
@@ -246,7 +246,7 @@ class CICovscan(gluetool.Module):
         for log_type in ['added', 'fixed']:
             for log_ext in ['err', 'html', 'js']:
                 log_name = "{}.{}".format(log_type, log_ext)
-                new_xml_element("log", _parent=logs, name=log_name, url=_log_url(log_name))
+                new_xml_element("log", _parent=logs, name=log_name, href=_log_url(log_name))
 
         new_xml_element('log', _parent=logs, name='src.rpm', url=logs_url.format(result.baseline.nvr + '.src.rpm'))
         new_xml_element('log', _parent=logs, name='tar.gz', url=logs_url.format(result.baseline.nvr + '.tar.gz'))
