@@ -261,16 +261,6 @@ def fixture_result_modules(request, notify_email, monkeypatch):
 
 @pytest.fixture(name='soft_modules', params=[
     (
-        gluetool.glue.GlueError,
-        ('dummy error message',),
-        {},
-        asset('hard-error.yaml'),
-        {
-            'JOB_NAME': 'ci-openstack',
-            'BUILD_ID': '2692'
-        }
-    ),
-    (
         gluetool_modules.testing.beaker.beaker.BeakerJobwatchError,
         (MagicMock(), 'beaker matrix URL',),
         {},
