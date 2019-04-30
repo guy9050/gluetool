@@ -104,10 +104,20 @@ class TestSchedulerBeakerXML(gluetool.Module):
 
             schedule_entry = TestScheduleEntry(gluetool.log.Logging.get_logger(), index, i, recipe_set)
 
-            schedule_entry.testing_environment = TestingEnvironment(
-                compose=recipe_set.find('distroRequires').find('distro_name')['value'].encode('ascii'),
-                arch=recipe_set.find('distroRequires').find('distro_arch')['value'].encode('ascii')
-            )
+            distro_request = recipe_set.find('distroRequires')
+            if not distro_request:
+                raise gluetool.GlueError('No "distroRequires" found in recipe set')
+
+            distro_name_request = distro_request.find(['distro_name', 'distro_family'])
+            distro_arch_request = distro_request.find('distro_arch')
+
+            if not distro_name_request or not distro_arch_request:
+                raise gluetool.GlueError('Failed to detect distro name and architecture from request')
+
+            compose = distro_name_request['value'].encode('ascii')
+            arch = distro_arch_request['value'].encode('ascii')
+
+            schedule_entry.testing_environment = TestingEnvironment(compose=compose, arch=arch)
 
             log_xml(schedule_entry.debug, 'full recipe set', schedule_entry.recipe_set)
             log_dict(schedule_entry.debug, 'testing environment', schedule_entry.testing_environment)
