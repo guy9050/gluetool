@@ -118,7 +118,7 @@ class Semaphore(gluetool.Module):
             for component in self.component_states:
                 log_dict(self.debug, 'component', component)
 
-                context = gluetool.utils.dict_update(self.eval_context, {
+                context = gluetool.utils.dict_update(self.shared('eval_context'), {
                     'MODULE': self,
                     'COMPONENT': component,
                     'COMPONENTS': self.component_states
