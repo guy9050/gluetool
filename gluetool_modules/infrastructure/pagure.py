@@ -135,6 +135,8 @@ class Pagure(gluetool.Module):
     name = 'pagure'
     description = 'Provides Pagure pull request information'
 
+    supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
+
     options = [
         ('Pagure options', {
             'pagure-url': {
