@@ -2,11 +2,9 @@ import collections
 import tempfile
 import os
 import re
-import sys
 
 from concurrent.futures import ThreadPoolExecutor
 import inotify.adapters
-import six
 
 import gluetool
 from gluetool import GlueError
@@ -22,6 +20,9 @@ from gluetool_modules.testing.test_scheduler_sti import TestScheduleEntry  # noq
 
 # Check whether Ansible finished running tests every 5 seconds.
 DEFAULT_WATCH_TIMEOUT = 5
+
+# Ansible output
+ANSIBLE_OUTPUT = "ansible-output.txt"
 
 
 #: Represents a single run of a test - one STI playbook can contain multiple such tests
@@ -172,7 +173,7 @@ sut     ansible_host={} ansible_user=root {}
                     'ansible_ssh_common_args': ' '.join(['-o ' + option for option in schedule_entry.guest.options])
                 })
 
-            log_filepath = os.path.join(work_dirpath, 'ansible-output.txt')
+            log_filepath = os.path.join(work_dirpath, ANSIBLE_OUTPUT)
             log_location = self.shared('artifacts_location', log_filepath, logger=schedule_entry.logger)
 
             with open(log_filepath, 'w') as f:
@@ -237,11 +238,13 @@ sut     ansible_host={} ansible_user=root {}
             future.result()
 
         except GlueError:
-            # STI defines that Ansible MUST fail if any of the tests fail
-            # To differentiate from a generic ansible error, we check if
-            # required test.log was generated with at least one result
+
+            # STI defines that Ansible MUST fail if any of the tests fail. To differentiate from a generic ansible
+            # error, we check if required test.log was generated with at least one result.
+            # Note that Ansible error is still a user error though, nothing we can do anything about, in case ansible
+            # failed, report the ansible output as the test result.
             if not results:
-                six.reraise(*sys.exc_info())
+                results.append(TaskRun(name='ansible', schedule_entry=schedule_entry, result='FAIL'))
 
         return results
 
