@@ -6,6 +6,31 @@ All notable changes to this project will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
 
+2019-05-03
+----------
+
+Added
+~~~~~
+
+- [pagure] support dry run level ``DRY``
+- [rules-engine] ANY & ALL helper functions
+- [wow] add WowCommand to the context 
+
+Changed
+~~~~~~~
+
+- [mbs] get tags from brew, target from platform stream
+- [semaphore] use `eval_context` correctly
+
+Fixed
+~~~~~
+
+- [covscan] fix minor issues with xunit export
+- [test-batch-planner] cleaner handling of stages and options
+- [test-scheduler-beaker-xml] if there is no distro_name from bkr, use distro_family
+
+
+
 2019-04-25
 ----------
 
