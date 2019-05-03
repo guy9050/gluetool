@@ -234,7 +234,7 @@ class MBSTask(object):
         if not platform_stream:
             raise gluetool.GlueError('Could not detect platform stream in modulemd document')
 
-        return platform_stream
+        return platform_stream.encode('ascii')
 
     @cached_property
     def _modulemd(self):
@@ -301,8 +301,6 @@ class MBSTask(object):
             requires = self._modulemd['data']['dependencies'][0]['requires']
         except (AttributeError, KeyError) as error:
             raise gluetool.GlueError('Could not detect module dependecies: {}'.format(error))
-
-        self.info(requires)
 
         for module_name, module_streams in requires.iteritems():
             for stream in module_streams:
