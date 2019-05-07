@@ -1,4 +1,5 @@
 import json
+import re
 import gluetool
 from gluetool.log import log_dict
 from gluetool.utils import Command
@@ -130,6 +131,39 @@ class InstallMBSBuild(gluetool.Module):
         sut_installation.add_step('Reset module', 'yum module reset -y {}', items=nsvc)
         sut_installation.add_step('Enable module', 'yum module enable -y {}', items=nsvc)
         sut_installation.add_step('Install module', 'yum module install -y {}', items=nsvc)
+
+        def _check_installed(command, output):
+            # type: (str, gluetool.utils.ProcessOutput) -> None
+            """
+            Process output of `yum module info` command and raises `gluetool.glue.GlueCommandError` if it is incorrect.
+            """
+
+            odcs_part = None
+
+            for part in output.stdout.split('\n\n'):
+                if re.search(r'Repo\s*:\s*odcs-\d+', part):
+                    odcs_part = part
+
+            if not odcs_part:
+                self.error("Module '{}' is not provided by ODCS repo".format(nsvc))
+                raise gluetool.glue.GlueCommandError(command, output)
+
+            if self.option('profile'):
+                profile = self.option('profile')
+            else:
+                match = re.search(r'Default profiles\s*:\s*(.*)', odcs_part)
+                profile = match.group(1) if match else 'UNKNOWN-DEFAULT-PROFILE'
+
+            if not re.search(r'Profiles\s*:.*{}(?: \[d\])? \[i\]'.format(profile), odcs_part):
+                self.error("Profile '{}' is not installed".format(profile))
+                raise gluetool.glue.GlueCommandError(command, output)
+
+            if not re.search(r'Stream\s*:\s*{} (?:\[d\])?\[e\] ?\[a\]'.format(primary_task.stream), odcs_part):
+                self.error("Stream '{}' is not active or enabled".format(primary_task.stream))
+                raise gluetool.glue.GlueCommandError(command, output)
+
+        sut_installation.add_step('Verify module installed', 'yum module info {}',
+                                  items=nsvc, callback=_check_installed)
 
         for guest in guests:
             sut_installation.run(guest)

@@ -9,19 +9,24 @@ from jq import jq
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
-from typing import TYPE_CHECKING, cast, Any, Dict, List, Union, Optional  # noqa
+from typing import TYPE_CHECKING, cast, Any, Dict, List, Union, Optional, Callable  # noqa
 
 if TYPE_CHECKING:
     import libci.guest # noqa
+
+#: Step callback type
+# pylint: disable=invalid-name
+StepCallbackType = Callable[[str, gluetool.utils.ProcessOutput], None]
 
 #: Describes one command used to SUT installtion
 #:
 #: :ivar str label: Label used for logging.
 #: :ivar str command: Command to execute on the guest, executed once for each item from items.
 #:                    It can contain a placeholder ({}) which is substituted by the current item.
-#: :ivar list(str) items: Items to execute command withreplaced to `command`.
+#: :ivar list(str) items: Items to execute command with replaced to `command`.
 #: :ivar bool ignore_exception: Indicates whether to raise `SUTInstallationFailedError` when command fails.
-SUTStep = collections.namedtuple('SUTStep', ['label', 'command', 'items', 'ignore_exception'])
+#: :ivar Callable callback: Callback to additional processing of command output.
+SUTStep = collections.namedtuple('SUTStep', ['label', 'command', 'items', 'ignore_exception', 'callback'])
 
 
 class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
@@ -42,8 +47,9 @@ class SUTInstallation(object):
         self.primary_task = primary_task
         self.steps = []  # type: List[SUTStep]
 
-    def add_step(self, label, command, items=None, ignore_exception=False):
-        # type: (str, str, Union[Optional[str], Optional[List[str]]], bool) -> None
+    def add_step(self, label, command, items=None, ignore_exception=False, callback=None):
+        # pylint: disable=too-many-arguments
+        # type: (str, str, Union[Optional[str], Optional[List[str]]], bool, Optional[StepCallbackType]) -> None
 
         if not items:
             items = []
@@ -51,13 +57,13 @@ class SUTInstallation(object):
         if not isinstance(items, list):
             items = [items]
 
-        self.steps.append(SUTStep(label, command, items, ignore_exception))
+        self.steps.append(SUTStep(label, command, items, ignore_exception, callback))
 
     def run(self, guest):
         # type: (libci.guest.NetworkedGuest) -> None
 
-        def _run_and_log(command, log_file_path):
-            # type: (str, str) -> bool
+        def _run_and_log(command, log_file_path, callback):
+            # type: (str, str, Optional[Callable]) -> bool
             # Set to `True` when the exception was raised by a command - we cannot immediately
             # raise `SUTInstallationFailedError` because we want to log output of the command,
             # and we cannot use `exc` and check whether it's not `None` because Python will
@@ -66,6 +72,9 @@ class SUTInstallation(object):
 
             try:
                 output = guest.execute(command)
+
+                if callback:
+                    callback(command, output)
 
             except gluetool.glue.GlueCommandError as exc:
                 execute_failed = True
@@ -105,7 +114,7 @@ class SUTInstallation(object):
                 command = '{}{}'.format('dnf', command[3:])
 
             if not step.items:
-                command_failed = _run_and_log(command, log_file_path)
+                command_failed = _run_and_log(command, log_file_path, step.callback)
 
                 if command_failed and not step.ignore_exception:
                     raise SUTInstallationFailedError(self.primary_task, guest)
@@ -115,7 +124,7 @@ class SUTInstallation(object):
                 # e.g 'yum install -y {}'.format('ksh')
                 final_command = command.format(item)
 
-                command_failed = _run_and_log(final_command, log_file_path)
+                command_failed = _run_and_log(final_command, log_file_path, step.callback)
 
                 if not command_failed:
                     continue

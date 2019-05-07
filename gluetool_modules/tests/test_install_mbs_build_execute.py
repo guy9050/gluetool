@@ -77,6 +77,77 @@ Waiting for command create on compose 72215 to finish.
 }
 """
 
+INFO_OUTPUT = """
+Name             : mailman
+Stream           : 2.1 [d][e]
+Version          : 820181213140247
+Context          : 77fc8825
+Profiles         : common [d] [i]
+Default profiles : common
+Repo             : rhel-AppStream
+Summary          : Electronic mail discussion and e-newsletter lists managing software
+Description      : An initial version of the mailman mailing list management software
+Artifacts        : mailman-3:2.1.29-4.module+el8+2450+4586b8cd.x86_64
+
+Name             : mailman
+Stream           : stream [d][e][a]
+Version          : 820181213140247
+Context          : 77fc8825
+Profiles         : common [d] [i]
+Default profiles : common
+Repo             : odcs-100372
+Summary          : Electronic mail discussion and e-newsletter lists managing software
+Description      : An initial version of the mailman mailing list management software
+Artifacts        : mailman-3:2.1.29-4.module+el8+2450+4586b8cd.x86_64
+
+Hint: [d]efault, [e]nabled, [x]disabled, [i]nstalled, [a]ctive]
+"""
+
+INFO_OUTPUT_NO_STREAM = """
+Name             : mailman
+Stream           : stream [d][a]
+Version          : 820181213140247
+Context          : 77fc8825
+Profiles         : common [d] [i]
+Default profiles : common
+Repo             : odcs-100372
+Summary          : Electronic mail discussion and e-newsletter lists managing software
+Description      : An initial version of the mailman mailing list management software
+Artifacts        : mailman-3:2.1.29-4.module+el8+2450+4586b8cd.x86_64
+
+Hint: [d]efault, [e]nabled, [x]disabled, [i]nstalled, [a]ctive]
+"""
+
+INFO_OUTPUT_NO_PROFILE = """
+Name             : mailman
+Stream           : stream [d][e][a]
+Version          : 820181213140247
+Context          : 77fc8825
+Profiles         : common [d]
+Default profiles : common
+Repo             : odcs-100372
+Summary          : Electronic mail discussion and e-newsletter lists managing software
+Description      : An initial version of the mailman mailing list management software
+Artifacts        : mailman-3:2.1.29-4.module+el8+2450+4586b8cd.x86_64
+
+Hint: [d]efault, [e]nabled, [x]disabled, [i]nstalled, [a]ctive]
+"""
+
+INFO_OUTPUT_NO_DEFAULT_PROFILE = """
+Name             : mailman
+Stream           : stream [d][e][a]
+Version          : 820181213140247
+Context          : 77fc8825
+Profiles         : some_other_profile [d]
+Default profiles : common
+Repo             : odcs-100372
+Summary          : Electronic mail discussion and e-newsletter lists managing software
+Description      : An initial version of the mailman mailing list management software
+Artifacts        : mailman-3:2.1.29-4.module+el8+2450+4586b8cd.x86_64
+
+Hint: [d]efault, [e]nabled, [x]disabled, [i]nstalled, [a]ctive]
+"""
+
 WORKAROUNDS_OUTPUT = [
     {'label': 'Apply workaround', 'command': 'workaround command'},
     {'label': 'Apply other workaround', 'command': 'other workaround command'}
@@ -158,9 +229,9 @@ def test_loadable(module):
 def test_guest_setup(module, monkeypatch):
     primary_task_mock = MagicMock()
     primary_task_mock.nsvc = NSVC
-    execute_mock = MagicMock()
-    run_mock = MagicMock()
-    run_mock.stdout = ODCS_OUTPUT
+    primary_task_mock.stream = STREAM
+    execute_mock = MagicMock(return_value=MagicMock(stdout=INFO_OUTPUT))
+    run_mock = MagicMock(stdout=ODCS_OUTPUT)
 
     module._config['log-dir-name'] = LOG_DIR_NAME
 
@@ -200,9 +271,8 @@ def test_use_devel_module_and_profile(module, monkeypatch):
     primary_task_mock.stream = STREAM
     primary_task_mock.version = VERSION
     primary_task_mock.context = CONTEXT
-    execute_mock = MagicMock()
-    run_mock = MagicMock()
-    run_mock.stdout = ODCS_OUTPUT
+    execute_mock = MagicMock(return_value=MagicMock(stdout=INFO_OUTPUT))
+    run_mock = MagicMock(stdout=ODCS_OUTPUT)
 
     module._config['log-dir-name'] = LOG_DIR_NAME
 
@@ -237,9 +307,9 @@ def test_workarounds(module, monkeypatch):
 
     primary_task_mock = MagicMock()
     primary_task_mock.nsvc = NSVC
-    execute_mock = MagicMock()
-    run_mock = MagicMock()
-    run_mock.stdout = ODCS_OUTPUT
+    primary_task_mock.stream = STREAM
+    execute_mock = MagicMock(return_value=MagicMock(stdout=INFO_OUTPUT))
+    run_mock = MagicMock(stdout=ODCS_OUTPUT)
 
     module._config['log-dir-name'] = LOG_DIR_NAME
 
@@ -326,6 +396,39 @@ def test_execute_command_fail(module, monkeypatch):
     execute_mock.side_effect = gluetool.glue.GlueCommandError('dummy_error', MagicMock(exit_code=1))
     run_mock = MagicMock()
     run_mock.stdout = ODCS_OUTPUT
+
+    module._config['log-dir-name'] = LOG_DIR_NAME
+
+    monkeypatch.setattr(
+        'gluetool_modules.helpers.install_mbs_build_execute.Command.run',
+        MagicMock(return_value=run_mock)
+    )
+
+    patch_shared(monkeypatch, module, {
+        'primary_task': primary_task_mock,
+        'evaluate_instructions': MagicMock()
+    })
+
+    guests = mock_guests(1, execute_mock)
+
+    with pytest.raises(SUTInstallationFailedError):
+        module.setup_guest(guests)
+
+    cleanup_log_files(guests)
+
+
+@pytest.mark.parametrize('info_output', [
+    INFO_OUTPUT_NO_STREAM,
+    INFO_OUTPUT_NO_PROFILE,
+    INFO_OUTPUT_NO_DEFAULT_PROFILE,
+    ''
+])
+def test_sut_installation_fail(module, monkeypatch, info_output):
+    primary_task_mock = MagicMock()
+    primary_task_mock.nsvc = NSVC
+    primary_task_mock.stream = STREAM
+    execute_mock = MagicMock(return_value=MagicMock(stdout=info_output))
+    run_mock = MagicMock(stdout=ODCS_OUTPUT)
 
     module._config['log-dir-name'] = LOG_DIR_NAME
 
