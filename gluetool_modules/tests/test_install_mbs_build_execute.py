@@ -118,7 +118,7 @@ Artifacts        : mailman-3:2.1.29-4.module+el8+2450+4586b8cd.x86_64
 Hint: [d]efault, [e]nabled, [x]disabled, [i]nstalled, [a]ctive]
 """
 
-INFO_OUTPUT_NO_PROFILE = """
+INFO_OUTPUT_NO_PROFILE_INSTALLED = """
 Name             : mailman
 Stream           : stream [d][e][a]
 Version          : 820181213140247
@@ -133,13 +133,41 @@ Artifacts        : mailman-3:2.1.29-4.module+el8+2450+4586b8cd.x86_64
 Hint: [d]efault, [e]nabled, [x]disabled, [i]nstalled, [a]ctive]
 """
 
+INFO_OUTPUT_NO_PROFILES_AVAILABLE = """
+Name             : mailman
+Stream           : stream [d][e][a]
+Version          : 820181213140247
+Context          : 77fc8825
+Default profiles : common
+Repo             : odcs-100372
+Summary          : Electronic mail discussion and e-newsletter lists managing software
+Description      : An initial version of the mailman mailing list management software
+Artifacts        : mailman-3:2.1.29-4.module+el8+2450+4586b8cd.x86_64
+
+Hint: [d]efault, [e]nabled, [x]disabled, [i]nstalled, [a]ctive]
+"""
+
 INFO_OUTPUT_NO_DEFAULT_PROFILE = """
 Name             : mailman
 Stream           : stream [d][e][a]
 Version          : 820181213140247
 Context          : 77fc8825
-Profiles         : some_other_profile [d]
-Default profiles : common
+Profiles         : common [d]
+Repo             : odcs-100372
+Summary          : Electronic mail discussion and e-newsletter lists managing software
+Description      : An initial version of the mailman mailing list management software
+Artifacts        : mailman-3:2.1.29-4.module+el8+2450+4586b8cd.x86_64
+
+Hint: [d]efault, [e]nabled, [x]disabled, [i]nstalled, [a]ctive]
+"""
+
+INFO_OUTPUT_UNAVAILABLE_PROFILE = """
+Name             : mailman
+Stream           : stream [d][e][a]
+Version          : 820181213140247
+Context          : 77fc8825
+Profiles         : common [d]
+Default profiles : unavailable
 Repo             : odcs-100372
 Summary          : Electronic mail discussion and e-newsletter lists managing software
 Description      : An initial version of the mailman mailing list management software
@@ -195,9 +223,11 @@ def assert_log_files(guests, file_names=None):
     if not file_names:
         file_names = [
             '0-Download-ODCS-repo.txt',
-            '1-Reset-module.txt',
-            '2-Enable-module.txt',
-            '3-Install-module.txt'
+            '1-Verify-profile.txt',
+            '2-Reset-module.txt',
+            '3-Enable-module.txt',
+            '4-Install-module.txt',
+            '5-Verify-module-installed.txt'
         ]
 
     for guest in guests:
@@ -348,9 +378,11 @@ def test_workarounds(module, monkeypatch):
         '0-Apply-workaround.txt',
         '1-Apply-other-workaround.txt',
         '2-Download-ODCS-repo.txt',
-        '3-Reset-module.txt',
-        '4-Enable-module.txt',
-        '5-Install-module.txt'
+        '3-Verify-profile.txt',
+        '4-Reset-module.txt',
+        '5-Enable-module.txt',
+        '6-Install-module.txt',
+        '7-Verify-module-installed.txt'
         ])
     cleanup_log_files(guests)
 
@@ -419,8 +451,10 @@ def test_execute_command_fail(module, monkeypatch):
 
 @pytest.mark.parametrize('info_output', [
     INFO_OUTPUT_NO_STREAM,
-    INFO_OUTPUT_NO_PROFILE,
+    INFO_OUTPUT_NO_PROFILE_INSTALLED,
     INFO_OUTPUT_NO_DEFAULT_PROFILE,
+    INFO_OUTPUT_NO_PROFILES_AVAILABLE,
+    INFO_OUTPUT_UNAVAILABLE_PROFILE,
     ''
 ])
 def test_sut_installation_fail(module, monkeypatch, info_output):

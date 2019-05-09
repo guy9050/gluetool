@@ -109,10 +109,16 @@ class InstallMBSBuild(gluetool.Module):
         # Some modules do not provide 'default' module and user needs to explicitly specify it, for more info see
         #   https://projects.engineering.redhat.com/browse/OSCI-56
         #
-        if self.option('profile'):
-            nsvc = '{}/{}'.format(nsvc, self.option('profile'))
 
-        sut_installation = SUTInstallation(self.option('log-dir-name'), primary_task)
+        # using dictionary with one item to be able modify this value from inner functions, since python 2 does not
+        # support `nonlocal`
+        profile = {}
+
+        if self.option('profile'):
+            profile['profile'] = self.option('profile')
+            nsvc = '{}/{}'.format(nsvc, profile['profile'])
+
+        sut_installation = SUTInstallation(self.option('log-dir-name'), primary_task, logger=self.logger)
 
         # callback for 'commands' item in installation_workarounds
         # pylint: disable=unused-argument
@@ -128,6 +134,47 @@ class InstallMBSBuild(gluetool.Module):
             'Download ODCS repo', 'curl -v {} --output /etc/yum.repos.d/mbs_build.repo',
             items=repo_url
         )
+
+        def _find_odcs_part(output):
+            for part in output.split('\n\n'):
+                if re.search(r'Repo\s*:\s*odcs-\d+', part):
+                    return part
+
+            return None
+
+        def _verify_profile(command, output):
+            odcs_part = _find_odcs_part(output.stdout)
+
+            if not odcs_part:
+                return "Module '{}' is not provided by ODCS repo".format(nsvc)
+
+            profiles = None
+            match = re.search(r'Profiles\s*:\s*(.+)', odcs_part)
+            if match:
+                profiles = match.group(1).split(',')
+                profiles = [re.sub(r'\s*(?:\[d\])?(?: \[i])?', '', item) for item in profiles]
+
+            if not profiles:
+                return "Module '{}' does not have any profiles".format(nsvc)
+
+            log_dict(self.debug, 'Available profiles', profiles)
+
+            if not profile:
+                match = re.search(r'Default profiles\s*:\s*(.*)', odcs_part)
+                if match:
+                    profile['profile'] = match.group(1)
+                    self.info("Using default profile '{}'".format(profile['profile']))
+                else:
+                    return "Module '{}' doesn't have default profile set".format(nsvc)
+
+            if profile['profile'] not in profiles:
+                return "Profile '{}' is not available".format(profile['profile'])
+
+            return None
+
+        sut_installation.add_step('Verify profile', 'yum module info {}',
+                                  items=nsvc, callback=_verify_profile)
+
         sut_installation.add_step('Reset module', 'yum module reset -y {}', items=nsvc)
         sut_installation.add_step('Enable module', 'yum module enable -y {}', items=nsvc)
         sut_installation.add_step('Install module', 'yum module install -y {}', items=nsvc)
@@ -138,29 +185,18 @@ class InstallMBSBuild(gluetool.Module):
             Process output of `yum module info` command and raises `gluetool.glue.GlueCommandError` if it is incorrect.
             """
 
-            odcs_part = None
-
-            for part in output.stdout.split('\n\n'):
-                if re.search(r'Repo\s*:\s*odcs-\d+', part):
-                    odcs_part = part
+            odcs_part = _find_odcs_part(output.stdout)
 
             if not odcs_part:
-                self.error("Module '{}' is not provided by ODCS repo".format(nsvc))
-                raise gluetool.glue.GlueCommandError(command, output)
+                return "Module '{}' is not provided by ODCS repo".format(nsvc)
 
-            if self.option('profile'):
-                profile = self.option('profile')
-            else:
-                match = re.search(r'Default profiles\s*:\s*(.*)', odcs_part)
-                profile = match.group(1) if match else 'UNKNOWN-DEFAULT-PROFILE'
-
-            if not re.search(r'Profiles\s*:.*{}(?: \[d\])? \[i\]'.format(profile), odcs_part):
-                self.error("Profile '{}' is not installed".format(profile))
-                raise gluetool.glue.GlueCommandError(command, output)
+            if not re.search(r'Profiles\s*:.*{}(?: \[d\])? \[i\]'.format(profile['profile']), odcs_part):
+                return "Profile '{}' is not installed".format(profile['profile'])
 
             if not re.search(r'Stream\s*:\s*{} (?:\[d\])?\[e\] ?\[a\]'.format(primary_task.stream), odcs_part):
-                self.error("Stream '{}' is not active or enabled".format(primary_task.stream))
-                raise gluetool.glue.GlueCommandError(command, output)
+                return "Stream '{}' is not active or enabled".format(primary_task.stream)
+
+            return None
 
         sut_installation.add_step('Verify module installed', 'yum module info {}',
                                   items=nsvc, callback=_check_installed)

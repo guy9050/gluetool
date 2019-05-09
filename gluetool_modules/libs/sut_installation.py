@@ -9,7 +9,7 @@ from jq import jq
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
-from typing import TYPE_CHECKING, cast, Any, Dict, List, Union, Optional, Callable  # noqa
+from typing import TYPE_CHECKING, cast, Any, Dict, List, Tuple, Union, Optional, Callable  # noqa
 
 if TYPE_CHECKING:
     import libci.guest # noqa
@@ -30,22 +30,24 @@ SUTStep = collections.namedtuple('SUTStep', ['label', 'command', 'items', 'ignor
 
 
 class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
-    def __init__(self, task, guest, items=None):
-        # type: (Any, libci.guest.Guest, Any) -> None
+    def __init__(self, task, guest, items=None, reason=None):
+        # type: (Any, libci.guest.Guest, Any, Optional[str]) -> None
 
         super(SUTInstallationFailedError, self).__init__(task, 'SUT installation failed')
 
         self.guest = guest
         self.items = items
+        self.reason = reason
 
 
 class SUTInstallation(object):
 
-    def __init__(self, directory_name, primary_task):
-        # type: (str, Any) -> None
+    def __init__(self, directory_name, primary_task, logger=None):
+        # type: (str, Any, Optional[gluetool.log.ContextAdapter]) -> None
         self.directory_name = directory_name
         self.primary_task = primary_task
         self.steps = []  # type: List[SUTStep]
+        self.logger = logger or gluetool.log.Logging.get_logger()
 
     def add_step(self, label, command, items=None, ignore_exception=False, callback=None):
         # pylint: disable=too-many-arguments
@@ -63,22 +65,23 @@ class SUTInstallation(object):
         # type: (libci.guest.NetworkedGuest) -> None
 
         def _run_and_log(command, log_file_path, callback):
-            # type: (str, str, Optional[Callable]) -> bool
+            # type: (str, str, Optional[Callable]) -> Tuple[bool, Optional[str]]
             # Set to `True` when the exception was raised by a command - we cannot immediately
             # raise `SUTInstallationFailedError` because we want to log output of the command,
             # and we cannot use `exc` and check whether it's not `None` because Python will
             # unset `exc` when leaving `except` branch.
             execute_failed = False
+            error_message = None
 
             try:
                 output = guest.execute(command)
 
-                if callback:
-                    callback(command, output)
-
             except gluetool.glue.GlueCommandError as exc:
                 execute_failed = True
                 output = exc.output
+
+            if callback:
+                error_message = callback(command, output)
 
             with open(log_file_path, 'a') as log_file:
                 # pylint: disable=unused-argument
@@ -91,7 +94,7 @@ class SUTInstallation(object):
                 log_blob(cast(LoggingFunctionType, write_cover), 'Stdout', output.stdout or '')
                 log_blob(cast(LoggingFunctionType, write_cover), 'Stderr', output.stderr or '')
 
-            return execute_failed
+            return bool(execute_failed or error_message), error_message
 
         try:
             guest.execute('command -v yum')
@@ -114,23 +117,27 @@ class SUTInstallation(object):
                 command = '{}{}'.format('dnf', command[3:])
 
             if not step.items:
-                command_failed = _run_and_log(command, log_file_path, step.callback)
+                command_failed, error_message = _run_and_log(command, log_file_path, step.callback)
 
                 if command_failed and not step.ignore_exception:
-                    raise SUTInstallationFailedError(self.primary_task, guest)
+                    raise SUTInstallationFailedError(self.primary_task, guest, items=None, reason=error_message)
 
             for item in step.items:
                 # `step.command` contains `{}` to indicate place where item is substitute.
                 # e.g 'yum install -y {}'.format('ksh')
                 final_command = command.format(item)
 
-                command_failed = _run_and_log(final_command, log_file_path, step.callback)
+                command_failed, error_message = _run_and_log(final_command, log_file_path, step.callback)
 
                 if not command_failed:
                     continue
 
                 if step.ignore_exception:
                     continue
+
+                if error_message:
+                    self.logger.error(error_message)
+                    raise SUTInstallationFailedError(self.primary_task, guest, item, reason=error_message)
 
                 raise SUTInstallationFailedError(self.primary_task, guest, item)
 
