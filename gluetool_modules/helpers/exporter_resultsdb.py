@@ -50,6 +50,16 @@ class CIExporterResultsDB(gluetool.Module):
         """
         self.process_rpmdiff_analysis(result, topic_spec='rpmdiff.comparison')
 
+    def process_rpminspect_analysis(self, result):
+        """
+        Process rpminspect analysis results. This function just calls rpmdiff analysis handler,
+        as the processing is the same here.
+        """
+        self.process_rpmdiff_analysis(result, topic_spec='rpminspect.analysis')
+
+    def process_rpminspect_comparison(self, result):
+        self.process_rpmdiff_analysis(result, topic_spec='rpminspect.comparison')
+
     def process_covscan(self, result):
         self.require_shared('primary_task')
 
