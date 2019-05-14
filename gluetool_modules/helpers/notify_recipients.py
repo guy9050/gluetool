@@ -81,10 +81,26 @@ class NotifyRecipients(gluetool.Module):
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     supported_result_types = (
-        'beaker', 'boc', 'composetest', 'covscan', 'restraint', 'rpmdiff-analysis', 'rpmdiff-comparison'
+        'beaker',
+        'boc',
+        'composetest',
+        'covscan',
+        'restraint',
+        'rpmdiff-analysis',
+        'rpmdiff-comparison',
+        'rpminspect-analysis',
+        'rpminspect-comparison'
     )
     result_type_names = (
-        'Beaker', 'Build-on-commit', 'ComposeTest', 'Covscan', 'Restraint', 'RPMdiff analysis', 'RPMdiff comparison'
+        'Beaker',
+        'Build-on-commit',
+        'ComposeTest',
+        'Covscan',
+        'Restraint',
+        'RPMdiff analysis',
+        'RPMdiff comparison',
+        'RPMinspect analysis',
+        'RPMinspect comparison'
     )
 
     options = [

@@ -29,6 +29,8 @@ def fixture_configured_module(module, tmpdir):
         'restraint-notify': ['mno', 'some-weird/recipient'],
         'rpmdiff-analysis-add-notify': ['jkl, abc', 'abc'],
         'rpmdiff-comparison-add-notify': ['jkl, abc', 'abc'],
+        'rpminspect-analysis-add-notify': ['jkl, abc', 'abc'],
+        'rpminspect-comparison-add-notify': ['jkl, abc', 'abc'],
         'covscan-default-notify': ['uvw'],
         'foo-notify': 'xyz',
         'foo-default-notify': ['def', 'ghi'],
@@ -198,7 +200,11 @@ def test_overall_recipients(configured_module):
         'mno', 'some-weird/recipient', 'jkl', 'abc', 'abc',
         'generic recipient 1', 'generic recipient 2', 'generic recipient 3',
         'jkl', 'abc', 'abc',
-        'generic recipient 1', 'generic recipient 2', 'generic recipient 3'
+        'generic recipient 1', 'generic recipient 2', 'generic recipient 3',
+        'jkl', 'abc', 'abc',
+        'generic recipient 1', 'generic recipient 2', 'generic recipient 3',
+        'jkl', 'abc', 'abc',
+        'generic recipient 1', 'generic recipient 2', 'generic recipient 3',
     ]
 
 
