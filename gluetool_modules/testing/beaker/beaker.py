@@ -14,6 +14,7 @@ from libci.results import TestResult, publish_result
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 import gluetool_modules.libs.artifacts
+import gluetool_modules.libs.test_schedule
 
 
 REQUIRED_COMMANDS = ['bkr', 'beaker-jobwatch', 'tcms-results']
@@ -369,6 +370,9 @@ class Beaker(gluetool.Module):
 
         # workflow-tomorrow
         jobs = self._run_wow()
+
+        if not jobs:
+            raise gluetool_modules.libs.test_schedule.EmptyTestScheduleError(self.shared('primary_task'))
 
         # Log the initial beaker matrix - it will be logged by beaker-jobwatch later,
         # but beaker-jobwatch will be running behind a pipe and one or two buffers,

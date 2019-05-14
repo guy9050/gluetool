@@ -23,6 +23,7 @@ import gluetool
 import gluetool.utils
 
 import gluetool_modules.libs.artifacts
+import gluetool_modules.libs.test_schedule
 
 import gluetool_modules.testing.testing_results
 import gluetool_modules.helpers.notify_email.notify_email
@@ -321,10 +322,10 @@ def fixture_result_modules(request, notify_email, monkeypatch):
         }
     ),
     (
-        gluetool_modules.testing.wow.NoTestAvailableError,
+        gluetool_modules.libs.test_schedule.EmptyTestScheduleError,
         (MagicMock(),),
         {},
-        asset('NoTestAvailableError.yaml'),
+        asset('EmptyTestScheduleError.yaml'),
         {
             'JOB_NAME': 'ci-openstack',
             'BUILD_ID': '2692'

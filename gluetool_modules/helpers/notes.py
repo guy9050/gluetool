@@ -67,6 +67,8 @@ class Notes(gluetool.Module):
 
         self._notes.append(note)
 
+        gluetool.log.log_dict(self.debug, 'note recorded', note)
+
     @property
     def eval_context(self):
         # pylint: disable=unused-variable

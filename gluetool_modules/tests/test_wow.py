@@ -5,7 +5,8 @@ import pytest
 from mock import MagicMock
 
 import gluetool
-from gluetool_modules.testing.wow import WorkflowTomorrow, NoTestAvailableError
+from gluetool_modules.libs.test_schedule import EmptyTestScheduleError
+from gluetool_modules.testing.wow import WorkflowTomorrow
 
 from . import create_module, patch_shared, assert_shared
 
@@ -100,7 +101,7 @@ def test_loadable(module):
 def test_sanity_fail(module_with_task, opts):
     _, module = module_with_task
     module._config['wow-options'] = opts
-    with pytest.raises(NoTestAvailableError, match=r'No tests provided for the component'):
+    with pytest.raises(EmptyTestScheduleError, match=r'No tests were found for the component'):
         module.beaker_job_xml()
 
 

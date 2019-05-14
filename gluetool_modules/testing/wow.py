@@ -11,18 +11,10 @@ from libci.sentry import PrimaryTaskFingerprintsMixin
 
 import qe
 
+import gluetool_modules.libs.test_schedule
+
 
 DEFAULT_WOW_OPTIONS_SEPARATOR = '#-#-#-#-#'
-
-
-class NoTestAvailableError(PrimaryTaskFingerprintsMixin, SoftGlueError):
-    def __init__(self, task):
-        super(NoTestAvailableError, self).__init__(task, 'No tests provided for the component')
-
-    # We no longer want to see this exception in Sentry
-    @property
-    def submit_to_sentry(self):
-        return False
 
 
 class NoGeneralTestPlanError(PrimaryTaskFingerprintsMixin, SoftGlueError):
@@ -256,7 +248,7 @@ class WorkflowTomorrow(gluetool.Module):
         log_dict(self.debug, 'distros', distros)
 
         if not body_options and not self.option('wow-options') and not self.option('use-general-test-plan'):
-            raise NoTestAvailableError(primary_task)
+            raise gluetool_modules.libs.test_schedule.EmptyTestScheduleError(primary_task)
 
         distros = distros or self.shared('distro')
         log_dict(self.debug, 'actual distros', distros)
@@ -314,7 +306,11 @@ class WorkflowTomorrow(gluetool.Module):
         def _plan_job(distro, wow_options):
             # pylint: disable=too-many-statements
 
-            self.debug("constructing options distro '{}'".format(distro))
+            formatted_wow_options = gluetool.utils.format_command_line([
+                wow_options
+            ])
+
+            self.debug("constructing options for distro '{}' and options {}".format(distro, formatted_wow_options))
 
             command = WowCommand(['bkr', 'workflow-tomorrow'], [
                 '--dry-run'  # this will make wow to print job description in XML
@@ -382,20 +378,31 @@ class WorkflowTomorrow(gluetool.Module):
                 return bs4.BeautifulSoup(output.stdout, 'xml')
 
             except GlueCommandError as exc:
-                # Check for most common causes, and raise soft error where necessary
-                if 'No relevant tasks found in test plan' in exc.output.stderr:
-                    raise NoTestAvailableError(primary_task)
-
-                if 'No recipe generated (no relevant tasks?)' in exc.output.stderr:
-                    raise NoTestAvailableError(primary_task)
-
-                if 'No valid distro/variant/arch combination found' in exc.output.stderr:
-                    msg = 'Not possible to test the artifact on {}, no valid distro/arch combination.'.format(distro)
-
+                def _return_empty(msg):
                     self.warn(msg)
                     self.shared('add_note', msg, level=logging.WARN)
 
                     return None
+
+                # Check for most common causes, and raise soft error where necessary
+                if 'No relevant tasks found in test plan' in exc.output.stderr:
+                    return _return_empty('No relevant tasks found for {} and options {}'.format(
+                        distro,
+                        formatted_wow_options
+                    ))
+
+                if 'No recipe generated (no relevant tasks?)' in exc.output.stderr:
+                    return _return_empty('No relevant tasks found for {} and options {}'.format(
+                        distro,
+                        formatted_wow_options
+                    ))
+
+                if 'No valid distro/variant/arch combination found' in exc.output.stderr:
+                    return _return_empty(
+                        'Not possible to test on {}, no valid distro/arch combination'.format(
+                            distro
+                        )
+                    )
 
                 raise GeneralWOWError(primary_task, exc.output)
 

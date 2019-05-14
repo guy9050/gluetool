@@ -2,14 +2,28 @@ import enum
 import gluetool
 import gluetool.log
 from gluetool.log import LoggingFunctionType, LoggingWarningFunctionType, log_table
+import libci.sentry
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
+# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from typing import TYPE_CHECKING, cast, Any, List, Optional  # noqa
 
 if TYPE_CHECKING:
     import libci.guest  # noqa
     import gluetool_modules.libs.testing_environment  # noqa
+
+
+class EmptyTestScheduleError(libci.sentry.PrimaryTaskFingerprintsMixin, gluetool.SoftGlueError):
+    def __init__(self, task):
+        # type: (Any) -> None
+
+        super(EmptyTestScheduleError, self).__init__(task, 'No tests were found for the component')
+
+    @property
+    def submit_to_sentry(self):
+        # type: () -> bool
+
+        return False
 
 
 class TestScheduleEntryStage(enum.Enum):

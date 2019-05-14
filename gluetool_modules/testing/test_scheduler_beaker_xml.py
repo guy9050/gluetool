@@ -2,19 +2,21 @@ import gluetool
 import gluetool.log
 from gluetool.log import log_dict, log_xml
 
+import gluetool_modules.libs.test_schedule
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 from gluetool_modules.libs.test_schedule import TestSchedule, TestScheduleEntry as BaseTestScheduleEntry
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order
 from typing import cast, Any, List, Optional  # noqa
+import bs4  # noqa
 
 
 class TestScheduleEntry(BaseTestScheduleEntry):
     # pylint: disable=too-few-public-methods
 
     def __init__(self, logger, job_index, recipe_set_index, recipe_set):
-        # type: (gluetool.log.ContextAdapter, int, int, Any) -> None
+        # type: (gluetool.log.ContextAdapter, int, int, bs4.element.Tag) -> None
         """
         Test schedule entry, suited for use with Restraint.
 
@@ -56,7 +58,7 @@ class TestSchedulerBeakerXML(gluetool.Module):
     shared_functions = ['create_test_schedule']
 
     def _get_job_xmls(self, testing_environment_constraints=None):
-        # type: (Optional[List[TestingEnvironment]]) -> List[Any]
+        # type: (Optional[List[TestingEnvironment]]) -> List[bs4.element.Tag]
         """
         Use ``beaker_job_xml`` shared function - probably running ``workflow-tomorrow`` behind the curtain - to get
         XML descriptions of Beaker jobs, implementing the testing. Provides few basic options, necessary from "system"
@@ -78,12 +80,19 @@ class TestSchedulerBeakerXML(gluetool.Module):
             '--suppress-install-task'
         ]
 
-        return cast(List[Any], self.shared('beaker_job_xml', options=options, extra_context={
-            'TESTING_ENVIRONMENT_CONSTRAINTS': testing_environment_constraints or []
-        }))
+        return cast(
+            List[bs4.element.Tag],
+            self.shared(
+                'beaker_job_xml',
+                options=options,
+                extra_context={
+                    'TESTING_ENVIRONMENT_CONSTRAINTS': testing_environment_constraints or []
+                }
+            )
+        )
 
     def _create_job_schedule(self, index, job):
-        # type: (int, Any) -> TestSchedule
+        # type: (int, bs4.element.Tag) -> TestSchedule
         """
         For a given job XML, extract recipe sets and their corresponding testing environments.
 
@@ -138,7 +147,7 @@ class TestSchedulerBeakerXML(gluetool.Module):
         return schedule
 
     def _create_jobs_schedule(self, jobs):
-        # type: (List[Any]) -> TestSchedule
+        # type: (List[bs4.element.Tag]) -> TestSchedule
         """
         Create schedule for given set of jobs.
 
@@ -175,5 +184,8 @@ class TestSchedulerBeakerXML(gluetool.Module):
         self.require_shared('beaker_job_xml')
 
         job_xmls = self._get_job_xmls(testing_environment_constraints=testing_environment_constraints)
+
+        if not job_xmls:
+            raise gluetool_modules.libs.test_schedule.EmptyTestScheduleError(self.shared('primary_task'))
 
         return self._create_jobs_schedule(job_xmls)
