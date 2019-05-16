@@ -11,8 +11,9 @@ class BuildDependencies(gluetool.Module):
 
     Following methods are available:
 
-    * ``companions-from-koji``: takes a list of `companions` (via ``--companions`` option), tries
-      to lookup up the latest possible builds for them, respecting the build target.
+    * ``companions-from-koji``: takes a list of `companions` by NVR (via ``--companions-nvr``) or by looking up
+                                the latest possible builds specified by compoment name (via ``--companions``),
+                                using the build target of the primary task in the pipeline.
 
     * ``companions-from-copr``: takes a list of `companions` (via ``--companions`` option), tries
       to lookup their latest build with same build target in project, which primary task belongs to.
@@ -37,6 +38,12 @@ class BuildDependencies(gluetool.Module):
             'action': 'append',
             'default': [],
             'metavar': 'COMPONENT1,...'
+        },
+        'companions-nvr': {
+            'help': 'List of additional build NVRs to look for (default: none).',
+            'action': 'append',
+            'default': [],
+            'metavar': 'NVR1,...'
         },
         'companion-target-fallback-map': {
             'help': """
@@ -195,13 +202,15 @@ class BuildDependencies(gluetool.Module):
         method = self.option('method')
 
         self.companions = normalize_multistring_option(self.option('companions'))
+        self.companions_nvr = normalize_multistring_option(self.option('companions-nvr'))
 
-        if self.companions and not method:
-            raise gluetool.utils.IncompatibleOptionsError('--companions option specified but no --method selected')
-
-        if method in self._methods.keys() and not self.companions:
+        if (self.companions or self.companions_nvr) and not method:
             # pylint: disable=line-too-long
-            raise gluetool.utils.IncompatibleOptionsError("--companions option is required with methods: {}.".format(', '.join(self._methods.keys())))  # Ignore PEP8Bear
+            raise gluetool.utils.IncompatibleOptionsError('--companions or --companions-nvr option specified but no --method selected')  # Ignore PEP8Bear
+
+        if method == 'companions-from-copr' and self.companions_nvr:
+            # pylint: disable=line-too-long
+            raise gluetool.utils.IncompatibleOptionsError("--companions-nvr is not compatible with '{}'".format(method))  # Ignore PEP8Bear
 
     def execute(self):
         self.require_shared('primary_task', 'tasks')
@@ -210,20 +219,21 @@ class BuildDependencies(gluetool.Module):
             self.info('No method specified, moving on.')
             return
 
-        # It may happen that user configured CI to run a single command for mulptiple components, adding them
-        # as each others companions as well, e.g. "for A, B or C, run foo and, as companions, install latest
-        # builds of A, B and C". In such case, we'd try to install A's build under the test and the latest
-        # regular build of A at the same moment, and these two build may be different builds (think scratch build,
-        # newer than the most recent regular build). Our attempt to install these two builds of component A
-        # would obviously fail. To avoid that situation, if the primary component is present on the list
-        # of companions, remove it, that way we would just try to install A's build under the test.
-        primary_component = self.shared('primary_task').component
-        if primary_component in self.companions:
-            self.info("removing primary component '{}' from a list of companions".format(primary_component))
+        if self.shared('primary_task'):
+            # It may happen that user configured CI to run a single command for multiple components, adding them
+            # as each others companions as well, e.g. "for A, B or C, run foo and, as companions, install latest
+            # builds of A, B and C". In such case, we'd try to install A's build under the test and the latest
+            # regular build of A at the same moment, and these two build may be different builds (think scratch build,
+            # newer than the most recent regular build). Our attempt to install these two builds of component A
+            # would obviously fail. To avoid that situation, if the primary component is present on the list
+            # of companions, remove it, that way we would just try to install A's build under the test.
+            primary_component = self.shared('primary_task').component
+            if primary_component in self.companions:
+                self.info("removing primary component '{}' from a list of companions".format(primary_component))
 
-            self.companions.remove(primary_component)
+                self.companions.remove(primary_component)
 
-        log_dict(self.debug, 'final list of companions', self.companions)
+            log_dict(self.debug, 'final list of companions', self.companions)
 
         method = self._methods.get(self.option('method'), None)
 
@@ -239,6 +249,10 @@ class BuildDependencies(gluetool.Module):
             log_dict(self.debug, 'current task IDs', current_tasks_ids)
             log_dict(self.debug, 'additional task IDs', additional_task_ids)
 
-            self.shared('tasks', task_ids=current_tasks_ids + additional_task_ids)
+            self.shared('tasks', task_ids=current_tasks_ids + additional_task_ids, nvrs=self.companions_nvr)
+
+        elif self.companions_nvr:
+
+            self.shared('tasks', nvrs=self.companions_nvr)
 
         log_dict(self.info, 'Updated list of tasks', [task.full_name for task in self.shared('tasks')])
