@@ -11,7 +11,7 @@ class TaskDispatcher(gluetool.Module):
     shared function - for modules and their arguments, and than runs them.
     """
 
-    name = ['task-dispatcher', 'brew-dispatcher', 'koji-dispatcher', 'copr-dispatcher']
+    name = 'task-dispatcher'
     description = 'Configurable task dispatcher'
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 

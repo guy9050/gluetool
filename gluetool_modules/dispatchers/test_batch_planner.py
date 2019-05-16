@@ -82,12 +82,18 @@ class TestBatchPlanner(gluetool.Module):
             'help': 'Comma-separated list of methods (default: none).',
             'metavar': 'METHOD',
             'action': 'append',
-            'choices': ['basic-static-config', 'ci.fmf', 'static-config', 'sti'],
+            'choices': ['basic-static-config', 'ci.fmf', 'static-config', 'sti', 'sidetag'],
             'default': []
         },
         'config': {
             'help': 'Static configuration(s) for components (default: none).',
             'action': 'append',
+            'default': []
+        },
+        'sidetag-jobs': {
+            # pylint: disable=line-too-long
+            'help': 'List of jobs supporting sidetags, for which the module adds/modifies ``--build-dependecies-options`` (default: none).',  # Ignore PEP8Bear
+            'metavar': 'JOB',
             'default': []
         },
         'sti-job-map': {
@@ -436,7 +442,40 @@ class TestBatchPlanner(gluetool.Module):
                                     all_commands=global_all_commands,
                                     default_commands=global_default_commands)
 
-    def _plan_by_static_config(self):
+    def _plan_by_sidetag(self):
+        self.require_shared('trigger_message')
+
+        message = self.shared('trigger_message')
+
+        try:
+            builds = message['msg']['artifact']['builds']
+
+        except TypeError:
+            self.warn('Trigger message is empty, skipping sidetag', sentry=True)
+            return []
+
+        except KeyError as error:
+            self.warn("Could not find builds in trigger message, skipping sidetag: '{}'".format(error), sentry=True)
+            return []
+
+        final_commands = []
+
+        for build in builds:
+            # initialize primary_task
+            tasks = self.shared('tasks', nvrs=[build['nvr']])
+
+            if not tasks:
+                raise GlueError("Could not find build '{}'".format(build['nvr']))
+
+            # companions are all other builds
+            companion_nvrs = [companion['nvr'] for companion in builds if companion['nvr'] != build['nvr']]
+
+            # call _plan_by_static_config to plan normal execition
+            final_commands.extend(self._plan_by_static_config(companion_nvrs=companion_nvrs))
+
+        return final_commands
+
+    def _plan_by_static_config(self, companion_nvrs=None):
         self.require_shared('evaluate_rules', 'eval_context')
 
         if not self.configs:
@@ -447,6 +486,39 @@ class TestBatchPlanner(gluetool.Module):
         final_commands = []
 
         context = self.shared('eval_context')
+
+        def _modify_build_dependecies(args):
+            # modify existing --build-dependecies-options
+            if not any(['--build-dependencies-options' in arg for arg in args]):
+
+                self.debug('added new build dependencies')
+
+                # pylint: disable=line-too-long
+                args.append('--build-dependecies-options=--method=companions-from-koji --companions-nvr={}'.format(','.join(companion_nvrs)))  # Ignore PEP8Bear
+
+            else:
+                # modify build dependencies with --companions-nvr option
+                args = [_alter_companions_nvr(arg) for arg in args]
+
+            return args
+
+        def _alter_companions_nvr(arg):
+            # not an option we are interested in, just return it
+            if '--build-dependencies-options' not in arg:
+                return arg
+
+            # create companion-nvrs option
+            nvrs = '--companions-nvr={}'.format(','.join(companion_nvrs))
+
+            # add to existing option
+            if '--companions-nvr' in arg:
+                self.debug('modified existing --companions-nvr')
+                return re.sub('--companions-nvr[= ]*', '{},'.format(nvrs), arg)
+
+            # add new option
+            self.debug('added new --companions-nvr')
+
+            return '{} {}'.format(arg, nvrs)
 
         for config_filepath in self.configs:
             config = load_yaml(config_filepath, logger=self.logger)
@@ -486,13 +558,17 @@ class TestBatchPlanner(gluetool.Module):
 
                     self.debug("module='{}', args='{}'".format(module, args))
 
-                    # Last step: render command arguments
+                    # Render command arguments
                     args = [
                         gluetool.utils.render_template(arg, logger=self.logger, **context)
                         for arg in args
                     ]
 
                     self.debug("module='{}', rendered args='{}'".format(module, args))
+
+                    # Modify companions if needed
+                    if companion_nvrs and module in self._sidetag_jobs:
+                        args = _modify_build_dependecies(args)
 
                     final_commands.append((module, args))
 
@@ -675,11 +751,13 @@ class TestBatchPlanner(gluetool.Module):
         self._planners = {
             'basic-static-config': self._plan_by_basic_static_config,
             'ci.fmf': self._plan_by_ci_fmf,
+            'sidetag': self._plan_by_sidetag,
             'static-config': self._plan_by_static_config,
             'sti': self._plan_by_sti
         }
 
         self._methods = gluetool.utils.normalize_multistring_option(self.option('methods'))
+        self._sidetag_jobs = gluetool.utils.normalize_multistring_option(self.option('sidetag-jobs'))
 
         if 'static-config' in self._methods and 'basic-static-config' in self._methods:
             raise gluetool.utils.IncompatibleOptionsError(
@@ -687,24 +765,24 @@ class TestBatchPlanner(gluetool.Module):
                 "methods 'basic-static-config' and 'static-config' cannot be used together"
             )
 
+        if 'sidetag' in self._methods and not self._sidetag_jobs:
+            raise gluetool.utils.IncompatibleOptionsError("--sidetag-jobs option is required with method 'sidetag'")
+
         for method in self._methods:
             if method not in self._planners:
                 raise GlueError("Unknown method '{}'".format(method))
 
             if method == 'static-config' and not self.option('config'):
                 raise gluetool.utils.IncompatibleOptionsError(
-                    self,
                     "--config option is required with method 'static-config'"
                 )
 
             if method == 'basic-static-config' and not self.option('config'):
                 raise gluetool.utils.IncompatibleOptionsError(
-                    self,
                     "--config option is required with method 'basic-static-config'"
                 )
 
             if method == 'sti' and not self.option('sti-job-map'):
                 raise gluetool.utils.IncompatibleOptionsError(
-                    self,
                     "--sti-job-map option is required with method 'sti'"
                 )
