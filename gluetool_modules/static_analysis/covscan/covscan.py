@@ -274,21 +274,23 @@ class CICovscan(gluetool.Module):
             self.info("Using '{}' (build task id: {}) as target".format(target.nvr, target.id))
             self.info("Using '{}' (build task id: {}) as baseline".format(baseline.nvr, baseline.id))
 
-            target_srpm_name = target.srpm_urls[0] if target.srpm_urls else None
-            baseline_srpm_name = baseline.srpm_urls[0] if baseline.srpm_urls else None
+            target_srpm_url = target.srpm_urls[0] if target.srpm_urls else None
+            baseline_srpm_url = baseline.srpm_urls[0] if baseline.srpm_urls else None
 
-            if not target_srpm_name:
+            if not target_srpm_url:
                 raise GlueError('Target srpm is missing')
 
-            if not baseline_srpm_name:
+            if not baseline_srpm_url:
                 raise GlueError('Baseline srpm is missing')
 
+            baseline_srpm_name = 'baseline-{}'.format(os.path.basename(baseline_srpm_url))
+
             log_dict(self.info, 'Obtaining source RPMs', {
-                'target': target_srpm_name,
-                'baseline': "{} -> baseline.src.rpm".format(baseline_srpm_name)
+                'target': target_srpm_url,
+                'baseline': "{} -> {}".format(baseline_srpm_url, baseline_srpm_name)
             })
-            target_srpm = urlgrab(target_srpm_name)
-            baseline_srpm = urlgrab(baseline_srpm_name, filename='baseline.src.rpm')
+            target_srpm = urlgrab(target_srpm_url)
+            baseline_srpm = urlgrab(baseline_srpm_url, filename=baseline_srpm_name)
 
             self.info('Looking for covscan configuration in {}'.format(self.option('config-map')))
             configs = PatternMap(self.option('config-map'), logger=self.logger).match(self.task.target, multiple=True)
