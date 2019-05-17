@@ -54,6 +54,20 @@ class TestBatchPlanner(gluetool.Module):
 
     * ``sti``: check if test/test.yaml is present in component repository. Jenkins job name
       is found in mapping file (set by ``--sti-job-map`` option).
+
+    There is a possibility to ignore some of the methods according to a rules file passed
+    via the ``--ignore-methods-map`` option. This is useful if you do not want to run some
+    of the methods for some of the artifacts. The format of the rule file is as follows:
+
+    .. code-block:: yaml
+
+       ---
+
+       - rule: PRIMARY_TASK.ARTIFACT_NAMESPACE == 'redhat-module' and PRIMARY_TASK.component == '389-ds'
+         ignore-methods:
+           - sti
+
+    Where ``ignore-methods`` attribute contains a list of methods to be ignored.
     """
 
     # Supported flags - keep them alphabetically sorted
@@ -87,6 +101,10 @@ class TestBatchPlanner(gluetool.Module):
         },
         'ci-fmf-dispatch-map': {
             'help': 'Instructions for dispatching test commands based on their ci.fmf configuration.',
+            'metavar': 'FILE'
+        },
+        'ignore-methods-map': {
+            'help': 'Additional rules for ignoring specific methods.',
             'metavar': 'FILE'
         }
     }
@@ -131,6 +149,13 @@ class TestBatchPlanner(gluetool.Module):
             return []
 
         return load_yaml(self.option('ci-fmf-dispatch-map'), logger=self.logger)
+
+    @cached_property
+    def _ignore_methods_map(self):
+        if not self.option('ignore-methods-map'):
+            return []
+
+        return load_yaml(self.option('ignore-methods-map'), logger=self.logger)
 
     def _reduce_section(self, commands, is_component=True, default_commands=None, all_commands=None):
         # pylint: disable=too-many-statements
@@ -587,6 +612,24 @@ class TestBatchPlanner(gluetool.Module):
 
         return commands
 
+    def _get_ignored_methods(self):
+        ignored_methods = []
+
+        # pylint: disable=unused-argument
+        def _add_ignore_methods(instruction, command, argument, context):
+            # pylint: disable=unused-argument
+            if not isinstance(argument, list):
+                raise GlueError('ignore-methods MUST be a list.')
+
+            ignored_methods.extend(argument)
+
+        self.shared('evaluate_instructions', self._ignore_methods_map, {
+            'ignore-methods': _add_ignore_methods
+        })
+
+        # note: duplicates are OK
+        return ignored_methods
+
     def plan_test_batch(self):
         """
         Returns list of modules and their options. These modules implement testing process
@@ -609,7 +652,13 @@ class TestBatchPlanner(gluetool.Module):
 
         test_batch = []
 
+        ignored_methods = self._get_ignored_methods()
+
         for method in self._methods:
+            if method in ignored_methods:
+                self.warn("Ignoring method '{}' due to ignore rules".format(method))
+                continue
+
             self.debug("Plan test batch using '{}' method".format(method))
 
             method_test_batch = self._planners[method]()

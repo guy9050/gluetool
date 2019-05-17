@@ -2,6 +2,7 @@ import os
 import sys
 
 import pytest
+from mock import MagicMock
 
 import gluetool
 import gluetool_modules.helpers.rules_engine
@@ -9,17 +10,17 @@ import gluetool_modules.dispatchers.test_batch_planner
 
 from . import create_module, patch_shared
 
+ASSETS_DIR = os.path.join('gluetool_modules', 'tests', 'assets', 'test_batch_planner')
+
 
 def _load_from_assets(starts_with):
     assets = []
 
-    assets_dir = os.path.join('gluetool_modules', 'tests', 'assets', 'test_batch_planner')
-
-    for filename in sorted(os.listdir(assets_dir)):
+    for filename in sorted(os.listdir(ASSETS_DIR)):
         if not filename.startswith(starts_with):
             continue
 
-        with open(os.path.join(assets_dir, filename), 'r') as f:
+        with open(os.path.join(ASSETS_DIR, filename), 'r') as f:
             assets.append(gluetool.utils.YAML().load(f))
 
     return assets
@@ -110,3 +111,27 @@ def test_config(module, config, expected):
     gluetool.log.log_dict(module.debug, 'actual command sets', actual)
 
     assert actual == expected
+
+
+@pytest.mark.parametrize('component, ignored_methods', [
+    ('389-ds', ['sti']),
+    ('llvm-toolset', ['static-config', 'sti'])
+])
+def test_ignore_methods(module, monkeypatch, component, ignored_methods):
+    # pylint: disable=protected-access
+    module._config['ignore-methods-map'] = os.path.join(ASSETS_DIR, 'ignore-methods-map.yaml')
+    rules_engine = gluetool_modules.helpers.rules_engine.RulesEngine(module.glue, 'rules-engine')
+
+    module.glue.shared_functions = {
+        'evaluate_rules': (rules_engine, rules_engine.evaluate_rules),
+        'evaluate_instructions': (rules_engine, rules_engine.evaluate_instructions),
+        'eval_context': ('dummy-module', lambda: {
+            'PRIMARY_TASK': MagicMock(ARTIFACT_NAMESPACE='redhat-module', component=component)
+        })
+    }
+
+    assert module._get_ignored_methods() == ignored_methods
+
+
+def test_no_ignore_methods(module, monkeypatch):
+    assert module._get_ignored_methods() == []
