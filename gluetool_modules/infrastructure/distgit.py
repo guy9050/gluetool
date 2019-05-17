@@ -350,6 +350,9 @@ class DistGit(gluetool.Module):
         self.require_shared('primary_task')
         task = self.shared('primary_task')
 
+        if not task:
+            raise gluetool.GlueError('No task available, cannot continue')
+
         # Gather repository parameters. Some of them may be missing - ref and branch - because we can
         # use defaults (like `HEAD` and `master`), some are required. Selects correct getter, based on
         # the method.
