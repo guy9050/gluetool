@@ -267,7 +267,7 @@ class Beaker(gluetool.Module):
         # when it reaches this task in all recipes.
         if self.option('reserve'):
             options += [
-                '--last-task="/distribution/utils/dummy"',
+                '--last-task=/distribution/utils/dummy',
                 '--last-task=RESERVETIME={}h /distribution/reservesys'.format(self.option('reserve-time'))
             ]
         else:
