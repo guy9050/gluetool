@@ -17,6 +17,19 @@ ContextGetterType = Callable[[], ContextType]  # noqa
 CommandCallbackType = Callable[[EntryType, str, Any, ContextType], bool]  # noqa
 
 
+class AttrDict(dict):
+    """
+    Access dictonary items as its attributes.
+    """
+
+    def __init__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+
+        super(AttrDict, self).__init__(*args, **kwargs)
+
+        self.__dict__ = self
+
+
 class RulesError(SoftGlueError):
     """
     Base class of rules-related soft exceptions.
@@ -313,8 +326,70 @@ class RulesEngine(gluetool.Module):
 
         variables = {}  # type: Any
 
+        def _assert_var_names(d, *path):
+            # type: (Dict, *str) -> None
+            """
+            Make sure no key in the dictionary collides with any dictionary method. Should there be any collision,
+            value of the key would replace the method, and calling such method would result in error since it's
+            not the original method anymore but an arbitrary value that was present in the dictionary.
+
+            .. code-block:: python
+
+               d = {'keys': 'foo'}
+               e = AttrDict(**d)
+               e.keys()  # e.keys is now "foo", not callable...
+            """
+
+            for k in d.iterkeys():
+                if k not in dir(d):
+                    continue
+
+                raise GlueError("Invalid variable name '{}' in {}:{}".format(k, path[0], '.'.join(path[1:])))
+
+        def _replace_dicts(current, *path):
+            # type: (Any, *str) -> Any
+            """
+            Replaces all dictionaries under (and including) ``current`` with :py:class:`AttrDict`.
+            An object is returned, to be used instead of ``current`` - it *may* be the same object,
+            but it also may have been replaced with ``AttrDict`` instance (with the same content).
+
+            :param current: object to start with.
+            :param list(str) path: list of variable names as we walk the tree.
+            """
+
+            # If `current` is a dictionary, replace `current` itself by `AttrDict` instance with the same content,
+            # and then walk through all its keys and values, and take care of lists and dictionaries.
+            if isinstance(current, dict):
+                _assert_var_names(current, *path)
+
+                current = AttrDict(**current)
+
+                for k, v in current.iteritems():
+                    if not isinstance(v, (dict, list)):
+                        continue
+
+                    current[k] = _replace_dicts(v, *(list(path) + [k]))
+
+            # For list, we don't have to replace the list itself, but we need to check its items.
+            elif isinstance(current, list):
+                for i, v in enumerate(current):
+                    current[i] = _replace_dicts(v, *(list(path) + [str(i)]))
+
+            # Return what we created. We "repaired" objects bellow `current`, and we put them into their
+            # correct places in dictionaries and lists, an by returning `current` we make sure that if
+            # we "repaired" `current` itself, it'd not be lost - our caller will put it into the correct
+            # position in *its own* frame.
+            return current
+
         for config in configs:
-            variables.update(load_yaml(config, logger=self.logger))
+            new_variables = load_yaml(config, logger=self.logger)
+
+            if not isinstance(new_variables, dict):
+                raise GlueError('Cannot add variables from {}, not a key: value format'.format(config))
+
+            new_variables = _replace_dicts(new_variables, config)
+
+            variables.update(new_variables)
 
         return variables
 
