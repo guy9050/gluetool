@@ -17,6 +17,8 @@ class TriggerMessage(gluetool.Module):
     name = 'trigger-message'
     description = 'Provides access to the message that triggered the current pipeline.'
 
+    supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
+
     options = {
         'source': {
             'help': 'From which source read the message, either ``environment`` or ``file``.',
