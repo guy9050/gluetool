@@ -64,6 +64,7 @@ INSTALL_REQUIRES = [
     "requestsexceptions==1.2.0",
     "stomp.py==4.1.17",
     "urlgrabber==3.10.2",
+    "warlock==1.2.0",
     # cannot use the "nitrate" - pip would then fail to build pycurl with the correct SSL backend
     # "git+https://github.com/psss/python-nitrate.git@1.3-2#egg=nitrate"
     "nitrate==1.3.1"

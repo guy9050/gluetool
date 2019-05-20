@@ -9,3 +9,4 @@ dependencies:
     - python-novaclient==7.1.0
     - python-openstackclient==3.9.0
     - pytz==2017.3
+    - warlock==1.2.0
