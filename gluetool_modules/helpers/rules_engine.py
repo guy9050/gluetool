@@ -1,3 +1,4 @@
+import imp
 import re
 import ast
 
@@ -230,6 +231,13 @@ class RulesEngine(gluetool.Module):
         * ``ANY(iterable)``, returning ``True`` when any item of iterable is true-ish;
         * ``EXISTS('foo')``, returning ``True`` when the variable named ``foo`` exists.
 
+    Custom functions are supported via ``--functions`` option. Listed files are loaded and
+    any global object with name not starting with `_` becomes part of ``rules-engine`` eval
+    context.
+
+    Custom variables are supported via ``--variables`` option. Listed YAML files are loaded
+    and become part of ``rules-engine`` eval context.
+
     Users of this module would simply specify what objects are available to rules in their
     domain, and then provides these objects when asking ``rules-engine`` (via the shared
     function) to evaluate the rules.
@@ -249,6 +257,11 @@ class RulesEngine(gluetool.Module):
             'help': 'Rules to evaluate when module is executed. Used for testing (default: %(default)s).',
             'default': None
         },
+        'functions': {
+            'help': 'File(s) with additional functions to use in rules and templates (default: none).',
+            'action': 'append',
+            'default': []
+        },
         'variables': {
             'help': 'File(s) with additional context objects (default: none).',
             'action': 'append',
@@ -263,7 +276,11 @@ class RulesEngine(gluetool.Module):
     @property
     def eval_context(self):
         # type: () -> Any
-        return self.variables
+
+        return gluetool.utils.dict_update(
+            self.functions,
+            self.variables
+        )
 
     def _filter(self,
                 entries,  # type: List[EntryType]
@@ -317,6 +334,33 @@ class RulesEngine(gluetool.Module):
 
             if stop_at_first_hit:
                 break
+
+    @cached_property
+    def functions(self):
+        # type: () -> Dict[str, Callable]
+
+        sources = normalize_multistring_option(self.option('functions'))
+
+        functions = {}  # type: Dict[str, Callable]
+
+        for source_filename in sources:
+            source_filepath = gluetool.utils.normalize_path(source_filename)
+
+            try:
+                code = imp.load_source(source_filename.replace('/', '_'), source_filepath)
+
+            except Exception as exc:
+                raise GlueError('Failed to load functions from {}: {}'.format(source_filename, exc))
+
+            for member_name in dir(code):
+                if member_name.startswith('_'):
+                    continue
+
+                self.debug("registered function '{}' from {}".format(member_name, source_filename))
+
+                functions[member_name] = getattr(code, member_name)
+
+        return functions
 
     @cached_property
     def variables(self):
