@@ -226,8 +226,9 @@ def assert_log_files(guests, file_names=None):
             '1-Verify-profile.txt',
             '2-Reset-module.txt',
             '3-Enable-module.txt',
-            '4-Install-module.txt',
-            '5-Verify-module-installed.txt'
+            '4-Verify-module-enabled.txt',
+            '5-Install-module.txt',
+            '6-Verify-module-installed.txt'
         ]
 
     for guest in guests:
@@ -381,8 +382,9 @@ def test_workarounds(module, monkeypatch):
         '3-Verify-profile.txt',
         '4-Reset-module.txt',
         '5-Enable-module.txt',
-        '6-Install-module.txt',
-        '7-Verify-module-installed.txt'
+        '6-Verify-module-enabled.txt',
+        '7-Install-module.txt',
+        '8-Verify-module-installed.txt'
         ])
     cleanup_log_files(guests)
 

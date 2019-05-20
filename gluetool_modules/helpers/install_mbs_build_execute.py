@@ -29,6 +29,10 @@ class InstallMBSBuild(gluetool.Module):
             'help': 'Use -devel module when generating ODCS repo.',
             'action': 'store_true'
         },
+        'enable-only': {
+            'help': 'Module is only enabled, not installed.',
+            'action': 'store_true'
+        },
         'log-dir-name': {
             'help': 'Name of directory where outputs of installation commands will be stored (default: %(default)s).',
             'type': str,
@@ -172,17 +176,26 @@ class InstallMBSBuild(gluetool.Module):
 
             return None
 
-        sut_installation.add_step('Verify profile', 'yum module info {}',
-                                  items=nsvc, callback=_verify_profile)
+        def _check_enabled(command, output):
+            # type: (str, gluetool.utils.ProcessOutput) -> None
+            """
+            Process output of `yum module info` command and returns description of issue, when output is not correct.
+            """
 
-        sut_installation.add_step('Reset module', 'yum module reset -y {}', items=nsvc)
-        sut_installation.add_step('Enable module', 'yum module enable -y {}', items=nsvc)
-        sut_installation.add_step('Install module', 'yum module install -y {}', items=nsvc)
+            odcs_part = _find_odcs_part(output.stdout)
+
+            if not odcs_part:
+                return "Module '{}' is not provided by ODCS repo".format(nsvc)
+
+            if not re.search(r'Stream\s*:\s*{} (?:\[d\])?\[e\] ?\[a\]'.format(primary_task.stream), odcs_part):
+                return "Stream '{}' is not active or enabled".format(primary_task.stream)
+
+            return None
 
         def _check_installed(command, output):
             # type: (str, gluetool.utils.ProcessOutput) -> None
             """
-            Process output of `yum module info` command and raises `gluetool.glue.GlueCommandError` if it is incorrect.
+            Process output of `yum module info` command and returns description of issue, when output is not correct.
             """
 
             odcs_part = _find_odcs_part(output.stdout)
@@ -193,13 +206,21 @@ class InstallMBSBuild(gluetool.Module):
             if not re.search(r'Profiles\s*:.*{}(?: \[d\])? \[i\]'.format(profile['profile']), odcs_part):
                 return "Profile '{}' is not installed".format(profile['profile'])
 
-            if not re.search(r'Stream\s*:\s*{} (?:\[d\])?\[e\] ?\[a\]'.format(primary_task.stream), odcs_part):
-                return "Stream '{}' is not active or enabled".format(primary_task.stream)
-
             return None
 
-        sut_installation.add_step('Verify module installed', 'yum module info {}',
-                                  items=nsvc, callback=_check_installed)
+        if not self.option('enable-only'):
+            sut_installation.add_step('Verify profile', 'yum module info {}',
+                                      items=nsvc, callback=_verify_profile)
+
+        sut_installation.add_step('Reset module', 'yum module reset -y {}', items=nsvc)
+        sut_installation.add_step('Enable module', 'yum module enable -y {}', items=nsvc)
+        sut_installation.add_step('Verify module enabled', 'yum module info {}',
+                                  items=nsvc, callback=_check_enabled)
+
+        if not self.option('enable-only'):
+            sut_installation.add_step('Install module', 'yum module install -y {}', items=nsvc)
+            sut_installation.add_step('Verify module installed', 'yum module info {}',
+                                      items=nsvc, callback=_check_installed)
 
         for guest in guests:
             sut_installation.run(guest)
