@@ -2,6 +2,7 @@ import imp
 import re
 import ast
 
+import jinja2
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.log import log_dict
@@ -16,6 +17,18 @@ EntryType = Dict[str, Any]  # noqa
 ContextType = Dict[str, Any]  # noqa
 ContextGetterType = Callable[[], ContextType]  # noqa
 CommandCallbackType = Callable[[EntryType, str, Any, ContextType], bool]  # noqa
+
+
+# The module makes context available to rules via `EVAL_CONTEXT()` call. Level the playground
+# by making it available to templates as well.
+@jinja2.contextfunction  # type: ignore  # untyped decorator
+def _get_context(context):
+    # type: (Dict[str, Any]) -> Dict[str, Any]
+
+    return context
+
+
+jinja2.defaults.DEFAULT_NAMESPACE['EVAL_CONTEXT'] = _get_context
 
 
 class AttrDict(dict):
@@ -358,7 +371,12 @@ class RulesEngine(gluetool.Module):
 
                 self.debug("registered function '{}' from {}".format(member_name, source_filename))
 
-                functions[member_name] = getattr(code, member_name)
+                fn = getattr(code, member_name)
+
+                if not callable(fn):
+                    continue
+
+                functions[member_name] = fn
 
         return functions
 
@@ -466,7 +484,10 @@ class RulesEngine(gluetool.Module):
         assert context is not None  # to make mypy happy
         custom_locals = _enhance_strings(context)
 
+        # `EVAL_CONTEXT` cannot be `custom_locals` itself - that would be a circular reference.
+        # it must be called first to return the context itself.
         custom_locals.update({
+            'EVAL_CONTEXT': lambda: AttrDict(custom_locals),
             'ALL': all,
             'ANY': any,
             'EXISTS': lambda name: name in custom_locals
