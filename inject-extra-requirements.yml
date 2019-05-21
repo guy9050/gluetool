@@ -67,6 +67,13 @@
         msg: "Install package providing OpenSSL development tools (e.g. openssl-devel, compat-openssl10-devel or similar)"
       when: openssl_devel_present.stat.isreg is not defined or not openssl_devel_present.stat.isreg
 
+    - name: "Make sure that autoconf, automake and libtool are installed"
+      shell: "rpm -q {{ item }}"
+      with_items:
+      - autoconf
+      - automake
+      - libtool
+
       #- name: "Check whether RPM bindings for Python are available"
       #  stat:
       #    path: "/usr/lib64/python2.7/site-packages/rpm"
