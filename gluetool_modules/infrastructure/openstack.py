@@ -633,7 +633,20 @@ class OpenstackGuest(NetworkedGuest):
             })
 
             self._os_instance = self._nova.servers.find(id=instance_id)
-            self._os_floating_ip = self._nova.floating_ips.find(instance_id=instance_id)
+
+            # we need to wait for an instance to become active before getting IP from network
+            if self._os_details.get('network', None):
+
+                # initialize logger early
+                self.init_logging(module.logger, name=self._os_name)
+
+                self._wait_active()
+                self._acquire_network_ip()
+
+            # find floating IP only if ip pool name specified
+            if self._os_details['ip_pool_name']:
+                self._os_floating_ip = self._nova.floating_ips.find(instance_id=instance_id)
+
             self._os_name = self._os_instance.to_dict()['name']
             self._os_nics = self._acquire_nics()
 
@@ -1260,7 +1273,7 @@ class CIOpenstack(gluetool.Module):
                 # record guest details into the reservation file
                 f.write('{} {} {}{}'.format(reservation_time,
                                             guest.instance_id,
-                                            guest.floating_ip,
+                                            guest.ip,
                                             os.linesep))
 
             # record the reservation time to the remote reservation file
@@ -1287,9 +1300,15 @@ class CIOpenstack(gluetool.Module):
             self.info("invalid format, caused error (file will be removed): '{}'".format(e))
             return True
 
+        # we need to provide details required for network resolving
+        details = {
+            'network': self._get_network_ref(),
+            'ip_pool_name': self.option('ip-pool-name'),
+        }
+
         try:
             # init existing Openstack server from instance_id
-            guest = OpenstackGuest(self, instance_id=instance_id)
+            guest = OpenstackGuest(self, details=details, instance_id=instance_id)
         except NotFound:
             self.info("guest '{}' not found (file will be removed)".format(instance_id))
             return True
@@ -1373,22 +1392,7 @@ class CIOpenstack(gluetool.Module):
 
         return OpenStackImage.factory(self, image)
 
-    def provision(self, environment, count=1, name=None, image=None, flavor=None, **kwargs):
-        # pylint: disable=too-many-arguments,unused-argument
-
-        assert count >= 1, 'count needs to >= 1'
-
-        self.info('provisioning guest for environment {}'.format(environment))
-
-        image = self._provision_image(image)
-
-        # get flavor reference
-        flavor = flavor or self.option('flavor')
-        try:
-            flavor_ref = self.nova.flavors.find(name=flavor)
-        except NotFound:
-            self._resource_not_found('flavors', flavor)
-
+    def _get_network_ref(self):
         # get network reference
         networks = self.option('network')
         if networks is not None:
@@ -1404,9 +1408,25 @@ class CIOpenstack(gluetool.Module):
                         # get network reference by id
                         self._resource_not_found('networks', network, name_attr='label')
 
-            network_ref = [_get_network_ref(network) for network in networks.split(',')]
-        else:
-            network_ref = None
+            return [_get_network_ref(network) for network in networks.split(',')]
+
+        return None
+
+    def provision(self, environment, count=1, name=None, image=None, flavor=None, **kwargs):
+        # pylint: disable=too-many-arguments,unused-argument
+
+        assert count >= 1, 'count needs to >= 1'
+
+        self.info('provisioning guest for environment {}'.format(environment))
+
+        image = self._provision_image(image)
+
+        # get flavor reference
+        flavor = flavor or self.option('flavor')
+        try:
+            flavor_ref = self.nova.flavors.find(name=flavor)
+        except NotFound:
+            self._resource_not_found('flavors', flavor)
 
         # create given number of guests
         guests = []
@@ -1430,7 +1450,7 @@ class CIOpenstack(gluetool.Module):
                 'name': actual_name,
                 'image': image,
                 'flavor': flavor_ref,
-                'network': network_ref,
+                'network': self._get_network_ref(),
                 'key_name': self.option('key-name'),
                 'ip_pool_name': self.option('ip-pool-name'),
                 'username': self.option('ssh-user'),
