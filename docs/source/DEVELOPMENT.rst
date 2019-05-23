@@ -53,13 +53,12 @@ Following steps are necessary to install requirements for different distribution
     pip install -U setuptools
     pip install ansible virtualenv
 
-**Fedora 26**
+**Fedora 29**
 
 .. code-block:: bash
 
-    dnf install -y ansible krb5-devel libselinux-python python2-virtualenv /usr/lib/rpm/redhat/redhat-hardened-cc1
+    dnf install -y ansible krb5-devel libselinux-python python2-virtualenv /usr/lib/rpm/redhat/redhat-hardened-cc1 /usr/bin/virtualenv python2-setuptools libtool
     dnf install -y --allowerasing compat-openssl10-devel
-    pip install -U setuptools
 
 1. Create a virtual environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
