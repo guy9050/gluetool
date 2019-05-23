@@ -31,32 +31,50 @@ ANSIBLE_OUTPUT = "ansible-output.txt"
 #: :ivar str name: name of the test.
 #: :ivar libs.test_schedule.TestScheduleEntry schedule_entry: test schedule entry the task belongs to.
 #: :ivar dict results: results of the test run, as reported by Ansible playbook log.
-TaskRun = collections.namedtuple('TaskRun', ('name', 'schedule_entry', 'result'))
+#: :ivar dict logs: list of logs associated with the test
+TaskRun = collections.namedtuple('TaskRun', ('name', 'schedule_entry', 'result', 'logs'))
 
 
-def gather_test_results(schedule_entry, test_log_filename):
+def gather_test_results(schedule_entry, artifacts_directory):
     # type: (TestScheduleEntry, str) -> List[TaskRun]
     """
-    Extract detailed test results from test log.
+    Extract detailed test results from 'results.yml' or 'test.log'.
     """
 
     results = []
 
-    schedule_entry.debug('Checking results in {}'.format(test_log_filename))
+    # By default, check results in the new results.yml format
+    # https://docs.fedoraproject.org/en-US/ci/standard-test-interface/#_results_format
+    results_yml_filename = os.path.join(artifacts_directory, 'results.yml')
+    if os.path.isfile(results_yml_filename):
+        schedule_entry.debug('Checking results in {}'.format(results_yml_filename))
+        try:
+            parsed_results = gluetool.utils.load_yaml(results_yml_filename, logger=schedule_entry.logger)
+            for result in parsed_results['results']:
+                results.append(
+                    TaskRun(
+                        name=result.get('test'),
+                        schedule_entry=schedule_entry,
+                        result=result.get('result'),
+                        logs=result.get('logs', [])))
+        except gluetool.glue.GlueError:
+            schedule_entry.warn('Unable to check results in {}'.format(results_yml_filename))
 
-    try:
-        with open(test_log_filename) as test_log:
-            for line in test_log:
-                match = re.match('([^ ]+) (.*)', line)
-                if not match:
-                    continue
-
-                result, name = match.groups()
-
-                results.append(TaskRun(name=name, schedule_entry=schedule_entry, result=result))
-
-    except IOError:
-        schedule_entry.warn('Unable to check results in {}'.format(test_log_filename))
+    # Otherwise attempt to parse the old test.log file
+    else:
+        test_log_filename = os.path.join(artifacts_directory, 'test.log')
+        schedule_entry.debug('Checking results in {}'.format(test_log_filename))
+        try:
+            with open(test_log_filename) as test_log:
+                for line in test_log:
+                    match = re.match('([^ ]+) (.*)', line)
+                    if not match:
+                        continue
+                    result, name = match.groups()
+                    results.append(TaskRun(
+                        name=name, schedule_entry=schedule_entry, result=result, logs=[]))
+        except IOError:
+            schedule_entry.warn('Unable to check results in {}'.format(test_log_filename))
 
     return results
 
@@ -232,7 +250,7 @@ sut     ansible_host={} ansible_user=root {}
                     break
 
         # parse results
-        results = gather_test_results(schedule_entry, os.path.join(artifact_dirpath, 'test.log'))
+        results = gather_test_results(schedule_entry, artifact_dirpath)
 
         try:
             future.result()
@@ -244,7 +262,7 @@ sut     ansible_host={} ansible_user=root {}
             # Note that Ansible error is still a user error though, nothing we can do anything about, in case ansible
             # failed, report the ansible output as the test result.
             if not results:
-                results.append(TaskRun(name='ansible', schedule_entry=schedule_entry, result='FAIL'))
+                results.append(TaskRun(name='ansible', schedule_entry=schedule_entry, result='FAIL', logs=[]))
 
         return results
 
