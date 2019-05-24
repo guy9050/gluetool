@@ -195,6 +195,7 @@ def test_overall_recipients(configured_module):
     assert configured_module._recipients_overall() == [
         'def', 'ghi', 'to-be-removed-by-map', 'pqr', 'stu',
         'generic recipient 1', 'generic recipient 2', 'generic recipient 3',
+        'generic recipient 1', 'generic recipient 2', 'generic recipient 3',
         'uvw',
         'generic recipient 1', 'generic recipient 2', 'generic recipient 3',
         'mno', 'some-weird/recipient', 'jkl', 'abc', 'abc',

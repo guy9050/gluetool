@@ -83,6 +83,7 @@ class NotifyRecipients(gluetool.Module):
     supported_result_types = (
         'beaker',
         'boc',
+        'brew-build',
         'composetest',
         'covscan',
         'restraint',
@@ -94,6 +95,7 @@ class NotifyRecipients(gluetool.Module):
     result_type_names = (
         'Beaker',
         'Build-on-commit',
+        'Brew build',
         'ComposeTest',
         'Covscan',
         'Restraint',
