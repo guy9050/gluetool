@@ -475,7 +475,7 @@ class TestBatchPlanner(gluetool.Module):
         message = self.shared('trigger_message')
 
         try:
-            builds = message['msg']['artifact']['builds']
+            builds = message['artifact']['builds']
 
         except TypeError:
             self.warn('Trigger message is empty, skipping sidetag', sentry=True)
