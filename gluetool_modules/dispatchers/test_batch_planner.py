@@ -68,6 +68,22 @@ class TestBatchPlanner(gluetool.Module):
            - sti
 
     Where ``ignore-methods`` attribute contains a list of methods to be ignored.
+
+    It is possible to tweak *priority* of each scheduled test, via ``--job-priority-map``:
+
+    .. code-block:: yaml
+
+       ---
+
+       # Scratch builds shall run with lower priority, to vacate place for real builds (read: gating).
+       - rule: PRIMARY_TASK.scratch is True
+         set-priority: 4
+
+    Instructions are evaluated for each command, with ``COMMAND`` variable representing the current command
+    of the loop.
+
+    The priority itself is of no concern to this module, it is just a number. It is not evaluated,
+    that's up to that part of the infrastructure that actually executes the tests, to obey their priorities.
     """
 
     # Supported flags - keep them alphabetically sorted
@@ -111,6 +127,10 @@ class TestBatchPlanner(gluetool.Module):
         },
         'ignore-methods-map': {
             'help': 'Additional rules for ignoring specific methods.',
+            'metavar': 'FILE'
+        },
+        'job-priority-map': {
+            'help': 'Rules for setting priorities of tests.',
             'metavar': 'FILE'
         }
     }
@@ -162,6 +182,13 @@ class TestBatchPlanner(gluetool.Module):
             return []
 
         return load_yaml(self.option('ignore-methods-map'), logger=self.logger)
+
+    @cached_property
+    def _job_priority_map(self):
+        if not self.option('job-priority-map'):
+            return []
+
+        return load_yaml(self.option('job-priority-map'), logger=self.logger)
 
     def _reduce_section(self, commands, is_component=True, default_commands=None, all_commands=None):
         # pylint: disable=too-many-statements
@@ -744,6 +771,32 @@ class TestBatchPlanner(gluetool.Module):
                 continue
 
             test_batch += method_test_batch
+
+        # Apply priorities where necessary
+        for i, batch_command in enumerate(test_batch):
+            def _set_priority(instruction, command, argument, context):
+                # pylint: disable=unused-argument,cell-var-from-loop
+
+                try:
+                    priority = int(argument)
+
+                except ValueError as exc:
+                    raise GlueError('Command priority must be an integer: {}'.format(exc))
+
+                batch_command[1].append('--priority={}'.format(priority))
+
+                self.debug('command #{}: priority set to {}'.format(i, priority))
+
+            context = gluetool.utils.dict_update(
+                self.shared('eval_context'),
+                {
+                    'COMMAND': batch_command
+                }
+            )
+
+            self.shared('evaluate_instructions', self._job_priority_map, {
+                'set-priority': _set_priority
+            }, context=context)
 
         return test_batch
 
