@@ -659,6 +659,54 @@ class KojiTask(object):
         return None
 
     @cached_property
+    def _rpm_urls_from_subtasks(self):
+        """
+        Resolves RPM urls from subtasks' results. This is the only
+        option for scratch rpm builds.
+        """
+        rpms = []
+
+        for task in self._build_arch_subtasks:
+            try:
+                rpms.extend(self.session.getTaskResult(task['id'])['rpms'])
+            except AttributeError:
+                self.warn("No rpms found for task '{}'".format(task['id']))
+
+        return ['/'.join([self.pkgs_url, 'work', rpm]) for rpm in rpms]
+
+    @cached_property
+    def _rpm_urls_from_build(self):
+        """
+        Resolves RPM urls from build rpms.
+        """
+        return [
+            "{0}/packages/{1}/{2}/{3}/{4}/{5}.{4}.rpm".format(
+                self.pkgs_url,
+                self._build['package_name'],
+                self._build['version'],
+                self._build['release'],
+                rpm['arch'],
+                rpm['nvr'])
+            for rpm in self.session.listBuildRPMs(self.build_id) if rpm['arch'] != 'src'
+        ]
+
+    @cached_property
+    def rpm_urls(self):
+        """
+        List of URLs of all RPMs in the build.
+        """
+        if not self.is_build_task:
+            return []
+
+        # If build_id is around, use listRPMs to get all the builds
+        if self.build_id:
+            return self._rpm_urls_from_build
+
+        # For scratch build tasks, our only option is to resolve RPMs from task.
+        # If the task is expired (i.e. has no artifacts), the links will be 404.
+        return self._rpm_urls_from_subtasks
+
+    @cached_property
     def srpm_urls(self):
         """
         List of URL of the SRPM (:py:attr:`srcrpm`) or empty list if SRPM is not known.

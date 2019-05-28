@@ -345,6 +345,63 @@ listTaskOutput:
     - flex-2.5.37-3.el7_3.x86_64.rpm
     - flex-devel-2.5.37-3.el7_3.x86_64.rpm
 
+getTaskResult:
+  16311218:
+    rpms:
+      - flex-doc-2.5.37-3.el7_3.ppc.rpm
+      - flex-devel-2.5.37-3.el7_3.ppc.rpm
+      - flex-2.5.37-3.el7_3.ppc.rpm
+      - flex-debuginfo-2.5.37-3.el7_3.ppc.rpm
+      - flex-2.5.37-3.el7_3.src.rpm
+  16311219:
+    rpms:
+      - flex-2.5.37-3.el7_3.s390.rpm
+      - flex-doc-2.5.37-3.el7_3.s390.rpm
+      - flex-devel-2.5.37-3.el7_3.s390.rpm
+      - flex-debuginfo-2.5.37-3.el7_3.s390.rpm
+  16311220:
+    rpms:
+      - flex-2.5.37-3.el7_3.ppc64le.rpm
+      - flex-debuginfo-2.5.37-3.el7_3.ppc64le.rpm
+      - flex-devel-2.5.37-3.el7_3.ppc64le.rpm
+      - flex-doc-2.5.37-3.el7_3.ppc64le.rpm
+  16311221:
+    rpms:
+      - flex-devel-2.5.37-3.el7_3.aarch64.rpm
+      - flex-doc-2.5.37-3.el7_3.aarch64.rpm
+      - flex-2.5.37-3.el7_3.aarch64.rpm
+      - flex-debuginfo-2.5.37-3.el7_3.aarch64.rpm
+  16311222:
+    rpms:
+      - flex-debuginfo-2.5.37-3.el7_3.ppc64.rpm
+      - flex-doc-2.5.37-3.el7_3.ppc64.rpm
+      - flex-devel-2.5.37-3.el7_3.ppc64.rpm
+      - flex-2.5.37-3.el7_3.ppc64.rpm
+  16311223:
+    rpms:
+      - flex-2.5.37-3.el7_3.i686.rpm
+      - flex-doc-2.5.37-3.el7_3.i686.rpm
+      - flex-debuginfo-2.5.37-3.el7_3.i686.rpm
+      - flex-devel-2.5.37-3.el7_3.i686.rpm
+  16311224:
+    rpms:
+      - flex-doc-2.5.37-3.el7_3.s390x.rpm
+      - flex-debuginfo-2.5.37-3.el7_3.s390x.rpm
+      - flex-devel-2.5.37-3.el7_3.s390x.rpm
+      - flex-2.5.37-3.el7_3.s390x.rpm
+  16311225:
+    rpms:
+      - flex-debuginfo-2.5.37-3.el7_3.x86_64.rpm
+      - flex-doc-2.5.37-3.el7_3.x86_64.rpm
+      - flex-2.5.37-3.el7_3.x86_64.rpm
+      - flex-devel-2.5.37-3.el7_3.x86_64.rpm
+  6935377:
+    rpms:
+      - flex-debuginfo-2.5.37-3.el7_3.x86_64.rpm
+      - flex-doc-2.5.37-3.el7_3.x86_64.rpm
+      - flex-2.5.37-3.el7_3.x86_64.rpm
+      - flex-devel-2.5.37-3.el7_3.x86_64.rpm
+
 getUser:
   2228:
     status: 0

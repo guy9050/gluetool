@@ -18,6 +18,16 @@ srpm_names:
   - 'bash-4.3.43-4.fc25.src.rpm'
 srpm_urls:
   - 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/src/bash-4.3.43-4.fc25.src.rpm'
+rpm_urls:
+  - 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/armv7hl/bash-4.3.43-4.fc25.armv7hl.rpm'
+  - 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/armv7hl/bash-doc-4.3.43-4.fc25.armv7hl.rpm'
+  - 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/armv7hl/bash-debuginfo-4.3.43-4.fc25.armv7hl.rpm'
+  - 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/x86_64/bash-4.3.43-4.fc25.x86_64.rpm'
+  - 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/x86_64/bash-debuginfo-4.3.43-4.fc25.x86_64.rpm'
+  - 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/x86_64/bash-doc-4.3.43-4.fc25.x86_64.rpm'
+  - 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/i686/bash-doc-4.3.43-4.fc25.i686.rpm'
+  - 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/i686/bash-debuginfo-4.3.43-4.fc25.i686.rpm'
+  - 'https://kojipkgs.fedoraproject.org/packages/bash/4.3.43/4.fc25/i686/bash-4.3.43-4.fc25.i686.rpm'
 target: 'f25-candidate'
 id: 15869828
 dispatch_id: 15869828
