@@ -341,11 +341,15 @@ class TestScheduler(gluetool.Module):
 
     def execute(self):
         # type: () -> None
+        # pylint: disable=too-many-statements
 
-        self.require_shared('primary_task', 'tasks', 'create_test_schedule')
+        self.require_shared('create_test_schedule')
 
         # Check whether we have *any* artifacts at all, before we move on to more fine-grained checks.
-        gluetool_modules.libs.artifacts.has_artifacts(*self.shared('tasks'))
+        # If there's no task, just move on - we cannot check it, but it's allowed to run pipeline
+        # without a task.
+        if self.has_shared('tasks'):
+            gluetool_modules.libs.artifacts.has_artifacts(*self.shared('tasks'))
 
         # One day, all that arch constraint "guessing" would move into `guess-environment` (or similar module)
         # who would be responsible for generating testing environments transparently for all arches and provisioners.
@@ -364,16 +368,28 @@ class TestScheduler(gluetool.Module):
         provisioner_capabilities = self.shared('provisioner_capabilities')
         log_dict(self.debug, 'provisioner capabilities', provisioner_capabilities)
 
-        # ... these are arches available in the artifact...
-        artifact_arches = self.shared('primary_task').task_arches.arches
-        log_dict(self.debug, 'artifact arches', artifact_arches)
-
         # ... these are *valid* artifact arches - those supported by the provisioner...
         valid_arches = []  # type: List[str]
 
-        # ... and these are arches supported by the provisioner.
+        # ... these are arches supported by the provisioner...
         supported_arches = provisioner_capabilities.available_arches if provisioner_capabilities else []
         log_dict(self.debug, 'supported arches', supported_arches)
+
+        # ... and these are arches available in the artifact.
+        if self.has_shared('primary_task'):
+            artifact_arches = self.shared('primary_task').task_arches.arches
+
+        else:
+            artifact_arches = []
+
+        log_dict(self.debug, 'artifact arches', artifact_arches)
+
+        if not artifact_arches:
+            self.warn('No artifact arches found, using all supported ones', sentry=True)
+
+            artifact_arches = supported_arches
+
+        log_dict(self.debug, 'final artifact arches', artifact_arches)
 
         # When provisioner's so bold that it supports *any* architecture, give him every architecture present
         # in the artifact, and watch it burn :)
