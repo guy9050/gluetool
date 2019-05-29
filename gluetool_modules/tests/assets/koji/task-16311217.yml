@@ -7,6 +7,7 @@ build_id: null
 component: flex
 destination_tag: rhel-7.3-z-candidate
 full_name: task '16311217' build 'flex-2.5.37-3.el7_3' target 'rhel-7.3-z-candidate' (scratch)
+has_artifacts: True
 issuer: mprchlik
 owner: mprchlik
 latest: flex-2.5.37-3.el7

@@ -576,8 +576,8 @@ class KojiTask(object):
         has_task_artifacts = [bool(subtask_artifacts) for subtask_artifacts in self.task_artifacts.itervalues()]
         has_build_artifacts = [bool(arch_artifacts) for arch_artifacts in self.build_artifacts.itervalues()]
 
-        return (has_task_artifacts and all(has_task_artifacts)) \
-            or (has_build_artifacts and all(has_build_artifacts))
+        return bool(has_task_artifacts and all(has_task_artifacts)) \
+            or bool(has_build_artifacts and all(has_build_artifacts))
 
     @cached_property
     def _srcrpm_subtask(self):
