@@ -2,6 +2,7 @@ import collections
 import tempfile
 import os
 import re
+import stat
 
 from concurrent.futures import ThreadPoolExecutor
 import inotify.adapters
@@ -146,6 +147,21 @@ class STIRunner(gluetool.Module):
 
         work_dir = tempfile.mkdtemp(dir=os.getcwd(), prefix=work_dir_prefix)
         artifact_dir = tempfile.mkdtemp(dir=work_dir, prefix=artifact_dir_prefix)
+
+        # Make sure it's possible to enter our directories for other parties. We're not that concerned with privacy,
+        # we'd rather let common users inside the directories when inspecting the pipeline artifacts. Therefore
+        # setting their permissions to ug=rwx,o=rx.
+
+        # pylint: disable=line-too-long
+        os.chmod(
+            work_dir,
+            stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
+        )
+
+        os.chmod(
+            artifact_dir,
+            stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
+        )
 
         schedule_entry.info("working directory '{}'".format(work_dir))
 

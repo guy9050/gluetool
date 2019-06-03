@@ -1,5 +1,6 @@
 import os
 import os.path
+import stat
 import tempfile
 
 import gluetool.log
@@ -94,6 +95,16 @@ class RemoteGitRepository(object):
 
         except gluetool.GlueCommandError as exc:
             raise gluetool.GlueError('Failed to clone git repository: {}'.format(exc.output.stderr))
+
+        # Make sure it's possible to enter this directory for other parties. We're not that concerned with privacy,
+        # we'd rather let common users inside the repository when inspecting the pipeline artifacts. Therefore
+        # setting clone directory permissions to ug=rwx,o=rx.
+
+        # pylint: disable=line-too-long
+        os.chmod(
+            actual_path,
+            stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
+        )
 
         if ref:
             try:
