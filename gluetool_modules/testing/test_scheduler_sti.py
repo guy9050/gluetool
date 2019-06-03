@@ -1,6 +1,5 @@
 import glob
-import tempfile
-import os
+import os.path
 
 import gluetool
 from gluetool import GlueError, SoftGlueError
@@ -135,12 +134,10 @@ class TestSchedulerSTI(gluetool.Module):
             except GlueError as exc:
                 raise GlueError('Could not locate dist-git repository: {}'.format(exc))
 
-            repodir = tempfile.mkdtemp(
-                dir=os.getcwd(),
+            repodir = repository.clone(
+                logger=self.logger,
                 prefix='dist-git-{}-{}-'.format(repository.package, repository.branch)
             )
-
-            repository.clone(logger=self.logger, path=repodir)
 
             playbooks = self._playbooks_from_dist_git(repodir)
 

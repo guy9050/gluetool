@@ -1,4 +1,5 @@
 import os
+import os.path
 import tempfile
 
 import gluetool.log
@@ -6,7 +7,7 @@ import gluetool.utils
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order
-from typing import Optional  # cast, Any, Callable, Dict, List, NamedTuple, Optional, Tuple  # noqa
+from typing import cast, Optional  # cast, Any, Callable, Dict, List, NamedTuple, Optional, Tuple  # noqa
 
 
 class RemoteGitRepository(object):
@@ -29,8 +30,15 @@ class RemoteGitRepository(object):
         self.ref = ref
         self.web_url = web_url
 
-    def clone(self, logger=None, branch=None, ref=None, path=None):
-        # type: (Optional[gluetool.log.ContextAdapter], Optional[str], Optional[str], Optional[str]) -> str
+    # pylint: disable=too-many-arguments
+    def clone(self,
+              logger=None,  # type: Optional[gluetool.log.ContextAdapter]
+              branch=None,  # type: Optional[str]
+              ref=None,  # type: Optional[str]
+              path=None,  # type: Optional[str]
+              prefix=None  # type: Optional[str]
+             ):  # noqa
+        # type: (...) -> str
         """
         Clone remote repository.
 
@@ -40,14 +48,27 @@ class RemoteGitRepository(object):
         :param str branch: checkout specified branch. If not set, the one specified during ``RemoteGitRepository``
             initialization is used. If none of these was specified, ``master`` is used by default.
         :param str path: if specified, clone into this path. Othwerwise, a temporary directory is created.
-        :returns: path to a clone.
+        :param str prefix: if specified and `path` wasn't set, it is used as a prefix of directory created
+            to hold the clone.
+        :returns: path to a clone. If `path` was given explicitly, it is returned as-is. Otherwise,
+            function created a temporary directory and its path relative to CWD is returned.
         """
 
         logger = logger or gluetool.log.Logging.get_logger()
 
         branch = branch or self.branch or 'master'
         ref = ref or self.ref
-        path = path or tempfile.mkdtemp(dir=os.getcwd())
+
+        original_path = path  # save the original path for later
+
+        if path:
+            actual_path = path
+
+        elif prefix:
+            actual_path = tempfile.mkdtemp(dir=os.getcwd(), prefix=prefix)
+
+        else:
+            actual_path = tempfile.mkdtemp(dir=os.getcwd())
 
         logger.info('cloning repo {} (branch {}, ref {})'.format(
             self.clone_url,
@@ -65,7 +86,7 @@ class RemoteGitRepository(object):
 
         cmd.options += [
             self.clone_url,
-            path
+            actual_path
         ]
 
         try:
@@ -78,11 +99,16 @@ class RemoteGitRepository(object):
             try:
                 gluetool.utils.Command([
                     'git',
-                    '-C', path,
+                    '-C', actual_path,
                     'checkout', ref
                 ]).run()
 
             except gluetool.GlueCommandError as exc:
                 raise gluetool.GlueError('Failed to checkout ref {}: {}'.format(ref, exc.output.stderr))
 
-        return path
+        # Since we used `dir` when creating repo directory, the path we have is absolute. That is not perfect,
+        # we have an agreement with the rest of the world that we're living in current directory, which we consider
+        # a workdir (yes, it would be better to have an option to specify it explicitly), we should get the relative
+        # path instead.
+        # This applies to path *we* generated only - if we were given a path, we won't touch it.
+        return actual_path if original_path else os.path.relpath(actual_path, os.getcwd())
