@@ -181,6 +181,15 @@ sut     ansible_host={} ansible_user=root {}
             inventory.write(inventory_content)
             inventory.flush()
 
+        # Inventory file's permissions are limited to user only, u=rw,go=. That's far from being perfect, hard
+        # to examine such file, hence one more chmod to u=rw,go=r
+
+        # pylint: disable=line-too-long
+        os.chmod(
+            inventory.name,
+            stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH
+        )
+
         return work_dir, artifact_dir, inventory.name
 
     def _run_playbook(self, schedule_entry, work_dirpath, artifact_dirpath, inventory_filepath):
