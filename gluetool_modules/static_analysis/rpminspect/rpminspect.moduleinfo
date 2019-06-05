@@ -1,0 +1,16 @@
+---
+
+name: rpminspect
+description: RPMInspect analysis and comparison
+dependencies:
+  repo:
+    - name: rpminspect
+      description: RPMInspect repository
+      baseurl: https://copr.fedorainfracloud.org/coprs/dcantrel/rpminspect/repo/fedora-29/dcantrel-rpminspect-fedora-29.repo
+    - name: rpminspect-data-redhat
+      description: RPMInspect-data-RedHat repository
+      baseurl: https://copr.devel.redhat.com/coprs/dcantrel/rpmdiff/repo/fedora-29/dcantrel-rpmdiff-fedora-29.repo
+
+  yum:
+    - rpminspect
+    - rpminspect-data-redhat
