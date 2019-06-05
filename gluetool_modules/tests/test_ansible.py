@@ -26,6 +26,15 @@ def fixture_local_guest(module):
     return libci.guest.NetworkedGuest(module, '127.0.0.1', key='dummy_key')
 
 
+@pytest.fixture(name='assert_output')
+def fixture_assert_output():
+    # https://stackoverflow.com/questions/22627659/run-code-before-and-after-each-test-in-py-test
+    yield
+
+    assert os.path.exists(gluetool_modules.helpers.ansible.ANSIBLE_OUTPUT)
+    os.unlink(gluetool_modules.helpers.ansible.ANSIBLE_OUTPUT)
+
+
 def test_sanity(module):
     pass
 
@@ -38,7 +47,7 @@ def test_shared(module):
     assert module.glue.has_shared('run_playbook')
 
 
-def test_run_playbook_json(module, local_guest, monkeypatch):
+def test_run_playbook_json(module, local_guest, monkeypatch, assert_output):
     json_output = {'task': 'ok'}
     mock_output = MagicMock(exit_code=0, stdout=json.dumps(json_output))
 
@@ -63,7 +72,7 @@ def test_run_playbook_json(module, local_guest, monkeypatch):
     mock_command_run.assert_called_once_with(cwd=None, env=env_variables)
 
 
-def test_run_playbook_plaintext(module, local_guest, monkeypatch):
+def test_run_playbook_plaintext(module, local_guest, monkeypatch, assert_output):
     mock_output = MagicMock(exit_code=0)
 
     mock_command_init = MagicMock(return_value=None)
@@ -86,7 +95,7 @@ def test_run_playbook_plaintext(module, local_guest, monkeypatch):
     mock_command_run.assert_called_once_with(cwd=None, env=env_variables)
 
 
-def test_run_playbooks(module, local_guest, monkeypatch):
+def test_run_playbooks(module, local_guest, monkeypatch, assert_output):
     mock_output = MagicMock(exit_code=0)
 
     mock_command_init = MagicMock(return_value=None)
@@ -110,7 +119,7 @@ def test_run_playbooks(module, local_guest, monkeypatch):
     mock_command_run.assert_called_once_with(cwd=None, env=env_variables)
 
 
-def test_error(log, module, local_guest, monkeypatch):
+def test_error(log, module, local_guest, monkeypatch, assert_output):
     # simulate output of failed ansible-playbook run, giving user JSON blob with an error message
     mock_error = gluetool.GlueCommandError([], output=MagicMock(stdout='{"msg": "dummy error message"}'))
     mock_command_run = MagicMock(side_effect=mock_error)
@@ -121,7 +130,7 @@ def test_error(log, module, local_guest, monkeypatch):
         module.run_playbook('dummy playbook file', [local_guest])
 
 
-def test_error_exit_code(log, module, local_guest, monkeypatch):
+def test_error_exit_code(log, module, local_guest, monkeypatch, assert_output):
     mock_output = MagicMock(exit_code=1, stdout='{"msg": "dummy error message"}')
     mock_command_init = MagicMock(return_value=None)
     mock_command_run = MagicMock(return_value=mock_output)
@@ -133,7 +142,7 @@ def test_error_exit_code(log, module, local_guest, monkeypatch):
         module.run_playbook('dummy playbook file', [local_guest])
 
 
-def test_extra_vars(module, local_guest, monkeypatch):
+def test_extra_vars(module, local_guest, monkeypatch, assert_output):
     mock_output = MagicMock(exit_code=0, stdout=json.dumps({'task': 'ok'}))
 
     mock_command_init = MagicMock(return_value=None)
@@ -157,7 +166,7 @@ def test_extra_vars(module, local_guest, monkeypatch):
     mock_command_run.assert_called_once_with(cwd='foo', env=env_variables)
 
 
-def test_dryrun(module, local_guest, monkeypatch):
+def test_dryrun(module, local_guest, monkeypatch, assert_output):
     mock_output = MagicMock(exit_code=0, stdout=json.dumps({'task': 'ok'}))
 
     mock_command_init = MagicMock(return_value=None)
@@ -182,7 +191,7 @@ def test_dryrun(module, local_guest, monkeypatch):
     mock_command_run.assert_called_once_with(cwd=None, env=env_variables)
 
 
-def test_additonal_options(module, local_guest, monkeypatch):
+def test_additonal_options(module, local_guest, monkeypatch, assert_output):
     mock_output = MagicMock(exit_code=0, stdout=json.dumps({'task': 'ok'}))
 
     mock_command_init = MagicMock(return_value=None)

@@ -9,7 +9,7 @@ import inotify.adapters
 
 import gluetool
 from gluetool import GlueError
-from gluetool.log import format_blob, log_blob, log_dict
+from gluetool.log import log_blob, log_dict
 
 from gluetool_modules.libs.test_schedule import TestScheduleResult
 
@@ -21,9 +21,6 @@ from gluetool_modules.testing.test_scheduler_sti import TestScheduleEntry  # noq
 
 # Check whether Ansible finished running tests every 5 seconds.
 DEFAULT_WATCH_TIMEOUT = 5
-
-# Ansible output
-ANSIBLE_OUTPUT = "ansible-output.txt"
 
 
 #: Represents a single run of a test - one STI playbook can contain multiple such tests
@@ -203,34 +200,19 @@ sut     ansible_host={} ansible_user=root {}
 
             assert schedule_entry.guest is not None
 
-            # `run_playbook` always returns a process output, no need to catch the exception an extract the output
-            output, _ = self.shared(
+            # `run_playbook` and log the output to the working directory
+            self.shared(
                 'run_playbook',
                 schedule_entry.playbook_filepath,
                 [schedule_entry.guest],
                 inventory=inventory_filepath,
                 cwd=artifact_dirpath,
                 json_output=False,
+                log_dirpath=work_dirpath,
                 variables={
                     'artifacts': artifact_dirpath,
                     'ansible_ssh_common_args': ' '.join(['-o ' + option for option in schedule_entry.guest.options])
                 })
-
-            log_filepath = os.path.join(work_dirpath, ANSIBLE_OUTPUT)
-            log_location = self.shared('artifacts_location', log_filepath, logger=schedule_entry.logger)
-
-            with open(log_filepath, 'w') as f:
-                def _write(label, s):
-                    # type: (str, str) -> None
-
-                    f.write('{}\n{}\n\n'.format(label, s))
-
-                _write('# STDOUT:', format_blob(output.stdout))
-                _write('# STDERR:', format_blob(output.stderr))
-
-                f.flush()
-
-            schedule_entry.info('Ansible logs are in {}'.format(log_location))
 
         # monitor artifact directory
         notify = inotify.adapters.Inotify()

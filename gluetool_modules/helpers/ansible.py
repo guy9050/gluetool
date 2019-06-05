@@ -2,13 +2,13 @@ import os
 import re
 
 import gluetool
-from gluetool.utils import Command, from_json
-from gluetool.log import log_blob, log_dict
+from gluetool.utils import Command, from_json, LoggingFunctionType
+from gluetool.log import format_blob, log_blob, log_dict
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union  # noqa
+from typing import cast, TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union  # noqa
 
 if TYPE_CHECKING:
     import libci.guest  # noqa
@@ -16,6 +16,10 @@ if TYPE_CHECKING:
 
 # possible python interpreters
 ANSIBLE_PYTHON_INTERPRETERS = ["/usr/bin/python3", "/usr/bin/python2", "/usr/libexec/platform-python"]
+
+
+# Ansible output
+ANSIBLE_OUTPUT = "ansible-output.txt"
 
 
 class PlaybookError(PrimaryTaskFingerprintsMixin, gluetool.GlueError):
@@ -109,7 +113,9 @@ class Ansible(gluetool.Module):
                      variables=None,  # type: Optional[Dict[str, Any]]
                      inventory=None,  # type: Optional[str]
                      cwd=None,  # type: Optional[str]
-                     json_output=True  # type: bool
+                     json_output=True,  # type: bool
+                     log_dirpath=None,  # type: Optional[str]
+                     logger=None  # type: Optional[gluetool.log.ContextAdapter]
                     ):  # noqa
         # type: (...) -> Tuple[gluetool.utils.ProcessOutput, Optional[Any]]
         """
@@ -122,16 +128,19 @@ class Ansible(gluetool.Module):
         :param str inventory: A path to the inventory file. You can use it if you
           want to cheat the ansible module e.g. to overshadow localhost with another host.
         :param str cwd: A path to a directory where ansible will be executed from.
-        :param bool json_output: ansible returns response as json if set.
+        :param bool json_output: Ansible returns response as json if set.
+        :param str log_dirpath: Directory where to write ansible output, defaults to current directory.
         :returns: tuple of two items: a :py:class:`gluetool.utils.ProcessOutput` instance
             storing outcome of Ansible run, and a data structure representing the JSON output
             produced, or None if ``json_output`` was set to ``False``.
         """
 
+        logger = logger or self.logger
+
         if isinstance(playbook_paths, str):
             playbook_paths = [playbook_paths]
 
-        self.debug("running playbooks '{}'".format(', '.join(playbook_paths)))
+        log_dict(cast(LoggingFunctionType, logger.debug), 'running playbooks', playbook_paths)
 
         if not all([guest.key == guests[0].key for guest in guests]):
             raise gluetool.GlueError('SSH key must be the same for all guests')
@@ -147,7 +156,7 @@ class Ansible(gluetool.Module):
         ]
 
         if variables:
-            self.debug('variables:\n{}'.format(gluetool.log.format_dict(variables)))
+            log_dict(cast(LoggingFunctionType, logger.debug), 'variables', variables)
 
             cmd += [
                 '--extra-vars',
@@ -157,7 +166,7 @@ class Ansible(gluetool.Module):
         cmd += self.additional_options
 
         if not self.dryrun_allows('Running a playbook in non-check mode'):
-            self.debug("dry run enabled, telling ansible to use 'check' mode")
+            logger.debug("dry run enabled, telling ansible to use 'check' mode")
 
             cmd += ['-C']
 
@@ -169,19 +178,50 @@ class Ansible(gluetool.Module):
             env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'json'})
 
         try:
-            ansible_call = Command(cmd, logger=self.logger).run(cwd=cwd, env=env_variables)
+            ansible_call = Command(cmd, logger=logger).run(cwd=cwd, env=env_variables)
 
         except gluetool.GlueCommandError as exc:
             ansible_call = exc.output
 
+        finally:
+            # as path of logs, use the specific log_dirpath, with fallback to no path
+            log_filepath = os.path.join(log_dirpath or '', ANSIBLE_OUTPUT)
+
+            if self.has_shared('artifacts_location'):
+                log_location = self.shared('artifacts_location', log_filepath, logger=logger)
+            else:
+                log_location = log_filepath
+
+            with open(log_filepath, 'w') as f:
+                def _write(label, s):
+                    # type: (str, str) -> None
+
+                    f.write('{}\n{}\n\n'.format(label, s))
+
+                _write('# STDOUT:', format_blob(cast(str, ansible_call.stdout)))
+                _write('# STDERR:', format_blob(cast(str, ansible_call.stderr)))
+
+                f.flush()
+
+            logger.info('Ansible logs are in {}'.format(log_location))
+
         def show_ansible_errors(output):
             # type: (gluetool.utils.ProcessOutput) -> None
 
+            # required for type checking, which is "stupid" to know that it cannot be None
+            assert logger is not None
+
             if output.stdout:
-                log_blob(self.error, 'Last 30 lines of Ansible stdout', '\n'.join(output.stdout.splitlines()[-30:]))
+                log_blob(
+                    cast(LoggingFunctionType, logger.error),
+                    'Last 30 lines of Ansible stdout', '\n'.join(output.stdout.splitlines()[-30:])
+                )
 
             if output.stderr:
-                log_blob(self.error, 'Last 30 lines of Ansible stderr', '\n'.join(output.stderr.splitlines()[-30:]))
+                log_blob(
+                    cast(LoggingFunctionType, logger.error),
+                    'Last 30 lines of Ansible stderr', '\n'.join(output.stderr.splitlines()[-30:])
+                )
 
         if json_output:
             # With `-v` option, ansible-playbook produces additional output, placed before the JSON
@@ -199,7 +239,10 @@ class Ansible(gluetool.Module):
 
             ansible_json_output = from_json(ansible_call.stdout[match.start():])
 
-            log_dict(self.debug, 'Ansible json output', ansible_json_output)
+            log_dict(
+                cast(LoggingFunctionType, logger.debug),
+                'Ansible json output', ansible_json_output
+            )
 
         else:
             ansible_json_output = None
