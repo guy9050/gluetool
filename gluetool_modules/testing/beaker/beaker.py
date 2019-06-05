@@ -23,6 +23,9 @@ TCMS_RESULTS_LOCATIONS = ('/bin', '/usr/bin')
 
 DEFAULT_RESERVE_TIME = 24
 
+DEFAULT_FETCH_JOURNAL_TIMEOUT = 300
+DEFAULT_FETCH_JOURNAL_TICK = 15
+
 
 class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
     def __init__(self, task, installation_logs):
@@ -125,7 +128,19 @@ class Beaker(gluetool.Module):
 
                     See the module help for an example yaml file for this option.
                     """
-        }
+        },
+        'fetch-journal-timeout': {
+            'help': 'When fetching test case journal content, wait ``SECONDS`` until giving up (default: %(default)s).',
+            'metavar': 'SECONDS',
+            'type': int,
+            'default': DEFAULT_FETCH_JOURNAL_TIMEOUT
+        },
+        'fetch-journal-tick': {
+            'help': 'When fetching test case journal content, try every ``SECONDS`` (default: %(default)s).',
+            'metavar': 'SECONDS',
+            'type': int,
+            'default': DEFAULT_FETCH_JOURNAL_TICK
+        },
     }
 
     _processed_results = None
@@ -208,7 +223,21 @@ class Beaker(gluetool.Module):
 
                     journal_log = task_xml.find('log', attrs={'name': 'journal.xml'})
                     if journal_log:
-                        _, journal_data = fetch_url(journal_log['href'], logger=citool_module.logger)
+                        def _fetch_journal():
+                            try:
+                                _, journal_data = fetch_url(journal_log['href'], logger=citool_module.logger)
+                                return journal_data
+
+                            except GlueError:
+                                return False
+
+                        journal_data = gluetool.utils.wait(
+                            'fetch journal content', _fetch_journal,
+                            logger=citool_module.logger,
+                            timeout=self._module.option('fetch-journal-timeout'),
+                            tick=self._module.option('fetch-journal-tick')
+                        )
+
                         journal = bs4.BeautifulSoup(journal_data, 'xml').BEAKER_TEST
 
                     else:
