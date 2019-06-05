@@ -14,15 +14,15 @@ def fixture_errors():
 
     return [
         [
-            Job(logger=mock_logger, target=None, args=None, kwargs=None),
+            Job(logger=mock_logger, name='dummy #1', target=None, args=None, kwargs=None),
             (None, None, None)
         ],
         [
-            Job(logger=mock_logger, target=None, args=None, kwargs=None),
+            Job(logger=mock_logger, name='dummy #2', target=None, args=None, kwargs=None),
             (None, None, None)
         ],
         [
-            Job(logger=mock_logger, target=None, args=None, kwargs=None),
+            Job(logger=mock_logger, name='dummy #3', target=None, args=None, kwargs=None),
             (None, None, None)
         ]
     ]
@@ -74,6 +74,7 @@ def test_run_jobs(log):
 
     mock_job1 = Job(
         logger=MagicMock(),
+        name='dummy #1',
         target=MagicMock(return_value=MagicMock()),
         args=(MagicMock(), MagicMock()),
         kwargs={'foo': MagicMock()}
@@ -81,6 +82,7 @@ def test_run_jobs(log):
 
     mock_job2 = Job(
         logger=MagicMock(),
+        name='dummy #2',
         target=MagicMock(side_effect=Exception('dummy exception')),
         args=(MagicMock(), MagicMock()),
         kwargs={'bar': MagicMock()}
