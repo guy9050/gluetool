@@ -108,7 +108,7 @@ class TestBatchPlanner(gluetool.Module):
         },
         'sidetag-jobs': {
             # pylint: disable=line-too-long
-            'help': 'List of jobs supporting sidetags, for which the module adds/modifies ``--build-dependecies-options`` (default: none).',  # Ignore PEP8Bear
+            'help': 'List of jobs supporting sidetags, for which the module adds/modifies ``--build-dependencies-options`` (default: none).',  # Ignore PEP8Bear
             'metavar': 'JOB',
             'default': []
         },
@@ -521,7 +521,7 @@ class TestBatchPlanner(gluetool.Module):
                 self.debug('added new build dependencies')
 
                 # pylint: disable=line-too-long
-                args.append('--build-dependecies-options=--method=companions-from-koji --companions-nvr={}'.format(','.join(companion_nvrs)))  # Ignore PEP8Bear
+                args.append('--build-dependencies-options=--method=companions-from-koji --companions-nvr={}'.format(','.join(companion_nvrs)))  # Ignore PEP8Bear
 
             else:
                 # modify build dependencies with --companions-nvr option
