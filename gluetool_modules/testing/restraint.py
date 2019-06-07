@@ -213,14 +213,17 @@ class Restraint(gluetool.Module):
         self.debug("local index location is '{}'".format(index_location))
 
         # Woraround time! Restraint creates some directories and files, accessible, everything but index.html.
-        # index.html has rw------- permissions.
-        try:
-            # rw-r--r-- should be perfectly fine
-            os.chmod(index_location, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+        # index.html is set to u=rw,go=. Let's make it at least u=rw,go=r.
+        if os.path.exists(index_location):
+            try:
+                os.chmod(index_location, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
 
-        # pylint: disable=broad-except
-        except Exception as exc:
-            raise gluetool.GlueError('Failed to change permissions of results index: {}'.format(exc))
+            # pylint: disable=broad-except
+            except Exception as exc:
+                raise gluetool.GlueError('Failed to change permissions of results index: {}'.format(exc))
+
+        else:
+            self.warn('No results index produced by restraint, cannot fix its permissions')
 
         final_index_location = self.shared('artifacts_location', index_location, logger=self.logger)
 
