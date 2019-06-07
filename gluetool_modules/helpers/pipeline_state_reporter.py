@@ -4,6 +4,7 @@ Sends pipeline messages as specified in draft.
 https://docs.google.com/document/d/16L5odC-B4L6iwb9dp8Ry0Xk5Sc49h9KvTHrG86fdfQM/edit?ts=5a2af73c
 """
 
+import argparse
 import base64
 import datetime
 import zlib
@@ -141,6 +142,9 @@ class PipelineStateReporter(gluetool.Module):
             'run-map': {
                 'help': 'File with description of items provided as run info.'
             },
+            'final-overall-result-map': {
+                'help': 'Instructions to decide the final overall result of the pipeline.'
+            },
             'final-state-map': {
                 'help': 'Instructions to decide the final state of the pipeline.'
             }
@@ -221,6 +225,13 @@ class PipelineStateReporter(gluetool.Module):
             return []
 
         return gluetool.utils.load_yaml(self.option('run-map'), logger=self.logger)
+
+    @gluetool.utils.cached_property
+    def final_overall_result_map(self):
+        if not self.option('final-overall-result-map'):
+            return []
+
+        return gluetool.utils.load_yaml(self.option('final-overall-result-map'), logger=self.logger)
 
     @gluetool.utils.cached_property
     def final_state_map(self):
@@ -425,11 +436,21 @@ class PipelineStateReporter(gluetool.Module):
                                               **context)
 
     def _get_overall_result_xunit(self, test_results):
+        """
+        Decide what the overall result should be, based on xUnit representation of test results.
+
+        It is quite simple - xUnit representation already carries necessary value.
+        """
+
         # pylint: disable=no-self-use
 
         return test_results['overall-result']
 
     def _get_overall_result_legacy(self, results):
+        """
+        Decide what the overall result should be, based on internal representation of test results.
+        """
+
         # pylint: disable=no-self-use
 
         if not results:
@@ -439,6 +460,42 @@ class PipelineStateReporter(gluetool.Module):
             return 'passed'
 
         return 'failed'
+
+    def _get_final_overall_result(self, results, failure):
+        """
+        Read instructions from a file, and find out what the final overall result of the current pipeline
+        should be. If the instructions yield no decision, use default simple scheme to decide.
+        """
+
+        self.require_shared('evaluate_instructions')
+
+        context = gluetool.utils.dict_update(self.shared('eval_context'), {
+            'RESULTS': results,
+            'FAILURE': failure
+        })
+
+        overall_result = argparse.Namespace(result=None)
+
+        # Callback for 'result' command
+        def _result_callback(instruction, command, argument, context):
+            # pylint: disable=unused-argument
+
+            overall_result.result = argument.strip()
+
+            self.debug("final overall result set to '{}'".format(overall_result.result))
+
+        self.shared('evaluate_instructions', self.final_overall_result_map, {
+            'result': _result_callback
+        }, context=context, default_rule='False')
+
+        if overall_result.result is not None:
+            return overall_result.result
+
+        # No instruction applied, therefore fall back to default behavior.
+        if isinstance(results, bs4.element.Tag):
+            return self._get_overall_result_xunit(results)
+
+        return self._get_overall_result_legacy(results)
 
     def _get_final_state(self, failure):
         """
@@ -473,24 +530,22 @@ class PipelineStateReporter(gluetool.Module):
 
         self.info('reporting pipeline final state')
 
-        kwargs = {
-            'test_overall_result': None,
-            'test_results': None
-        }
-
         test_results = self.shared('results')
+
+        kwargs = {
+            'test_results': None,
+            'test_overall_result': self._get_final_overall_result(test_results, failure)
+        }
 
         # If the result is already an XML tree, therefore serialized, do nothing.
         if isinstance(test_results, bs4.element.Tag):
             kwargs.update({
-                'test_results': test_results,
-                'test_overall_result': self._get_overall_result_xunit(test_results)
+                'test_results': test_results
             })
 
         else:
             kwargs.update({
-                'test_results': self.shared('serialize_results', 'xunit', test_results),
-                'test_overall_result': self._get_overall_result_legacy(test_results)
+                'test_results': self.shared('serialize_results', 'xunit', test_results)
             })
 
         if failure:
