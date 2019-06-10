@@ -7,7 +7,7 @@ from gluetool_modules.static_analysis.covscan.covscan import CovscanTestResult
 from gluetool_modules.static_analysis.rpmdiff.rpmdiff import RpmdiffTestResult
 from gluetool_modules.testing.beaker.beaker import BeakerTestResult
 from libci.results import TestResult
-from . import create_module, patch_shared, assert_shared
+from . import create_module, patch_shared, assert_shared, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -21,12 +21,9 @@ def fixture_module():
 
 
 def test_loadable(module):
-    ci, _ = module
-    # pylint: disable=protected-access
-    python_mod = ci._load_python_module('helpers', 'exporter_resultsdb',
-                                        'gluetool_modules/helpers/exporter_resultsdb.py')
+    glue, _ = module
 
-    assert hasattr(python_mod, 'CIExporterResultsDB')
+    check_loadable(glue, 'gluetool_modules/helpers/exporter_resultsdb.py', 'CIExporterResultsDB')
 
 
 def test_unknown_type(log, module, monkeypatch):
@@ -76,9 +73,9 @@ def test_covscan(module, monkeypatch):
     patch_shared(monkeypatch, module, {
         'primary_task': mocked_task,
         'results': [mocked_result, mocked_result]
+    }, callables={
+        'publish_bus_messages': mocked_publish
     })
-
-    module.glue.shared_functions['publish_bus_messages'] = mocked_publish
 
     module.execute()
 
@@ -160,21 +157,21 @@ def rpmdiff(result_type, topic, module, monkeypatch):
     ]
 
     mocked_result = RpmdiffTestResult(module.glue, run_info, result_type, payload=subresults)
+    mocked_publish = MagicMock()
 
     patch_shared(monkeypatch, module, {
         'primary_task': mocked_task,
-        'results': [mocked_result, mocked_result],
-        'publish_bus_messages': None
+        'results': [mocked_result, mocked_result]
+    }, callables={
+        'publish_bus_messages': mocked_publish
     })
 
     module.execute()
 
-    # mocked publish_bus_messages is available deep in Glue
-    mocked_publish = module.glue.shared_functions['publish_bus_messages'][1]
+    # 2 actual calls + 2 calls to mock's __nonzero__
+    assert len(mocked_publish.mock_calls) == 4
 
-    assert len(mocked_publish.mock_calls) == 2
-
-    for _, args, kwargs in mocked_publish.mock_calls:
+    for _, args, kwargs in [mocked_publish.mock_calls[1], mocked_publish.mock_calls[3]]:
         assert kwargs == {'topic': 'topic://dummy/topic/rpmdiff.{}/foo'.format(topic)}
 
         assert len(args) == 1
@@ -237,11 +234,15 @@ def functional_testing(test_result, module, monkeypatch):
     mocked_task = MagicMock(nvr=nvr, scratch=scratch, id=task_id, url='dummy_brew_url',
                             latest='dummy_baseline', component=component, target=target)
 
+    mocked_publish = MagicMock()
+
     patch_shared(monkeypatch, module, {
         'primary_task': mocked_task,
         'results': [test_result, test_result],
         'distro': [distro],
         'notification_recipients': None
+    }, callables={
+        'publish_bus_messages': mocked_publish
     })
 
     build_type = 'dummy_build_type'
@@ -251,9 +252,6 @@ def functional_testing(test_result, module, monkeypatch):
     monkeypatch.setenv('BUILD_TYPE', build_type)
     monkeypatch.setenv('JOB_URL', job_url)
     monkeypatch.setenv('BUILD_URL', build_url)
-
-    mocked_publish = MagicMock()
-    module.glue.shared_functions['publish_bus_messages'] = mocked_publish
 
     module.execute()
 

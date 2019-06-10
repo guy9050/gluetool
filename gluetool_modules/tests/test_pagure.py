@@ -5,7 +5,7 @@ from mock import MagicMock
 import gluetool
 import gluetool_modules.infrastructure.pagure
 from gluetool_modules.infrastructure import pagure
-from . import create_module
+from . import create_module, check_loadable
 
 
 def patched_module(module, monkeypatch, json=None, side_effect=None):
@@ -39,11 +39,7 @@ def fixture_module():
 
 
 def test_loadable(module):
-    ci = module.glue
-    python_mod = ci._load_python_module('infrastructure/pagure', 'pytest_pagure',
-                                        'gluetool_modules/infrastructure/pagure.py')
-
-    assert hasattr(python_mod, 'Pagure')
+    check_loadable(module.glue, 'gluetool_modules/infrastructure/pagure.py', 'Pagure')
 
 
 def test_pagure_api(module, monkeypatch, log):

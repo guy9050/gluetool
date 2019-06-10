@@ -43,15 +43,19 @@ def test_playbook_map_empty(module):
     assert module.playbooks_map == []
 
 
-def test_missing_required_shared(module):
+def test_missing_required_shared(module, monkeypatch):
     assert_shared('run_playbook', module.execute)
 
     module._config['playbooks-map'] = 'map.yml'
-    module.glue._add_shared('run_playbook', module, lambda: None)
+
+    patch_shared(monkeypatch, module, {
+        'run_playbook': None
+    })
+
     assert_shared('evaluate_rules', module.execute)
 
 
-def test_setup(log, module, local_guest):
+def test_setup(log, module, local_guest, monkeypatch):
     playbooks = ['dummy-playbook-1.yml', 'dummy-playbook-2.yml']
     guests = [local_guest, local_guest]
 
@@ -77,8 +81,12 @@ def test_setup(log, module, local_guest):
     # pylint: disable=protected-access
     module._config['playbooks'] = ','.join(playbooks)
     module._config['extra-vars'] = ['key2=val2,key3=val3', 'key4=val4']
-    module.glue._add_shared('detect_ansible_interpreter', module, lambda guest: [])
-    module.glue._add_shared('run_playbook', module, dummy_run_playbook)
+
+    patch_shared(monkeypatch, module, {
+        'detect_ansible_interpreter': []
+    }, callables={
+        'run_playbook': dummy_run_playbook
+        })
 
     module.shared('setup_guest', guests, variables={'key1': 'val1'}, dummy_option=17)
 
@@ -88,7 +96,10 @@ def test_setup(log, module, local_guest):
 def test_playbook_map_guest_setup(module, monkeypatch):
     module._config['playbooks-map'] = 'map.yml'
 
-    module.glue._add_shared('detect_ansible_interpreter', module, lambda guest: [])
+    patch_shared(monkeypatch, module, {
+        'detect_ansible_interpreter': []
+    })
+
     monkeypatch.setattr(module, "_get_details_from_map", lambda: ([], {}))
 
     module.shared('setup_guest', [MagicMock()])
@@ -97,15 +108,16 @@ def test_playbook_map_guest_setup(module, monkeypatch):
 def test_playbook_map(module, monkeypatch):
     module._config['playbooks-map'] = 'map.yml'
 
+    rules_engine = gluetool_modules.helpers.rules_engine.RulesEngine(module.glue, 'rules-engine')
+
     # test default context
     patch_shared(monkeypatch, module, {
         'eval_context': {
             'BUILD_TARGET': 'rhel-7.0-candidate',
         }
+    }, callables={
+        'evaluate_rules': rules_engine.evaluate_rules
     })
-
-    rules_engine = gluetool_modules.helpers.rules_engine.RulesEngine(module.glue, 'rules-engine')
-    module.glue.shared_functions['evaluate_rules'] = (rules_engine, rules_engine.evaluate_rules)
 
     def load_yaml(path, logger):
         return [

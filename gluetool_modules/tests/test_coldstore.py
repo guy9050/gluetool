@@ -4,7 +4,7 @@ import pytest
 from mock import MagicMock
 
 import gluetool_modules.helpers.coldstore
-from . import create_module, patch_shared
+from . import create_module, patch_shared, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -13,11 +13,7 @@ def fixture_module():
 
 
 def test_loadable(module):
-    ci = module.glue
-    python_mod = ci._load_python_module('helpers/coldstore', 'pytest_coldstore',
-                                        'gluetool_modules/helpers/coldstore.py')
-
-    assert hasattr(python_mod, 'ColdStore')
+    check_loadable(module.glue, 'gluetool_modules/helpers/coldstore.py', 'ColdStore')
 
 
 def test_coldstore_url(module, monkeypatch):

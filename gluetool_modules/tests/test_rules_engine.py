@@ -21,7 +21,7 @@ def fixture_module():
 
 
 def test_loadable(module):
-    check_loadable(module.glue, 'helpers/rules_engine', 'gluetool_modules/helpers/rules_engine.py', 'RulesEngine')
+    check_loadable(module.glue, 'gluetool_modules/helpers/rules_engine.py', 'RulesEngine')
 
 
 def test_shared(module):

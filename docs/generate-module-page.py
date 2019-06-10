@@ -58,7 +58,7 @@ def gather_module_data():
     LOGGER.info('gathering data on all available modules')
 
     glue = gluetool.Glue()
-    glue.load_modules()
+    glue.modules = glue.discover_modules()
 
     cwd = os.getcwd() + '/'
     modules = []
@@ -70,14 +70,14 @@ def gather_module_data():
         if name in ('bash-completion', 'dep-list', 'yaml-pipeline'):
             continue
 
-        klass = properties['class'].__name__
+        klass = properties.klass.__name__
         if klass in classes:
             continue
 
         classes[klass] = True
 
         # get file where class is stored
-        filepath = inspect.getfile(properties['class'])
+        filepath = inspect.getfile(properties.klass)
 
         # strip the CWD out
         filepath = filepath.replace(os.path.commonprefix([cwd, filepath]), '')
@@ -88,7 +88,8 @@ def gather_module_data():
         modpath = re.sub(r'\.tox\..*\.site-packages\.', '', modpath)
         modpath = re.sub(r'\.tox\..*\.gluetool_modules.', '', modpath)
 
-        description = properties['description'] if properties['description'] else 'Module did not provide a description'
+        # pylint: disable=line-too-long
+        description = properties.klass.description if properties.klass.description else 'Module did not provide a description'
 
         filepath = filepath.replace('-', '_')
 
@@ -103,7 +104,7 @@ def gather_module_data():
             'description': description,
             'klass': klass,
             'filepath': filepath,
-            'modclass': properties['class'],
+            'modclass': properties.klass,
             'modpath': 'gluetool_modules.{}'.format(modpath),
             'filepath_mtime': stat.st_mtime if stat else sys.maxint
         })

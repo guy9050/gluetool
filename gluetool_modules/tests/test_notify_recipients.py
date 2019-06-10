@@ -6,7 +6,7 @@ import gluetool_modules.helpers.notify_recipients
 
 from mock import MagicMock
 
-from . import create_module, patch_shared
+from . import create_module, patch_shared, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -62,11 +62,7 @@ def test_sanity(module):
 
 
 def test_loadable(module):
-    # pylint: disable=protected-access
-    python_mod = module.glue._load_python_module('helpers/notify-recipients', 'pytest_notify_recipients_job',
-                                                 'gluetool_modules/helpers/notify_recipients.py')
-
-    assert hasattr(python_mod, 'NotifyRecipients')
+    check_loadable(module.glue, 'gluetool_modules/helpers/notify_recipients.py', 'NotifyRecipients')
 
 
 def test_deduplicate():

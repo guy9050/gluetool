@@ -12,7 +12,7 @@ import libci.guest
 
 from mock import MagicMock
 
-from . import create_module
+from . import create_module, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -67,11 +67,7 @@ def test_loadable(module):
     Test whether it is possible to load the module via ``gluetool`` native mechanisms.
     """
 
-    # pylint: disable=protected-access
-    python_mod = module.glue._load_python_module('helpers/smtp', 'pytest_smtp',
-                                                 'gluetool_modules/helpers/smtp.py')
-
-    assert hasattr(python_mod, 'SMTP')
+    check_loadable(module.glue, 'gluetool_modules/helpers/smtp.py', 'SMTP')
 
 
 def test_shared(module):

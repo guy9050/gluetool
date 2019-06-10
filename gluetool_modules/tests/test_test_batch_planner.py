@@ -8,7 +8,7 @@ import gluetool
 import gluetool_modules.helpers.rules_engine
 import gluetool_modules.dispatchers.test_batch_planner
 
-from . import create_module, patch_shared
+from . import create_module, check_loadable, patch_shared
 
 ASSETS_DIR = os.path.join('gluetool_modules', 'tests', 'assets', 'test_batch_planner')
 
@@ -43,7 +43,9 @@ def fixture_module(monkeypatch):
     })
 
     rules_engine = gluetool_modules.helpers.rules_engine.RulesEngine(module.glue, 'rules-engine')
-    module.glue.shared_functions['evaluate_rules'] = (rules_engine, rules_engine.evaluate_rules)
+    patch_shared(monkeypatch, module, {}, callables={
+        'evaluate_rules': rules_engine.evaluate_rules
+    })
 
     return module
 
@@ -55,11 +57,7 @@ def test_sanity(module):
 
 
 def test_loadable(module):
-    # pylint: disable=protected-access
-    python_mod = module.glue._load_python_module('dispatchers/test-batch-planner', 'pytest_test_batch_planner',
-                                                 'gluetool_modules/dispatchers/test_batch_planner.py')
-
-    assert hasattr(python_mod, 'TestBatchPlanner')
+    check_loadable(module.glue, 'gluetool_modules/dispatchers/test_batch_planner.py', 'TestBatchPlanner')
 
 
 def test_shared(module):
@@ -122,13 +120,14 @@ def test_ignore_methods(module, monkeypatch, component, ignored_methods):
     module._config['ignore-methods-map'] = os.path.join(ASSETS_DIR, 'ignore-methods-map.yaml')
     rules_engine = gluetool_modules.helpers.rules_engine.RulesEngine(module.glue, 'rules-engine')
 
-    module.glue.shared_functions = {
-        'evaluate_rules': (rules_engine, rules_engine.evaluate_rules),
-        'evaluate_instructions': (rules_engine, rules_engine.evaluate_instructions),
-        'eval_context': ('dummy-module', lambda: {
+    patch_shared(monkeypatch, module, {
+        'eval_context': {
             'PRIMARY_TASK': MagicMock(ARTIFACT_NAMESPACE='redhat-module', component=component)
-        })
-    }
+        }
+    }, callables={
+        'evaluate_rules': rules_engine.evaluate_rules,
+        'evaluate_instructions': rules_engine.evaluate_instructions,
+    })
 
     assert module._get_ignored_methods() == ignored_methods
 

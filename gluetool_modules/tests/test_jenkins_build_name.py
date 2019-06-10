@@ -2,7 +2,7 @@ import pytest
 
 from mock import MagicMock
 from gluetool_modules.helpers.jenkins.jenkins_build_name import JenkinsBuildName
-from . import create_module, patch_shared, assert_shared
+from . import create_module, patch_shared, assert_shared, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -11,12 +11,9 @@ def fixture_module():
 
 
 def test_loadable(module):
-    ci, _ = module
-    # pylint: disable=protected-access
-    python_mod = ci._load_python_module('helpers/jenkins', 'pytest_jenkins_build_name',
-                                        'gluetool_modules/helpers/jenkins/jenkins_build_name.py')
+    glue, _ = module
 
-    assert hasattr(python_mod, 'JenkinsBuildName')
+    check_loadable(glue, 'gluetool_modules/helpers/jenkins/jenkins_build_name.py', 'JenkinsBuildName')
 
 
 def test_no_jenkins(module, monkeypatch):

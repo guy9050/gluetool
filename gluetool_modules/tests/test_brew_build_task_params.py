@@ -3,7 +3,7 @@ import pytest
 from mock import MagicMock
 
 import gluetool_modules.helpers.brew_build_task_params
-from . import create_module, patch_shared
+from . import create_module, patch_shared, check_loadable
 
 
 def _patched_module(module, monkeypatch, scratch=False):
@@ -42,12 +42,7 @@ def fixture_patched_module_scratch(module, monkeypatch):
 
 
 def test_loadable(module):
-    ci = module.glue
-    # pylint: disable=protected-access
-    python_mod = ci._load_python_module('helpers/brew_buid_task_params', 'pytest_brew_buid_task_params',
-                                        'gluetool_modules/helpers/brew_build_task_params.py')
-
-    assert hasattr(python_mod, 'BrewBuildOptions')
+    check_loadable(module.glue, 'gluetool_modules/helpers/brew_build_task_params.py', 'BrewBuildOptions')
 
 
 def test_regular_task(patched_module):

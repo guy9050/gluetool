@@ -3,7 +3,7 @@ import pytest
 import gluetool_modules.static_analysis.rpmdiff.rpmdiff_job
 
 from libci.tests.test_dispatch_job import create_build_params, test_dispatch as basic_test_dispatch
-from . import create_module
+from . import create_module, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -19,13 +19,9 @@ def test_sanity(module):
 
 
 def test_loadable(module):
-    ci, _ = module
+    glue, _ = module
 
-    # pylint: disable=protected-access
-    python_mod = ci._load_python_module('static_analysis/rpmdiff', 'pytest_rpmdiff_job',
-                                        'gluetool_modules/static_analysis/rpmdiff/rpmdiff_job.py')
-
-    assert hasattr(python_mod, 'RpmdiffJob')
+    check_loadable(glue, 'gluetool_modules/static_analysis/rpmdiff/rpmdiff_job.py', 'RpmdiffJob')
 
 
 def test_build_params(module_with_primary_task):

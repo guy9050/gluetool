@@ -3,7 +3,7 @@ import gluetool_modules.libs
 from mock import MagicMock
 from gluetool_modules.testing.pull_request_builder import brew_builder
 from gluetool import GlueCommandError
-from . import create_module, patch_shared
+from . import create_module, patch_shared, check_loadable
 
 RHPKG_OUTPUT = """
 Created task: 123
@@ -17,11 +17,7 @@ def fixture_module():
 
 
 def test_loadable(module):
-    ci = module.glue
-    python_mod = ci._load_python_module('testing/pull_request_builder/brew_builder', 'pytest_brew_builder',
-                                        'gluetool_modules/testing/pull_request_builder/brew_builder.py')
-
-    assert hasattr(python_mod, 'BrewBuilder')
+    check_loadable(module.glue, 'gluetool_modules/testing/pull_request_builder/brew_builder.py', 'BrewBuilder')
 
 
 def test_pass(module, monkeypatch):
@@ -88,8 +84,9 @@ def test_fail_src_rpm(module, monkeypatch):
         )
     )
 
-    monkeypatch.setattr(module.glue, 'shared_functions',
-                        {'src_rpm': (None, src_rpm_mock)})
+    patch_shared(monkeypatch, module, {}, callables={
+        'src_rpm': src_rpm_mock
+    })
 
     publish_result_mock = MagicMock()
     monkeypatch.setattr(brew_builder, 'publish_result', publish_result_mock)

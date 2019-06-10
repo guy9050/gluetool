@@ -6,9 +6,9 @@ import bs4
 from libci.tests import *  # noqa
 
 
-def check_loadable(glue, group, path, klass):
+def check_loadable(glue, path, klass):
     # pylint: disable=protected-access
-    python_mod = glue._load_python_module(group, 'pytest_foo', path)
+    python_mod = glue._import_pm(path, 'pytest_foo')
 
     assert hasattr(python_mod, klass)
 

@@ -9,7 +9,7 @@ import libci.guest
 
 from mock import MagicMock
 
-from . import create_module
+from . import create_module, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -31,11 +31,7 @@ def test_sanity(module):
 
 
 def test_loadable(module):
-    # pylint: disable=protected-access
-    python_mod = module.glue._load_python_module('helpers/ansible', 'pytest_ansible',
-                                                 'gluetool_modules/helpers/ansible.py')
-
-    assert hasattr(python_mod, 'Ansible')
+    check_loadable(module.glue, 'gluetool_modules/helpers/ansible.py', 'Ansible')
 
 
 def test_shared(module):

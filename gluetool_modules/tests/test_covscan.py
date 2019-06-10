@@ -9,7 +9,7 @@ from gluetool.glue import DryRunLevels
 import gluetool_modules.static_analysis.covscan.covscan
 from gluetool_modules.static_analysis.covscan.covscan import CICovscan, CovscanResult, \
     CovscanFailedError, NoCovscanBaselineFoundError
-from . import create_module, patch_shared, assert_shared, testing_asset
+from . import create_module, patch_shared, assert_shared, testing_asset, check_loadable
 
 ADDED_PASS = """
 {
@@ -84,12 +84,9 @@ def fixture_module():
 
 
 def test_loadable(module):
-    ci, _ = module
-    # pylint: disable=protected-access
-    python_mod = ci._load_python_module('static_analysis/covscan', 'pytest_covscan',
-                                        'gluetool_modules/static_analysis/covscan/covscan.py')
+    glue, _ = module
 
-    assert hasattr(python_mod, 'CICovscan')
+    check_loadable(glue, 'gluetool_modules/static_analysis/covscan/covscan.py', 'CICovscan')
 
 
 def test_no_brew(module):
@@ -104,8 +101,8 @@ def test_blacklisted_component(log, module, monkeypatch):
     _, module = module
     module._config['blacklist'] = '{},libreoffice'.format(component_name)
 
-    monkeypatch.setattr(module.glue, 'shared_functions', {
-        'primary_task': (None, MagicMock(return_value=MagicMock(component=component_name)))
+    patch_shared(monkeypatch, module, {}, callables={
+        'primary_task': MagicMock(return_value=MagicMock(component=component_name))
     })
 
     module.execute()
@@ -121,9 +118,9 @@ def test_not_enabled_target(log, module, monkeypatch):
     _, module = module
     module._config['target_pattern'] = enabled_target
 
-    monkeypatch.setattr(module.glue, 'shared_functions', {
-        'primary_task': (None, MagicMock(return_value=MagicMock(target=target, component=component_name)))
-    })
+    patch_shared(monkeypatch, module, {}, callables={
+        'primary_task': MagicMock(return_value=MagicMock(target=target, component=component_name))
+        })
 
     module.execute()
 

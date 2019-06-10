@@ -2,7 +2,7 @@ import pytest
 
 import gluetool_modules.static_analysis.covscan.covscan_job
 from libci.tests.test_dispatch_job import create_build_params
-from . import create_module
+from . import create_module, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -18,13 +18,9 @@ def test_sanity(module):
 
 
 def test_loadable(module):
-    ci, _ = module
+    glue, _ = module
 
-    # pylint: disable=protected-access
-    python_mod = ci._load_python_module('static_analysis/covscan', 'pytest_covscan_job',
-                                        'gluetool_modules/static_analysis/covscan/covscan_job.py')
-
-    assert hasattr(python_mod, 'CovscanJob')
+    check_loadable(glue, 'gluetool_modules/static_analysis/covscan/covscan_job.py', 'CovscanJob')
 
 
 def test_build_params(module_with_primary_task):

@@ -4,7 +4,7 @@ import pytest
 
 import gluetool_modules.testing.beah_result_parser
 
-from . import create_module, xml as X
+from . import create_module, check_loadable, xml as X
 
 
 @pytest.fixture(name='module')
@@ -19,13 +19,9 @@ def test_sanity(module):
 
 
 def test_loadable(module):
-    ci, _ = module
+    glue, _ = module
 
-    # pylint: disable=protected-access
-    python_mod = ci._load_python_module('testing', 'pytest_beah_result_parser',
-                                        'gluetool_modules/testing/beah_result_parser.py')
-
-    assert hasattr(python_mod, 'BeahResultParser')
+    check_loadable(glue, 'gluetool_modules/testing/beah_result_parser.py', 'BeahResultParser')
 
 
 @pytest.mark.parametrize('task, journal, recipe, expected', [

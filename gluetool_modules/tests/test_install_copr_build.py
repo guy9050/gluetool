@@ -6,7 +6,7 @@ from mock import MagicMock
 from mock import call
 from gluetool_modules.helpers.install_copr_build import InstallCoprBuild
 from gluetool_modules.libs.sut_installation import SUTInstallationFailedError
-from . import create_module, patch_shared
+from . import create_module, patch_shared, check_loadable
 
 LOG_DIR_NAME = 'dummy_log_dir_name'
 
@@ -70,11 +70,7 @@ def fixture_module_shared_patched(module, monkeypatch):
 
 
 def test_loadable(module):
-    ci = module.glue
-    python_mod = ci._load_python_module('helpers/install_copr_build', 'pytest_install_copr_build',
-                                        'gluetool_modules/helpers/install_copr_build.py')
-
-    assert hasattr(python_mod, 'InstallCoprBuild')
+    check_loadable(module.glue, 'gluetool_modules/helpers/install_copr_build.py', 'InstallCoprBuild')
 
 
 def test_setup_guest(module_shared_patched):

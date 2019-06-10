@@ -6,8 +6,7 @@ from mock import MagicMock
 import gluetool
 from gluetool.utils import from_json
 import gluetool_modules.static_analysis.rpminspect.rpminspect
-from . import create_module
-from . import patch_shared
+from . import create_module, patch_shared, check_loadable
 
 ALL_PASSED_STDOUT = "{}"
 
@@ -456,10 +455,7 @@ def fixture_module(monkeypatch):
 
 
 def test_loadable(module):
-    ci = module.glue
-    python_mod = ci._load_python_module('static_analysis/rpminspect', 'pytest_rpminspect',
-                                        'gluetool_modules/static_analysis/rpminspect/rpminspect.py')
-    assert hasattr(python_mod, 'CIRpminspect')
+    check_loadable(module.glue, 'gluetool_modules/static_analysis/rpminspect/rpminspect.py', 'CIRpminspect')
 
 
 def test_run_rpminspect(module, monkeypatch):

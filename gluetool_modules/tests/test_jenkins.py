@@ -8,7 +8,7 @@ import jenkinsapi.jenkins
 import gluetool
 import gluetool_modules.infrastructure.jenkins
 from gluetool_modules.infrastructure.jenkins import CIJenkins, JenkinsProxy
-from . import create_module
+from . import create_module, check_loadable
 
 CONFIG_FILE_PATTERN = """[jenkins]
 url = dummy_url
@@ -24,11 +24,9 @@ def fixture_module():
 
 
 def test_loadable(module):
-    ci, _ = module
-    python_mod = ci._load_python_module('helpers/jenkins', 'pytest_jenkins',
-                                        'gluetool_modules/infrastructure/jenkins.py')
+    glue, _ = module
 
-    assert hasattr(python_mod, 'CIJenkins')
+    check_loadable(glue, 'gluetool_modules/infrastructure/jenkins.py', 'CIJenkins')
 
 
 def test_execute(module, monkeypatch, tmpdir):

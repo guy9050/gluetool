@@ -2,7 +2,7 @@ import pytest
 
 import gluetool_modules.testing.beaker.beaker_job
 from libci.tests.test_dispatch_job import create_build_params
-from . import create_module
+from . import create_module, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -47,13 +47,9 @@ def test_sanity(module):
 
 
 def test_loadable(module):
-    ci, _ = module
+    glue, _ = module
 
-    # pylint: disable=protected-access
-    python_mod = ci._load_python_module('testing/beaker', 'pytest_beaker_job',
-                                        'gluetool_modules/testing/beaker/beaker_job.py')
-
-    assert hasattr(python_mod, 'BeakerJob')
+    check_loadable(glue, 'gluetool_modules/testing/beaker/beaker_job.py', 'BeakerJob')
 
 
 @pytest.mark.parametrize('rpm_blacklist', [

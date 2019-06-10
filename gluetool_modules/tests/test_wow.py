@@ -8,7 +8,7 @@ import gluetool
 from gluetool_modules.libs.test_schedule import EmptyTestScheduleError
 from gluetool_modules.testing.wow import WorkflowTomorrow
 
-from . import create_module, patch_shared, assert_shared
+from . import create_module, check_loadable, patch_shared, assert_shared
 
 
 COMMON_SEQUENCIES = [
@@ -88,12 +88,9 @@ def test_shared(module):
 
 
 def test_loadable(module):
-    ci, _ = module
-    # pylint: disable=protected-access
-    python_mod = ci._load_python_module('testing/wow', 'pytest_wow',
-                                        'gluetool_modules/testing/wow.py')
+    glue, _ = module
 
-    assert hasattr(python_mod, 'WorkflowTomorrow')
+    check_loadable(glue, 'gluetool_modules/testing/wow.py', 'WorkflowTomorrow')
 
 
 @pytest.mark.skip(reason='tests are way too mesy to get fixed')

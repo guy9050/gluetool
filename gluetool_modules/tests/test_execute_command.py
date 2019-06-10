@@ -10,7 +10,7 @@ import libci.guest
 
 from mock import MagicMock
 
-from . import create_module, testing_asset as _testing_asset
+from . import create_module, testing_asset as _testing_asset, check_loadable
 
 
 def local_testing_asset(*bits):
@@ -35,11 +35,7 @@ def test_loadable(module):
     Test whether it is possible to load the module via ``gluetool`` native mechanisms.
     """
 
-    # pylint: disable=protected-access
-    python_mod = module.glue._load_python_module('helpers/execute_command', 'pytest_execute_command',
-                                                 'gluetool_modules/helpers/execute_command.py')
-
-    assert hasattr(python_mod, 'ExecuteCommand')
+    check_loadable(module.glue, 'gluetool_modules/helpers/execute_command.py', 'ExecuteCommand')
 
 
 def test_shared(module):

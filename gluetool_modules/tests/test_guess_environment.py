@@ -5,7 +5,7 @@ from mock import MagicMock
 import gluetool
 import gluetool_modules.helpers.guess_environment
 
-from . import create_module, patch_shared, assert_shared
+from . import create_module, patch_shared, assert_shared, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -69,11 +69,7 @@ def fixture_module_for_recent(module, monkeypatch):
 
 
 def test_loadable(module):
-    # pylint: disable=protected-access
-    python_mod = module.glue._load_python_module('helpers', 'pytest_guess_environment',
-                                                 'gluetool_modules/helpers/guess_environment.py')
-
-    assert hasattr(python_mod, 'CIGuess')
+    check_loadable(module.glue, 'gluetool_modules/helpers/guess_environment.py', 'CIGuess')
 
 
 @pytest.mark.parametrize('method, image, raises_exc, use', [
@@ -295,8 +291,8 @@ def test_image_autodetection(module, monkeypatch):
     # pylint: disable=protected-access
     module._image['method'] = 'target-autodetection'
 
-    monkeypatch.setattr(module.glue, 'shared_functions', {
-        'primary_task': (None, MagicMock(return_value=MagicMock(target=target)))
+    patch_shared(monkeypatch, module, {}, callables={
+        'primary_task': MagicMock(return_value=MagicMock(target=target))
     })
 
     # monkeypatching of @cached_property does not work, the property's __get__() gets called...
@@ -313,9 +309,9 @@ def test_distro_autodetection(module, monkeypatch):
     # pylint: disable=protected-access
     module._distro['method'] = 'target-autodetection'
 
-    monkeypatch.setattr(module.glue, 'shared_functions', {
-        'primary_task': (None, MagicMock(return_value=MagicMock(target=target)))
-    })
+    patch_shared(monkeypatch, module, {}, callables={
+        'primary_task': MagicMock(return_value=MagicMock(target=target))
+        })
 
     # monkeypatching of @cached_property does not work, the property's __get__() gets called...
     module.pattern_map = MagicMock(return_value=MagicMock(match=MagicMock(return_value=distro)))
@@ -331,8 +327,8 @@ def test_product_autodetection(module, monkeypatch):
     # pylint: disable=protected-access
     module._product['method'] = 'target-autodetection'
 
-    monkeypatch.setattr(module.glue, 'shared_functions', {
-        'primary_task': (None, MagicMock(return_value=MagicMock(target=target)))
+    patch_shared(monkeypatch, module, {}, callables={
+        'primary_task': MagicMock(return_value=MagicMock(target=target))
     })
 
     # monkeypatching of @cached_property does not work, the property's __get__() gets called...

@@ -2,7 +2,7 @@
 import pytest
 
 from gluetool_modules.helpers.envinject import EnvInject
-from . import create_module
+from . import create_module, check_loadable
 
 
 KEY_VALUES = [['key1', 'value1'], ['key2', ''], ['key3', 'value 3']]
@@ -27,11 +27,9 @@ def fixture_configured_module(module, tmpdir):
 
 
 def test_loadable(module):
-    ci, _ = module
-    python_mod = ci._load_python_module('helpers/envinject', 'pytest_envinject',
-                                        'gluetool_modules/helpers/envinject.py')
+    glue, _ = module
 
-    assert hasattr(python_mod, 'EnvInject')
+    check_loadable(glue, 'gluetool_modules/helpers/envinject.py', 'EnvInject')
 
 
 def test_shared(module):

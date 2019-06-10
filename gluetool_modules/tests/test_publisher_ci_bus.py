@@ -8,7 +8,7 @@ from mock import MagicMock
 import gluetool
 import gluetool_modules.helpers.publisher_ci_bus
 
-from . import create_module
+from . import create_module, check_loadable
 
 Message = collections.namedtuple('Message', ('headers', 'body'))
 
@@ -41,13 +41,9 @@ def fixture_mock_stomp(monkeypatch):
 
 
 def test_loadable(module):
-    ci, _ = module
+    glue, _ = module
 
-    # pylint: disable=protected-access
-    python_mod = ci._load_python_module('testing/beaker', 'pytest_publisher_ci_bus',
-                                        'gluetool_modules/helpers/publisher_ci_bus.py')
-
-    assert hasattr(python_mod, 'CIBusPublisher')
+    check_loadable(glue, 'gluetool_modules/helpers/publisher_ci_bus.py', 'CIBusPublisher')
 
 
 def test_sanity(module):

@@ -4,7 +4,7 @@ from mock import MagicMock
 import gluetool
 import gluetool_modules.infrastructure.mbs
 from gluetool_modules.infrastructure.mbs import MBS, TaskArches, nsvc_from_nvr
-from . import create_module, patch_shared
+from . import create_module, patch_shared, check_loadable
 
 BUILD_TARGET = 'el8'
 
@@ -126,12 +126,7 @@ def fixture_get(monkeypatch):
 
 
 def test_loadable(module):
-    ci = module.glue
-    # pylint: disable=protected-access
-    python_mod = ci._load_python_module('infrastructure/mbs', 'pytest_mbs',
-                                        'gluetool_modules/infrastructure/mbs.py')
-
-    assert hasattr(python_mod, 'MBS')
+    check_loadable(module.glue, 'gluetool_modules/infrastructure/mbs.py', 'MBS')
 
 
 # pylint: disable=unused-argument

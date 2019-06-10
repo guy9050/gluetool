@@ -7,7 +7,7 @@ import os
 import __builtin__
 import gluetool
 from gluetool_modules.helpers import pagure_srpm
-from . import create_module, patch_shared
+from . import create_module, patch_shared, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -18,11 +18,7 @@ def fixture_module():
 
 
 def test_loadable(module):
-    ci = module.glue
-    python_mod = ci._load_python_module('helpers/pagure_srpm', 'pytest_pagure_srpm',
-                                        'gluetool_modules/helpers/pagure_srpm.py')
-
-    assert hasattr(python_mod, 'PagureSRPM')
+    check_loadable(module.glue, 'gluetool_modules/helpers/pagure_srpm.py', 'PagureSRPM')
 
 
 def run_src_rpm(module, monkeypatch, command_calls):

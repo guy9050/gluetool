@@ -5,7 +5,7 @@ import gluetool
 from mock import MagicMock, call
 from gluetool_modules.helpers.install_mbs_build_execute import InstallMBSBuild
 from gluetool_modules.libs.sut_installation import SUTInstallationFailedError
-from . import create_module, patch_shared
+from . import create_module, patch_shared, check_loadable
 
 ODCS_OUTPUT = """
 Waiting for command create on compose 72215 to finish.
@@ -250,11 +250,7 @@ def fixture_module():
 
 
 def test_loadable(module):
-    ci = module.glue
-    python_mod = ci._load_python_module('helpers/install_mbs_build_execute', 'pytest_install_mbs_build',
-                                        'gluetool_modules/helpers/install_mbs_build_execute.py')
-
-    assert hasattr(python_mod, 'InstallMBSBuild')
+    check_loadable(module.glue, 'gluetool_modules/helpers/install_mbs_build_execute.py', 'InstallMBSBuild')
 
 
 def test_guest_setup(module, monkeypatch):
@@ -347,9 +343,9 @@ def test_workarounds(module, monkeypatch):
     def evaluate_instructions_mock(workarounds, callbacks):
         callbacks['steps']('instructions', 'commands', workarounds, 'context')
 
-    monkeypatch.setattr(module.glue, 'shared_functions', {
-        'evaluate_instructions': (None, evaluate_instructions_mock),
-        'primary_task': (None, MagicMock(return_value=primary_task_mock))
+    patch_shared(monkeypatch, module, {}, callables={
+        'evaluate_instructions': evaluate_instructions_mock,
+        'primary_task': MagicMock(return_value=primary_task_mock)
     })
 
     monkeypatch.setattr(

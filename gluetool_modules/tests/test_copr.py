@@ -3,7 +3,7 @@ import pytest
 import gluetool
 import gluetool_modules.infrastructure.copr
 from gluetool_modules.infrastructure.copr import Copr, TaskArches
-from . import create_module
+from . import create_module, check_loadable
 
 BUILD_INFO = {
     '_links': {
@@ -140,11 +140,7 @@ def fixture_module():
 
 
 def test_loadable(module):
-    ci = module.glue
-    python_mod = ci._load_python_module('infrastructure/copr', 'pytest_copr',
-                                        'gluetool_modules/infrastructure/copr.py')
-
-    assert hasattr(python_mod, 'Copr')
+    check_loadable(module.glue, 'gluetool_modules/infrastructure/copr.py', 'Copr')
 
 
 def test_execute(module, monkeypatch):

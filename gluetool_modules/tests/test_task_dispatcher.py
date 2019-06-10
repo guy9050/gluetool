@@ -3,7 +3,7 @@ import gluetool
 from mock import MagicMock
 import gluetool_modules.dispatchers.task_dispatcher
 from gluetool_modules.dispatchers.task_dispatcher import TaskDispatcher
-from . import create_module, patch_shared
+from . import create_module, patch_shared, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -25,11 +25,7 @@ def fixture_module_run_module(module, monkeypatch):
 
 
 def test_loadable(module):
-    ci = module.glue
-    python_mod = ci._load_python_module('dispatchers/task_dispatcher.py', 'pytest_task_dispatcher',
-                                        'gluetool_modules/dispatchers/task_dispatcher.py')
-
-    assert hasattr(python_mod, 'TaskDispatcher')
+    check_loadable(module.glue, 'gluetool_modules/dispatchers/task_dispatcher.py', 'TaskDispatcher')
 
 
 def test_empty_test_batch(module_run_module, monkeypatch):
@@ -88,9 +84,9 @@ def test_state_reporter_unknown_options(module_run_module, monkeypatch):
     module._config['pipeline-test-bus-topic'] = topic
 
     report_pipeline_state_mock = MagicMock()
-    monkeypatch.setattr(module.glue, 'shared_functions', {
-        'report_pipeline_state': (None, report_pipeline_state_mock),
-        'plan_test_batch': (None, MagicMock(return_value=test_batch))
+    patch_shared(monkeypatch, module, {}, callables={
+        'report_pipeline_state': report_pipeline_state_mock,
+        'plan_test_batch': MagicMock(return_value=test_batch)
     })
 
     module.execute()
@@ -128,9 +124,9 @@ def test_state_reporter_options_from_args(module_run_module, monkeypatch, args):
     module._config['pipeline-test-bus-topic'] = topic
 
     report_pipeline_state_mock = MagicMock()
-    monkeypatch.setattr(module.glue, 'shared_functions', {
-        'report_pipeline_state': (None, report_pipeline_state_mock),
-        'plan_test_batch': (None, MagicMock(return_value=test_batch))
+    patch_shared(monkeypatch, module, {}, callables={
+        'report_pipeline_state': report_pipeline_state_mock,
+        'plan_test_batch': MagicMock(return_value=test_batch)
     })
 
     module.execute()
@@ -158,9 +154,9 @@ def test_state_reporter_options_from_mapping(module_run_module, monkeypatch):
     module._config['pipeline-test-types'] = 'dummy_topic_types'
 
     report_pipeline_state_mock = MagicMock()
-    monkeypatch.setattr(module.glue, 'shared_functions', {
-        'report_pipeline_state': (None, report_pipeline_state_mock),
-        'plan_test_batch': (None, MagicMock(return_value=test_batch))
+    patch_shared(monkeypatch, module, {}, callables={
+        'report_pipeline_state': report_pipeline_state_mock,
+        'plan_test_batch': MagicMock(return_value=test_batch)
     })
 
     mapping_mock = MagicMock()
@@ -195,9 +191,9 @@ def test_state_reporter_options_mapping_error(module_run_module, monkeypatch):
     module._config['pipeline-test-types'] = 'dummy_topic_types'
 
     report_pipeline_state_mock = MagicMock()
-    monkeypatch.setattr(module.glue, 'shared_functions', {
-        'report_pipeline_state': (None, report_pipeline_state_mock),
-        'plan_test_batch': (None, MagicMock(return_value=test_batch))
+    patch_shared(monkeypatch, module, {}, callables={
+        'report_pipeline_state': report_pipeline_state_mock,
+        'plan_test_batch': MagicMock(return_value=test_batch)
     })
 
     mapping_mock = MagicMock()

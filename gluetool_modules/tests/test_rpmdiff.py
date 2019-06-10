@@ -9,7 +9,7 @@ import gluetool
 import gluetool_modules.static_analysis.rpmdiff.rpmdiff
 import gluetool_modules.testing.testing_results
 
-from . import Bunch, create_module, patch_shared
+from . import Bunch, create_module, patch_shared, check_loadable
 
 
 SUCCESS_STDOUT = """{
@@ -656,10 +656,9 @@ def test_shared(module):
 
 
 def test_loadable(module):
-    ci, _ = module
-    python_mod = ci._load_python_module("static_analysis/rpmdiff", "pytest_rpmdiff",
-                                        "gluetool_modules/static_analysis/rpmdiff/rpmdiff.py")
-    assert hasattr(python_mod, "CIRpmdiff")
+    glue, _ = module
+
+    check_loadable(glue, "gluetool_modules/static_analysis/rpmdiff/rpmdiff.py", "CIRpmdiff")
 
 
 def test_run_command(module, monkeypatch):

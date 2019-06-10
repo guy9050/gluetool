@@ -2,7 +2,7 @@ import pytest
 import os
 from mock import MagicMock
 from gluetool_modules.helpers.testing_thread import TestingThread
-from . import create_module, patch_shared
+from . import create_module, check_loadable, patch_shared
 
 
 @pytest.fixture(name='module')
@@ -12,11 +12,7 @@ def fixture_module():
 
 
 def test_loadable(module):
-    ci = module.glue
-    python_mod = ci._load_python_module('helpers/testing_thread', 'pytest_testing_threa',
-                                        'gluetool_modules/helpers/testing_thread.py')
-
-    assert hasattr(python_mod, 'TestingThread')
+    check_loadable(module.glue, 'gluetool_modules/helpers/testing_thread.py', 'TestingThread')
 
 
 def test_sanity_no_option(module):

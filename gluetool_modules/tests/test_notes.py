@@ -4,7 +4,7 @@ import logging
 
 from gluetool import GlueError
 from gluetool_modules.helpers.notes import Notes, Note
-from . import create_module
+from . import create_module, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -13,12 +13,7 @@ def fixture_module():
 
 
 def test_loadable(module):
-    ci = module.glue
-    # pylint: disable=protected-access
-    python_mod = ci._load_python_module('helpers', 'pytest_notes',
-                                        'gluetool_modules/helpers/notes.py')
-
-    assert hasattr(python_mod, 'Notes')
+    check_loadable(module.glue, 'gluetool_modules/helpers/notes.py', 'Notes')
 
 
 def test_default_level(module):

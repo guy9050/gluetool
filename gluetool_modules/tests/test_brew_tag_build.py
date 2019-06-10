@@ -4,7 +4,7 @@ from mock import MagicMock
 
 import gluetool.utils
 from gluetool_modules.helpers import brew_tag_build
-from . import create_module, patch_shared, assert_shared
+from . import create_module, patch_shared, assert_shared, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -41,12 +41,7 @@ def _patch_module(module, monkeypatch, mocked_result=None, scratch=False):
 
 
 def test_loadable(module):
-    ci = module.glue
-    # pylint: disable=protected-access
-    python_mod = ci._load_python_module('helpers/brew_tag_build', 'pytest_brew_tag_build',
-                                        'gluetool_modules/helpers/brew_tag_build.py')
-
-    assert hasattr(python_mod, 'CIBrewTagBuild')
+    check_loadable(module.glue, 'gluetool_modules/helpers/brew_tag_build.py', 'CIBrewTagBuild')
 
 
 def test_execute_no_primary_task(module):

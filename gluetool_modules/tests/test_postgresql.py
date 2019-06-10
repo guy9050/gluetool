@@ -5,7 +5,7 @@ import psycopg2
 import gluetool
 import gluetool_modules.database.postgresql
 from mock import MagicMock
-from . import create_module
+from . import create_module, check_loadable
 
 
 @pytest.fixture(name='module')
@@ -32,11 +32,9 @@ def fixture_configured_module(module, monkeypatch):
 
 
 def test_loadable(module):
-    # pylint: disable=protected-access
-    ci, _ = module
-    python_mod = ci._load_python_module("database/postgresql", "pytest_postgresql",
-                                        "gluetool_modules/database/postgresql.py")
-    assert hasattr(python_mod, "PostgreSQL")
+    glue, _ = module
+
+    check_loadable(glue, "gluetool_modules/database/postgresql.py", "PostgreSQL")
 
 
 def test_shared(module):
