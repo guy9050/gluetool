@@ -234,8 +234,8 @@ class Beaker(gluetool.Module):
                         journal_data = gluetool.utils.wait(
                             'fetch journal content', _fetch_journal,
                             logger=citool_module.logger,
-                            timeout=self._module.option('fetch-journal-timeout'),
-                            tick=self._module.option('fetch-journal-tick')
+                            timeout=citool_module.option('fetch-journal-timeout'),
+                            tick=citool_module.option('fetch-journal-tick')
                         )
 
                         journal = bs4.BeautifulSoup(journal_data, 'xml').BEAKER_TEST
