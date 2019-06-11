@@ -5,8 +5,8 @@ import bs4
 
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError
-from gluetool.log import log_dict
-from gluetool.utils import Command, render_template
+from gluetool.log import log_dict, log_blob
+from gluetool.utils import Command, render_template, dict_update
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 import qe
@@ -28,17 +28,71 @@ class GeneralWOWError(PrimaryTaskFingerprintsMixin, GlueError):
 
 
 class WowCommand(Command):
+    def __init__(self, module, upstream_options, ordinary_options, *args, **kwargs):
+        super(WowCommand, self).__init__(*args, **kwargs)
+
+        self.module = module
+        self.upstream_options = upstream_options
+        self.ordinary_options = ordinary_options
+
     # Following methods are exposed to ``evaluate_instructions`` shared function
     # as command callbacks.
     def add_options(self, instruction, command, argument, context):
         # pylint: disable=unused-argument
 
         options = render_template(argument, logger=self.logger, **context)
-        gluetool.log.log_blob(self.debug, 'adding options', options)
+        log_blob(self.debug, 'adding options', options)
 
         # simple split() is too dumb: '--foo "bar baz"' => ['--foo', 'bar baz']. shlex is the right tool
         # to split command-line options, it obeys quoting.
         self.options += shlex.split(options)
+
+        log_dict(self.debug, 'current options', self.options)
+
+    def modify_option(self, instruction, command, argument, context):
+        # pylint: disable=unused-argument
+
+        assert isinstance(argument, dict)
+
+        new_options = []
+
+        if command == 'modify-upstream-option':
+            option_list_name = 'upstream_options'
+
+        elif command == 'modify-ordinary-option':
+            option_list_name = 'ordinary_options'
+
+        for option in getattr(self, option_list_name):
+            option_context = dict_update(
+                {},
+                context,
+                {
+                    'OPTION': option
+                }
+            )
+
+            if not self.module.shared('evaluate_rules', argument.get('rule', 'False'), context=option_context):
+                new_options.append(option)
+                continue
+
+            if 'remove' in argument:
+                log_blob(self.debug, 'removing option', option)
+                continue
+
+            if 'replace-with' in argument:
+                log_blob(self.debug, 'replacing option', option)
+
+                new_option = render_template(argument['replace-with'], logger=self.logger, **option_context)
+
+                log_blob(self.debug, 'replaced with option', new_option)
+
+                new_options += [new_option]
+
+        # Simple self.old_list = new_list is not good enough - we must change *the content* of the list,
+        # since it is shared between us and Wow module who'd add it, when done with instructions, to the
+        # final command.
+        getattr(self, option_list_name)[:] = new_options
+        log_dict(self.debug, 'current options', new_options)
 
     def set_command(self, instruction, command, argument, context):
         # pylint: disable=unused-argument
@@ -220,8 +274,8 @@ class WorkflowTomorrow(gluetool.Module):
         :param list body_options: main options, usually representing a test plan or a list of tasks
             to wrap by "paperwork" elements. If not set, ``wow-options`` option is used. Even an empty
             list has more priority than ``wow-options`` option.
-        :param list options: additional options for ``workflow-tomorrow``, for finer tuning of job build from
-            "body" options.
+        :param list options: additional ordinary options for ``workflow-tomorrow``, for finer tuning of job build
+            from "body" options.
         :param dict environment: if set, it will be passed to the tests via ``--environment`` option.
         :param dict task_params: if set, params will be passed to the tests via multiple
             ``--taskparam`` options.
@@ -241,7 +295,7 @@ class WorkflowTomorrow(gluetool.Module):
         log_dict(self.debug, 'body options', body_options)
         log_dict(self.debug, 'wow options', self.option('wow-options'))
         log_dict(self.debug, 'general test plan', self.option('use-general-test-plan'))
-        log_dict(self.debug, 'options', options)
+        log_dict(self.debug, 'ordinary options', options)
         log_dict(self.debug, 'environment', environment)
         log_dict(self.debug, 'task params', task_params)
         log_dict(self.debug, 'extra context', extra_context)
@@ -303,14 +357,14 @@ class WorkflowTomorrow(gluetool.Module):
 
         extra_context = extra_context or {}
 
-        def _plan_job(distro, wow_options):
+        def _plan_job(distro, upstream_options):
             # pylint: disable=too-many-statements
 
-            formatted_wow_options = gluetool.utils.format_command_line([
-                wow_options
+            formatted_upstream_options = gluetool.utils.format_command_line([
+                upstream_options
             ])
 
-            self.debug("constructing options for distro '{}' and options {}".format(distro, formatted_wow_options))
+            self.debug("constructing options for distro '{}' and options {}".format(distro, formatted_upstream_options))
 
             #
             # prepare --environment content if available
@@ -322,11 +376,17 @@ class WorkflowTomorrow(gluetool.Module):
             # incorporate changes demanded by user
             _environment.update(environment or {})
 
-            command = WowCommand(['bkr', 'workflow-tomorrow'], [
-                '--dry-run'  # this will make wow to print job description in XML
-            ], logger=self.logger)
+            command = WowCommand(
+                self,
+                upstream_options,
+                options,
+                ['bkr', 'workflow-tomorrow'], [
+                    '--dry-run'  # this will make wow to print job description in XML
+                ],
+                logger=self.logger
+            )
 
-            context = gluetool.utils.dict_update(
+            context = dict_update(
                 self.shared('eval_context'),
                 {
                     'DISTRO': distro,
@@ -335,7 +395,11 @@ class WorkflowTomorrow(gluetool.Module):
                     # Bare `ENVIRONMENT` would collide with common practice of using it to hold
                     # *testing environment* as understood by the pipeline. This "environment"
                     # definition is something understood by workflow-* tools.
-                    'WOW_ENVIRONMENT': _environment
+                    'WOW_ENVIRONMENT': _environment,
+
+                    # Let configuration see the given options
+                    'UPSTREAM_OPTIONS': upstream_options,
+                    'ORDINARY_OPTIONS': options
                 },
                 extra_context
             )
@@ -350,6 +414,8 @@ class WorkflowTomorrow(gluetool.Module):
 
             instruction_commands = {
                 'add-options': command.add_options,
+                'modify-upstream-option': command.modify_option,
+                'modify-ordinary-option': command.modify_option,
                 'command': command.set_command,
                 'use-shell': command.set_use_shell,
                 'quote-args': command.set_quote_args,
@@ -359,13 +425,13 @@ class WorkflowTomorrow(gluetool.Module):
             self.shared('evaluate_instructions', self.wow_options_map, instruction_commands, context=context)
 
             #
-            # add additional options
+            # add ordinary options
             if options:
                 command.options += options
 
             #
             # add "body" workflow-options (prepared by caller)
-            command.options += wow_options
+            command.options += upstream_options
 
             # incorporate changes demanded by user
             if task_params:
@@ -388,13 +454,13 @@ class WorkflowTomorrow(gluetool.Module):
                 if 'No relevant tasks found in test plan' in exc.output.stderr:
                     return _return_empty('No relevant tasks found for {} and options {}'.format(
                         distro,
-                        formatted_wow_options
+                        formatted_upstream_options
                     ))
 
                 if 'No recipe generated (no relevant tasks?)' in exc.output.stderr:
                     return _return_empty('No relevant tasks found for {} and options {}'.format(
                         distro,
-                        formatted_wow_options
+                        formatted_upstream_options
                     ))
 
                 if 'No valid distro/variant/arch combination found' in exc.output.stderr:
