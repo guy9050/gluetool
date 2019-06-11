@@ -312,6 +312,16 @@ class WorkflowTomorrow(gluetool.Module):
 
             self.debug("constructing options for distro '{}' and options {}".format(distro, formatted_wow_options))
 
+            #
+            # prepare --environment content if available
+            _environment = {}
+
+            if self.has_shared('product'):
+                _environment['product'] = self.shared('product')
+
+            # incorporate changes demanded by user
+            _environment.update(environment or {})
+
             command = WowCommand(['bkr', 'workflow-tomorrow'], [
                 '--dry-run'  # this will make wow to print job description in XML
             ], logger=self.logger)
@@ -320,7 +330,12 @@ class WorkflowTomorrow(gluetool.Module):
                 self.shared('eval_context'),
                 {
                     'DISTRO': distro,
-                    'SCHEDULER': command
+                    'SCHEDULER': command,
+
+                    # Bare `ENVIRONMENT` would collide with common practice of using it to hold
+                    # *testing environment* as understood by the pipeline. This "environment"
+                    # definition is something understood by workflow-* tools.
+                    'WOW_ENVIRONMENT': _environment
                 },
                 extra_context
             )
@@ -351,21 +366,6 @@ class WorkflowTomorrow(gluetool.Module):
             #
             # add "body" workflow-options (prepared by caller)
             command.options += wow_options
-
-            #
-            # add environment if available
-            _environment = {}
-
-            if self.has_shared('product'):
-                _environment['product'] = self.shared('product')
-
-            # incorporate changes demanded by user
-            _environment.update(environment or {})
-
-            command.options += [
-                '--environment',
-                ' && '.join(['{}={}'.format(k, v) for k, v in _environment.iteritems()])
-            ] if _environment else []
 
             # incorporate changes demanded by user
             if task_params:
