@@ -5,16 +5,14 @@ import gluetool_modules.libs
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order
-from typing import Any, Dict, List, NamedTuple, Union  # noqa
+from typing import Any, Dict, List, Optional, Union  # noqa
 
 
-BaseTestingEnvironment = NamedTuple('TestingEnvironment', (
-    ('compose', Union[str, gluetool_modules.libs._UniqObject]),  # pylint: disable=protected-access
-    ('arch', str)
-))
+ComposeType = Union[str, gluetool_modules.libs._UniqObject]  # pylint: disable=invalid-name,protected-access
+ArchType = str
 
 
-class TestingEnvironment(BaseTestingEnvironment):
+class TestingEnvironment(object):
     """
     To specify what environment should provisioner provide when asked for guest(s), one needs to
     describe attributes of such environment. It's up to provisioning modules to decode the information,
@@ -42,10 +40,23 @@ class TestingEnvironment(BaseTestingEnvironment):
     # of each instance.
     ANY = gluetool_modules.libs.ANY
 
+    _fields = ('arch', 'compose')
+
+    def __init__(self, arch=None, compose=None):
+        # type: (Optional[ArchType], Optional[ComposeType]) -> None
+
+        self.arch = arch
+        self.compose = compose
+
     def __str__(self):
         # type: () -> str
 
         return self.serialize_to_string()
+
+    def __repr__(self):
+        # type: () -> str
+
+        return str(self)
 
     def serialize_to_string(self):
         # type: () -> str

@@ -11,7 +11,7 @@ from . import create_module, patch_shared, assert_shared, check_loadable
 @pytest.fixture(name='module')
 def fixture_module():
     # pylint: disable=unused-argument
-    module = create_module(gluetool_modules.helpers.guess_environment.CIGuess)[1]
+    module = create_module(gluetool_modules.helpers.guess_environment.GuessEnvironment)[1]
     # pylint: disable=protected-access
     module._distro = {
         'type': 'distro',
@@ -69,7 +69,7 @@ def fixture_module_for_recent(module, monkeypatch):
 
 
 def test_loadable(module):
-    check_loadable(module.glue, 'gluetool_modules/helpers/guess_environment.py', 'CIGuess')
+    check_loadable(module.glue, 'gluetool_modules/helpers/guess_environment.py', 'GuessEnvironment')
 
 
 @pytest.mark.parametrize('method, image, raises_exc, use', [
@@ -299,7 +299,7 @@ def test_image_autodetection(module, monkeypatch):
     module.pattern_map = MagicMock(return_value=MagicMock(match=MagicMock(return_value=image)))
 
     # pylint: disable=protected-access
-    module._guess_target_autodetection(module._image)
+    module._guess_target_autodetect(module._image)
 
 
 def test_distro_autodetection(module, monkeypatch):
@@ -317,7 +317,7 @@ def test_distro_autodetection(module, monkeypatch):
     module.pattern_map = MagicMock(return_value=MagicMock(match=MagicMock(return_value=distro)))
 
     # pylint: disable=protected-access
-    module._guess_target_autodetection(module._distro)
+    module._guess_target_autodetect(module._distro)
 
 
 def test_product_autodetection(module, monkeypatch):
@@ -335,12 +335,12 @@ def test_product_autodetection(module, monkeypatch):
     module.pattern_map = MagicMock(return_value=MagicMock(match=MagicMock(return_value=product)))
 
     # pylint: disable=protected-access
-    module._guess_target_autodetection(module._product)
+    module._guess_target_autodetect(module._product)
 
 
 def test_autodetection_no_brew(module):
     # pylint: disable=protected-access
-    assert_shared('primary_task', module._guess_target_autodetection, MagicMock())
+    assert_shared('primary_task', module._guess_target_autodetect, MagicMock())
 
 
 def test_recent_no_openstack(module):
