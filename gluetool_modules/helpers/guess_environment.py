@@ -17,11 +17,12 @@ from typing import cast, Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 DEFAULT_NIGHTLY_LISTING = 'http://download.eng.brq.redhat.com/nightly/'  # type: str
 DEFAULT_BU_LISTING = 'http://download-node-02.eng.bos.redhat.com/rel-eng/updates/'  # type: str
+SEPARATOR = ';'
 
 
 class GuessEnvironment(gluetool.Module):
     """
-    "Guess" compose/arch/distro/image/product.
+    "Guess" compose/arch/distro/image/product/wow relevancy distro.
 
     Goal of this module is to at least partialy answer question about the testing environment
     for a given artifact - deduce what composes, architectures and other properties are
@@ -30,11 +31,11 @@ class GuessEnvironment(gluetool.Module):
     User can choose from different possible methods of "guessing":
 
     * ``autodetect``: module will use artifact to deduce as many properties possible,
-      using mapping files (``--{distro,image,product}-pattern-map``) and instruction
+      using mapping files (``--{distro,image,product,wow-relevancy-distro}-pattern-map``) and instruction
       files (``--environment-map``).
 
     * ``force``: instead of autodetection, use specified properties. Use ``--environment``,
-      ``--distro``, ``--image`` and ``--product`` options to set actual values.
+      ``--distro``, ``--image``, ``--product`` and ``--wow-relevancy-distro`` options to set actual values.
 
     * ``recent``: (Only for images) use ``--image`` option as a hint - a regular
       expression, with one matching group, that tells module what image names should be
@@ -101,12 +102,13 @@ class GuessEnvironment(gluetool.Module):
     """
 
     name = 'guess-environment'
-    description = 'Guess testing environment properties (compose/arch/distro/image/product) for artifacts'
+    # pylint: disable=line-too-long
+    description = 'Guess testing environment properties (compose/arch/distro/image/wow relevancy env) for artifacts'
 
     options = [
         ('Methods', {
             'environment-method': {
-                'help': 'What method to use for distro "guessing" (default: %(default)s).',
+                'help': 'What method to use for environment "guessing" (default: %(default)s).',
                 'choices': ('autodetect', 'target-autodetection', 'force', 'nightly', 'buc'),
                 'default': 'autodetect'
 
@@ -117,12 +119,17 @@ class GuessEnvironment(gluetool.Module):
                 'default': 'autodetect'
             },
             'image-method': {
-                'help': 'What method to use for distro "guessing" (default: %(default)s).',
+                'help': 'What method to use for image "guessing" (default: %(default)s).',
                 'choices': ('autodetect', 'target-autodetection', 'force', 'recent'),
                 'default': 'autodetect'
             },
             'product-method': {
-                'help': 'What method to use for distro "guessing" (default: %(default)s).',
+                'help': 'What method to use for product "guessing" (default: %(default)s).',
+                'choices': ('autodetect', 'target-autodetection', 'force'),
+                'default': 'autodetect'
+            },
+            'wow-relevancy-distro-method': {
+                'help': 'What method to use for wow relevancy distro "guessing" (default: %(default)s).',
                 'choices': ('autodetect', 'target-autodetection', 'force'),
                 'default': 'autodetect'
             }
@@ -144,6 +151,9 @@ class GuessEnvironment(gluetool.Module):
             },
             'product': {
                 'help': 'Product identification, to help your method with guessing.'
+            },
+            'wow-relevancy-distro': {
+                'help': 'Wow relevancy distro identification, to help your method with guessing.'
             }
         }),
         ('Distro-listings', {
@@ -190,11 +200,14 @@ class GuessEnvironment(gluetool.Module):
             },
             'product-pattern-map': {
                 'help': 'Path to a file with target => product patterns.'
+            },
+            'wow-relevancy-distro-pattern-map': {
+                'help': 'Path to a file with target => wow relevancy distro patterns.'
             }
         })
     ]
 
-    shared_functions = ['testing_environments', 'distro', 'image', 'product']
+    shared_functions = ['testing_environments', 'distro', 'image', 'product', 'wow_relevancy_distro']
 
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
@@ -206,6 +219,7 @@ class GuessEnvironment(gluetool.Module):
         self._distro = {}  # type: Dict[str, Union[str, List[str]]]
         self._image = {}  # type: Dict[str, Union[str, List[str]]]
         self._product = {}  # type: Dict[str, Union[str, List[str]]]
+        self._wow_relevancy_distro = {}  # type: Dict[str, Union[str, List[str]]]
 
     def testing_environments(self):
         # type: () -> List[TestingEnvironment]
@@ -252,6 +266,21 @@ class GuessEnvironment(gluetool.Module):
         if self._product['result'] is None:
             self.execute_method(self._product)
         return self._product['result']
+
+    def wow_relevancy_distro(self, distro):
+        # type: (Any) -> Union[str, List[str]]
+        """
+        Return guessed wow relevancy distro.
+        Wow relevancy distro is a part of wow environment and is used for defining distro wow needs to test.
+        For example, a user needs to run tests for an upcoming minor release. In this case we can't just pass
+        `distro` to wow, because the `distro` describes a released version.
+
+        :param distro: beaker distro with which the wow relevancy distro is related to
+        :rtype: Union[str, List[str]]
+        """
+        if self._wow_relevancy_distro['result'] is None:
+            self.execute_method(self._wow_relevancy_distro, distro)
+        return self._wow_relevancy_distro['result']
 
     @gluetool.utils.cached_property
     def _arch_compatibility_map(self):
@@ -488,11 +517,16 @@ class GuessEnvironment(gluetool.Module):
         else:
             source['result'] = source['specification']
 
-    def _guess_autodetect_by_target(self, source):
+    def _guess_autodetect_by_target(self, source, *args):
         # type: (Dict[str, Union[str, List[str]]]) -> None
         self.require_shared('primary_task')
 
         target = self.shared('primary_task').target
+
+        # wow relevancy distro is related not only to target, but on beaker distro as well
+        if source['type'] == 'wow_relevancy_distro':
+            # wow relevancy distro is passed from the *args
+            target = SEPARATOR.join([target, args[0]])
 
         source['result'] = self.pattern_map(source).match(target, multiple=(source['type'] == 'distro'))
 
@@ -714,7 +748,7 @@ class GuessEnvironment(gluetool.Module):
 
         source['result'] = output_constraints
 
-    def _guess_target_autodetect(self, source):
+    def _guess_target_autodetect(self, source, *args):
         # type: (Dict[str, Union[str, List[str]]]) -> None
         self.require_shared('primary_task')
 
@@ -722,7 +756,7 @@ class GuessEnvironment(gluetool.Module):
             self._guess_autodetect_environments(source)
 
         else:
-            self._guess_autodetect_by_target(source)
+            self._guess_autodetect_by_target(source, *args)
 
     _methods = {
         'autodetect': _guess_target_autodetect,
@@ -767,6 +801,13 @@ class GuessEnvironment(gluetool.Module):
             'pattern-map': self.option('product-pattern-map'),
             'result': None
         }
+        self._wow_relevancy_distro = {
+            'type': 'wow_relevancy_distro',
+            'specification': self.option('wow-relevancy-distro'),
+            'method': self.option('wow-relevancy-distro-method'),
+            'pattern-map': self.option('wow-relevancy-distro-pattern-map'),
+            'result': None
+        }
 
     def sanity(self):
         # type: () -> None
@@ -777,7 +818,7 @@ class GuessEnvironment(gluetool.Module):
         specification_required = ('force', 'recent', 'nightly', 'buc')
         specification_ignored = ('autodetect', 'target-autodetection',)
 
-        for source in [self._distro, self._image, self._product]:
+        for source in [self._distro, self._image, self._product, self._wow_relevancy_distro]:
 
             if source['method'] == 'target-autodetection' and source['pattern-map'] is None:
                 raise GlueError(
@@ -792,14 +833,14 @@ class GuessEnvironment(gluetool.Module):
                 raise IncompatibleOptionsError(
                     "--{} option is ignored with method '{}'".format(source['type'], source['method']))
 
-    def execute_method(self, source):
+    def execute_method(self, source, *args):
         # type: (Dict[str, Union[str, List[str]]]) -> None
 
         method = self._methods.get(source['method'], None)  # type: ignore
         if method is None:
             raise IncompatibleOptionsError("Unknown 'guessing' method '{}'".format(source['method']))
 
-        method(self, source)
+        method(self, source, *args)
 
         log_dict(self.info, 'Using {}'.format(source['type']), source['result'])
 

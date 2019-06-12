@@ -32,6 +32,13 @@ def fixture_module():
         'pattern-map': 'foo',
         'result': None
     }
+    module._wow_relevancy_distro = {
+        'type': 'wow_relevancy_distro',
+        'specification': 'foo',
+        'method': 'foo',
+        'pattern-map': 'foo',
+        'result': None
+    }
     return module
 
 
@@ -198,6 +205,13 @@ def test_shared_product(module):
     assert module.product() == module._product['result']
 
 
+def test_shared_wow_relevancy_distro(module):
+    # pylint: disable=protected-access
+    module._wow_relevancy_distro['result'] = MagicMock()
+
+    assert module.wow_relevancy_distro('dummy-distro') == module._wow_relevancy_distro['result']
+
+
 def test_image_pattern_map(module, monkeypatch):
     map_instance = MagicMock()
     map_class = MagicMock(return_value=map_instance)
@@ -263,6 +277,17 @@ def test_product_force(module):
     assert module._product['result'] == product
 
 
+def test_wow_relevancy_distro_force(module):
+    wow_relevancy_distro = 'dummy-wow_relevancy_distro'
+
+    # pylint: disable=protected-access
+    module._wow_relevancy_distro['specification'] = wow_relevancy_distro
+
+    module._guess_force(module._wow_relevancy_distro)
+
+    assert module._wow_relevancy_distro['result'] == wow_relevancy_distro
+
+
 def test_image_autodetection(module, monkeypatch):
     target = 'dummy-target'
     image = 'dummy-image'
@@ -277,6 +302,8 @@ def test_image_autodetection(module, monkeypatch):
     module.pattern_map = MagicMock(return_value=MagicMock(match=MagicMock(return_value=image)))
 
     module._guess_target_autodetect(module._image)
+
+    assert module._image['result'] == image
 
 
 def test_distro_autodetection(module, monkeypatch):
@@ -294,6 +321,8 @@ def test_distro_autodetection(module, monkeypatch):
 
     module._guess_target_autodetect(module._distro)
 
+    assert module._distro['result'] == distro
+
 
 def test_product_autodetection(module, monkeypatch):
     target = 'dummy-target'
@@ -309,6 +338,29 @@ def test_product_autodetection(module, monkeypatch):
     module.pattern_map = MagicMock(return_value=MagicMock(match=MagicMock(return_value=product)))
 
     module._guess_target_autodetect(module._product)
+
+    assert module._product['result'] == product
+
+
+def test_wow_relevancy_autodetection(module, monkeypatch):
+    target = 'dummy-target'
+    distro = 'dummy-distro'
+    wow_relevancy_distro = 'dummy-wow_relevancy_distro'
+
+    # pylint: disable=protected-access
+    module._wow_relevancy_distro['method'] = 'target-autodetection'
+
+    patch_shared(monkeypatch, module, {}, callables={
+        'primary_task': MagicMock(return_value=MagicMock(target=target))
+    })
+
+    # monkeypatching of @cached_property does not work, the property's __get__() gets called...
+    module.pattern_map = MagicMock(return_value=MagicMock(match=MagicMock(return_value=wow_relevancy_distro)))
+
+    # pylint: disable=protected-access
+    module._guess_target_autodetect(module._wow_relevancy_distro, distro)
+
+    assert module._wow_relevancy_distro['result'] == wow_relevancy_distro
 
 
 def test_autodetection_no_brew(module):

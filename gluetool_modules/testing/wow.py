@@ -367,6 +367,9 @@ class WorkflowTomorrow(gluetool.Module):
             # prepare --environment content if available
             _environment = {}
 
+            if self.has_shared('wow_relevancy_distro'):
+                _environment['distro'] = self.shared('wow_relevancy_distro', distro)
+
             if self.has_shared('product'):
                 _environment['product'] = self.shared('product')
 
