@@ -597,12 +597,17 @@ class TestBatchPlanner(gluetool.Module):
                     if companion_nvrs and module in self._sidetag_jobs:
                         args = _modify_build_dependecies(args)
 
+                    # Add required artifact ID
+                    args.insert(0, '--artifact-id={}'.format(task.dispatch_id))
+
                     final_commands.append((module, args))
 
         return final_commands
 
     def _plan_by_basic_static_config(self):
         self.require_shared('evaluate_filter')
+
+        task = self.shared('primary_task')
 
         if not self.configs:
             self.warn('Empty dispatcher configuration')
@@ -616,6 +621,9 @@ class TestBatchPlanner(gluetool.Module):
 
                 module = item['module']
                 args = item['args'] if item['args'] else []
+
+                # Add required artifact ID
+                args.insert(0, '--artifact-id={}'.format(task.dispatch_id))
 
                 self.info("module='{}', args='{}'".format(module, args))
                 final_commands.append((module, args))
@@ -637,7 +645,13 @@ class TestBatchPlanner(gluetool.Module):
 
         if repository.has_sti_tests:
             # Note that we currently support only Openstack
-            return [('openstack-job', ['--job-name', job_name])]
+            return [(
+                'openstack-job',
+                [
+                    '--artifact-id={}'.format(task.dispatch_id),
+                    '--job-name', job_name
+                ]
+            )]
 
         return []
 
@@ -669,7 +683,9 @@ class TestBatchPlanner(gluetool.Module):
                 continue
 
             dispatch_command = {
-                'options': {}
+                'options': {
+                    '--artifact-id': task.dispatch_id
+                }
             }
 
             def _dispatch_module(instruction, command, argument, context):
