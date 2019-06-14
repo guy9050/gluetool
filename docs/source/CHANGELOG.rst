@@ -6,6 +6,39 @@ All notable changes to this project will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
 
+2019-06-14
+----------
+
+Added
+~~~~~
+
+- [ansible] add logging of ansible output (Miroslav Vadkerti)
+- [guess-environment] find out what environments we should use (mprchlik)
+- [jenkins] fetch build params via direct endpoint (Milos Prchlik)
+- [wow] move --environment to a configuration (mprchlik)
+- [pes] Provides access to Package Evolution Sevice (PES) (Martin Kluson)
+- [pipeline-state-reporter] use map to enhance "overall result" decisions (mprchlik)
+- [rpminspect] new module rpminspect (Evgeny Fedin)
+- [wow] let configuration modify "upstream" options (mprchlik)
+- [wow-artifact-installation-options-koji-build] order installation tasks (mprchlik)
+
+
+Fixed
+~~~~~
+
+- [beaker] fix wrong use of self._module in TaskAggregator (mprchlik)
+- [beaker] retry when fetching tasks' journal (mprchlik)
+- [restraint] change index.html permissions only when it really exists (mprchlik)
+- [sti] fix git and workdir permissions to allow 3rd party to read our files (mprchlik)
+- [test-schedule-runner-sti] fix inventory file permissions to make it readable by other (mprchlik)
+
+Changed
+~~~~~~~
+
+- [git] return relative path instead of absolute (mprchlik)
+- [test-schedule-runner] a state machine \o/ (mprchlik)
+
+
 2019-05-03
 ----------
 
