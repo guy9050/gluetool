@@ -243,8 +243,9 @@ class BuildDependencies(gluetool.Module):
 
         additional_task_ids = method(self)
 
+        current_tasks_ids = [task.id for task in self.shared('tasks')]
+
         if additional_task_ids:
-            current_tasks_ids = [task.id for task in self.shared('tasks')]
 
             log_dict(self.debug, 'current task IDs', current_tasks_ids)
             log_dict(self.debug, 'additional task IDs', additional_task_ids)
@@ -253,6 +254,6 @@ class BuildDependencies(gluetool.Module):
 
         elif self.companions_nvr:
 
-            self.shared('tasks', nvrs=self.companions_nvr)
+            self.shared('tasks', task_ids=current_tasks_ids, nvrs=self.companions_nvr)
 
         log_dict(self.info, 'Updated list of tasks', [task.full_name for task in self.shared('tasks')])
