@@ -5,7 +5,7 @@ import tempfile
 
 import gluetool
 from gluetool import GlueError, GlueCommandError
-from gluetool.utils import Command, check_for_commands, load_json, normalize_multistring_option
+from gluetool.utils import Command, check_for_commands, load_json, normalize_multistring_option, new_xml_element
 from gluetool.log import log_dict
 from libci.results import TestResult, publish_result
 
@@ -75,6 +75,27 @@ class RpminspectTestResult(TestResult):
 
         return test_results
 
+    def _serialize_to_xunit_property_dict(self, parent, properties, names):
+        # type: (Any, Any, Any) -> None
+
+        if 'data' in self.payload[0]:
+
+            rpminspect_data = self.payload[0]['data']
+            for item in rpminspect_data:
+                new_xml_element('property', parent,
+                                name='rpminspect.{}'.format(item),
+                                value=rpminspect_data[item])
+
+        super(RpminspectTestResult, self)._serialize_to_xunit_property_dict(parent, properties, names)
+
+    def _serialize_to_xunit(self):
+        # type: () -> Any
+        test_suite = super(RpminspectTestResult, self)._serialize_to_xunit()
+
+        test_suite = self.glue.shared('rpminspect_xunit_serialize', test_suite, self)
+
+        return test_suite
+
 
 class RpminspectSkippedTestResult(TestResult):
     """
@@ -123,6 +144,8 @@ class CIRpminspect(gluetool.Module):
             'default': ''
         }
     }
+
+    shared_functions = ['rpminspect_xunit_serialize', ]
 
     def sanity(self):
         # type: () -> None
@@ -312,6 +335,63 @@ class CIRpminspect(gluetool.Module):
         payload = self._parse_runinfo(task, json_output)
         overall_result = payload[0]['outcome']
         publish_result(self, RpminspectTestResult, self.option('type'), overall_result, payload=payload)
+
+    def rpminspect_xunit_serialize(self, test_suite, result):
+        # pylint: disable=no-self-use
+        # type: (Any, Any, Any) -> Any
+
+        if not result.payload:
+            return test_suite
+
+        for _test in result.payload:
+
+            outcome = _test['outcome']
+            testcase = _test['testcase']
+
+            test_case = new_xml_element(
+                'testcase',
+                _parent=test_suite,
+                name=testcase['name']
+            )
+
+            properties = new_xml_element('properties', _parent=test_case)
+            new_xml_element('property', _parent=properties, name='outcome', value=outcome)
+
+            if outcome in RPMINSPECT_MAP:
+
+                outcome_index = RPMINSPECT_MAP.index(outcome)
+                fail_indexes = [
+                    RPMINSPECT_MAP.index('NEEDS_INSPECTION'),
+                    RPMINSPECT_MAP.index('FAILED')
+                ]
+
+                if outcome_index in fail_indexes:
+                    new_xml_element('failure', _parent=test_case, message="Test failed")
+
+            else:
+                self.warn('Unknown outcome {} in test {}', outcome, testcase['name'])
+
+            logs = new_xml_element('logs', _parent=test_case)
+            new_xml_element('log', _parent=logs,
+                            name='test-ref-url', value=_test['ref_url'])
+            new_xml_element('log', _parent=logs,
+                            name='testcase-ref-url', value=testcase['ref_url'])
+
+            if 'test_outputs' in testcase:
+
+                test_outputs = new_xml_element(
+                    'test-outputs',
+                    _parent=test_case
+                )
+
+                for test_output in testcase['test_outputs']:
+                    new_xml_element(
+                        'test-output',
+                        _parent=test_outputs,
+                        **test_output
+                    )
+
+        return test_suite
 
     def execute(self):
         # type: () -> None
