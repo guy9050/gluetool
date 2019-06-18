@@ -1,4 +1,5 @@
 import logging
+import re
 import shlex
 
 import bs4
@@ -20,6 +21,16 @@ DEFAULT_WOW_OPTIONS_SEPARATOR = '#-#-#-#-#'
 class NoGeneralTestPlanError(PrimaryTaskFingerprintsMixin, SoftGlueError):
     def __init__(self, task):
         super(NoGeneralTestPlanError, self).__init__(task, "No general test plan found for '{}'".format(task.component))
+
+
+class InvalidArchError(PrimaryTaskFingerprintsMixin, SoftGlueError):
+    def __init__(self, task, arch):
+        super(InvalidArchError, self).__init__(
+            task,
+            "Invalid architecture '{}' encountered for '{}'".format(arch, task.component)
+        )
+
+        self.arch = arch
 
 
 class GeneralWOWError(PrimaryTaskFingerprintsMixin, GlueError):
@@ -469,6 +480,11 @@ class WorkflowTomorrow(gluetool.Module):
                             distro
                         )
                     )
+
+                invalid_arch = re.search(r".*Invalid arch '(.*)'", exc.output.stderr, re.MULTILINE)
+
+                if invalid_arch:
+                    raise InvalidArchError(primary_task, invalid_arch.group(1))
 
                 raise GeneralWOWError(primary_task, exc.output)
 
