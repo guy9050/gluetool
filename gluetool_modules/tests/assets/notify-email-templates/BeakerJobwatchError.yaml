@@ -1,4 +1,4 @@
-subject: "[CI] [dummy-package-1.2.3-79.el7, task 123456, fixing-bz17] notify-email Failed to babysit Beaker jobs till the successfull end for dummy-package-1.2.3-79.el7, brew task 123456, branch fixing-bz17"
+subject: "[CI] [dummy-package-1.2.3-79.el7, task 123456, fixing-bz17] Failed to babysit Beaker jobs till the successfull end for dummy-package-1.2.3-79.el7, brew task 123456, branch fixing-bz17"
 body: |-
   CI pipeline was halted due to the following error:
 

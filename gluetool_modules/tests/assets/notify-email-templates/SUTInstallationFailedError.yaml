@@ -1,4 +1,4 @@
-subject: "[CI] [dummy-package-1.2.3-79.el7, task 123456, fixing-bz17] notify-email SUT installation failed"
+subject: "[CI] [dummy-package-1.2.3-79.el7, task 123456, fixing-bz17] SUT installation failed"
 body: |-
   CI pipeline was halted due to the following error:
 
