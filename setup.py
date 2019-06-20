@@ -196,6 +196,7 @@ if __name__ == '__main__':
                   'static_analysis',
                   'static_analysis.covscan',
                   'static_analysis.rpmdiff',
+                  'static_analysis.rpminspect',
                   'build_on_commit',
                   'pipelines',
                   'provision'
