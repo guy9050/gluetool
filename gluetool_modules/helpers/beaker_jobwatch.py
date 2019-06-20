@@ -26,6 +26,9 @@ class BeakerJobwatch(gluetool.Module):
     options = {
         'jobwatch-options': {
             'help': 'Additional options for beaker-jobwatch'
+        },
+        'matrix-baseurl': {
+            'help': 'A base URL to beaker matrix'
         }
     }
 
@@ -52,10 +55,13 @@ class BeakerJobwatch(gluetool.Module):
 
         jobwatch_log = jobwatch_log.strip().split('\n')
 
+        # extracts all matrix urls from jobwatch_log
+        matrix_url = [value for value in jobwatch_log if self.option('matrix-baseurl') in value]
+
         if len(jobwatch_log) < 3:
             raise BeakerJobwatchError(self.shared('primary_task'), 'jobwatch output is unexpectedly short')
 
-        if not jobwatch_log[-3].startswith('https://beaker.engineering.redhat.com/matrix/'):
+        if not matrix_url:
             raise BeakerJobwatchError(self.shared('primary_task'),
                                       'Could not find beaker matrix URL in jobwatch output')
 
@@ -64,8 +70,8 @@ class BeakerJobwatch(gluetool.Module):
 
         self.info('beaker-jobwatch finished')
 
-        # matrix url is always on the 3rd line from the end
-        return jobwatch_log[-3].strip()
+        # the last one matrix url is needed
+        return matrix_url[-1].strip()
 
     def beaker_jobwatch(self, jobs, end_task=None, critical_tasks=None, inspect=True):
         """
