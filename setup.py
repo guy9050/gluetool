@@ -105,7 +105,7 @@ CATEGORIES = [
     'infrastructure',
     'pipelines',
     'provision',
-    'static_analysis', 'static_analysis/covscan', 'static_analysis/rpmdiff',
+    'static_analysis', 'static_analysis/covscan', 'static_analysis/rpmdiff', 'static_analysis/rpminspect',
     'testing', 'testing/beaker', 'testing/composetest', 'testing/openstack', 'testing/pull_request_builder'
 ]
 
