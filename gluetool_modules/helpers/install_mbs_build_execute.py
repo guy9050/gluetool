@@ -1,9 +1,13 @@
 import json
+import os
 import re
 import gluetool
 from gluetool.log import log_dict
 from gluetool.utils import Command
 from gluetool import GlueError
+
+from gluetool_modules.libs.artifacts import artifacts_location
+from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput
 from gluetool_modules.libs.sut_installation import SUTInstallation
 
 
@@ -40,7 +44,7 @@ class InstallMBSBuild(gluetool.Module):
         }
     }
 
-    def _get_repo(self, module_nsvc, guests):
+    def _get_repo(self, module_nsvc, guest):
         self.info('Generating repo for module via ODCS')
 
         command = [
@@ -51,10 +55,9 @@ class InstallMBSBuild(gluetool.Module):
         ]
 
         # Inner list gather all arches, `set` gets rid of duplicities, and final `list` converts set to a list.
-        for arch in list(set([guest.environment.arch for guest in guests])):
-            command += [
-                '--arch', arch
-            ]
+        command += [
+            '--arch', guest.environment.arch
+        ]
 
         try:
             output = Command(command).run()
@@ -79,11 +82,23 @@ class InstallMBSBuild(gluetool.Module):
 
         return gluetool.utils.load_yaml(self.option('installation-workarounds'), logger=self.logger)
 
-    def setup_guest(self, guests, **kwargs):
-
+    def setup_guest(self, guest, log_dirpath=None, **kwargs):
         self.require_shared('primary_task', 'evaluate_instructions')
 
-        self.overloaded_shared('setup_guest', guests, **kwargs)
+        log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
+
+        installation_log_dirpath = os.path.join(
+            log_dirpath,
+            '{}-{}'.format(self.option('log-dir-name'), guest.name)
+        )
+
+        log_dict(guest.debug, 'setup log directories', [
+            log_dirpath, installation_log_dirpath
+        ])
+
+        guest_setup_output = self.overloaded_shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs) or []
+
+        guest.info('installing the artifact')
 
         primary_task = self.shared('primary_task')
 
@@ -107,7 +122,7 @@ class InstallMBSBuild(gluetool.Module):
             # For ODCS request we need to include both modules, for installation we will use only -devel if requested
             nsvc_odcs = '{} {}'.format(primary_task.nsvc, nsvc)
 
-        repo_url = self._get_repo(nsvc_odcs, guests)
+        repo_url = self._get_repo(nsvc_odcs, guest)
 
         #
         # Some modules do not provide 'default' module and user needs to explicitly specify it, for more info see
@@ -122,7 +137,7 @@ class InstallMBSBuild(gluetool.Module):
             profile['profile'] = self.option('profile')
             nsvc = '{}/{}'.format(nsvc, profile['profile'])
 
-        sut_installation = SUTInstallation(self.option('log-dir-name'), primary_task, logger=self.logger)
+        sut_installation = SUTInstallation(self, installation_log_dirpath, primary_task, logger=guest)
 
         # callback for 'commands' item in installation_workarounds
         # pylint: disable=unused-argument
@@ -222,5 +237,21 @@ class InstallMBSBuild(gluetool.Module):
             sut_installation.add_step('Verify module installed', 'yum module info {}',
                                       items=nsvc, callback=_check_installed)
 
-        for guest in guests:
-            sut_installation.run(guest)
+        # If the installation fails, we won't return GuestSetupOutput instance(s) to the caller,
+        # therefore the caller won't have any access to logs, hence nobody would find out where
+        # installation logs live. This will be solved one day, when we would be able to propagate
+        # output anyway, despite errors. Until that, each guest-setup-like module is responsible
+        # for logging location of relevant logs.
+        guest.info('module installation logs are in {}'.format(
+            artifacts_location(self, installation_log_dirpath, logger=guest.logger)
+        ))
+
+        sut_installation.run(guest)
+
+        return guest_setup_output + [
+            GuestSetupOutput(
+                label='module installation',
+                log_path=installation_log_dirpath,
+                additional_data=sut_installation
+            )
+        ]

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, cast, Any, List, Optional  # noqa
 
 if TYPE_CHECKING:
     import libci.guest  # noqa
+    import gluetool_modules.libs.guest_setup  # noqa
     import gluetool_modules.libs.testing_environment  # noqa
 
 
@@ -155,6 +156,9 @@ class TestScheduleEntry(object):
 
         self.testing_environment = None  # type: Optional[gluetool_modules.libs.testing_environment.TestingEnvironment]
         self.guest = None  # type: Optional[libci.guest.NetworkedGuest]
+
+        # List of outputs produced by different guest setup actions
+        self.guest_setup_outputs = []  # type: List[gluetool_modules.libs.guest_setup.GuestSetupOutput]
 
     def log(self, log_fn=None):
         # type: (Optional[gluetool.log.LoggingFunctionType]) -> None

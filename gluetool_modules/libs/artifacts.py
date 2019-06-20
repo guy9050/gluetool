@@ -2,7 +2,10 @@ import gluetool
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order
-from typing import Any  # noqa
+from typing import TYPE_CHECKING, cast, Any, Optional  # noqa
+
+if TYPE_CHECKING:
+    from gluetool.log import ContextAdapter  # noqa
 
 
 class NoArtifactsError(gluetool.glue.SoftGlueError):
@@ -36,3 +39,21 @@ def has_artifacts(*tasks):
     for task in tasks:
         if not task.has_artifacts:
             raise NoArtifactsError(task.id)
+
+
+def artifacts_location(module, local_path, logger=None):
+    # type: (gluetool.Module, str, Optional[ContextAdapter]) -> str
+    """
+    If we have access to ``artifacts_location`` shared function, return its output. Otherwise, return
+    the input string.
+
+    The goal si to simplify the code when``artifacts_location`` shared function is not available.
+    """
+
+    if module.has_shared('artifacts_location'):
+        return cast(
+            str,
+            module.shared('artifacts_location', local_path, logger=logger)
+        )
+
+    return local_path

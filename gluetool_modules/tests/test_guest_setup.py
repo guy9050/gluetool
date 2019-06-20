@@ -57,24 +57,23 @@ def test_missing_required_shared(module, monkeypatch):
 
 def test_setup(log, module, local_guest, monkeypatch):
     playbooks = ['dummy-playbook-1.yml', 'dummy-playbook-2.yml']
-    guests = [local_guest, local_guest]
 
-    def dummy_run_playbook(_playbook, _guests, variables=None, **kwargs):
-        expected_playbook = os.path.join(os.getcwd(), playbooks.pop(0))
+    def dummy_run_playbook(_playbook, _guest, variables=None, **kwargs):
+        assert log.match(message='setting up with playbooks {}'.format(', '.join([
+            os.path.join(os.getcwd(), playbook) for playbook in playbooks
+        ])))
 
-        guest_hostnames = ', '.join([guest.hostname for guest in guests])
-        assert log.records[-1].message \
-            == "setting the guests '{}' up with '{}'".format(guest_hostnames, expected_playbook)
-
-        assert _playbook == expected_playbook
-        assert _guests == guests
+        assert _guest == local_guest
         # key1:val1 is gone because extra-vars option overrides it
         assert variables == {
             'key2': 'val2',
             'key3': 'val3',
             'key4': 'val4'
         }
-        assert kwargs == {'dummy_option': 17}
+        assert kwargs == {
+            'dummy_option': 17,
+            'log_filepath': 'guest-setup-{}/guest-setup-output.txt'.format(local_guest.name)
+        }
 
         return None
 
@@ -86,11 +85,9 @@ def test_setup(log, module, local_guest, monkeypatch):
         'detect_ansible_interpreter': []
     }, callables={
         'run_playbook': dummy_run_playbook
-        })
+    })
 
-    module.shared('setup_guest', guests, variables={'key1': 'val1'}, dummy_option=17)
-
-    assert not playbooks
+    module.shared('setup_guest', local_guest, variables={'key1': 'val1'}, dummy_option=17)
 
 
 def test_playbook_map_guest_setup(module, monkeypatch):
@@ -102,7 +99,7 @@ def test_playbook_map_guest_setup(module, monkeypatch):
 
     monkeypatch.setattr(module, "_get_details_from_map", lambda: ([], {}))
 
-    module.shared('setup_guest', [MagicMock()])
+    module.shared('setup_guest', MagicMock())
 
 
 def test_playbook_map(module, monkeypatch):

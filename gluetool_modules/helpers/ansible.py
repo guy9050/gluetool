@@ -2,13 +2,13 @@ import os
 import re
 
 import gluetool
-from gluetool.utils import Command, from_json, LoggingFunctionType
+from gluetool.utils import Command, from_json
 from gluetool.log import format_blob, log_blob, log_dict
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order
-from typing import cast, TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union  # noqa
+from typing import cast, TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Tuple, Union  # noqa
 
 if TYPE_CHECKING:
     import libci.guest  # noqa
@@ -18,8 +18,21 @@ if TYPE_CHECKING:
 ANSIBLE_PYTHON_INTERPRETERS = ["/usr/bin/python3", "/usr/bin/python2", "/usr/libexec/platform-python"]
 
 
-# Ansible output
+# Default name of log file with Ansible output
 ANSIBLE_OUTPUT = "ansible-output.txt"
+
+
+#: Represents bundle of information we know about Ansible output.
+#:
+#: :ivar gluetool.utils.ProcessOutput execution_output: raw output of the command
+#:     as returned by :py:meth:`gluetool.utils.Command.run`.
+#: :ivar str json_output: if set, a Python data structure representing Ansible output.
+#: :ivar str log_filepath: local path to a file with Ansible output.
+AnsibleOutput = NamedTuple('RestraintOutput', (
+    ('execution_output', gluetool.utils.ProcessOutput),
+    ('json_output', Optional[Any]),
+    ('log_filepath', str)
+))
 
 
 class PlaybookError(PrimaryTaskFingerprintsMixin, gluetool.GlueError):
@@ -70,8 +83,6 @@ class Ansible(gluetool.Module):
         :returns: List of paths to the auto-detected python interpreters. Empty list if auto-detection failed.
         """
 
-        available_interpreters = []  # type: List[str]
-
         assert guest.hostname is not None
         assert guest.key is not None
         assert guest.username is not None
@@ -91,72 +102,67 @@ class Ansible(gluetool.Module):
         try:
             ansible_call = Command(cmd, logger=guest.logger).run()
 
-            if not ansible_call.stdout:
-                raise gluetool.GlueError('Ansible did not produce usable output')
-
-            available_interpreters = [
-                intrp for intrp in ansible_call.stdout.splitlines() if intrp in ANSIBLE_PYTHON_INTERPRETERS
-            ]
-
-            log_dict(guest.debug, 'available interpreters', available_interpreters)
-
         except gluetool.GlueCommandError as exc:
             self.warn('failed to auto-detect Ansible python interpreter\n{}'.format(
                 exc.output.stdout))
+
+            return []
+
+        if not ansible_call.stdout:
+            raise gluetool.GlueError('Ansible did not produce usable output')
+
+        available_interpreters = [
+            intrp for intrp in ansible_call.stdout.splitlines() if intrp in ANSIBLE_PYTHON_INTERPRETERS
+        ]
+
+        log_dict(guest.debug, 'available interpreters', available_interpreters)
 
         return available_interpreters
 
     # pylint: disable=too-many-arguments
     def run_playbook(self,
                      playbook_paths,  # type: Union[str, List[str]]
-                     guests,  # type: List[libci.guest.NetworkedGuest]
+                     guest,  # type: libci.guest.NetworkedGuest
                      variables=None,  # type: Optional[Dict[str, Any]]
                      inventory=None,  # type: Optional[str]
                      cwd=None,  # type: Optional[str]
                      json_output=True,  # type: bool
-                     log_dirpath=None,  # type: Optional[str]
-                     logger=None  # type: Optional[gluetool.log.ContextAdapter]
+                     log_filepath=None  # type: Optional[str]
                     ):  # noqa
-        # type: (...) -> Tuple[gluetool.utils.ProcessOutput, Optional[Any]]
+        # type: (...) -> AnsibleOutput
         """
-        Run Ansible playbook.
+        Run Ansible playbook on a given guest.
 
         :param str or list playbook_paths: Path to the playbook or a list of playbook paths.
-        :param list(libci.guest.NetworkedGuest) guests: Guests to run playbooks on.
+        :param libci.guest.NetworkedGuest guest: Guest to run playbooks on.
         :param dict variables: If set, represents additional variables that will
-          be passed to ``ansible-playbook`` using ``--extra-vars`` option.
+            be passed to ``ansible-playbook`` using ``--extra-vars`` option.
         :param str inventory: A path to the inventory file. You can use it if you
-          want to cheat the ansible module e.g. to overshadow localhost with another host.
+            want to cheat the ansible module e.g. to overshadow localhost with another host.
         :param str cwd: A path to a directory where ansible will be executed from.
         :param bool json_output: Ansible returns response as json if set.
-        :param str log_dirpath: Directory where to write ansible output, defaults to current directory.
-        :returns: tuple of two items: a :py:class:`gluetool.utils.ProcessOutput` instance
-            storing outcome of Ansible run, and a data structure representing the JSON output
-            produced, or None if ``json_output`` was set to ``False``.
+        :param str log_filepath: Path to a file to store Ansible output in. If not set, ``ansible-output.txt``
+            is created in the current directory.
+        :returns: Instance of :py:class:`AnsibleOutput`.
         """
-
-        logger = logger or self.logger
 
         if isinstance(playbook_paths, str):
             playbook_paths = [playbook_paths]
 
-        log_dict(cast(LoggingFunctionType, logger.debug), 'running playbooks', playbook_paths)
+        log_dict(guest.debug, 'running playbooks', playbook_paths)
 
-        if not all([guest.key == guests[0].key for guest in guests]):
-            raise gluetool.GlueError('SSH key must be the same for all guests')
+        assert guest.key is not None
 
-        assert guests[0].key is not None
-
-        inventory = inventory or '{},'.format(','.join([guest.hostname for guest in guests]))  # note the comma
+        inventory = inventory or '{},'.format(guest.hostname)  # note the comma
 
         cmd = [
             'ansible-playbook',
             '-i', inventory,
-            '--private-key', guests[0].key
+            '--private-key', guest.key
         ]
 
         if variables:
-            log_dict(cast(LoggingFunctionType, logger.debug), 'variables', variables)
+            log_dict(guest.debug, 'variables', variables)
 
             cmd += [
                 '--extra-vars',
@@ -166,7 +172,7 @@ class Ansible(gluetool.Module):
         cmd += self.additional_options
 
         if not self.dryrun_allows('Running a playbook in non-check mode'):
-            logger.debug("dry run enabled, telling ansible to use 'check' mode")
+            guest.debug("dry run enabled, telling ansible to use 'check' mode")
 
             cmd += ['-C']
 
@@ -178,48 +184,38 @@ class Ansible(gluetool.Module):
             env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'json'})
 
         try:
-            ansible_call = Command(cmd, logger=logger).run(cwd=cwd, env=env_variables)
+            ansible_call = Command(cmd, logger=guest.logger).run(cwd=cwd, env=env_variables)
 
         except gluetool.GlueCommandError as exc:
             ansible_call = exc.output
 
-        finally:
-            # as path of logs, use the specific log_dirpath, with fallback to no path
-            log_filepath = os.path.join(log_dirpath or '', ANSIBLE_OUTPUT)
+        # As path of logs, use the given file, with fallback to current directory & default name.
+        if not log_filepath:
+            log_filepath = os.path.join(os.getcwd(), ANSIBLE_OUTPUT)
 
-            if self.has_shared('artifacts_location'):
-                log_location = self.shared('artifacts_location', log_filepath, logger=logger)
-            else:
-                log_location = log_filepath
+        with open(log_filepath, 'w') as f:
+            def _write(label, s):
+                # type: (str, str) -> None
 
-            with open(log_filepath, 'w') as f:
-                def _write(label, s):
-                    # type: (str, str) -> None
+                f.write('{}\n{}\n\n'.format(label, s))
 
-                    f.write('{}\n{}\n\n'.format(label, s))
+            _write('# STDOUT:', format_blob(cast(str, ansible_call.stdout)))
+            _write('# STDERR:', format_blob(cast(str, ansible_call.stderr)))
 
-                _write('# STDOUT:', format_blob(cast(str, ansible_call.stdout)))
-                _write('# STDERR:', format_blob(cast(str, ansible_call.stderr)))
-
-                f.flush()
-
-            logger.info('Ansible logs are in {}'.format(log_location))
+            f.flush()
 
         def show_ansible_errors(output):
             # type: (gluetool.utils.ProcessOutput) -> None
 
-            # required for type checking, which is "stupid" to know that it cannot be None
-            assert logger is not None
-
             if output.stdout:
                 log_blob(
-                    cast(LoggingFunctionType, logger.error),
+                    guest.error,
                     'Last 30 lines of Ansible stdout', '\n'.join(output.stdout.splitlines()[-30:])
                 )
 
             if output.stderr:
                 log_blob(
-                    cast(LoggingFunctionType, logger.error),
+                    guest.error,
                     'Last 30 lines of Ansible stderr', '\n'.join(output.stderr.splitlines()[-30:])
                 )
 
@@ -240,7 +236,7 @@ class Ansible(gluetool.Module):
             ansible_json_output = from_json(ansible_call.stdout[match.start():])
 
             log_dict(
-                cast(LoggingFunctionType, logger.debug),
+                guest.debug,
                 'Ansible json output', ansible_json_output
             )
 
@@ -256,4 +252,8 @@ class Ansible(gluetool.Module):
 
             raise gluetool.GlueError('Failure during Ansible playbook execution')
 
-        return ansible_call, ansible_json_output
+        return AnsibleOutput(
+            execution_output=ansible_call,
+            json_output=ansible_json_output,
+            log_filepath=log_filepath
+        )

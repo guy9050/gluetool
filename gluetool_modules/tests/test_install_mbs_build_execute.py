@@ -204,22 +204,18 @@ NSVC_DEVEL_WITH_PROFILE = '{}-devel:{}:{}:{}/{}'.format(
     PROFILE
 )
 
-LOG_DIR_NAME = 'dummy_log_dir_name'
+LOG_DIR_NAME = 'artifact-installation'
 
 
-def mock_guests(number, execute_mock):
-    guests = []
+def mock_guest(execute_mock):
+    guest_mock = MagicMock()
+    guest_mock.name = 'guest0'
+    guest_mock.execute = execute_mock
 
-    for i in range(number):
-        guest_mock = MagicMock()
-        guest_mock.name = 'guest{}'.format(i)
-        guest_mock.execute = execute_mock
-        guests.append(guest_mock)
-
-    return guests
+    return guest_mock
 
 
-def assert_log_files(guests, file_names=None):
+def assert_log_files(guest, log_dirpath, file_names=None):
     if not file_names:
         file_names = [
             '0-Download-ODCS-repo.txt',
@@ -231,21 +227,25 @@ def assert_log_files(guests, file_names=None):
             '6-Verify-module-installed.txt'
         ]
 
-    for guest in guests:
-        dir_name = '{}-{}'.format(LOG_DIR_NAME, guest.name)
-        os.path.isdir(dir_name)
-        for file_name in file_names:
-            assert os.path.isfile(os.path.join(dir_name, file_name))
+    installation_log_dir = os.path.join(
+        log_dirpath,
+        '{}-{}'.format(LOG_DIR_NAME, guest.name)
+    )
 
+    os.path.isdir(installation_log_dir)
 
-def cleanup_log_files(guests):
-    for guest in guests:
-        shutil.rmtree('{}-{}'.format(LOG_DIR_NAME, guest.name))
+    for file_name in file_names:
+        filepath = os.path.join(installation_log_dir, file_name)
+        if not os.path.isfile(filepath):
+            assert False, 'File {} should exist'.format(filepath)
 
 
 @pytest.fixture(name='module')
 def fixture_module():
     module = create_module(InstallMBSBuild)[1]
+
+    module._config['log-dir-name'] = LOG_DIR_NAME
+
     return module
 
 
@@ -253,14 +253,12 @@ def test_loadable(module):
     check_loadable(module.glue, 'gluetool_modules/helpers/install_mbs_build_execute.py', 'InstallMBSBuild')
 
 
-def test_guest_setup(module, monkeypatch):
+def test_guest_setup(module, monkeypatch, tmpdir):
     primary_task_mock = MagicMock()
     primary_task_mock.nsvc = NSVC
     primary_task_mock.stream = STREAM
     execute_mock = MagicMock(return_value=MagicMock(stdout=INFO_OUTPUT))
     run_mock = MagicMock(stdout=ODCS_OUTPUT)
-
-    module._config['log-dir-name'] = LOG_DIR_NAME
 
     monkeypatch.setattr(
         'gluetool_modules.helpers.install_mbs_build_execute.Command.run',
@@ -272,23 +270,21 @@ def test_guest_setup(module, monkeypatch):
         'evaluate_instructions': MagicMock()
     })
 
-    guests = mock_guests(2, execute_mock)
-    module.setup_guest(guests)
+    guest = mock_guest(execute_mock)
+    module.setup_guest(guest, log_dirpath=str(tmpdir))
 
-    calls = []
-
-    for _ in guests:
-        calls.append(call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)))
-        calls.append(call('yum module reset -y {}'.format(NSVC)))
-        calls.append(call('yum module enable -y {}'.format(NSVC)))
-        calls.append(call('yum module install -y {}'.format(NSVC)))
+    calls = [
+        call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)),
+        call('yum module reset -y {}'.format(NSVC)),
+        call('yum module enable -y {}'.format(NSVC)),
+        call('yum module install -y {}'.format(NSVC))
+    ]
 
     execute_mock.assert_has_calls(calls, any_order=True)
-    assert_log_files(guests)
-    cleanup_log_files(guests)
+    assert_log_files(guest, str(tmpdir))
 
 
-def test_use_devel_module_and_profile(module, monkeypatch):
+def test_use_devel_module_and_profile(module, monkeypatch, tmpdir):
     module._config['use-devel-module'] = True
     module._config['profile'] = 'common'
 
@@ -301,8 +297,6 @@ def test_use_devel_module_and_profile(module, monkeypatch):
     execute_mock = MagicMock(return_value=MagicMock(stdout=INFO_OUTPUT))
     run_mock = MagicMock(stdout=ODCS_OUTPUT)
 
-    module._config['log-dir-name'] = LOG_DIR_NAME
-
     monkeypatch.setattr(
         'gluetool_modules.helpers.install_mbs_build_execute.Command.run',
         MagicMock(return_value=run_mock)
@@ -313,23 +307,21 @@ def test_use_devel_module_and_profile(module, monkeypatch):
         'evaluate_instructions': MagicMock()
     })
 
-    guests = mock_guests(2, execute_mock)
-    module.setup_guest(guests)
+    guest = mock_guest(execute_mock)
+    module.setup_guest(guest, log_dirpath=str(tmpdir))
 
-    calls = []
-
-    for _ in guests:
-        calls.append(call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)))
-        calls.append(call('yum module reset -y {}'.format(NSVC_DEVEL_WITH_PROFILE)))
-        calls.append(call('yum module enable -y {}'.format(NSVC_DEVEL_WITH_PROFILE)))
-        calls.append(call('yum module install -y {}'.format(NSVC_DEVEL_WITH_PROFILE)))
+    calls = [
+        call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)),
+        call('yum module reset -y {}'.format(NSVC_DEVEL_WITH_PROFILE)),
+        call('yum module enable -y {}'.format(NSVC_DEVEL_WITH_PROFILE)),
+        call('yum module install -y {}'.format(NSVC_DEVEL_WITH_PROFILE))
+    ]
 
     execute_mock.assert_has_calls(calls, any_order=True)
-    assert_log_files(guests)
-    cleanup_log_files(guests)
+    assert_log_files(guest, str(tmpdir))
 
 
-def test_workarounds(module, monkeypatch):
+def test_workarounds(module, monkeypatch, tmpdir):
     module._config['installation-workarounds'] = 'dummy_workaround_path'
 
     primary_task_mock = MagicMock()
@@ -337,8 +329,6 @@ def test_workarounds(module, monkeypatch):
     primary_task_mock.stream = STREAM
     execute_mock = MagicMock(return_value=MagicMock(stdout=INFO_OUTPUT))
     run_mock = MagicMock(stdout=ODCS_OUTPUT)
-
-    module._config['log-dir-name'] = LOG_DIR_NAME
 
     def evaluate_instructions_mock(workarounds, callbacks):
         callbacks['steps']('instructions', 'commands', workarounds, 'context')
@@ -357,21 +347,20 @@ def test_workarounds(module, monkeypatch):
         MagicMock(return_value=WORKAROUNDS_OUTPUT)
     )
 
-    guests = mock_guests(2, execute_mock)
-    module.setup_guest(guests)
+    guest = mock_guest(execute_mock)
+    module.setup_guest(guest, log_dirpath=str(tmpdir))
 
-    calls = []
-
-    for _ in guests:
-        calls.append(call('workaround command'))
-        calls.append(call('other workaround command'))
-        calls.append(call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)))
-        calls.append(call('yum module reset -y {}'.format(NSVC)))
-        calls.append(call('yum module enable -y {}'.format(NSVC)))
-        calls.append(call('yum module install -y {}'.format(NSVC)))
+    calls = [
+        call('workaround command'),
+        call('other workaround command'),
+        call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)),
+        call('yum module reset -y {}'.format(NSVC)),
+        call('yum module enable -y {}'.format(NSVC)),
+        call('yum module install -y {}'.format(NSVC))
+    ]
 
     execute_mock.assert_has_calls(calls, any_order=True)
-    assert_log_files(guests, file_names=[
+    assert_log_files(guest, str(tmpdir), file_names=[
         '0-Apply-workaround.txt',
         '1-Apply-other-workaround.txt',
         '2-Download-ODCS-repo.txt',
@@ -381,8 +370,7 @@ def test_workarounds(module, monkeypatch):
         '6-Verify-module-enabled.txt',
         '7-Install-module.txt',
         '8-Verify-module-installed.txt'
-        ])
-    cleanup_log_files(guests)
+    ])
 
 
 def test_odcs_fail(module, monkeypatch):
@@ -399,7 +387,7 @@ def test_odcs_fail(module, monkeypatch):
     )
 
     with pytest.raises(gluetool.GlueError, match=r"^Getting repo from ODCS failed$"):
-        module._get_repo('dummy_nsvc', [guest_mock])
+        module._get_repo('dummy_nsvc', guest_mock)
 
 
 def test_odcs_command_fail(module, monkeypatch):
@@ -416,10 +404,10 @@ def test_odcs_command_fail(module, monkeypatch):
     )
 
     with pytest.raises(gluetool.GlueError, match=r"^ODCS call failed$"):
-        module._get_repo('dummy_nsvc', [guest_mock])
+        module._get_repo('dummy_nsvc', guest_mock)
 
 
-def test_execute_command_fail(module, monkeypatch):
+def test_execute_command_fail(module, monkeypatch, tmpdir):
     primary_task_mock = MagicMock()
     primary_task_mock.nsvc = NSVC
     execute_mock = MagicMock()
@@ -439,12 +427,10 @@ def test_execute_command_fail(module, monkeypatch):
         'evaluate_instructions': MagicMock()
     })
 
-    guests = mock_guests(1, execute_mock)
+    guest = mock_guest(execute_mock)
 
     with pytest.raises(SUTInstallationFailedError):
-        module.setup_guest(guests)
-
-    cleanup_log_files(guests)
+        module.setup_guest(guest, log_dirpath=str(tmpdir))
 
 
 @pytest.mark.parametrize('info_output', [
@@ -455,7 +441,7 @@ def test_execute_command_fail(module, monkeypatch):
     INFO_OUTPUT_UNAVAILABLE_PROFILE,
     ''
 ])
-def test_sut_installation_fail(module, monkeypatch, info_output):
+def test_sut_installation_fail(module, monkeypatch, info_output, tmpdir):
     primary_task_mock = MagicMock()
     primary_task_mock.nsvc = NSVC
     primary_task_mock.stream = STREAM
@@ -474,9 +460,7 @@ def test_sut_installation_fail(module, monkeypatch, info_output):
         'evaluate_instructions': MagicMock()
     })
 
-    guests = mock_guests(1, execute_mock)
+    guest = mock_guest(execute_mock)
 
     with pytest.raises(SUTInstallationFailedError):
-        module.setup_guest(guests)
-
-    cleanup_log_files(guests)
+        module.setup_guest(guest, log_dirpath=str(tmpdir))

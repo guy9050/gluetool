@@ -57,14 +57,14 @@ def test_run_playbook_json(module, local_guest, monkeypatch, assert_output):
     monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
-    ansible_call, output = module.run_playbook('dummy playbook file', [local_guest])
+    output = module.run_playbook('dummy playbook file', local_guest)
 
-    assert ansible_call is mock_output
-    assert output == json_output
+    assert output.execution_output is mock_output
+    assert output.json_output == json_output
 
     mock_command_init.assert_called_once_with([
         'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key, os.path.abspath('dummy playbook file')
-    ], logger=module.logger)
+    ], logger=local_guest.logger)
 
     env_variables = os.environ.copy()
     env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'json'})
@@ -81,14 +81,14 @@ def test_run_playbook_plaintext(module, local_guest, monkeypatch, assert_output)
     monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
-    ansible_call, output = module.run_playbook('dummy playbook file', [local_guest], json_output=False)
+    output = module.run_playbook('dummy playbook file', local_guest, json_output=False)
 
-    assert ansible_call is mock_output
-    assert output is None
+    assert output.execution_output is mock_output
+    assert output.json_output is None
 
     mock_command_init.assert_called_once_with([
         'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key, os.path.abspath('dummy playbook file')
-    ], logger=module.logger)
+    ], logger=local_guest.logger)
 
     env_variables = os.environ.copy()
 
@@ -104,15 +104,15 @@ def test_run_playbooks(module, local_guest, monkeypatch, assert_output):
     monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
-    ansible_call, output = module.run_playbook(['playbook1', 'playbook2'], [local_guest], json_output=False)
+    output = module.run_playbook(['playbook1', 'playbook2'], local_guest, json_output=False)
 
-    assert ansible_call is mock_output
-    assert output is None
+    assert output.execution_output is mock_output
+    assert output.json_output is None
 
     mock_command_init.assert_called_once_with([
         # pylint: disable=long-line
         'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key, os.path.abspath('playbook1'), os.path.abspath('playbook2')  # Ignore PEP8Bear
-    ], logger=module.logger)
+    ], logger=local_guest.logger)
 
     env_variables = os.environ.copy()
 
@@ -127,7 +127,7 @@ def test_error(log, module, local_guest, monkeypatch, assert_output):
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
     with pytest.raises(gluetool.GlueError, match='Failure during Ansible playbook execution'):
-        module.run_playbook('dummy playbook file', [local_guest])
+        module.run_playbook('dummy playbook file', local_guest)
 
 
 def test_error_exit_code(log, module, local_guest, monkeypatch, assert_output):
@@ -139,7 +139,7 @@ def test_error_exit_code(log, module, local_guest, monkeypatch, assert_output):
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
     with pytest.raises(gluetool.GlueError, match='Failure during Ansible playbook execution'):
-        module.run_playbook('dummy playbook file', [local_guest])
+        module.run_playbook('dummy playbook file', local_guest)
 
 
 def test_extra_vars(module, local_guest, monkeypatch, assert_output):
@@ -150,7 +150,7 @@ def test_extra_vars(module, local_guest, monkeypatch, assert_output):
 
     monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
-    module.run_playbook('dummy playbook file', [local_guest], variables={
+    module.run_playbook('dummy playbook file', local_guest, variables={
         'FOO': 'bar'
     }, cwd='foo')
 
@@ -158,7 +158,7 @@ def test_extra_vars(module, local_guest, monkeypatch, assert_output):
         'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key,
         '--extra-vars', 'FOO="bar"',
         os.path.abspath('dummy playbook file')
-    ], logger=module.logger)
+    ], logger=local_guest.logger)
 
     env_variables = os.environ.copy()
     env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'json'})
@@ -177,13 +177,13 @@ def test_dryrun(module, local_guest, monkeypatch, assert_output):
 
     monkeypatch.setattr(module.glue, '_dryrun_level', gluetool.glue.DryRunLevels.DRY)
 
-    module.run_playbook('dummy playbook path', [local_guest])
+    module.run_playbook('dummy playbook path', local_guest)
 
     mock_command_init.assert_called_once_with([
         'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key,
         '-C',
         os.path.abspath('dummy playbook path')
-    ], logger=module.logger)
+    ], logger=local_guest.logger)
 
     env_variables = os.environ.copy()
     env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'json'})
@@ -201,7 +201,7 @@ def test_additonal_options(module, local_guest, monkeypatch, assert_output):
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
     module._config['ansible-playbook-options'] = ['-vvv', '-d']
 
-    module.run_playbook('dummy playbook file', [local_guest], variables={
+    module.run_playbook('dummy playbook file', local_guest, variables={
         'FOO': 'bar'
     })
 
@@ -210,4 +210,4 @@ def test_additonal_options(module, local_guest, monkeypatch, assert_output):
         '--extra-vars', 'FOO="bar"',
         '-vvv', '-d',
         os.path.abspath('dummy playbook file')
-    ], logger=module.logger)
+    ], logger=local_guest.logger)

@@ -312,9 +312,9 @@ def fixture_result_modules(request, notify_email, monkeypatch):
         }
     ),
     (
-        gluetool_modules.helpers.install_koji_build.SUTInstallationFailedError,
-        (None, 'some install logs URL',),
-        {},
+        gluetool_modules.libs.sut_installation.SUTInstallationFailedError,
+        (None, None),
+        {'installation_logs': 'some install logs URL'},
         asset('SUTInstallationFailedError.yaml'),
         {
             'JOB_NAME': 'ci-openstack',

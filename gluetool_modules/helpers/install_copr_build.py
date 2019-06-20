@@ -1,4 +1,8 @@
+import os
+
 import gluetool
+from gluetool_modules.libs.artifacts import artifacts_location
+from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput
 from gluetool_modules.libs.sut_installation import SUTInstallation
 
 
@@ -20,15 +24,25 @@ class InstallCoprBuild(gluetool.Module):
 
     shared_functions = ('setup_guest',)
 
-    def setup_guest(self, guests, **kwargs):
+    def setup_guest(self, guest, log_dirpath=None, **kwargs):
+        # type: (Guest, Optional[str], **Any) -> List[GuestSetupOutput]
 
         self.require_shared('primary_task')
 
-        self.overloaded_shared('setup_guest', guests, **kwargs)
+        log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
+
+        installation_log_dirpath = os.path.join(
+            log_dirpath,
+            '{}-{}'.format(self.option('log-dir-name'), guest.name)
+        )
+
+        guest_setup_output = self.overloaded_shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs) or []
+
+        guest.info('installing the artifact')
 
         primary_task = self.shared('primary_task')
 
-        sut_installation = SUTInstallation(self.option('log-dir-name'), primary_task)
+        sut_installation = SUTInstallation(self, installation_log_dirpath, primary_task, logger=guest.logger)
 
         sut_installation.add_step('Download copr repository', 'curl -v {} --output /etc/yum.repos.d/copr_build.repo',
                                   items=primary_task.repo_url)
@@ -50,5 +64,21 @@ class InstallCoprBuild(gluetool.Module):
 
         sut_installation.add_step('Verify packages installed', 'rpm -q {}', items=primary_task.rpm_names)
 
-        for guest in guests:
-            sut_installation.run(guest)
+        # If the installation fails, we won't return GuestSetupOutput instance(s) to the caller,
+        # therefore the caller won't have any access to logs, hence nobody would find out where
+        # installation logs live. This will be solved one day, when we would be able to propagate
+        # output anyway, despite errors. Until that, each guest-setup-like module is responsible
+        # for logging location of relevant logs.
+        guest.info('Copr build installation logs are in {}'.format(
+            artifacts_location(self, installation_log_dirpath, logger=guest.logger)
+        ))
+
+        sut_installation.run(guest)
+
+        return guest_setup_output + [
+            GuestSetupOutput(
+                label='Copr build installation',
+                log_path=installation_log_dirpath,
+                additional_data=sut_installation
+            )
+        ]

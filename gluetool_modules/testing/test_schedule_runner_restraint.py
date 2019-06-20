@@ -40,6 +40,8 @@ from gluetool.log import log_blob, log_dict, format_xml
 from gluetool.utils import new_xml_element, normalize_bool_option, render_template
 import libci.guest
 import libci.results
+
+from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.test_schedule import TestScheduleResult
 from gluetool_modules.testing.test_scheduler_beaker_xml import TestScheduleEntry
 
@@ -368,6 +370,7 @@ class RestraintRunner(gluetool.Module):
 
             # For now, use simple template, which is disabled when parallelization is enabled.
             rename_dir_to = None
+
             if self.option('results-directory-template'):
                 context = gluetool.utils.dict_update(
                     self.shared('eval_context'),
@@ -382,6 +385,12 @@ class RestraintRunner(gluetool.Module):
 
             output = self.shared('restraint', guest, job,
                                  rename_dir_to=rename_dir_to)
+
+            index_filepath = os.path.join(output.directory, 'index.html')
+
+            schedule_entry.info('restraint logs are in {}'.format(
+                artifacts_location(self, index_filepath, logger=schedule_entry.logger)
+            ))
 
         except gluetool.GlueError:
             exc_info = sys.exc_info()

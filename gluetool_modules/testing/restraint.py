@@ -22,10 +22,7 @@ DEFAULT_RESTRAINTD_START_TIMEOUT_TICK = 10
 #: :ivar gluetool.utils.ProcessOutput execution_output: raw output of the command
 #:     as returned by :py:meth:`gluetool.utils.Command.run`.
 #: :ivar str directory: path to a directory with ``restraint`` files.
-#: :ivar str index_location: final user-accessible location of ``index.html``. It may be a local file path, or remote
-#:     URL, anything we get from ``artifacts_location`` shared function. Used for logging and reporting, to provide
-#:     user access to this file.
-RestraintOutput = collections.namedtuple('RestraintOutput', ('execution_output', 'directory', 'index_location'))
+RestraintOutput = collections.namedtuple('RestraintOutput', ('execution_output', 'directory'))
 
 
 class StdStreamAdapter(ContextAdapter):
@@ -79,7 +76,7 @@ class Restraint(gluetool.Module):
 
         return '{}:{}/{}'.format(guest.hostname, restraintd_port, guest.port)
 
-    def restraint(self, guest, job, port=None, rename_dir_to=None, label=None):
+    def restraint(self, guest, job, port=None, rename_dir_to=None):
         # pylint: disable=too-many-arguments
         """
         Run a job on the guest.
@@ -90,8 +87,6 @@ class Restraint(gluetool.Module):
             by ``--restraintd-port`` option.
         :param str rename_dir_to: if set, when ``restraint`` finishes, its output directory
             would be renamed to this value.
-        :param str label: if set, path or URL to ``restraint`` index.html report will be logged
-            using ``label`` as the log message intro.
         :rtype: RestraintOutput(gluetool.utils.ProcessOutput, str, str)
         :returns: output of ``restraint`` command, a path to ``restraint`` directory, and
             and location of ``index.html`` report, suitabel for reporting.
@@ -225,12 +220,4 @@ class Restraint(gluetool.Module):
         else:
             self.warn('No results index produced by restraint, cannot fix its permissions')
 
-        final_index_location = self.shared('artifacts_location', index_location, logger=self.logger)
-
-        self.debug("final index location is '{}'".format(final_index_location))
-
-        # If asked to do so, log index.html location
-        label = label or 'restraint logs are in'
-        self.info('{} {}'.format(label, final_index_location))
-
-        return RestraintOutput(output, output_dir, final_index_location)
+        return RestraintOutput(output, output_dir)

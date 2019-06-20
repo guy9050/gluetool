@@ -1,14 +1,10 @@
+import os
+
 import gluetool
-from gluetool import SoftGlueError
 
-from libci.sentry import PrimaryTaskFingerprintsMixin
-
-
-class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
-    def __init__(self, task, installation_logs):
-        super(SUTInstallationFailedError, self).__init__(task, 'SUT installation failed')
-
-        self.installation_logs = installation_logs
+from gluetool_modules.libs.artifacts import artifacts_location
+from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput
+from gluetool_modules.libs.sut_installation import SUTInstallationFailedError
 
 
 class InstallKojiBuild(gluetool.Module):
@@ -28,15 +24,21 @@ class InstallKojiBuild(gluetool.Module):
 
     shared_functions = ('setup_guest',)
 
-    def _setup_guest(self, guest):
-        # pylint: disable=no-self-use
-        """
-        Run task, which installs brew artifact on SUT
-        """
+    def setup_guest(self, guest, log_dirpath=None, **kwargs):
+        self.require_shared('restraint', 'brew_build_task_params', 'beaker_job_xml')
 
-        guest.info('setting the guest up')
+        log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
 
-        # Install SUT
+        installation_log_dirpath = os.path.join(
+            log_dirpath,
+            'artifact-installation-{}'.format(guest.name)
+        )
+
+        guest_setup_output = []
+
+        if not self.option('skip-overloaded-shared'):
+            guest_setup_output = self.overloaded_shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs)
+
         self.info('installing the artifact')
 
         brew_build_task_params = self.shared('brew_build_task_params')
@@ -73,20 +75,34 @@ class InstallKojiBuild(gluetool.Module):
         job_xml = job_xmls[0]
 
         output = self.shared('restraint', guest, job_xml,
-                             rename_dir_to='artifact-installation-{}'.format(guest.name),
-                             label='Artifact installation logs are in')
+                             rename_dir_to=installation_log_dirpath)
+
+        # If the installation fails, we won't return GuestSetupOutput instance(s) to the caller,
+        # therefore the caller won't have any access to logs, hence nobody would find out where
+        # installation logs live. This will be solved one day, when we would be able to propagate
+        # output anyway, despite errors. Until that, each guest-setup-like module is responsible
+        # for logging location of relevant logs.
+        index_filepath = os.path.join(installation_log_dirpath, 'index.html')
+
+        guest.info('Brew/Koji build installation logs are in {}'.format(
+            artifacts_location(self, index_filepath, logger=guest.logger)
+        ))
 
         if output.execution_output.exit_code != 0:
             self.debug('restraint exited with invalid exit code {}'.format(output.execution_output.exit_code))
 
-            raise SUTInstallationFailedError(self.shared('primary_task'), output.index_location)
+            raise SUTInstallationFailedError(
+                self.shared('primary_task'),
+                guest,
+                installation_logs=index_filepath
+            )
 
-    def setup_guest(self, guests, **kwargs):
-        self.require_shared('restraint', 'brew_build_task_params', 'beaker_job_xml')
+        guest.info('All packages have been successfully installed')
 
-        # prevent recursion in setup_guest
-        if not self.option('skip-overloaded-shared'):
-            self.overloaded_shared('setup_guest', guests, **kwargs)
-
-        for guest in guests:
-            self._setup_guest(guest)
+        return guest_setup_output + [
+            GuestSetupOutput(
+                label='Brew/Koji build installation',
+                log_path=index_filepath,
+                additional_data=output
+            )
+        ]

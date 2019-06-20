@@ -11,6 +11,7 @@ import gluetool
 from gluetool import GlueError
 from gluetool.log import log_blob, log_dict
 
+from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.test_schedule import TestScheduleResult
 
 # Type annotations
@@ -21,6 +22,8 @@ from gluetool_modules.testing.test_scheduler_sti import TestScheduleEntry  # noq
 
 # Check whether Ansible finished running tests every 5 seconds.
 DEFAULT_WATCH_TIMEOUT = 5
+
+STI_ANSIBLE_LOG_FILENAME = 'ansible-output.txt'
 
 
 #: Represents a single run of a test - one STI playbook can contain multiple such tests
@@ -208,7 +211,7 @@ sut     ansible_host={} ansible_user=root {}
                 inventory=inventory_filepath,
                 cwd=artifact_dirpath,
                 json_output=False,
-                log_dirpath=work_dirpath,
+                log_filepath=os.path.join(work_dirpath, STI_ANSIBLE_LOG_FILENAME),
                 variables={
                     'artifacts': artifact_dirpath,
                     'ansible_ssh_common_args': ' '.join(['-o ' + option for option in schedule_entry.guest.options])
@@ -288,6 +291,12 @@ sut     ansible_host={} ansible_user=root {}
         # We don't need the working directory actually - we need artifact directory, which is
         # a subdirectory of working directory. But one day, who knows...
         work_dirpath, artifact_dirpath, inventory_filepath = self._prepare_environment(schedule_entry)
+
+        ansible_log_filepath = os.path.join(work_dirpath, STI_ANSIBLE_LOG_FILENAME)
+
+        schedule_entry.info('Ansible logs are in {}'.format(
+            artifacts_location(self, ansible_log_filepath, logger=schedule_entry.logger)
+        ))
 
         results = self._run_playbook(schedule_entry, work_dirpath, artifact_dirpath, inventory_filepath)
 

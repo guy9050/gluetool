@@ -794,7 +794,7 @@ class OpenstackGuest(NetworkedGuest):
         if 'IMAGE_NAME' not in variables:
             variables['IMAGE_NAME'] = self.image.name
 
-        super(OpenstackGuest, self).setup(variables=variables, **kwargs)
+        return super(OpenstackGuest, self).setup(variables=variables, **kwargs)
 
     def destroy(self):
         """

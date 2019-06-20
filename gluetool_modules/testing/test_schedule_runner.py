@@ -8,6 +8,7 @@ from gluetool_modules.libs.test_schedule import TestScheduleEntryStage, TestSche
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from typing import TYPE_CHECKING, cast, Any, Callable, Dict, List, Optional  # noqa
 from gluetool_modules.libs.test_schedule import TestSchedule, TestScheduleEntry  # noqa
+from gluetool_modules.helpers.guest_setup import GuestSetupOutput
 
 
 class TestScheduleRunner(gluetool.Module):
@@ -148,12 +149,35 @@ class TestScheduleRunner(gluetool.Module):
             elif schedule_entry.stage == TestScheduleEntryStage.GUEST_SETUP:
                 schedule_entry.info('guest setup finished')
 
+                gluetool.log.log_dict(schedule_entry.debug, 'guest setup outputs', result)
+
+                schedule_entry.guest_setup_outputs = cast(
+                    List[GuestSetupOutput],
+                    result
+                )
+
+                # In a perfect world, we should log each log location here, to provide this functionality
+                # to all involved guest-setup-like modules. But their `setup-guest` methods can raise
+                # exceptions, that means no `result` for us, and especially in that case we need to know
+                # where logs live, therefore at this moment, each module must log the location on its own.
+                # When we get access to their output - and errors as well - we re-enable the code below.
+
+                # for output in schedule_entry.guest_setup_outputs:
+                #    schedule_entry.info('{} logs are in {}'.format(
+                #        output.label,
+                #        artifacts_location(self, output.log_path, logger=schedule_entry.logger)
+                #    ))
+
                 _shift(schedule_entry, TestScheduleEntryStage.PREPARED)
 
                 engine.enqueue_jobs(_job(schedule_entry, 'running tests', self._run_tests))
 
             elif schedule_entry.stage == TestScheduleEntryStage.RUNNING:
                 schedule_entry.info('test execution finished')
+
+                # Here we should display "test logs are in ..." message like we do for guest-setup,
+                # but leaving that for another patch as we don't have unified "report results"
+                # structure yet.
 
                 _shift(schedule_entry, TestScheduleEntryStage.COMPLETE)
 
@@ -165,13 +189,13 @@ class TestScheduleRunner(gluetool.Module):
             exc = exc_info[1]
 
             if schedule_entry.stage == TestScheduleEntryStage.GUEST_PROVISIONING:
-                schedule_entry.error('guest provisioning failed: {}'.format(exc))
+                schedule_entry.error('guest provisioning failed: {}'.format(exc), exc_info=exc_info)
 
             elif schedule_entry.stage == TestScheduleEntryStage.GUEST_SETUP:
-                schedule_entry.error('guest setup failed: {}'.format(exc))
+                schedule_entry.error('guest setup failed: {}'.format(exc), exc_info=exc_info)
 
             elif schedule_entry.stage == TestScheduleEntryStage.RUNNING:
-                schedule_entry.error('test execution failed: {}'.format(exc))
+                schedule_entry.error('test execution failed: {}'.format(exc), exc_info=exc_info)
 
             _shift(schedule_entry, TestScheduleEntryStage.COMPLETE, new_state=TestScheduleEntryState.ERROR)
 

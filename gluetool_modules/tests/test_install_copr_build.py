@@ -8,22 +8,18 @@ from gluetool_modules.helpers.install_copr_build import InstallCoprBuild
 from gluetool_modules.libs.sut_installation import SUTInstallationFailedError
 from . import create_module, patch_shared, check_loadable
 
-LOG_DIR_NAME = 'dummy_log_dir_name'
+LOG_DIR_NAME = 'artifact-installation'
 
 
-def mock_guests(number, execute_mock):
-    guests = []
+def mock_guest(execute_mock):
+    guest_mock = MagicMock()
+    guest_mock.name = 'guest0'
+    guest_mock.execute = execute_mock
 
-    for i in range(number):
-        guest_mock = MagicMock()
-        guest_mock.name = 'guest{}'.format(i)
-        guest_mock.execute = execute_mock
-        guests.append(guest_mock)
-
-    return guests
+    return guest_mock
 
 
-def assert_log_files(guests, file_names=None):
+def assert_log_files(guest, log_dirpath, file_names=None):
     if not file_names:
         file_names = [
             '0-Download-copr-repository.txt',
@@ -34,21 +30,25 @@ def assert_log_files(guests, file_names=None):
             '5-Verify-packages-installed.txt'
         ]
 
-    for guest in guests:
-        dir_name = '{}-{}'.format(LOG_DIR_NAME, guest.name)
-        os.path.isdir(dir_name)
-        for file_name in file_names:
-            assert os.path.isfile(os.path.join(dir_name, file_name))
+    installation_log_dir = os.path.join(
+        log_dirpath,
+        '{}-{}'.format(LOG_DIR_NAME, guest.name)
+    )
 
+    os.path.isdir(installation_log_dir)
 
-def cleanup_log_files(guests):
-    for guest in guests:
-        shutil.rmtree('{}-{}'.format(LOG_DIR_NAME, guest.name))
+    for file_name in file_names:
+        filepath = os.path.join(installation_log_dir, file_name)
+        if not os.path.isfile(filepath):
+            assert False, 'File {} should exist'.format(filepath)
 
 
 @pytest.fixture(name='module')
 def fixture_module():
     module = create_module(InstallCoprBuild)[1]
+
+    module._config['log-dir-name'] = LOG_DIR_NAME
+
     return module
 
 
@@ -58,8 +58,6 @@ def fixture_module_shared_patched(module, monkeypatch):
     primary_task_mock.repo_url = 'dummy_repo_url'
     primary_task_mock.rpm_urls = ['dummy_rpm_url1', 'dummy_rpm_url2']
     primary_task_mock.rpm_names = ['dummy_rpm_names1', 'dummy_rpm_names2']
-
-    module._config['log-dir-name'] = LOG_DIR_NAME
 
     patch_shared(monkeypatch, module, {
         'primary_task': primary_task_mock,
@@ -73,30 +71,28 @@ def test_loadable(module):
     check_loadable(module.glue, 'gluetool_modules/helpers/install_copr_build.py', 'InstallCoprBuild')
 
 
-def test_setup_guest(module_shared_patched):
+def test_setup_guest(module_shared_patched, tmpdir):
     module, primary_task_mock = module_shared_patched
 
     execute_mock = MagicMock()
-    guests = mock_guests(2, execute_mock)
+    guest = mock_guest(execute_mock)
 
-    module.setup_guest(guests)
+    module.setup_guest(guest, log_dirpath=str(tmpdir))
 
-    calls = []
-
-    for _ in guests:
-        calls.append(call('curl -v dummy_repo_url --output /etc/yum.repos.d/copr_build.repo'))
-        calls.append(call('yum -y reinstall dummy_rpm_url1'))
-        calls.append(call('yum -y reinstall dummy_rpm_url2'))
-        calls.append(call('yum -y downgrade dummy_rpm_url1 dummy_rpm_url2'))
-        calls.append(call('yum -y update dummy_rpm_url1 dummy_rpm_url2'))
-        calls.append(call('yum -y install dummy_rpm_url1 dummy_rpm_url2'))
+    calls = [
+        call('curl -v dummy_repo_url --output /etc/yum.repos.d/copr_build.repo'),
+        call('yum -y reinstall dummy_rpm_url1'),
+        call('yum -y reinstall dummy_rpm_url2'),
+        call('yum -y downgrade dummy_rpm_url1 dummy_rpm_url2'),
+        call('yum -y update dummy_rpm_url1 dummy_rpm_url2'),
+        call('yum -y install dummy_rpm_url1 dummy_rpm_url2')
+    ]
 
     execute_mock.assert_has_calls(calls, any_order=True)
-    assert_log_files(guests)
-    cleanup_log_files(guests)
+    assert_log_files(guest, str(tmpdir))
 
 
-def test_no_yum(module_shared_patched):
+def test_no_yum(module_shared_patched, tmpdir):
     module, primary_task_mock = module_shared_patched
 
     def execute_mock_side_effect(cmd):
@@ -107,25 +103,23 @@ def test_no_yum(module_shared_patched):
     execute_mock = MagicMock()
     execute_mock.side_effect = execute_mock_side_effect
 
-    guests = mock_guests(2, execute_mock)
-    module.setup_guest(guests)
+    guest = mock_guest(execute_mock)
+    module.setup_guest(guest, log_dirpath=str(tmpdir))
 
-    calls = []
-
-    for _ in guests:
-        calls.append(call('curl -v dummy_repo_url --output /etc/yum.repos.d/copr_build.repo'))
-        calls.append(call('dnf -y reinstall dummy_rpm_url1'))
-        calls.append(call('dnf -y reinstall dummy_rpm_url2'))
-        calls.append(call('dnf -y downgrade dummy_rpm_url1 dummy_rpm_url2'))
-        calls.append(call('dnf -y update dummy_rpm_url1 dummy_rpm_url2'))
-        calls.append(call('dnf -y install dummy_rpm_url1 dummy_rpm_url2'))
+    calls = [
+        call('curl -v dummy_repo_url --output /etc/yum.repos.d/copr_build.repo'),
+        call('dnf -y reinstall dummy_rpm_url1'),
+        call('dnf -y reinstall dummy_rpm_url2'),
+        call('dnf -y downgrade dummy_rpm_url1 dummy_rpm_url2'),
+        call('dnf -y update dummy_rpm_url1 dummy_rpm_url2'),
+        call('dnf -y install dummy_rpm_url1 dummy_rpm_url2')
+    ]
 
     execute_mock.assert_has_calls(calls, any_order=True)
-    assert_log_files(guests)
-    cleanup_log_files(guests)
+    assert_log_files(guest, str(tmpdir))
 
 
-def test_nvr_check_fails(module_shared_patched):
+def test_nvr_check_fails(module_shared_patched, tmpdir):
     module, primary_task_mock = module_shared_patched
 
     def execute_mock(cmd):
@@ -133,16 +127,15 @@ def test_nvr_check_fails(module_shared_patched):
             raise gluetool.glue.GlueCommandError('dummy_error', MagicMock(exit_code=1))
         return MagicMock()
 
-    guests = mock_guests(2, execute_mock)
+    guest = mock_guest(execute_mock)
 
     with pytest.raises(SUTInstallationFailedError):
-        module.setup_guest(guests)
+        module.setup_guest(guest, log_dirpath=str(tmpdir))
 
-    assert_log_files(guests[:1])
-    cleanup_log_files(guests[:1])
+    assert_log_files(guest, str(tmpdir))
 
 
-def test_repo_download_fails(module_shared_patched):
+def test_repo_download_fails(module_shared_patched, tmpdir):
     module, primary_task_mock = module_shared_patched
 
     def execute_mock(cmd):
@@ -150,10 +143,9 @@ def test_repo_download_fails(module_shared_patched):
             raise gluetool.glue.GlueCommandError('dummy_error', MagicMock(exit_code=1))
         return MagicMock()
 
-    guests = mock_guests(2, execute_mock)
+    guest = mock_guest(execute_mock)
 
     with pytest.raises(SUTInstallationFailedError):
-        module.setup_guest(guests)
+        module.setup_guest(guest, log_dirpath=str(tmpdir))
 
-    assert_log_files(guests[:1], file_names=['0-Download-copr-repository.txt'])
-    cleanup_log_files(guests[:1])
+    assert_log_files(guest, str(tmpdir), file_names=['0-Download-copr-repository.txt'])

@@ -4,8 +4,11 @@ import gluetool
 from gluetool import SoftGlueError
 from gluetool.log import log_dict, log_blob, LoggingFunctionType
 from libci.sentry import PrimaryTaskFingerprintsMixin
+
 # pylint: disable=no-name-in-module
 from jq import jq
+
+from .artifacts import artifacts_location
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
@@ -30,21 +33,25 @@ SUTStep = collections.namedtuple('SUTStep', ['label', 'command', 'items', 'ignor
 
 
 class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
-    def __init__(self, task, guest, items=None, reason=None):
-        # type: (Any, libci.guest.Guest, Any, Optional[str]) -> None
+    # pylint: disable=too-many-arguments
+    def __init__(self, task, guest, items=None, reason=None, installation_logs=None):
+        # type: (Any, libci.guest.Guest, Any, Optional[str], Optional[str]) -> None
 
         super(SUTInstallationFailedError, self).__init__(task, 'SUT installation failed')
 
         self.guest = guest
         self.items = items
         self.reason = reason
+        self.installation_logs = installation_logs
 
 
 class SUTInstallation(object):
 
-    def __init__(self, directory_name, primary_task, logger=None):
-        # type: (str, Any, Optional[gluetool.log.ContextAdapter]) -> None
-        self.directory_name = directory_name
+    def __init__(self, module, log_dirpath, primary_task, logger=None):
+        # type: (gluetool.Module, str, Any, Optional[gluetool.log.ContextAdapter]) -> None
+
+        self.module = module
+        self.log_dirpath = log_dirpath
         self.primary_task = primary_task
         self.steps = []  # type: List[SUTStep]
         self.logger = logger or gluetool.log.Logging.get_logger()
@@ -64,7 +71,7 @@ class SUTInstallation(object):
     def run(self, guest):
         # type: (libci.guest.NetworkedGuest) -> None
 
-        def _run_and_log(command, log_file_path, callback):
+        def _run_and_log(command, log_filepath, callback):
             # type: (str, str, Optional[Callable]) -> Tuple[bool, Optional[str]]
             # Set to `True` when the exception was raised by a command - we cannot immediately
             # raise `SUTInstallationFailedError` because we want to log output of the command,
@@ -83,7 +90,7 @@ class SUTInstallation(object):
             if callback:
                 error_message = callback(command, output)
 
-            with open(log_file_path, 'a') as log_file:
+            with open(log_filepath, 'a') as log_file:
                 # pylint: disable=unused-argument
                 def write_cover(text, **kwargs):
                     # type: (str) -> None
@@ -102,14 +109,18 @@ class SUTInstallation(object):
         except gluetool.glue.GlueCommandError:
             yum_present = False
 
-        log_dir_name = '{}-{}'.format(self.directory_name, guest.name)
-        os.mkdir(log_dir_name)
+        if not os.path.exists(self.log_dirpath):
+            os.mkdir(self.log_dirpath)
+
+        guest.info('artifact installation logs are in {}'.format(
+            artifacts_location(self.module, self.log_dirpath, logger=guest.logger)
+        ))
 
         for i, step in enumerate(self.steps):
             guest.info(step.label)
 
-            log_file_name = '{}-{}.txt'.format(i, step.label.replace(' ', '-'))
-            log_file_path = os.path.join(log_dir_name, log_file_name)
+            log_filename = '{}-{}.txt'.format(i, step.label.replace(' ', '-'))
+            log_filepath = os.path.join(self.log_dirpath, log_filename)
 
             command = step.command
             # replace yum with dnf in case yum is not present on guest
@@ -117,17 +128,22 @@ class SUTInstallation(object):
                 command = '{}{}'.format('dnf', command[3:])
 
             if not step.items:
-                command_failed, error_message = _run_and_log(command, log_file_path, step.callback)
+                command_failed, error_message = _run_and_log(command, log_filepath, step.callback)
 
                 if command_failed and not step.ignore_exception:
-                    raise SUTInstallationFailedError(self.primary_task, guest, items=None, reason=error_message)
+                    raise SUTInstallationFailedError(
+                        self.primary_task,
+                        guest,
+                        reason=error_message,
+                        installation_logs=self.log_dirpath
+                    )
 
             for item in step.items:
                 # `step.command` contains `{}` to indicate place where item is substitute.
                 # e.g 'yum install -y {}'.format('ksh')
                 final_command = command.format(item)
 
-                command_failed, error_message = _run_and_log(final_command, log_file_path, step.callback)
+                command_failed, error_message = _run_and_log(final_command, log_filepath, step.callback)
 
                 if not command_failed:
                     continue
@@ -137,9 +153,20 @@ class SUTInstallation(object):
 
                 if error_message:
                     self.logger.error(error_message)
-                    raise SUTInstallationFailedError(self.primary_task, guest, item, reason=error_message)
+                    raise SUTInstallationFailedError(
+                        self.primary_task,
+                        guest,
+                        items=item,
+                        reason=error_message,
+                        installation_logs=self.log_dirpath
+                    )
 
-                raise SUTInstallationFailedError(self.primary_task, guest, item)
+                raise SUTInstallationFailedError(
+                    self.primary_task,
+                    guest,
+                    items=item,
+                    installation_logs=self.log_dirpath
+                )
 
         guest.info('All packages have been successfully installed')
 
