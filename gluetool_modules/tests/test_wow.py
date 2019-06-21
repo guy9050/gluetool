@@ -120,7 +120,7 @@ def test_common_command_failures(module_with_task, monkeypatch, stderr):
         raise gluetool.GlueCommandError(cmd, MagicMock(exit_code=1, stderr=stderr))
 
     monkeypatch.setattr(gluetool.utils, 'run_command', faulty_run_command)
-    with pytest.raises(NoTestAvailableError, match=r'No tests provided for the component'):
+    with pytest.raises(EmptyTestScheduleError, match=r'No tests provided for the component'):
         module.beaker_job_xml()
 
 

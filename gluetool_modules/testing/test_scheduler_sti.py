@@ -2,30 +2,15 @@ import glob
 import os.path
 
 import gluetool
-from gluetool import GlueError, SoftGlueError
+from gluetool import GlueError
 
-from libci.sentry import PrimaryTaskFingerprintsMixin
-
+import gluetool_modules
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 from gluetool_modules.libs.test_schedule import TestSchedule, TestScheduleEntry as BaseTestScheduleEntry
 
 # Type annotations
 # pylint: disable=unused-import,wrong-import-order
 from typing import Any, List, Optional  # noqa
-
-
-class NoTestAvailableError(PrimaryTaskFingerprintsMixin, SoftGlueError):
-    def __init__(self, task):
-        # type: (Any) -> None
-
-        super(NoTestAvailableError, self).__init__(task, 'No tests provided for the component')
-
-    # do not send this entry to Sentry
-    @property
-    def submit_to_sentry(self):
-        # type: () -> bool
-
-        return False
 
 
 class TestScheduleEntry(BaseTestScheduleEntry):
@@ -104,7 +89,7 @@ class TestSchedulerSTI(gluetool.Module):
         playbooks = glob.glob('{}/tests/tests*.yml'.format(repodir))
 
         if not playbooks:
-            raise NoTestAvailableError(self.shared('primary_task'))
+            raise gluetool_modules.libs.test_schedule.EmptyTestScheduleError(self.shared('primary_task'))
 
         return playbooks
 
