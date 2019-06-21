@@ -207,7 +207,7 @@ sut     ansible_host={} ansible_user=root {}
             self.shared(
                 'run_playbook',
                 schedule_entry.playbook_filepath,
-                [schedule_entry.guest],
+                schedule_entry.guest,
                 inventory=inventory_filepath,
                 cwd=artifact_dirpath,
                 json_output=False,
