@@ -70,8 +70,17 @@ MBS_INFO = {
 }
 
 
+@pytest.fixture(name='root_action')
+def fixture_root_action():
+    root = gluetool.action.Action('dummy root action')
+
+    gluetool.action.Action.set_thread_root(root)
+
+    return root
+
+
 @pytest.fixture(name='module')
-def fixture_module():
+def fixture_module(root_action):
     return create_module(MBS)[1]
 
 

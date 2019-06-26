@@ -10,6 +10,7 @@ import requests
 from jq import jq
 
 import gluetool
+from gluetool.action import Action
 from gluetool.utils import cached_property, normalize_multistring_option
 from gluetool.log import log_dict
 
@@ -105,10 +106,14 @@ class MBSApi(object):
 
         self.module.debug('[MBS API]: {}'.format(url))
 
-        try:
-            output = requests.get(url).json()
-        except Exception:
-            raise gluetool.GlueError('Unable to get: {}'.format(url))
+        with Action('query MBS API', parent=Action.current_action(), logger=self.module.logger, tags={
+            'location': location,
+            'params': params
+        }):
+            try:
+                output = requests.get(url).json()
+            except Exception:
+                raise gluetool.GlueError('Unable to get: {}'.format(url))
 
         log_dict(self.module.debug, '[MBS API] output', output)
 
@@ -398,18 +403,33 @@ class MBS(gluetool.Module):
         nsvcs = nsvcs or []
         nvrs = nvrs or []
 
+        current_action = Action.current_action()
+
+        # Our API routines call `Action.current_action` to get parent for their own actions,
+        # and since we're spawning threads for our `MBSTask` calls, we need to provide
+        # the initial action in each of those threads.
+        def _init_trampoline(**kwargs):
+            Action.set_thread_root(current_action)
+
+            return MBSTask(self, **kwargs)
+
         with ThreadPoolExecutor(thread_name_prefix="api_thread") as executor:
             # initialized from build IDs
-            futures = {executor.submit(MBSTask, self, build_id=build_id) for build_id in build_ids}
+            futures = {
+                executor.submit(_init_trampoline, build_id=build_id)
+                for build_id in build_ids
+            }
 
             # initialized from NSVCs
             futures.update({
-                executor.submit(MBSTask, self, nsvc=nsvc) for nsvc in nsvcs
+                executor.submit(_init_trampoline, nsvc=nsvc)
+                for nsvc in nsvcs
             })
 
             # initialized from NVRs
             futures.update({
-                executor.submit(MBSTask, self, nvr=nvr) for nvr in nvrs
+                executor.submit(_init_trampoline, nvr=nvr)
+                for nvr in nvrs
             })
 
             for future in wait(futures).done:
