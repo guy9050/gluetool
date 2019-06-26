@@ -1,5 +1,6 @@
 import libci.guest
 import gluetool
+from gluetool.action import Action
 from gluetool.utils import normalize_bool_option
 from gluetool_modules.libs.jobs import JobEngine, Job, handle_job_errors
 from gluetool_modules.libs.test_schedule import TestScheduleEntryStage, TestScheduleEntryState
@@ -65,10 +66,11 @@ class TestScheduleRunner(gluetool.Module):
         # that as an exercise for long winter evenings...
         schedule_entry.info('starting guest provisioning')
 
-        return cast(
-            List[libci.guest.NetworkedGuest],
-            self.shared('provision', schedule_entry.testing_environment)
-        )
+        with Action('provisioning guest', parent=schedule_entry.action, logger=schedule_entry.logger):
+            return cast(
+                List[libci.guest.NetworkedGuest],
+                self.shared('provision', schedule_entry.testing_environment)
+            )
 
     def _setup_guest(self, schedule_entry):
         # type: (TestScheduleEntry) -> Any
@@ -78,14 +80,16 @@ class TestScheduleRunner(gluetool.Module):
 
         schedule_entry.info('starting guest setup')
 
-        return schedule_entry.guest.setup()
+        with Action('guest setup', parent=schedule_entry.action, logger=schedule_entry.logger):
+            return schedule_entry.guest.setup()
 
     def _run_tests(self, schedule_entry):
         # type: (TestScheduleEntry) -> None
 
         schedule_entry.info('starting tests execution')
 
-        self.shared('run_test_schedule_entry', schedule_entry)
+        with Action('test execution', parent=schedule_entry.action, logger=schedule_entry.logger):
+            self.shared('run_test_schedule_entry', schedule_entry)
 
     def _run_schedule(self, schedule):
         # type: (TestSchedule) -> None
@@ -114,6 +118,19 @@ class TestScheduleRunner(gluetool.Module):
             schedule_entry.debug('shifted: {} => {}, {} => {}'.format(
                 old_stage.name, new_stage.name, old_state.name, new_state.name
             ))
+
+        def _finish_action(schedule_entry):
+            # type: (TestScheduleEntry) -> None
+
+            assert schedule_entry.action is not None
+
+            schedule_entry.action.set_tags({
+                'stage': schedule_entry.stage.name,
+                'state': schedule_entry.state.name,
+                'result': schedule_entry.result.name
+            })
+
+            schedule_entry.action.finish()
 
         def _on_job_start(schedule_entry):
             # type: (TestScheduleEntry) -> None
@@ -181,6 +198,8 @@ class TestScheduleRunner(gluetool.Module):
 
                 _shift(schedule_entry, TestScheduleEntryStage.COMPLETE)
 
+                _finish_action(schedule_entry)
+
         def _on_job_error(exc_info, schedule_entry):
             # type: (Any, TestScheduleEntry) -> None
 
@@ -198,6 +217,8 @@ class TestScheduleRunner(gluetool.Module):
                 schedule_entry.error('test execution failed: {}'.format(exc), exc_info=exc_info)
 
             _shift(schedule_entry, TestScheduleEntryStage.COMPLETE, new_state=TestScheduleEntryState.ERROR)
+
+            _finish_action(schedule_entry)
 
         def _on_job_done(remaining_count, schedule_entry):
             # type: (int, TestScheduleEntry) -> None
@@ -226,10 +247,26 @@ class TestScheduleRunner(gluetool.Module):
             on_job_done=_on_job_done
         )
 
-        engine.enqueue_jobs(*[
-            _job(se, 'provisioning', self._provision_guest)
-            for se in schedule
-        ])
+        for schedule_entry in schedule:
+            # We spawn new action for each schedule entry - we don't enter its context anywhere though!
+            # It serves only as a link between "schedule" action and "doing X to move entry forward" subactions,
+            # capturing lifetime of the schedule entry. It is then closed when we switch the entry to COMPLETE
+            # stage.
+
+            assert schedule_entry.testing_environment is not None
+
+            schedule_entry.action = Action(
+                'processing schedule entry',
+                parent=schedule.action,
+                logger=schedule_entry.logger,
+                tags={
+                    'entry-id': schedule_entry.id,
+                    'runner-capability': schedule_entry.runner_capability,
+                    'testing-environment': schedule_entry.testing_environment.serialize_to_json()
+                }
+            )
+
+            engine.enqueue_jobs(_job(schedule_entry, 'provisioning', self._provision_guest))
 
         engine.run()
 
@@ -250,4 +287,7 @@ class TestScheduleRunner(gluetool.Module):
             self.shared('test_schedule') or []
         )
 
-        self._run_schedule(schedule)
+        with Action('test schedule execution', parent=Action.current_action(), logger=self.logger) as schedule.action:
+            self._run_schedule(schedule)
+
+            schedule.action.set_tag('result', schedule.result.name)

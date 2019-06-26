@@ -160,6 +160,8 @@ class TestScheduleEntry(object):
         # List of outputs produced by different guest setup actions
         self.guest_setup_outputs = []  # type: List[gluetool_modules.libs.guest_setup.GuestSetupOutput]
 
+        self.action = None  # type: Optional[gluetool.action.Action]
+
     def log(self, log_fn=None):
         # type: (Optional[gluetool.log.LoggingFunctionType]) -> None
 
@@ -184,6 +186,7 @@ class TestSchedule(List[TestScheduleEntry]):
         super(TestSchedule, self).__init__(*args, **kwargs)
 
         self.result = TestScheduleResult.UNDEFINED
+        self.action = None  # type: Optional[gluetool.action.Action]
 
     def log(self, log_fn, label=None):
         # type: (gluetool.log.LoggingFunctionType, Optional[str]) -> None
