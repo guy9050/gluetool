@@ -8,6 +8,7 @@ import tempfile
 
 import gluetool
 from gluetool.log import log_xml, ContextAdapter
+from gluetool.result import Result
 from gluetool.utils import Bunch, Command
 
 
@@ -109,14 +110,15 @@ class Restraint(gluetool.Module):
                                        connection_timeout=self.option('restraintd-start-timeout-tick'))
 
             except gluetool.GlueCommandError:
-                self.debug('ss check failed, ignoring error')
-                return False
+                return Result.Error('ss check failed, ignoring error')
 
             # ss' output looks like this:
             # LISTEN     0      5      127.0.0.1:\d+      *:*       users:(("restraind",pid=\d+,fd=\d+))
             # just match the important bits, address and name. If the output matches, it's good, restraind
             # is somewhere in the output (using search - match matches from the first character).
-            return re.search(r'.*?\s+127\.0\.0\.1:{}.*?"restraintd".*?'.format(port), output.stdout.strip()) is not None
+            match = re.search(r'.*?\s+127\.0\.0\.1:{}.*?"restraintd".*?'.format(port), output.stdout.strip())
+
+            return Result.Ok(True) if match is not None else Result.Error('no restraintd running')
 
         guest.wait('restraintd is running', _check_restraintd_running,
                    timeout=self.option('restraintd-start-timeout'), tick=self.option('restraintd-start-timeout-tick'))

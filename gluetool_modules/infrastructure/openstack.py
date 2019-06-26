@@ -2,7 +2,6 @@
 
 import collections
 import errno
-import functools
 import gzip
 import os
 import re
@@ -24,6 +23,7 @@ from novaclient.exceptions import BadRequest, NotFound, Unauthorized, NoUniqueMa
 import gluetool
 from gluetool import GlueError, GlueCommandError
 from gluetool.log import format_dict, log_dict
+from gluetool.result import Result
 from gluetool.utils import cached_property, normalize_path, load_yaml, dict_update
 from libci.guest import NetworkedGuest
 
@@ -290,7 +290,7 @@ class OpenstackGuest(NetworkedGuest):
 
         def _ask():
             try:
-                return func(*args, **kwargs)
+                return Result.Ok(func(*args, **kwargs))
 
             except novaclient.exceptions.Forbidden as exc:
                 if not exc.message.startswith('Quota exceeded'):
@@ -301,7 +301,7 @@ class OpenstackGuest(NetworkedGuest):
                 logger.info('{}. Will try again in a moment.'.format(exc.message))
 
                 # let wait() know we need to try again
-                return False
+                return Result.Error('failed to acquire resource: {}'.format(exc.message))
 
             except novaclient.exceptions.BadRequest as exc:
                 # Handle floating IP not yet available for assignment
@@ -311,7 +311,7 @@ class OpenstackGuest(NetworkedGuest):
                 logger.info('{}. Will try again in a moment.'.format(exc.message))
 
                 # let wait() know we need to try again
-                return False
+                return Result.Error('failed to acquire resource: {}'.format(exc.message))
 
         return gluetool.utils.wait('acquire {} from OpenStack'.format(resource),
                                    _ask,
@@ -559,8 +559,13 @@ class OpenstackGuest(NetworkedGuest):
 
     def _wait_for_resource_status(self, label, resource, rid, status, timeout, tick):
         # pylint: disable=too-many-arguments
-        check = functools.partial(self._check_resource_status, resource, rid, status)
-        self.wait(label, check, timeout=timeout, tick=tick)
+        def _check():
+            if self._check_resource_status(resource, rid, status):
+                return Result.Ok(True)
+
+            return Result.Error('resource {} {} not in state {}'.format(resource, rid, status))
+
+        self.wait(label, _check, timeout=timeout, tick=tick)
 
     def _assign_floating_ip(self):
         """

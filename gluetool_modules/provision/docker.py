@@ -3,6 +3,7 @@ import time
 
 import gluetool
 from gluetool import GlueError, GlueCommandError
+from gluetool.result import Result
 import libci.guest
 
 from gluetool_modules.libs.testing_environment import TestingEnvironment
@@ -256,7 +257,7 @@ class DockerGuest(libci.guest.Guest):
             # wait for it to finish the execution
             def _check_exited():
                 container.reload()
-                return container.status == 'exited'
+                return Result.Ok(True) if container.status == 'exited' else Result.Error('still running')
 
             self.wait('container exits', _check_exited, tick=2)
 

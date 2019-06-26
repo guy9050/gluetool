@@ -41,6 +41,7 @@ import threading
 import gluetool
 from gluetool import GlueError
 from gluetool.log import log_dict, log_table
+from gluetool.result import Result
 from gluetool.utils import cached_property, normalize_bool_option, normalize_multistring_option, normalize_path, \
     load_yaml, dict_update
 from libci.guest import NetworkedGuest
@@ -265,11 +266,9 @@ class BeakerGuest(NetworkedGuest):
                 self.execute('type extendtesttime.sh')
 
             except gluetool.utils.GlueCommandError:
-                self.debug('extendtesttime.sh does not exist yet')
+                return Result.Error('extendtesttime.sh does not exist yet')
 
-                return False
-
-            return True
+            return Result.Ok(True)
 
         gluetool.utils.wait('check whether extendtesttime.sh exists', _check_extendtesttime,
                             logger=self.logger,

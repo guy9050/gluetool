@@ -6,6 +6,7 @@ from pymemcache.client import base
 
 import gluetool
 from gluetool.log import log_dict
+from gluetool.result import Result
 
 
 DEFAULT_DUMP_FETCH_TIMEOUT = 60
@@ -184,10 +185,9 @@ class Cache(object):
             log_dict(self.debug, 'metadump response', response)
 
             if response and response[0] == 'BUSY currently processing crawler request':
-                self.debug('remote server is busy')
-                return False
+                return Result.Error('remote server is busy')
 
-            return response
+            return Result.Ok(response)
 
         metadump = gluetool.utils.wait('metadump available', _fetch_metadump,
                                        timeout=self._module.option('dump-fetch-timeout'),

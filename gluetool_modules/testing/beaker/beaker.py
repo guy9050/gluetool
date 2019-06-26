@@ -9,6 +9,7 @@ import bs4
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError, utils
 from gluetool.log import BlobLogger
+from gluetool.result import Result
 from gluetool.utils import load_yaml, fetch_url, Command
 from libci.results import TestResult, publish_result
 from libci.sentry import PrimaryTaskFingerprintsMixin
@@ -226,10 +227,10 @@ class Beaker(gluetool.Module):
                         def _fetch_journal():
                             try:
                                 _, journal_data = fetch_url(journal_log['href'], logger=citool_module.logger)
-                                return journal_data
+                                return Result.Ok(journal_data)
 
                             except GlueError:
-                                return False
+                                return Result.Error('fetch failed')
 
                         journal_data = gluetool.utils.wait(
                             'fetch journal content', _fetch_journal,

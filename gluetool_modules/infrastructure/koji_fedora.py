@@ -12,6 +12,7 @@ from rpmUtils.miscutils import compareEVR, splitFilename
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.log import Logging, log_dict
+from gluetool.result import Result
 from gluetool.utils import cached_property, dict_update, wait, normalize_multistring_option, render_template
 
 
@@ -203,7 +204,10 @@ class KojiTask(object):
 
         self._flush_task_info()
 
-        return self._task_info['state'] == koji.TASK_STATES['CLOSED']
+        if self._task_info['state'] == koji.TASK_STATES['CLOSED']:
+            return Result.Ok(True)
+
+        return Result.Error('task is not closed')
 
     def _check_nonwaiting_task(self):
         """
@@ -213,7 +217,7 @@ class KojiTask(object):
 
         self._flush_task_info()
 
-        return self._task_info['waiting'] is not True
+        return Result.Ok(True) if self._task_info['waiting'] is not True else Result.Error('task is still waiting')
 
     @cached_property
     def _subtasks(self):
@@ -1029,17 +1033,17 @@ class BrewTask(KojiTask):
                         res = req.get(url, timeout=self._module.option('commit-fetch-timeout'))
 
                     if res.ok:
-                        return BeautifulSoup(res.content, 'html.parser')
+                        return Result.Ok(BeautifulSoup(res.content, 'html.parser'))
 
                     # Special case - no such URL, we should stop dealing with this one and try another.
                     # Tell `wait` control code to quit.
                     if res.status_code == 404:
-                        return True
+                        return Result.Ok(True)
 
                     # Ignore (possibly transient) HTTP errors 5xx - server knows it encountered an error
                     # or is incapable of finishing the request now. Try again.
                     if 500 <= res.status_code <= 599:
-                        return False
+                        return Result.Error('transient HTTP error')
 
                     # Other not-ok-ish codes should be reported, they probably are not going do disappear
                     # on their own and signal something is really wrong.
@@ -1052,22 +1056,22 @@ class BrewTask(KojiTask):
                     # warn as we needed to retry
                     self.warn("Failed to fetch commit info from '{}' (retrying)".format(url))
 
-                    return False
+                    return Result.Error('connection error')
 
-                return False
+                return Result.Error('unknown error')
 
-            commit_page = wait('fetching commit web page', _fetch,
-                               logger=self.logger,
-                               timeout=self._module.option('commit-fetch-timeout'),
-                               tick=self._module.option('commit-fetch-tick'))
+            ret = wait('fetching commit web page', _fetch,
+                       logger=self.logger,
+                       timeout=self._module.option('commit-fetch-timeout'),
+                       tick=self._module.option('commit-fetch-tick'))
 
             # If our `_fetch` returned `True`, it means it failed to fetch the commit
             # page *in the expected* manner - e.g. the page does not exist. Issues like
             # flapping network would result in another spin of waiting loop.
-            if commit_page is True:
+            if ret is True:
                 continue
 
-            return commit_page
+            return ret
 
         return None
 

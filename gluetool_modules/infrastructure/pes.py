@@ -4,17 +4,19 @@ import simplejson.errors  # type: ignore  # no stubfile for simplejson
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 
 import gluetool
-from gluetool.utils import cached_property
+from gluetool.utils import cached_property, requests
 from gluetool.log import log_dict, LoggingFunctionType
-
-from gluetool.utils import requests
+from gluetool.result import Result
 
 # pylint: disable=no-name-in-module
 from jq import jq
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
-from typing import cast, Any, Dict, List, Optional, Tuple, Union  # noqa
+# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
+from typing import TYPE_CHECKING, cast, Any, Dict, List, Optional, Tuple, Union  # noqa
+
+if TYPE_CHECKING:
+    import requests as orig_requests  # noqa
 
 
 DEFAULT_RETRY_TIMEOUT = 30
@@ -40,13 +42,13 @@ class PESApi(object):
         self.logger.connect(self)
 
     def _post_payload(self, location, payload):
-        # type: (str, Dict) -> Any
+        # type: (str, Dict) -> orig_requests.Response
         url = urljoin(self.api_url, location)
 
         self.debug('[PES API]: {}'.format(url))
 
         def _post_response():
-            # type: () -> Any
+            # type: () -> Result[orig_requests.Response, Exception]
             try:
                 with requests() as req:
                     response = req.post(url, json=payload)
@@ -68,30 +70,19 @@ class PESApi(object):
                 except simplejson.errors.JSONDecodeError:
                     raise gluetool.GlueError("Pes returned unexpected non-json output, needs investigation")
 
-                # IMPORTANT: as 404 evaluates to False, so we need to force True
-                if response.status_code == 404:
-                    return (True, response)
-
-                # let reponse evaluate to boolean for wait as designed
-                return (response, response)
+                return Result.Ok(response)
 
             except (ConnectionError, HTTPError, Timeout) as error:
-                self.debug('retrying because of exception: {}'.format(error))
+                return Result.Error(error)
 
-                # does not matter that response is not returned here, as it is ignored anyway
-                return (False, error)
+            return Result.Error('unknown error')
 
-        # wait until we get a valid response
-        (success, response) = gluetool.utils.wait('getting post response from {}'.format(url),
-                                                  _post_response,
-                                                  timeout=self.module.option('retry-timeout'),
-                                                  tick=self.module.option('retry-tick'))
-
-        # handle connection errors, when response is actually false
-        if not success:
-            raise gluetool.GlueError("Failed to get valid API response from PES: '{}'".format(response))
-
-        return response
+        # Wait until we get a valid response. For 200 or 404, we get valid result, for anything else _post_payload
+        # returns invalid result, forcing another attempt.
+        return gluetool.utils.wait('getting post response from {}'.format(url),
+                                   _post_response,
+                                   timeout=self.module.option('retry-timeout'),
+                                   tick=self.module.option('retry-tick'))
 
     def get_ancestors(self, package):
         # type: (str) -> List[str]
