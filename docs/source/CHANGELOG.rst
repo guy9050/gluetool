@@ -6,6 +6,34 @@ All notable changes to this project will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
 
+2019-06-28
+----------
+
+Added
+~~~~~
+
+- [ansible] focus on a single guest (mprchlik)
+- [guest-setup] focus on a single guest (mprchlik)
+- [mbs] wrap API calls with Actions (mprchlik)
+- [pipeline-install-koji-build] install koji build in pipeline (Miroslav Vadkerti)
+- [rpminspect] serialize results to xunit (Anna Khaitovich)
+- [test-schedule-runner] wrap few interesting points with Actions (mprchlik)
+
+Changed
+~~~~~~~
+
+- Update wait call sites to use Result (mprchlik)
+- [test-batch-planner] set artifact_id (Miroslav Vadkerti)
+
+Fixed
+~~~~~
+
+- [beaker-jobwatch]: Better exctracting of matrix url (Evgeny Fedin)
+- [build-dependencies] always use current_task_ids (Miroslav Vadkerti)
+- [test-schedule-runner-sti]: pass guest to run_playbook not wrapped by a list (Milos Prchlik)
+- [wow] add handling of invalid archs (Miroslav Vadkerti)
+
+
 2019-06-14
 ----------
 
