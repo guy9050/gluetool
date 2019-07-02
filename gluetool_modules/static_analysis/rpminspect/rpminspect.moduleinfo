@@ -5,11 +5,15 @@ description: RPMInspect analysis and comparison
 dependencies:
   repo:
     - name: rpminspect
-      description: RPMInspect repository
-      baseurl: https://copr.fedorainfracloud.org/coprs/dcantrel/rpminspect/repo/fedora-29/dcantrel-rpminspect-fedora-29.repo
+      baseurl: https://copr-be.cloud.fedoraproject.org/results/dcantrel/rpminspect/fedora-$releasever-$basearch/
+      enabled: 1
+      gpgkey: https://copr-be.cloud.fedoraproject.org/results/dcantrel/rpminspect/pubkey.gpg
+      gpgcheck: 1
     - name: rpminspect-data-redhat
-      description: RPMInspect-data-RedHat repository
-      baseurl: https://copr.devel.redhat.com/coprs/dcantrel/rpmdiff/repo/fedora-29/dcantrel-rpmdiff-fedora-29.repo
+      baseurl: http://coprbe.devel.redhat.com/results/dcantrel/rpmdiff/fedora-$releasever-$basearch/
+      enabled: 1
+      gpgkey: http://coprbe.devel.redhat.com/results/dcantrel/rpmdiff/pubkey.gpg
+      gpgcheck: 1
 
   yum:
     - rpminspect
