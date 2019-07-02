@@ -29,6 +29,9 @@ INSTALL_REQUIRES = [
     # required by all...
     "typing==3.6.6",
 
+    # required to enable tracing - not included in gluetool, it's optional
+    "jaeger-client==4.0.0",
+
     # required to build documentation - workaround, this will end up in gluetool upstream
     "commonmark==0.8.0",
 
