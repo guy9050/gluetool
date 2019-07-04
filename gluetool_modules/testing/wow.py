@@ -262,7 +262,7 @@ class WorkflowTomorrow(gluetool.Module):
     def beaker_job_xml(self, distros=None, body_options=None, options=None, environment=None, task_params=None,
                        extra_context=None):
         """
-        Run ``workflow-tomorrow`` utility to create a Bbeaker job XML.
+        Run ``workflow-tomorrow`` utility to create a Beaker job XML.
 
         .. warning::
 
