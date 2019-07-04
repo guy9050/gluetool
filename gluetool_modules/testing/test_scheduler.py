@@ -112,7 +112,7 @@ class TestScheduler(gluetool.Module):
         # type: () -> None
         # pylint: disable=too-many-statements
 
-        self.require_shared('create_test_schedule')
+        self.require_shared('create_test_schedule', 'provisioner_capabilities')
 
         # Check whether we have *any* artifacts at all, before we move on to more fine-grained checks.
         # If there's no task, just move on - we cannot check it, but it's allowed to run pipeline
