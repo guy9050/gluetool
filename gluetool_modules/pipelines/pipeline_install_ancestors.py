@@ -1,7 +1,7 @@
 import six
 
 import gluetool
-from gluetool.utils import normalize_shell_option
+from gluetool.utils import normalize_shell_option, normalize_multistring_option
 
 
 class PipelineInstallAncestors(gluetool.Module):
@@ -25,14 +25,15 @@ class PipelineInstallAncestors(gluetool.Module):
         'tag': {
             'help': 'Tag to use when looking up ancestors.'
         },
-        'playbook': {
-            'help': 'Path to Ansible playbook(s) to run BEFORE installing the ancestors.',
+        'playbooks': {
+            'help': 'Path to Ansible playbook(s) to run BEFORE installing the ancestors (default: none).',
+            'default': [],
             'action': 'append'
         }
     }
 
     shared_functions = ('setup_guest',)
-    required_options = ('playbook',)
+    required_options = ('playbooks',)
 
     def setup_guest(self, guests, *args, **kwargs):
 
@@ -59,7 +60,7 @@ class PipelineInstallAncestors(gluetool.Module):
         def do_setup_guest(self):
             self.shared('setup_guest', guests, *args, **kwargs)
 
-        playbooks = self.option('playbook')
+        playbooks = normalize_multistring_option(self.option('playbooks'))
         rpm_urls = self.shared('primary_task').rpm_urls
         rpm_urls = ['"{}"'.format(rpm_url) for rpm_url in rpm_urls]
 
