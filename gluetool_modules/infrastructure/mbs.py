@@ -205,6 +205,7 @@ class MBSTask(object):
         self.version = build_info['version']
         self.context = build_info['context']
         self.issuer = build_info['owner']
+        self.scratch = build_info['scratch']
         self.nsvc = '{}:{}:{}:{}'.format(self.name, self.stream, self.version, self.context)
 
         # `nvr` is:
@@ -213,7 +214,10 @@ class MBSTask(object):
         # - for modules the nvr is diffrent from NSVC, as it is delimited with '-' instead of ':'
         #   and also in case of stream the character '-' is replaced with '_', see:
         #   https://github.com/release-engineering/resultsdb-updater/pull/73#discussion_r235964781
+        # - if build is scratch, the '+' and id is added to the end
         self.nvr = '{}-{}-{}.{}'.format(self.name, self.stream.replace('-', '_'), self.version, self.context)
+        if self.scratch:
+            self.nvr = '{}+{}'.format(self.nvr, self.id)
 
         # build tags from brew
         self.tags = [tag['name'] for tag in self.module.shared('koji_session').listTags(self.nvr)]

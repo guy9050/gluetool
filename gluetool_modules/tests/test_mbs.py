@@ -30,6 +30,7 @@ MBS_INFO = {
     "owner": "jistone",
     "rebuild_strategy": "only-changed",
     "scmurl": "git://pkgs.devel.redhat.com/modules/rust-toolset?#7981ffe74ef8badda5dfcc5407fb2d9a84af0d62",
+    "scratch": False,
     "siblings": [],
     "state": 5,
     "state_name": "ready",
@@ -211,6 +212,17 @@ def test_execute(module, tags, get):
 
     assert primary_task.tags == ['tag1', 'tag2']
     assert primary_task.task_arches == TaskArches(['aarch64', 'i686', 'ppc64le', 's390x', 'x86_64'])
+
+
+def test_scratch_build(module, get, tags):
+    # pylint: disable=protected-access
+    module._config['nsvc'] = ['rust-toolset:rhel8:820181105234334:b09eea91']
+
+    MBS_INFO['scratch'] = True
+
+    module.execute()
+
+    assert module.primary_task().nvr == 'rust-toolset-rhel8-820181105234334.b09eea91+2178'
 
 
 # pylint: disable=unused-argument
