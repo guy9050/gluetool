@@ -151,6 +151,7 @@ def test_execute(module, monkeypatch):
         def __init__(self, source):
             self.source = source
             self.content = str(self.source)
+            self.status_code = 200
 
         def json(self):
             return self.source
@@ -211,6 +212,7 @@ def test_not_found(module, monkeypatch):
         def __init__(self, source):
             self.source = source
             self.text = str(self.source)
+            self.status_code = 200
 
         def json(self):
             return self.source
@@ -264,6 +266,7 @@ def test_tasks(module, monkeypatch):
         def __init__(self, source):
             self.source = source
             self.text = str(self.source)
+            self.status_code = 200
 
         def json(self):
             return self.source

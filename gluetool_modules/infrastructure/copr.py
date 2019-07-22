@@ -24,10 +24,10 @@ class CoprApi(object):
 
         self.module.debug('[copr API] {}: {}'.format(label, url))
 
-        try:
-            request = requests.get(url)
-        except Exception:
-            raise gluetool.GlueError('Unable to get: {}'.format(url))
+        request = requests.get(url)
+
+        if request.status_code != 200:
+            self.module.warn('Request to copr API ended up with status code {}'.format(request.status_code))
 
         return request
 
@@ -39,7 +39,11 @@ class CoprApi(object):
         return output
 
     def _get_json(self, url, label, full_url=None):
-        output = self._api_request(url, label, full_url=full_url).json()
+        try:
+            output = self._api_request(url, label, full_url=full_url).json()
+        except Exception:
+            raise gluetool.GlueError('Unable to get: {}'.format(url))
+
         log_dict(self.module.debug, '[copr API] {} output'.format(label), output)
         return output
 
