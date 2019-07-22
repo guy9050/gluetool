@@ -2,19 +2,19 @@
 
 name: rpminspect
 description: RPMInspect analysis and comparison
-dependencies:
-  repo:
-    - name: rpminspect
-      baseurl: https://copr-be.cloud.fedoraproject.org/results/dcantrel/rpminspect/fedora-$releasever-$basearch/
-      enabled: 1
-      gpgkey: https://copr-be.cloud.fedoraproject.org/results/dcantrel/rpminspect/pubkey.gpg
-      gpgcheck: 1
-    - name: rpminspect-data-redhat
-      baseurl: http://coprbe.devel.redhat.com/results/dcantrel/rpmdiff/fedora-$releasever-$basearch/
-      enabled: 1
-      gpgkey: http://coprbe.devel.redhat.com/results/dcantrel/rpmdiff/pubkey.gpg
-      gpgcheck: 1
+# dependencies:
+#   repo:
+#     - name: rpminspect
+#       baseurl: https://copr-be.cloud.fedoraproject.org/results/dcantrel/rpminspect/fedora-$releasever-$basearch/
+#       enabled: 1
+#       gpgkey: https://copr-be.cloud.fedoraproject.org/results/dcantrel/rpminspect/pubkey.gpg
+#       gpgcheck: 0
+#     - name: rpminspect-data-redhat
+#       baseurl: http://coprbe.devel.redhat.com/results/dcantrel/rpmdiff/fedora-$releasever-$basearch/
+#       enabled: 1
+#       gpgkey: http://coprbe.devel.redhat.com/results/dcantrel/rpmdiff/pubkey.gpg
+#       gpgcheck: 0
 
-  yum:
-    - rpminspect
-    - rpminspect-data-redhat
+#   yum:
+#     - rpminspect
+#     - rpminspect-data-redhat
