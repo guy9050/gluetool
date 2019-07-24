@@ -20,7 +20,13 @@ def fixture_module():
 
 @pytest.fixture(name='local_guest')
 def fixture_local_guest(module):
-    return libci.guest.NetworkedGuest(module, '127.0.0.1', key=MagicMock())
+    guest = libci.guest.NetworkedGuest(module, '127.0.0.1', key=MagicMock())
+    guest.environment = gluetool_modules.libs.testing_environment.TestingEnvironment(
+        arch='x86_64',
+        compose='dummy-compose'
+    )
+
+    return guest
 
 
 def test_sanity_shared(module):

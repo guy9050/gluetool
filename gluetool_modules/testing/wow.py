@@ -6,6 +6,7 @@ import bs4
 
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError
+from gluetool.action import Action
 from gluetool.log import log_dict, log_blob
 from gluetool.utils import Command, render_template, dict_update
 from libci.sentry import PrimaryTaskFingerprintsMixin
@@ -450,7 +451,11 @@ class WorkflowTomorrow(gluetool.Module):
                     command.options += ['--taskparam="{}={}"'.format(name, value)]
 
             try:
-                output = command.run()
+                with Action('running wow', parent=Action.current_action(), logger=self.logger, tags={
+                    'executable': command.executable,
+                    'options': command.options
+                }):
+                    output = command.run()
 
                 return bs4.BeautifulSoup(output.stdout, 'xml')
 

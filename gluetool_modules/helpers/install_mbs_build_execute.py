@@ -2,6 +2,7 @@ import json
 import os
 import re
 import gluetool
+from gluetool.action import Action
 from gluetool.log import log_dict
 from gluetool.utils import Command
 from gluetool import GlueError
@@ -44,7 +45,7 @@ class InstallMBSBuild(gluetool.Module):
         }
     }
 
-    def _get_repo(self, module_nsvc, guest):
+    def _get_repo(self, task, module_nsvc, guest):
         self.info('Generating repo for module via ODCS')
 
         command = [
@@ -59,10 +60,23 @@ class InstallMBSBuild(gluetool.Module):
             '--arch', guest.environment.arch
         ]
 
-        try:
-            output = Command(command).run()
-        except gluetool.glue.GlueCommandError:
-            raise GlueError('ODCS call failed')
+        with Action(
+            'creating ODCS repository',
+            parent=Action.current_action(),
+            logger=guest.logger,
+            tags={
+                'guest': {
+                    'hostname': guest.hostname,
+                    'environment': guest.environment.serialize_to_json()
+                },
+                'artifact-id': task.id,
+                'artifact-type': task.ARTIFACT_NAMESPACE
+            }
+        ):
+            try:
+                output = Command(command).run()
+            except gluetool.glue.GlueCommandError:
+                raise GlueError('ODCS call failed')
 
         # strip 1st line before json data
         output = output.stdout[output.stdout.index('{'):]
@@ -122,7 +136,7 @@ class InstallMBSBuild(gluetool.Module):
             # For ODCS request we need to include both modules, for installation we will use only -devel if requested
             nsvc_odcs = '{} {}'.format(primary_task.nsvc, nsvc)
 
-        repo_url = self._get_repo(nsvc_odcs, guest)
+        repo_url = self._get_repo(primary_task, nsvc_odcs, guest)
 
         #
         # Some modules do not provide 'default' module and user needs to explicitly specify it, for more info see
@@ -246,7 +260,20 @@ class InstallMBSBuild(gluetool.Module):
             artifacts_location(self, installation_log_dirpath, logger=guest.logger)
         ))
 
-        sut_installation.run(guest)
+        with Action(
+            'installing module',
+            parent=Action.current_action(),
+            logger=guest.logger,
+            tags={
+                'guest': {
+                    'hostname': guest.hostname,
+                    'environment': guest.environment.serialize_to_json()
+                },
+                'artifact-id': primary_task.id,
+                'artifact-type': primary_task.ARTIFACT_NAMESPACE
+            }
+        ):
+            sut_installation.run(guest)
 
         return guest_setup_output + [
             GuestSetupOutput(

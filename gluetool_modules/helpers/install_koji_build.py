@@ -2,6 +2,7 @@ import os
 
 import gluetool
 
+from gluetool.action import Action
 from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput
 from gluetool_modules.libs.sut_installation import SUTInstallationFailedError
@@ -50,21 +51,34 @@ class InstallKojiBuild(gluetool.Module):
         # This belongs to some sort of config file... But setting source options
         # is probably a bit too complicated for config file, and it's better to target it
         # to just a single task instead of using --taskparam & setting them globally.
-        job_xmls = self.shared('beaker_job_xml', body_options=[
-            '--task={} /distribution/install/brew-build'.format(brew_build_task_params),
-            '--task=/distribution/runtime_tests/verify-nvr-installed',
-            '--task=/distribution/collect_repos'
-        ], options=[
-            # These seem to be important for restraint - probably moving to wow-options-map is the right way,
-            # if we could tell we're putting together a recipe for restraint instead of Beaker.
-            '--single',
-            '--no-reserve',
-            '--restraint',
-            '--suppress-install-task',
-            '--arch', guest.environment.arch
-        ], extra_context={
-            'PHASE': 'artifact-installation'
-        })
+        with Action(
+            'preparing brew/koji build installation recipe',
+            parent=Action.current_action(),
+            logger=guest.logger,
+            tags={
+                'guest': {
+                    'hostname': guest.hostname,
+                    'environment': guest.environment.serialize_to_json()
+                },
+                'artifact-id': self.shared('primary_task').id,
+                'artifact-type': self.shared('primary_task').ARTIFACT_NAMESPACE
+            }
+        ):
+            job_xmls = self.shared('beaker_job_xml', body_options=[
+                '--task={} /distribution/install/brew-build'.format(brew_build_task_params),
+                '--task=/distribution/runtime_tests/verify-nvr-installed',
+                '--task=/distribution/collect_repos'
+            ], options=[
+                # These seem to be important for restraint - probably moving to wow-options-map is the right way,
+                # if we could tell we're putting together a recipe for restraint instead of Beaker.
+                '--single',
+                '--no-reserve',
+                '--restraint',
+                '--suppress-install-task',
+                '--arch', guest.environment.arch
+            ], extra_context={
+                'PHASE': 'artifact-installation'
+            })
 
         # This is probably not true in general, but our Docker pipelines - in both beaker and openstack - deal
         # with just a single Beaker distro. To avoid any weird errors later, check number of XMLs, but it would
@@ -74,8 +88,21 @@ class InstallKojiBuild(gluetool.Module):
 
         job_xml = job_xmls[0]
 
-        output = self.shared('restraint', guest, job_xml,
-                             rename_dir_to=installation_log_dirpath)
+        with Action(
+            'running brew/koji build installation recipe',
+            parent=Action.current_action(),
+            logger=guest.logger,
+            tags={
+                'guest': {
+                    'hostname': guest.hostname,
+                    'environment': guest.environment.serialize_to_json()
+                },
+                'artifact-id': self.shared('primary_task').id,
+                'artifact-type': self.shared('primary_task').ARTIFACT_NAMESPACE
+            }
+        ):
+            output = self.shared('restraint', guest, job_xml,
+                                 rename_dir_to=installation_log_dirpath)
 
         # If the installation fails, we won't return GuestSetupOutput instance(s) to the caller,
         # therefore the caller won't have any access to logs, hence nobody would find out where

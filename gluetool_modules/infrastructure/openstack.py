@@ -22,6 +22,7 @@ from novaclient.exceptions import BadRequest, NotFound, Unauthorized, NoUniqueMa
 
 import gluetool
 from gluetool import GlueError, GlueCommandError
+from gluetool.action import Action
 from gluetool.log import format_dict, log_dict
 from gluetool.result import Result
 from gluetool.utils import cached_property, normalize_path, load_yaml, dict_update
@@ -55,6 +56,15 @@ TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 #: OpenStack provisioner capabilities.
 #: Follows :doc:`Provisioner Capabilities Protocol </protocols/provisioner-capabilities>`.
 ProvisionerCapabilities = collections.namedtuple('ProvisionerCapabilities', ['available_arches'])
+
+
+def _call_api(logger, method_label, method, *args, **kwargs):
+    with Action('query OpenStack API', parent=Action.current_action(), logger=logger, tags={
+        'method': method_label,
+        'positional-arguments': args,
+        'keyword-arguments': kwargs
+    }):
+        return method(*args, **kwargs)
 
 
 class OpenStackImage(object):
@@ -116,7 +126,8 @@ class OpenStackImage(object):
             return self._resource
 
         try:
-            image = self.module.nova.images.find(name=self.name)
+            # pylint: disable=protected-access
+            image = self.module._call_api('images.find', self.module.nova.images.find, name=self.name)
             self._resource = image
 
         except NotFound:
@@ -130,7 +141,9 @@ class OpenStackImage(object):
                 raise GlueError("Image name '{}' references multiple images".format(self.name))
 
             images = [
-                (image, image.to_dict()) for image in self.module.nova.images.findall(name=self.name)
+                (image, image.to_dict())
+                # pylint: disable=protected-access
+                for image in self.module._call_api('images.findall', self.module.nova.images.findall, name=self.name)
             ]
 
             log_dict(self.debug, 'found images', images)
@@ -206,6 +219,9 @@ class OpenstackGuest(NetworkedGuest):
     Implements Openstack Network Guest with snapshots support.
     """
 
+    def _call_api(self, method_label, method, *args, **kwargs):
+        return _call_api(self.logger, method_label, method, *args, **kwargs)
+
     def _is_allowed_degraded(self, service):
         self._module.require_shared('evaluate_instructions')
 
@@ -265,8 +281,9 @@ class OpenstackGuest(NetworkedGuest):
     # Low-level API, dealing directly with OpenStack resources and objects.
     #
 
+    # pylint: disable=too-many-arguments
     @staticmethod
-    def _acquire_os_resource(resource, logger, timeout, tick, func, *args, **kwargs):
+    def _acquire_os_resource(resource, logger, timeout, tick, func_label, func, *args, **kwargs):
         """
         Acquire a resource from OpenStack. If there are quotas in play, this method will handle
         "quota exceeded" responses, and will wait till the resource becomes available.
@@ -283,14 +300,17 @@ class OpenstackGuest(NetworkedGuest):
         :param gluetool.log.ContextLogger logger: Logger used for logging.
         :param int timeout: Timeout in seconds for acquiring the resource.
         :param int tick: Tick in seconds before retrying.
-        :param callable func: Function which, when called, will acquire the resource.
+        :param str func_label: Getter label used for logging.
+        :param callable func: Getter which, when called, will acquire the resource.
         :param tuple args: Positional arguments for ``func``.
         :param dict kwargs: Keyword arguments for ``func``.
         """
 
         def _ask():
             try:
-                return Result.Ok(func(*args, **kwargs))
+                ret = _call_api(logger, func_label, func, *args, **kwargs)
+
+                return Result.Ok(ret)
 
             except novaclient.exceptions.Forbidden as exc:
                 if not exc.message.startswith('Quota exceeded'):
@@ -326,10 +346,15 @@ class OpenstackGuest(NetworkedGuest):
         if not self._os_details['ip_pool_name']:
             return
 
-        self._os_floating_ip = OpenstackGuest._acquire_os_resource('floating IP', self._module.logger,
-                                                                   self._module.option('acquire-timeout'), 30,
-                                                                   self._nova.floating_ips.create,
-                                                                   self._os_details['ip_pool_name'])
+        self._os_floating_ip = OpenstackGuest._acquire_os_resource(
+            'floating IP',
+            self._module.logger,
+            self._module.option('acquire-timeout'),
+            30,
+            'floating_ips.create',
+            self._nova.floating_ips.create,
+            self._os_details['ip_pool_name']
+        )
 
     def _acquire_nics(self):
         """
@@ -352,15 +377,20 @@ class OpenstackGuest(NetworkedGuest):
 
         image = image or self._os_details['image']
 
-        self._os_instance = OpenstackGuest._acquire_os_resource('instance', self._module.logger,
-                                                                self._module.option('acquire-timeout'), 30,
-                                                                self._nova.servers.create,
-                                                                name=self._os_name,
-                                                                flavor=self._os_details['flavor'],
-                                                                image=image.resource(pick_most_recent=True),
-                                                                nics=self._os_nics,
-                                                                key_name=self._os_details['key_name'],
-                                                                userdata=self._os_details['user_data'])
+        self._os_instance = OpenstackGuest._acquire_os_resource(
+            'instance',
+            self._module.logger,
+            self._module.option('acquire-timeout'),
+            30,
+            'servers.create',
+            self._nova.servers.create,
+            name=self._os_name,
+            flavor=self._os_details['flavor'],
+            image=image.resource(pick_most_recent=True),
+            nics=self._os_nics,
+            key_name=self._os_details['key_name'],
+            userdata=self._os_details['user_data']
+        )
 
     def _acquire_network_ip(self):
         """
@@ -388,9 +418,14 @@ class OpenstackGuest(NetworkedGuest):
 
             return self._os_network_ip
 
-        OpenstackGuest._acquire_os_resource('Network IP', self._module.logger,
-                                            self._module.option('acquire-timeout'), 30,
-                                            _find_ip)
+        OpenstackGuest._acquire_os_resource(
+            'Network IP',
+            self._module.logger,
+            self._module.option('acquire-timeout'),
+            30,
+            'instance.networks[0]',
+            _find_ip
+        )
 
     def _release_snapshots(self):
         """
@@ -431,7 +466,7 @@ class OpenstackGuest(NetworkedGuest):
 
             self.debug("storing console output in '{}'".format(filename))
 
-            console = self._os_instance.get_console_output()
+            console = self._call_api('instance.get_console_output', self._os_instance.get_console_output)
 
             if console:
                 console = console.encode('utf-8', 'replace')
@@ -453,7 +488,7 @@ class OpenstackGuest(NetworkedGuest):
         try:
             self.debug('deleting...')
 
-            self._os_instance.delete()
+            self._call_api('instance.delete', self._os_instance.delete)
 
             self.debug('deleted')
 
@@ -470,7 +505,7 @@ class OpenstackGuest(NetworkedGuest):
 
         self.debug('shutting down...')
 
-        self._os_instance.stop()
+        self._call_api('instance.stop', self._os_instance.stop)
 
         self._wait_shutoff()
 
@@ -483,7 +518,7 @@ class OpenstackGuest(NetworkedGuest):
 
         self.debug('starting...')
 
-        self._os_instance.start()
+        self._call_api('instance.start', self._os_instance.start)
 
         self._wait_active()
 
@@ -517,7 +552,7 @@ class OpenstackGuest(NetworkedGuest):
 
         self.debug('rebooting...')
 
-        self._os_instance.reboot(reboot_type)
+        self._call_api('instance.reboot', self._os_instance.reboot, reboot_type)
 
         self._wait_active()
 
@@ -540,7 +575,7 @@ class OpenstackGuest(NetworkedGuest):
                                        timeout=self._module.option('shutdown-timeout'), tick=1)
 
     def _get_resource_status(self, resource, rid):
-        status = getattr(self._nova, resource).find(id=rid).status
+        status = self._call_api('{}.find'.format(resource), getattr(self._nova, resource).find, id=rid).status
 
         self.debug("status of resource '{}' within '{}' is '{}'".format(rid, resource, status))
 
@@ -591,9 +626,14 @@ class OpenstackGuest(NetworkedGuest):
 
             return isinstance(self._os_instance.add_floating_ip(self.floating_ip), novaclient.base.TupleWithMeta)
 
-        OpenstackGuest._acquire_os_resource('IP assignment', self._module.logger,
-                                            self._module.option('acquire-timeout'), 1,
-                                            _assign)
+        OpenstackGuest._acquire_os_resource(
+            'IP assignment',
+            self._module.logger,
+            self._module.option('acquire-timeout'),
+            1,
+            'instance.add_floating_ip',
+            _assign
+        )
 
     def __init__(self, module, details=None, instance_id=None, **kwargs):
         self._snapshots = []
@@ -637,7 +677,7 @@ class OpenstackGuest(NetworkedGuest):
                 'key': module.option('ssh-key')
             })
 
-            self._os_instance = self._nova.servers.find(id=instance_id)
+            self._os_instance = self._call_api('servers.find', self._nova.servers.find, id=instance_id)
 
             # we need to wait for an instance to become active before getting IP from network
             if self._os_details.get('network', None):
@@ -650,7 +690,11 @@ class OpenstackGuest(NetworkedGuest):
 
             # find floating IP only if ip pool name specified
             if self._os_details['ip_pool_name']:
-                self._os_floating_ip = self._nova.floating_ips.find(instance_id=instance_id)
+                self._os_floating_ip = self._call_api(
+                    'floating_ips.find',
+                    self._nova.floating_ips.find,
+                    instance_id=instance_id
+                )
 
             self._os_name = self._os_instance.to_dict()['name']
             self._os_nics = self._acquire_nics()
@@ -672,7 +716,7 @@ class OpenstackGuest(NetworkedGuest):
         img_id = self._os_instance.image['id']
 
         try:
-            resource = self._nova.images.findall(id=img_id)[0]
+            resource = self._call_api('images.findall', self._nova.images.findall, id=img_id)[0]
 
         except IndexError:
             raise GlueError("Cannot find image by its ID '{}'".format(img_id))
@@ -830,7 +874,7 @@ class OpenstackGuest(NetworkedGuest):
         self._shutdown()
 
         # create image
-        image_id = self._os_instance.create_image(name)
+        image_id = self._call_api('instance.create_image', self._os_instance.create_image, name)
         image = OpenStackImage(self._module, name)
         self._snapshots.append(image)
 
@@ -1220,6 +1264,9 @@ class CIOpenstack(gluetool.Module):
         raise GlueError("resource of type {} and value '{}' not found, available:\n{}".format(resource, name,
                                                                                               format_dict(available)))
 
+    def _call_api(self, method_label, method, *args, **kwargs):
+        return _call_api(self.logger, method_label, method, *args, **kwargs)
+
     def openstack(self):
         return self.nova
 
@@ -1405,10 +1452,10 @@ class CIOpenstack(gluetool.Module):
             def _get_network_ref(network):
                 # get network reference label
                 try:
-                    return self.nova.networks.find(label=network)
+                    return self._call_api('networks.find', self.nova.networks.find, label=network)
                 except (NotFound, BadRequest):
                     try:
-                        return self.nova.networks.find(id=network)
+                        return self._call_api('networks.find', self.nova.networks.find, id=network)
                     except NotFound:
                         # get network reference by id
                         self._resource_not_found('networks', network, name_attr='label')
@@ -1429,7 +1476,7 @@ class CIOpenstack(gluetool.Module):
         # get flavor reference
         flavor = flavor or self.option('flavor')
         try:
-            flavor_ref = self.nova.flavors.find(name=flavor)
+            flavor_ref = self._call_api('flavors.find', self.nova.flavors.find, name=flavor)
         except NotFound:
             self._resource_not_found('flavors', flavor)
 
@@ -1588,7 +1635,7 @@ class CIOpenstack(gluetool.Module):
 
         # test connection
         try:
-            self.nova.servers.list()
+            self._call_api('servers.list', self.nova.servers.list)
         except Unauthorized:
             raise GlueError('invalid openstack credentials')
         self.info("connected to '{}' with user '{}', project '{}'".format(auth_url,
@@ -1599,18 +1646,18 @@ class CIOpenstack(gluetool.Module):
             self.info('This will remove all instances and floating IPs! Do you really want to continue? Type YES now.')
             if six.moves.input() == 'YES':
                 # remove all instances
-                for server in self.nova.servers.list():
+                for server in self._call_api('servers.list', self.nova.servers.list):
                     self.info("removing instance '{}'".format(server.name))
-                    server.delete()
+                    self._call_api('instance.delete', server.delete)
                 # remove all floating ips
-                for floating_ip in self.nova.floating_ips.list():
+                for floating_ip in self._call_api('floating_ips.list', self.nova.floating_ips.list):
                     self.info("removing ip '{}'".format(floating_ip.ip))
-                    floating_ip.delete()
+                    self._call_api('floating_ip.delete', floating_ip.delete)
             else:
                 self.info('cowardly skipping removal of all resources')
 
         # check if key name valid
-        self.nova.keypairs.find(name=key_name)
+        self._call_api('keypairs.find', self.nova.keypairs.find, name=key_name)
 
         # provision given number of guests right away
         if provision_count:

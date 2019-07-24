@@ -287,7 +287,7 @@ class TestScheduleRunner(gluetool.Module):
             self.shared('test_schedule') or []
         )
 
-        with Action('test schedule execution', parent=Action.current_action(), logger=self.logger) as schedule.action:
+        with Action('executing test schedule', parent=Action.current_action(), logger=self.logger) as schedule.action:
             self._run_schedule(schedule)
 
             schedule.action.set_tag('result', schedule.result.name)

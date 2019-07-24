@@ -2,6 +2,7 @@
 import mock
 import pytest
 
+from gluetool.action import Action
 from gluetool.tests.conftest import fixture_enable_logger, fixture_enable_logger_propagate, fixture_log  # noqa
 from libci.tests.conftest import fixture_module_with_primary_task  # noqa
 
@@ -44,3 +45,8 @@ def fixture_mock_command(monkeypatch):
     monkeypatch.setattr(gluetool.utils, 'Command', mock_command_init)
 
     return mock_command_init, mock_command, mock_run, mock_output
+
+
+@pytest.fixture(scope='function', name='root_action', autouse=True)
+def fixture_root_action():
+    Action.set_thread_root(Action('dummy-root-action'))

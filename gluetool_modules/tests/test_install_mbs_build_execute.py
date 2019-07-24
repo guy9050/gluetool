@@ -387,7 +387,7 @@ def test_odcs_fail(module, monkeypatch):
     )
 
     with pytest.raises(gluetool.GlueError, match=r"^Getting repo from ODCS failed$"):
-        module._get_repo('dummy_nsvc', guest_mock)
+        module._get_repo(MagicMock(), 'dummy_nsvc', guest_mock)
 
 
 def test_odcs_command_fail(module, monkeypatch):
@@ -404,7 +404,7 @@ def test_odcs_command_fail(module, monkeypatch):
     )
 
     with pytest.raises(gluetool.GlueError, match=r"^ODCS call failed$"):
-        module._get_repo('dummy_nsvc', guest_mock)
+        module._get_repo(MagicMock(), 'dummy_nsvc', guest_mock)
 
 
 def test_execute_command_fail(module, monkeypatch, tmpdir):

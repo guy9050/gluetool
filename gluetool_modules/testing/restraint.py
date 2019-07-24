@@ -7,6 +7,7 @@ import stat
 import tempfile
 
 import gluetool
+from gluetool.action import Action
 from gluetool.log import log_xml, ContextAdapter
 from gluetool.result import Result
 from gluetool.utils import Bunch, Command
@@ -99,7 +100,18 @@ class Restraint(gluetool.Module):
 
         # Make sure restraintd is running and listens for connections
         try:
-            guest.execute('service restraintd start')
+            with Action(
+                'starting restraintd',
+                parent=Action.current_action(),
+                logger=guest.logger,
+                tags={
+                    'guest': {
+                        'hostname': guest.hostname,
+                        'environment': guest.environment.serialize_to_json()
+                    }
+                }
+            ):
+                guest.execute('service restraintd start')
 
         except gluetool.GlueCommandError as exc:
             raise gluetool.GlueError('Failed to start restraintd service: {}'.format(exc.output.stderr))
@@ -120,15 +132,28 @@ class Restraint(gluetool.Module):
 
             return Result.Ok(True) if match is not None else Result.Error('no restraintd running')
 
-        guest.wait('restraintd is running', _check_restraintd_running,
-                   timeout=self.option('restraintd-start-timeout'), tick=self.option('restraintd-start-timeout-tick'))
+        with Action(
+            'waiting for restraintd running',
+            parent=Action.current_action(),
+            logger=guest.logger,
+            tags={
+                'guest': {
+                    'hostname': guest.hostname,
+                    'environment': guest.environment.serialize_to_json()
+                }
+            }
+        ):
+            guest.wait(
+                'restraintd is running',
+                _check_restraintd_running,
+                timeout=self.option('restraintd-start-timeout'),
+                tick=self.option('restraintd-start-timeout-tick')
+            )
 
-        restraint_command = [
-            'restraint', '-v'
-        ]
+        restraint_command = Command(['restraint'], options=['-v'], logger=guest.logger)
 
         if self.option('restraint-options'):
-            restraint_command += shlex.split(self.option('restraint-options'))
+            restraint_command.options += shlex.split(self.option('restraint-options'))
 
         # Write out our job description, and tell restraint to run it
         with tempfile.NamedTemporaryFile() as f:
@@ -174,12 +199,24 @@ class Restraint(gluetool.Module):
             try:
                 remote = '1={}@{}'.format(guest.username, self._guest_restraint_address(guest, port))
 
-                cmd = Command(restraint_command + [
+                restraint_command.options += [
                     '--host', remote,
                     '--job', f.name
-                ], logger=guest.logger)
+                ]
 
-                output = cmd.run(inspect=True, inspect_callback=output_streamer)
+                with Action(
+                    'running restraint',
+                    parent=Action.current_action(),
+                    logger=guest.logger,
+                    tags={
+                        'guest': {
+                            'hostname': guest.hostname,
+                            'environment': guest.environment.serialize_to_json()
+                        },
+                        'options': restraint_command.options
+                    }
+                ):
+                    output = restraint_command.run(inspect=True, inspect_callback=output_streamer)
 
             except gluetool.GlueCommandError as exc:
                 output = exc.output

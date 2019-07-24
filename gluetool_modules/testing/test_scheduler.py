@@ -1,5 +1,6 @@
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
+from gluetool.action import Action
 from gluetool.log import log_dict
 
 import libci.guest
@@ -253,9 +254,10 @@ class TestScheduler(gluetool.Module):
         log_dict(self.debug, 'constraint arches (duplicities pruned)', constraint_arches)
 
         # Call plugin to create the schedule
-        schedule = self.shared('create_test_schedule', testing_environment_constraints=[
-            TestingEnvironment(arch=arch, compose=TestingEnvironment.ANY) for arch in constraint_arches
-        ])
+        with Action('creating test schedule', parent=Action.current_action(), logger=self.logger):
+            schedule = self.shared('create_test_schedule', testing_environment_constraints=[
+                TestingEnvironment(arch=arch, compose=TestingEnvironment.ANY) for arch in constraint_arches
+            ])
 
         if not schedule:
             raise GlueError('Test schedule is empty')

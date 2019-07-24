@@ -11,6 +11,7 @@ from rpmUtils.miscutils import compareEVR, splitFilename
 
 import gluetool
 from gluetool import GlueError, SoftGlueError
+from gluetool.action import Action
 from gluetool.log import Logging, log_dict
 from gluetool.result import Result
 from gluetool.utils import cached_property, dict_update, wait, normalize_multistring_option, render_template
@@ -85,6 +86,17 @@ ImageRepository = collections.namedtuple('ImageRepository', ['arch', 'url', 'alt
 TaskInitializer = collections.namedtuple('TaskInitializer', ['task_id', 'build_id'])
 
 
+def _call_api(session, logger, method, *args, **kwargs):
+    with Action('query Koji API', parent=Action.current_action(), logger=logger, tags={
+        'method': method,
+        'positional-arguments': args,
+        'keyword-arguments': kwargs
+    }):
+        method_callable = getattr(session, method)
+
+        return method_callable(*args, **kwargs)
+
+
 class KojiTask(object):
     # pylint: disable=too-many-public-methods
 
@@ -118,6 +130,9 @@ class KojiTask(object):
         if not all(key in details for key in required_instance_keys):
             raise GlueError('instance details do not contain all required keys')
 
+    def _call_api(self, method, *args, **kwargs):
+        return _call_api(self.session, self.logger, method, *args, **kwargs)
+
     def _assign_build(self, build_id):
         # Helper method - if build_id is specified, don't give API a chance, use the given
         # build, and emit a warning.
@@ -125,7 +140,7 @@ class KojiTask(object):
         if build_id is None:
             return
 
-        self._build = self.session.getBuild(build_id)
+        self._build = self._call_api('getBuild', build_id)
 
         log_dict(self.debug, 'build for task ID {}'.format(self.id), self._build)
 
@@ -227,7 +242,7 @@ class KojiTask(object):
         :rtype: list(dict)
         """
 
-        subtasks = self.session.getTaskChildren(self.id, request=True)
+        subtasks = self._call_api('getTaskChildren', self.id, request=True)
         log_dict(self.debug, 'subtasks', subtasks)
 
         return subtasks
@@ -274,7 +289,7 @@ class KojiTask(object):
         :rtype: dict
         """
 
-        task_info = self.session.getTaskInfo(self.id, request=True)
+        task_info = self._call_api('getTaskInfo', self.id, request=True)
 
         if not task_info:
             raise GlueError("Task '{}' not found".format(self.id))
@@ -297,7 +312,7 @@ class KojiTask(object):
         if self.scratch:
             return None
 
-        builds = self.session.listBuilds(taskID=self.id)
+        builds = self._call_api('listBuilds', taskID=self.id)
         log_dict(self.debug, 'builds for task ID {}'.format(self.id), builds)
 
         if not builds:
@@ -313,7 +328,7 @@ class KojiTask(object):
         :rtype: dict
         """
 
-        result = self.session.getTaskResult(self.id)
+        result = self._call_api('getTaskResult', self.id)
 
         log_dict(self.debug, 'task result', result)
 
@@ -365,7 +380,7 @@ class KojiTask(object):
         """
 
         owner_id = self._task_info["owner"]
-        return self.session.getUser(owner_id)["name"]
+        return self._call_api('getUser', owner_id)["name"]
 
     @cached_property
     def issuer(self):
@@ -458,7 +473,7 @@ class KojiTask(object):
         """
         tag = tag or self.target
 
-        builds = self.session.listTagged(tag, None, True, latest=2, package=self.component)
+        builds = self._call_api('listTagged', tag, None, True, latest=2, package=self.component)
 
         if not builds:
             self.debug("no latest builds found for package '{}' on tag '{}'".format(self.component, tag))
@@ -515,7 +530,7 @@ class KojiTask(object):
         for task in self._build_arch_subtasks:
             task_id = task['id']
 
-            task_output = self.session.listTaskOutput(task_id)
+            task_output = self._call_api('listTaskOutput', task_id)
 
             log_dict(self.debug, 'task output of subtask {}'.format(task_id), task_output)
 
@@ -540,7 +555,7 @@ class KojiTask(object):
         if not self.has_build:
             return {}
 
-        build_rpms = self.session.listBuildRPMs(self.build_id)
+        build_rpms = self._call_api('listBuildRPMs', self.build_id)
 
         log_dict(self.debug, 'build RPMs', build_rpms)
 
@@ -564,7 +579,7 @@ class KojiTask(object):
         if not self.has_build:
             return []
 
-        archives = self.session.listArchives(buildID=self.build_id)
+        archives = self._call_api('listArchives', buildID=self.build_id)
         log_dict(self.debug, 'build archives', archives)
 
         return archives
@@ -672,7 +687,7 @@ class KojiTask(object):
 
         for task in self._build_arch_subtasks:
             try:
-                rpms.extend(self.session.getTaskResult(task['id'])['rpms'])
+                rpms.extend(self._call_api('getTaskResult', task['id'])['rpms'])
             except AttributeError:
                 self.warn("No rpms found for task '{}'".format(task['id']))
 
@@ -691,7 +706,7 @@ class KojiTask(object):
                 self._build['release'],
                 rpm['arch'],
                 rpm['nvr'])
-            for rpm in self.session.listBuildRPMs(self.build_id) if rpm['arch'] != 'src'
+            for rpm in self._call_api('listBuildRPMs', self.build_id) if rpm['arch'] != 'src'
         ]
 
     @cached_property
@@ -845,7 +860,7 @@ class KojiTask(object):
         """
 
         try:
-            return self.session.getBuildTarget(self.target)["dest_tag_name"]
+            return self._call_api('getBuildTarget', self.target)["dest_tag_name"]
         except TypeError:
             return None
 
@@ -1522,6 +1537,9 @@ class Koji(gluetool.Module):
 
         return task
 
+    def _call_api(self, method, *args, **kwargs):
+        return _call_api(self._session, self.logger, method, *args, **kwargs)
+
     def _objects_to_builds(self, name, object_ids, finder):
         if not object_ids:
             return []
@@ -1588,12 +1606,12 @@ class Koji(gluetool.Module):
         builds = []
 
         builds += self._objects_to_builds('build', build_ids,
-                                          lambda build_id: [self._session.getBuild(build_id)])
+                                          lambda build_id: [self._call_api('getBuild', build_id)])
         builds += self._objects_to_builds('nvr', nvrs,
-                                          lambda nvr: [self._session.getBuild(nvr)])
+                                          lambda nvr: [self._call_api('getBuild', nvr)])
         builds += self._objects_to_builds('name', names,
                                           # pylint: disable=line-too-long
-                                          lambda name: self._session.listTagged(self.option('tag'), package=name, inherit=True, latest=True))  # Ignore PEP8Bear
+                                          lambda name: self._call_api('listTagged', self.option('tag'), package=name, inherit=True, latest=True))  # Ignore PEP8Bear
 
         # Now extract task IDs.
         for build in builds:
@@ -1735,7 +1753,7 @@ class Koji(gluetool.Module):
         wait_timeout = self.option('wait')
 
         self._session = koji.ClientSession(url)
-        version = self._session.getAPIVersion()
+        version = self._call_api('getAPIVersion')
         self.info('connected to {} instance \'{}\' API version {}'.format(self.unique_name, url, version))
 
         task_initializers = self._find_task_initializers(
@@ -1832,7 +1850,7 @@ class Brew(Koji, (gluetool.Module)):
 
         # Just like the original, fetch builds for given build IDs
         builds = self._objects_to_builds('build', build_ids,
-                                         lambda build_id: [self._session.getBuild(build_id)])
+                                         lambda build_id: [self._call_api('getBuild', build_id)])
 
         # Check each build - if it does have task_id, it passes through. If it does not have task_id,
         # but it does have extras.container_koji_task_id, we create an initializer (with the correct

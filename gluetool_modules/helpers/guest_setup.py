@@ -1,6 +1,7 @@
 import os
 
 import gluetool
+from gluetool.action import Action
 from gluetool.log import log_dict
 from gluetool.utils import normalize_path_option, render_template
 from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput
@@ -160,6 +161,8 @@ class GuestSetup(gluetool.Module):
 
         self.require_shared('detect_ansible_interpreter')
 
+        assert guest.environment is not None
+
         variables = variables or {}
 
         (playbooks, variables_from_map) = self._get_details_from_map()
@@ -202,14 +205,26 @@ class GuestSetup(gluetool.Module):
 
         guest.info('setting up with playbooks {}'.format(', '.join(playbooks)))
 
-        ansible_output = self.shared(
-            'run_playbook',
-            playbooks,
-            guest,
-            variables=variables,
-            log_filepath=log_filepath,
-            **kwargs
-        )
+        with Action(
+            'configuring guest with playbooks',
+            parent=Action.current_action(),
+            logger=guest.logger,
+            tags={
+                'guest': {
+                    'hostname': guest.hostname,
+                    'environment': guest.environment.serialize_to_json()
+                },
+                'playbook-paths': playbooks
+            }
+        ):
+            ansible_output = self.shared(
+                'run_playbook',
+                playbooks,
+                guest,
+                variables=variables,
+                log_filepath=log_filepath,
+                **kwargs
+            )
 
         return [
             GuestSetupOutput(

@@ -2,6 +2,7 @@ import os
 import re
 
 import gluetool
+from gluetool.action import Action
 from gluetool.utils import Command, from_json
 from gluetool.log import format_blob, log_blob, log_dict
 from libci.sentry import PrimaryTaskFingerprintsMixin
@@ -152,6 +153,7 @@ class Ansible(gluetool.Module):
         log_dict(guest.debug, 'running playbooks', playbook_paths)
 
         assert guest.key is not None
+        assert guest.environment is not None
 
         inventory = inventory or '{},'.format(guest.hostname)  # note the comma
 
@@ -183,11 +185,23 @@ class Ansible(gluetool.Module):
         if json_output:
             env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'json'})
 
-        try:
-            ansible_call = Command(cmd, logger=guest.logger).run(cwd=cwd, env=env_variables)
+        with Action(
+            'running playbooks',
+            parent=Action.current_action(),
+            logger=guest.logger,
+            tags={
+                'guest': {
+                    'hostname': guest.hostname,
+                    'environment': guest.environment.serialize_to_json()
+                },
+                'playbook-paths': playbook_paths
+            }
+        ):
+            try:
+                ansible_call = Command(cmd, logger=guest.logger).run(cwd=cwd, env=env_variables)
 
-        except gluetool.GlueCommandError as exc:
-            ansible_call = exc.output
+            except gluetool.GlueCommandError as exc:
+                ansible_call = exc.output
 
         # As path of logs, use the given file, with fallback to current directory & default name.
         if not log_filepath:
