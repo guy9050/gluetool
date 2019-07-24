@@ -268,14 +268,14 @@ class Notify((gluetool.Module)):
         xheaders_config = utils.normalize_multistring_option(self.option('xheaders'))
 
         xheaders = {}
+        context = self.shared('eval_context')
 
         for xheader in xheaders_config:
             if not xheader or ':' not in xheader:
                 raise gluetool.GlueError("'{}' is not correct format of xheader".format(xheader))
 
             name, value = xheader.strip().split(':')
-
-            xheaders[name.strip()] = value.strip()
+            xheaders[name.strip()] = gluetool.utils.render_template(value, logger=self.logger, **context)
 
         log.log_dict(self.debug, 'X-Headers', xheaders)
 
