@@ -172,7 +172,7 @@ class SUTInstallation(object):
 
 
 def check_ansible_sut_installation(ansible_output,  # type: Dict[str, Any]
-                                   guests,  # type: List[libci.guest.NetworkedGuest]
+                                   guest,  # type: libci.guest.NetworkedGuest
                                    primary_task,  # type: Any
                                    logger=None  # type: Optional[gluetool.log.ContextAdapter]
                                   ):  # noqa
@@ -182,7 +182,7 @@ def check_ansible_sut_installation(ansible_output,  # type: Dict[str, Any]
     ansible installation tasks failed.
 
     :param ansible_output: output (in json format) to be checked
-    :param guests: list of guests, where playbook was run
+    :param guest: guest where playbook was run
     :param primary_task: Object covering installed artifact
     :param logger: Logger object used to log
     :raises SUTInstallationFailedError: if some of ansible installation tasks failed
@@ -218,7 +218,6 @@ def check_ansible_sut_installation(ansible_output,  # type: Dict[str, Any]
         return
 
     first_fail = failed_tasks[0]
-    guest = [guest for guest in guests if guest.hostname == first_fail['host']][0]
     failed_modules = first_fail['items']
 
     guest.warn('Following items have not been installed: {}'.format(','.join(failed_modules)))

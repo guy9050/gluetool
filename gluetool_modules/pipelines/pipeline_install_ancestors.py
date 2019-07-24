@@ -35,10 +35,10 @@ class PipelineInstallAncestors(gluetool.Module):
     shared_functions = ('setup_guest',)
     required_options = ('playbooks',)
 
-    def setup_guest(self, guests, *args, **kwargs):
+    def setup_guest(self, guest, *args, **kwargs):
 
         # make sure previous setup_guest methods are called
-        self.overloaded_shared('setup_guest', guests, **kwargs)
+        self.overloaded_shared('setup_guest', guest, **kwargs)
 
         brew_options = normalize_shell_option(self.option('brew-options'))
 
@@ -58,7 +58,7 @@ class PipelineInstallAncestors(gluetool.Module):
 
         # callback to initiate setup guest in separate pipeline
         def do_setup_guest(self):
-            self.shared('setup_guest', guests, *args, **kwargs)
+            self.shared('setup_guest', guest, *args, **kwargs)
 
         playbooks = normalize_multistring_option(self.option('playbooks'))
         rpm_urls = self.shared('primary_task').rpm_urls
@@ -70,7 +70,7 @@ class PipelineInstallAncestors(gluetool.Module):
                 self.shared(
                     'run_playbook',
                     playbook,
-                    guests,
+                    guest,
                     variables={'PACKAGE_URLS': '[{}]'.format(','.join(rpm_urls))},
                 )
 

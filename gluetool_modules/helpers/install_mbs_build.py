@@ -25,21 +25,16 @@ class InstallMBSBuild(gluetool.Module):
 
     shared_functions = ('setup_guest',)
 
-    def _get_repo(self, module_nsvc, guests):
+    def _get_repo(self, module_nsvc, guest):
         self.info('Generating repo for module via ODCS')
 
         command = [
             'odcs',
             '--redhat', 'create',
             'module', module_nsvc,
-            '--sigkey', 'none'
+            '--sigkey', 'none',
+            '--arch', guest.environment.arch
         ]
-
-        # Inner list gather all arches, `set` gets rid of duplicities, and final `list` converts set to a list.
-        for arch in list(set([guest.environment.arch for guest in guests])):
-            command += [
-                '--arch', arch
-            ]
 
         # TO improve: raise OdcsError if command fails
         output = Command(command).run()
@@ -54,22 +49,22 @@ class InstallMBSBuild(gluetool.Module):
         self.info('Module repo from ODCS: {}'.format(repo_url))
         return repo_url
 
-    def setup_guest(self, guests, **kwargs):
+    def setup_guest(self, guest, **kwargs):
 
         self.require_shared('run_playbook', 'primary_task')
 
-        self.overloaded_shared('setup_guest', guests, **kwargs)
+        self.overloaded_shared('setup_guest', guest, **kwargs)
 
         primary_task = self.shared('primary_task')
 
         nsvc = primary_task.nsvc
-        repo_url = self._get_repo(nsvc, guests)
+        repo_url = self._get_repo(nsvc, guest)
         self.info('Installing module "{}" from {}'.format(nsvc, repo_url))
 
         _, ansible_output = self.shared(
             'run_playbook',
             gluetool.utils.normalize_path(self.option('playbook')),
-            guests,
+            guest,
             variables={
                 'REPO_URL': repo_url,
                 'MODULE_NSVC': nsvc,
@@ -77,6 +72,6 @@ class InstallMBSBuild(gluetool.Module):
             }
         )
 
-        check_ansible_sut_installation(ansible_output, guests, self.shared('primary_task'))
+        check_ansible_sut_installation(ansible_output, guest, self.shared('primary_task'))
 
         self.info('All modules have been successfully installed')
