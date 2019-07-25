@@ -2,6 +2,7 @@ import six
 
 import gluetool
 from gluetool.utils import normalize_shell_option, normalize_multistring_option
+from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath
 
 
 class PipelineInstallAncestors(gluetool.Module):
@@ -35,11 +36,16 @@ class PipelineInstallAncestors(gluetool.Module):
     shared_functions = ('setup_guest',)
     required_options = ('playbooks',)
 
-    def setup_guest(self, guest, *args, **kwargs):
+    def setup_guest(self, guest, log_dirpath=None, **kwargs):
+
+        log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
 
         # make sure previous setup_guest methods are called
-        self.overloaded_shared('setup_guest', guest, **kwargs)
+        guest_setup_output = self.overloaded_shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs)
+        if guest_setup_output is None:
+            guest_setup_output = []
 
+        self.info('installing the ancestor {}'.format(self.shared('primary_task').nvr))
         brew_options = normalize_shell_option(self.option('brew-options'))
 
         # get ancestors of the package in our pipeline and construct options for koji module
@@ -58,7 +64,7 @@ class PipelineInstallAncestors(gluetool.Module):
 
         # callback to initiate setup guest in separate pipeline
         def do_setup_guest(self):
-            self.shared('setup_guest', guest, *args, **kwargs)
+            guest_setup_output.extend(self.shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs))
 
         playbooks = normalize_multistring_option(self.option('playbooks'))
         rpm_urls = self.shared('primary_task').rpm_urls
@@ -107,3 +113,5 @@ class PipelineInstallAncestors(gluetool.Module):
 
         if failure_destroy:
             six.reraise(*failure_destroy.exc_info)
+
+        return guest_setup_output
