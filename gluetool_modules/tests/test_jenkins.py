@@ -92,6 +92,8 @@ def test_jenkins_set_build_name(log, module, monkeypatch):
 
     monkeypatch.setenv('BUILD_URL', '')
     module._config['url'] = 'dummy_jenkins_url'
+    module._config['jenkins-api-timeout'] = 5
+    module._config['jenkins-api-timeout-tick'] = 1
 
     build_name = 'dummy_name'
     jenkins_proxy.set_build_name(build_name)
@@ -103,6 +105,8 @@ def test_jenkins_set_build_name_credentials(log, module, monkeypatch):
 
     module._config['username'] = 'dummy_username'
     module._config['password'] = 'dummy_password'
+    module._config['jenkins-api-timeout'] = 5
+    module._config['jenkins-api-timeout-tick'] = 1
 
     jenkins_proxy = JenkinsProxy(MagicMock(), module)
 
@@ -130,8 +134,10 @@ def test_jenkins_set_build_name_url_not_found(module, monkeypatch):
 
     monkeypatch.setenv('BUILD_URL', '')
     module._config['url'] = 'dummy_jenkins_url'
+    module._config['jenkins-api-timeout'] = 5
+    module._config['jenkins-api-timeout-tick'] = 1
 
-    with pytest.raises(gluetool.GlueError, match=r'^Jenkins REST request failed'):
+    with pytest.raises(gluetool.GlueError, match=r'^Condition \'waiting for Jenkins to respond successfully\' failed to pass within given time'):
         jenkins_proxy.set_build_name('dummy_name')
 
 

@@ -14,9 +14,12 @@ import gluetool
 from gluetool import GlueError
 from gluetool.log import format_dict, log_dict
 from gluetool.proxy import Proxy
+from gluetool.result import Result
+from gluetool.utils import wait
 
 
 DEFAULT_JENKINSAPI_TIMEOUT = 120
+DEFAULT_JENKINSAPI_TIMEOUT_TICK = 30
 
 
 class JenkinsProxy(Proxy):
@@ -181,6 +184,12 @@ class CIJenkins(gluetool.Module):
             'type': int,
             'default': DEFAULT_JENKINSAPI_TIMEOUT,
             'metavar': 'SECONDS'
+        },
+        'jenkins-api-timeout-tick': {
+            'help': 'Try every SECONDS to send a request to Jenkins (default: %(default)s).',
+            'type': int,
+            'default': DEFAULT_JENKINSAPI_TIMEOUT_TICK,
+            'metavar': 'SECONDS'
         }
     }
     required_options = ['url']
@@ -193,7 +202,7 @@ class CIJenkins(gluetool.Module):
 
         return self._jenkins
 
-    def jenkins_rest(self, url, **data):
+    def jenkins_rest(self, url, wait_timeout=None, wait_tick=None, **data):
         """
         Submit request to Jenkins via its http interface.
 
@@ -202,6 +211,7 @@ class CIJenkins(gluetool.Module):
           with '/'. Configured Jenkjins URL is prepended to relative URLS,
           while absolute URLs must lead to this configured Jenkins instance.
         :param dict data: data to submit to the URL.
+        :param int wait_timeout: number of seconds to wait for Jenkins successful response.
         :returns: (response, resonse-content)
         """
 
@@ -232,13 +242,17 @@ class CIJenkins(gluetool.Module):
         else:
             request = url
 
-        response = urllib2.urlopen(request, data)
+        def _request():
+            response = urllib2.urlopen(request, data)
+            return Result.Ok(response) if response.getcode() == 200 else Result.Error(response)
+
+        timeout = wait_timeout or self.option('jenkins-api-timeout')
+        tick = wait_tick or self.option('jenkins-api-timeout-tick')
+
+        response = wait('waiting for Jenkins to respond successfully', _request, timeout=timeout, tick=tick)
+
         code, content = response.getcode(), response.read()
-
         gluetool.log.log_blob(self.debug, 'response: {}'.format(code), content)
-
-        if code != 200:
-            raise GlueError('Jenkins REST request failed')
 
         return response, content
 
