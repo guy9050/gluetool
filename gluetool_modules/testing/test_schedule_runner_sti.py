@@ -9,6 +9,7 @@ import inotify.adapters
 
 import gluetool
 from gluetool import GlueError
+from gluetool.action import Action
 from gluetool.log import log_blob, log_dict
 
 from gluetool_modules.libs.artifacts import artifacts_location
