@@ -198,10 +198,16 @@ sut     ansible_host={} ansible_user=root {}
         Run an STI playbook, observe and report results.
         """
 
+        # We're going to spawn new thread for `run_playbook`, therefore we will have to setup its thread
+        # root action to the current one of this thread.
+        current_action = Action.current_action()
+
         def _run_playbook_wrapper():
             # type: () -> Any
 
             assert schedule_entry.guest is not None
+
+            Action.set_thread_root(current_action)
 
             # `run_playbook` and log the output to the working directory
             self.shared(
