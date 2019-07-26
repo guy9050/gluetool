@@ -6,6 +6,31 @@ All notable changes to this project will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
 
+2019-07-26
+----------
+
+Added
+~~~~~
+
+- Wrapping more points in brew-ts_restraint-openstack pipeline with actions (mprchlik)
+
+Changed
+~~~~~~~
+
+- [notify-email] Treat x-headers as templates (Jakub Haruda)
+
+Fixed
+~~~~~
+
+copr: fix JSONDecodeError (Evgeny Fedin)
+mbs: fix nvr for scratch builds (Evgeny Fedin)
+pipeline-install-ancestors: fix handling of ansible playbooks (Martin Kluson)
+wow: fix typo (Martin Kluson)
+test-scheduler: require provisioner_capabilities() (omosnace)
+test_scheduler_sti: Get rid of NoTestAvailableError (Robin Hack)
+rpminspect-job: new job module for rpminspect (Evgeny Fedin)
+
+
 2019-06-28
 ----------
 
