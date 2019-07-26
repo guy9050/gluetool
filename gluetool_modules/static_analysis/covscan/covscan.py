@@ -115,7 +115,13 @@ class CovscanResult(object):
     def __init__(self, module, task_id):
         self.module = module
         self.task_id = task_id
-        self.url = 'http://cov01.lab.eng.brq.redhat.com/covscanhub/task/{}/'.format(task_id)
+        self.url = gluetool.utils.render_template(
+            self.module.option('covscan-task-url-template'),
+            logger=self.module.logger,
+            **{
+                'COVSCAN_TASK_ID': task_id
+            }
+        )
 
     def _fetch_diff(self, url):
         diff_json = urlopen(url).read()
@@ -193,8 +199,13 @@ class CICovscan(gluetool.Module):
         'config-map': {
             'help': 'Path to a file with ``target`` => ``target_config``, ``baseline_config`` patterns.',
             'metavar': 'FILE'
+        },
+        'covscan-task-url-template': {
+            'help': 'Url to a coverity scan scheduler'
         }
     }
+
+    required_options = ('covscan-task-url-template',)
 
     shared_functions = ('covscan_xunit_serialize',)
 
