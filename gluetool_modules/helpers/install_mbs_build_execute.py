@@ -4,7 +4,7 @@ import re
 import gluetool
 from gluetool.action import Action
 from gluetool.log import log_dict
-from gluetool.utils import Command
+from gluetool.utils import Command, normalize_shell_option, render_template
 from gluetool import GlueError
 
 from gluetool_modules.libs.artifacts import artifacts_location
@@ -42,6 +42,10 @@ class InstallMBSBuild(gluetool.Module):
             'help': 'Name of directory where outputs of installation commands will be stored (default: %(default)s).',
             'type': str,
             'default': 'artifact-installation'
+        },
+        'odcs-options': {
+            'help': 'Addditional options passed to ODCS command, value is treated as a template.',
+            'type': str
         }
     }
 
@@ -59,6 +63,14 @@ class InstallMBSBuild(gluetool.Module):
         command += [
             '--arch', guest.environment.arch
         ]
+
+        if self.option('odcs-options'):
+            odcs_options = render_template(
+                self.option('odcs-options'),
+                logger=guest.logger,
+                **self.shared('eval_context')
+            )
+            command += normalize_shell_option(odcs_options)
 
         with Action(
             'creating ODCS repository',
