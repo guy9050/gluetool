@@ -86,19 +86,20 @@ class Ansible(gluetool.Module):
 
         assert guest.hostname is not None
         assert guest.key is not None
-        assert guest.username is not None
 
         cmd = [
             'ansible',
             '--inventory', '{},'.format(guest.hostname),
             '--private-key', guest.key,
-            '--user', guest.username,
             '--module-name', 'raw',
             '--args', 'command -v ' + ' '.join(ANSIBLE_PYTHON_INTERPRETERS),
             '--ssh-common-args',
             ' '.join(['-o ' + option for option in guest.options]),
             guest.hostname
         ]
+
+        if guest.username:
+            cmd += ['--user', guest.username]
 
         try:
             ansible_call = Command(cmd, logger=guest.logger).run()
@@ -162,6 +163,9 @@ class Ansible(gluetool.Module):
             '-i', inventory,
             '--private-key', guest.key
         ]
+
+        if guest.username:
+            cmd += ['--user', guest.username]
 
         if variables:
             log_dict(guest.debug, 'variables', variables)
