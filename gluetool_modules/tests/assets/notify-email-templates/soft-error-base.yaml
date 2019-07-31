@@ -12,7 +12,7 @@ footer: |-
 
   --
   CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation
-  IRC: #baseosci
+  IRC: #tft
 recipients:
   - dummy-recipient@redhat.com
 cc: []

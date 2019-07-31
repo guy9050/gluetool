@@ -23,7 +23,7 @@ footer: |-
   --
   RPMdiff CI Test Plan: http://url.corp.redhat.com/rpmdiff-in-ci
   CI Project page: https://docs.engineering.redhat.com/display/CI/User+Documentation
-  IRC: #baseosci
+  IRC: #tft
 recipients:
   - dummy-recipient@redhat.com
 cc: []
