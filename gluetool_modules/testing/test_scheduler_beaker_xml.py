@@ -35,12 +35,12 @@ class TestScheduleEntry(BaseTestScheduleEntry):
         self.recipe_set = recipe_set
         self.recipe_set_results = None  # type: Any
 
-    def log(self, log_fn=None):
+    def log_entry(self, log_fn=None):
         # type: (Optional[gluetool.log.LoggingFunctionType]) -> None
 
         log_fn = log_fn or self.debug
 
-        super(TestScheduleEntry, self).log(log_fn=log_fn)
+        super(TestScheduleEntry, self).log_entry(log_fn=log_fn)
 
         log_xml(log_fn, 'recipe set', self.recipe_set)
 

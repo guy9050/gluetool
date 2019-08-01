@@ -23,7 +23,7 @@ from novaclient.exceptions import BadRequest, NotFound, Unauthorized, NoUniqueMa
 import gluetool
 from gluetool import GlueError, GlueCommandError
 from gluetool.action import Action
-from gluetool.log import format_dict, log_dict
+from gluetool.log import LoggerMixin, format_dict, log_dict
 from gluetool.result import Result
 from gluetool.utils import cached_property, normalize_path, load_yaml, dict_update
 from libci.guest import NetworkedGuest
@@ -67,18 +67,18 @@ def _call_api(logger, method_label, method, *args, **kwargs):
         return method(*args, **kwargs)
 
 
-class OpenStackImage(object):
+class OpenStackImage(LoggerMixin, object):
     """
     Represents an OpenStack image, allowing consistent manipulation of images, snapshots
     and their names and IDs in module internals, with few helper methods on top of that.
     """
 
     def __init__(self, module, name, resource=None):
+        super(OpenStackImage, self).__init__(module.logger)
+
         self.module = module
         self.name = name
         self._resource = resource
-
-        module.logger.connect(self)
 
         glance_options = {}
         for option in ['auth-url', 'project-name', 'username', 'password']:

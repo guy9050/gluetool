@@ -116,7 +116,7 @@ def test_publish(log, module, mock_stomp, dryrun_level):
     assert log.match(message='body:\n{\n    "foo": "bar"\n}')
 
     if dryrun_level == gluetool.glue.DryRunLevels.DEFAULT:
-        mock_stomp['session.send'].assert_called_once_with(body=gluetool.utils.format_dict(message.body),
+        mock_stomp['session.send'].assert_called_once_with(body=gluetool.log.format_dict(message.body),
                                                            headers=message.headers, destination=None)
 
     else:

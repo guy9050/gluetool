@@ -5,7 +5,7 @@ import urllib
 from pymemcache.client import base
 
 import gluetool
-from gluetool.log import log_dict
+from gluetool.log import LoggerMixin, log_dict
 from gluetool.result import Result
 
 
@@ -42,16 +42,16 @@ def _json_deserializer(key, value, flags):
     raise gluetool.GlueError('Data in cache has invalid format')
 
 
-class Cache(object):
+class Cache(LoggerMixin, object):
     """
     Provides access to cache API.
     """
 
     def __init__(self, module, client):
+        super(Cache, self).__init__(module.logger)
+
         self._module = module
         self._client = client
-
-        module.logger.connect(self)
 
         # guards access to self._client - apparently, it's not thread-safe by default
         self._lock = threading.Lock()

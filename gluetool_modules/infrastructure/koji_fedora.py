@@ -12,7 +12,7 @@ from rpmUtils.miscutils import compareEVR, splitFilename
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.action import Action
-from gluetool.log import Logging, log_dict
+from gluetool.log import Logging, LoggerMixin, log_dict
 from gluetool.result import Result
 from gluetool.utils import cached_property, dict_update, wait, normalize_multistring_option, render_template
 
@@ -97,7 +97,7 @@ def _call_api(session, logger, method, *args, **kwargs):
         return method_callable(*args, **kwargs)
 
 
-class KojiTask(object):
+class KojiTask(LoggerMixin, object):
     # pylint: disable=too-many-public-methods
 
     """
@@ -150,10 +150,9 @@ class KojiTask(object):
 
     # pylint: disable=too-many-arguments
     def __init__(self, details, task_id, module, logger=None, wait_timeout=None, build_id=None):
-        self._check_required_instance_keys(details)
+        super(KojiTask, self).__init__(logger or Logging.get_logger())
 
-        self.logger = logger or Logging.get_logger()
-        logger.connect(self)
+        self._check_required_instance_keys(details)
 
         self._module = module
 

@@ -2,13 +2,14 @@ import re
 
 import gluetool
 
+from gluetool.log import LoggerMixin
 from gluetool.utils import cached_property, IncompatibleOptionsError, log_blob, PatternMap, render_template
 
 import gluetool_modules.libs
 import gluetool_modules.libs.git
 
 
-class DistGitRepository(gluetool_modules.libs.git.RemoteGitRepository):
+class DistGitRepository(LoggerMixin, gluetool_modules.libs.git.RemoteGitRepository):
     """
     Provides a dist-git repository.
     """
@@ -16,12 +17,9 @@ class DistGitRepository(gluetool_modules.libs.git.RemoteGitRepository):
     def __init__(self, module, package, clone_url=None, branch=None, ref=None, web_url=None):
         # pylint: disable=too-many-arguments
 
-        super(DistGitRepository, self).__init__(clone_url, branch=branch, ref=ref, web_url=web_url)
+        super(DistGitRepository, self).__init__(module.logger, clone_url, branch=branch, ref=ref, web_url=web_url)
 
         self._module = module
-
-        module.logger.connect(self)
-        self.logger = module.logger
 
         self.package = package
 

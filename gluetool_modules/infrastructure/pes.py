@@ -5,7 +5,7 @@ from requests.exceptions import ConnectionError, HTTPError, Timeout
 
 import gluetool
 from gluetool.utils import cached_property, requests
-from gluetool.log import log_dict, LoggingFunctionType
+from gluetool.log import LoggerMixin, log_dict
 from gluetool.result import Result
 
 # pylint: disable=no-name-in-module
@@ -23,7 +23,7 @@ DEFAULT_RETRY_TIMEOUT = 30
 DEFAULT_RETRY_TICK = 10
 
 
-class PESApi(object):
+class PESApi(LoggerMixin, object):
     # pylint: disable=too-few-public-methods
     """
     API to Package Evolution Service
@@ -32,14 +32,10 @@ class PESApi(object):
     def __init__(self, module):
         # type: (gluetool.Module) -> None
 
+        super(PESApi, self).__init__(module.logger)
+
         self.api_url = module.option('api-url')  # type: str
         self.module = module  # type: gluetool.Module
-        self.logger = module.logger  # type: gluetool.log.ContextAdapter
-
-        # required for type checking, see gluetool.log for more details
-        self.debug = cast(LoggingFunctionType, lambda s: None)
-
-        self.logger.connect(self)
 
     def _post_payload(self, location, payload):
         # type: (str, Dict) -> orig_requests.Response

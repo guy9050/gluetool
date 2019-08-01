@@ -12,7 +12,7 @@ import re
 import gluetool
 
 
-LOGGER = gluetool.log.Logging.create_logger()
+LOGGER = gluetool.log.Logging.setup_logger()
 OUTPUT_DIR = 'docs/source'
 
 MOD_TEMPLATE = """

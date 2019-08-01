@@ -190,7 +190,7 @@ def check_ansible_sut_installation(ansible_output,  # type: Dict[str, Any]
 
     logger = logger or gluetool.log.Logging.get_logger()
 
-    log_dict(logger.debug,  # type: ignore  # logger.debug signature is compatible
+    log_dict(logger.debug,
              'ansible output before jq processing',
              ansible_output)
 
@@ -210,7 +210,7 @@ def check_ansible_sut_installation(ansible_output,  # type: Dict[str, Any]
 
     failed_tasks = jq(query).transform(ansible_output, multiple_output=True)
 
-    log_dict(logger.debug,  # type: ignore  # logger.debug signature is compatible
+    log_dict(logger.debug,
              'ansible output after jq processing',
              failed_tasks)
 

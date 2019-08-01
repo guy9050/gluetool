@@ -38,12 +38,12 @@ class TestScheduleEntry(BaseTestScheduleEntry):
         self.playbook_filepath = playbook_filepath
         self.results = None  # type: Any
 
-    def log(self, log_fn=None):
+    def log_entry(self, log_fn=None):
         # type: (Optional[gluetool.log.LoggingFunctionType]) -> None
 
         log_fn = log_fn or self.debug
 
-        super(TestScheduleEntry, self).log(log_fn=log_fn)
+        super(TestScheduleEntry, self).log_entry(log_fn=log_fn)
 
         log_fn('playbook path: {}'.format(self.playbook_filepath))
 

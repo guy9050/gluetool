@@ -12,7 +12,7 @@ from jq import jq
 import gluetool
 from gluetool.action import Action
 from gluetool.utils import cached_property, normalize_multistring_option
-from gluetool.log import log_dict
+from gluetool.log import LoggerMixin, log_dict
 
 #: Information about task architectures.
 #:
@@ -170,7 +170,7 @@ class MBSApi(object):
         return '{}/module/{}'.format(self.mbs_ui_url, build_id)
 
 
-class MBSTask(object):
+class MBSTask(LoggerMixin, object):
     # pylint: disable=too-few-public-methods,too-many-instance-attributes
 
     ARTIFACT_NAMESPACE = 'redhat-module'
@@ -178,9 +178,9 @@ class MBSTask(object):
     def __init__(self, module, build_id=None, nsvc=None, nvr=None):
         # pylint: disable=invalid-name
 
+        super(MBSTask, self).__init__(module.logger)
+
         self.module = module
-        self.logger = module.logger
-        module.logger.connect(self)
 
         mbs_api = module.mbs_api()
 

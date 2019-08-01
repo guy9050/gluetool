@@ -93,7 +93,7 @@ class TestingResults(gluetool.Module):
         return test_suites
 
     writers = {
-        'json': lambda stream, results: stream.write(gluetool.utils.format_dict([result for result in results])),
+        'json': lambda stream, results: stream.write(gluetool.log.format_dict([result for result in results])),
         'xunit': lambda stream, results: stream.write(results.prettify(encoding='utf-8'))
     }
 

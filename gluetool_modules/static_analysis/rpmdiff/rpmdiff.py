@@ -4,7 +4,7 @@ import time
 
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError, utils
-from gluetool.log import log_blob
+from gluetool.log import format_dict, log_blob
 from libci.results import TestResult, publish_result
 
 # map RPMdiff overal score to resultsdb 2.0 API outcome states
@@ -186,7 +186,7 @@ class CIRpmdiff(gluetool.Module):
         command = self._rpmdiff_cmd + ["runinfo", str(run_id)]
 
         blob = json.loads(CIRpmdiff._run_command(command).stdout)
-        log_blob(self.debug, 'rpmdiff-remote runinfo returned', utils.format_dict(blob))
+        log_blob(self.debug, 'rpmdiff-remote runinfo returned', format_dict(blob))
 
         return blob
 
@@ -230,7 +230,7 @@ class CIRpmdiff(gluetool.Module):
             command += ["--baseline", nvr_baseline]
 
         blob = json.loads(CIRpmdiff._run_command(command).stdout)
-        self.debug('rpmdiff-remote schedule returned:\n{}'.format(utils.format_dict(blob)))
+        self.debug('rpmdiff-remote schedule returned:\n{}'.format(format_dict(blob)))
         self.info("web url: {}".format(blob['web_url']))
         return self._wait_until_finished(str(blob['run_id']))
 

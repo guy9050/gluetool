@@ -107,7 +107,7 @@ class JobEngine(object):
             [future, job.name] for future, job in self._futures.iteritems()
         ]
 
-        gluetool.log.log_table(self.logger.debug, label, table, headers='firstrow', tablefmt='psql')  # type: ignore
+        gluetool.log.log_table(self.logger.debug, label, table, headers='firstrow', tablefmt='psql')
 
     def _start_job(self, job):
         # type: (Job) -> None
@@ -148,7 +148,7 @@ class JobEngine(object):
 
         max_workers = self.max_workers or len(self._jobs)
 
-        gluetool.log.log_dict(  # type: ignore  # logger.debug signature is compatible
+        gluetool.log.log_dict(
             self.logger.debug,
             'running {} jobs with {} workers'.format(len(self._jobs), max_workers),
             self._jobs
@@ -228,7 +228,7 @@ class JobEngine(object):
 
         self._executor = None
 
-        gluetool.log.log_dict(  # type: ignore  # logger.debug signature is compatible
+        gluetool.log.log_dict(
             self.logger.debug,
             'jobs produced errors',
             self.errors

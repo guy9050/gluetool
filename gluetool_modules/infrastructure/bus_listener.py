@@ -8,7 +8,7 @@ import sys
 import stomp
 
 import gluetool
-from gluetool.log import format_dict
+from gluetool.log import LoggerMixin, format_dict
 
 
 DEFAULT_BUS_HOST = 'ci-bus.lab.eng.rdu2.redhat.com'
@@ -16,7 +16,7 @@ DEFAULT_BUS_PORT = 61613
 DEFAULT_DESTINATION = '/topic/CI'
 
 
-class Listener(stomp.listener.ConnectionListener):
+class Listener(LoggerMixin, stomp.listener.ConnectionListener):
     """
     Listener we pass to Stomp to react on received messages.
 
@@ -41,10 +41,9 @@ class Listener(stomp.listener.ConnectionListener):
     """
 
     def __init__(self, module):
-        super(Listener, self).__init__()
+        super(Listener, self).__init__(module.logger)
 
         self._module = module
-        module.logger.connect(self)
 
         self.keep_running = True
 

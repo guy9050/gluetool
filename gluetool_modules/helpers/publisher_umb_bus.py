@@ -4,6 +4,7 @@ import itertools
 import time
 
 import gluetool
+from gluetool.log import LoggerMixin
 from gluetool.utils import normalize_path
 
 import proton
@@ -23,13 +24,13 @@ UMBErrorDescription = collections.namedtuple('UMBErrorDescription', ('name', 'de
 
 
 class ContainerAdapter(gluetool.log.ContextAdapter):
-    def __init__(self, logger, handler):
-        super(ContainerAdapter, self).__init__(logger, {'ctx_container_url': (100, handler.topic)})
+    def __init__(self, logger, topic):
+        super(ContainerAdapter, self).__init__(logger, {'ctx_container_url': (100, topic)})
 
 
-class TestHandler(proton.handlers.MessagingHandler):
+class TestHandler(LoggerMixin, proton.handlers.MessagingHandler):
     def __init__(self, module, urls, messages, topic, *args, **kwargs):
-        super(TestHandler, self).__init__(*args, **kwargs)
+        super(TestHandler, self).__init__(ContainerAdapter(module.logger, topic), *args, **kwargs)
 
         self._module = module
 
@@ -37,9 +38,6 @@ class TestHandler(proton.handlers.MessagingHandler):
         self.messages = messages
         self.topic = topic
         self.pending = {}
-
-        self.logger = ContainerAdapter(module.logger, self)
-        self.logger.connect(self)
 
         self._step_timeout = None
         self._global_timeout = None
