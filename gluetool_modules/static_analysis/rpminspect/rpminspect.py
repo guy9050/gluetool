@@ -27,16 +27,6 @@ RPMINSPECT_SCORE = {
     'BAD': 4
 }
 
-TEST_NAMES = [
-    'License',
-    'Payload',
-    'Header Metadata',
-    'Man pages',
-    'XML files',
-    'ELF object properties',
-    'Desktop Entry files'
-]
-
 # required commands of module
 REQUIRED_CMDS = ['rpminspect']
 
@@ -125,10 +115,10 @@ class CIRpminspect(gluetool.Module):
             'default': 'comparison'
         },
         'tests': {
-            'help': 'List of tests to perform. If nothing is set, all tests would run (default: ALL)',
+            # pylint: disable=line-too-long
+            'help': 'List of tests to perform. If nothing is set, all tests would run. Run `rpminspect -l` to find out a list of all available types of tests  (default: ALL)',
             'metavar': 'TESTS',
             'action': 'append',
-            'choices': ['ALL', 'license', 'emptyrpm', 'metadata', 'manpage', 'xml', 'elf'],
             'default': []
         },
         'results-file': {
@@ -142,6 +132,12 @@ class CIRpminspect(gluetool.Module):
             'metavar': 'FILE',
             'type': str,
             'default': ''
+        },
+        'artifacts-dir': {
+            'help': 'A directory for storing artifacts (default: %(default)s)',
+            'metavar': 'DIR',
+            'type': str,
+            'default': 'artifacts'
         }
     }
 
@@ -159,10 +155,10 @@ class CIRpminspect(gluetool.Module):
             'rpminspect',
             '-v',
             # give a subfolder as a workdir to rpminspect for easy deleting it later
-            '-w', os.path.join(workdir, 'artifacts'),
+            '-w', os.path.join(workdir, self.option('artifacts-dir')),
             '-o', os.path.join(workdir, self.option('results-file')),
             '-F', 'json',
-            '-T', ','.join(tests) if tests else 'ALL'
+            '-T', ','.join(tests) if tests and tests != [''] else 'ALL'
         ]
         return cmd
 
@@ -268,10 +264,7 @@ class CIRpminspect(gluetool.Module):
             parsed_results = []
 
             # Parse results for every test.
-            # Passed if test doesn't have any output
-            for test_name in TEST_NAMES:
-
-                test_info = data[test_name] if test_name in data.keys() else {}
+            for test_name, test_info in data.iteritems():
 
                 # Return the worst result from test
                 # pylint: disable=cell-var-from-loop
@@ -428,5 +421,5 @@ class CIRpminspect(gluetool.Module):
             self._publish_results(task, json_results)
 
         finally:
-            if os.path.exists(os.path.join(workdir, 'artifacts')):
-                shutil.rmtree(os.path.join(workdir, 'artifact'))
+            if os.path.exists(os.path.join(workdir, self.option('artifacts-dir'))):
+                shutil.rmtree(os.path.join(workdir, self.option('artifacts-dir')))

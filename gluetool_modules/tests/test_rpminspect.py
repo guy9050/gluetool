@@ -36,6 +36,12 @@ STDOUT = """{
        "waiver authorization": "Not Waivable"
      }
    ],
+   "Payload": [
+     {
+       "result": "OK",
+       "waiver authorization": "Not Waivable"
+     }
+   ],
    "Man pages": [
      {
        "message": "man-message1",
@@ -88,6 +94,27 @@ ANALYSIS_PARSED_STDOUT = [
             "taskid": 111111,
             "type": "brew_build"
         },
+        "outcome": "PASSED",
+        "ref_url": "",
+        "testcase": {
+            "name": "dist.rpminspect.analysis.payload",
+            "ref_url": "",
+            "test_outputs": [
+                {
+                    'result': 'PASSED',
+                    'waiver_authorization': 'Not Waivable'
+                }]
+        }
+    },
+    {
+        "data": {
+            "item": "dummy-nvr",
+            "newnvr": "dummy-nvr",
+            "oldnvr": "dummy-latest",
+            "scratch": False,
+            "taskid": 111111,
+            "type": "brew_build"
+        },
         "outcome": "FAILED",
         "ref_url": "",
         "testcase": {
@@ -116,40 +143,6 @@ ANALYSIS_PARSED_STDOUT = [
                     "waiver_authorization": "Not Waivable"
                 }
             ]
-        }
-    },
-    {
-        "data": {
-            "item": "dummy-nvr",
-            "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
-            "scratch": False,
-            "taskid": 111111,
-            "type": "brew_build"
-        },
-        "outcome": "PASSED",
-        "ref_url": "",
-        "testcase": {
-            "name": "dist.rpminspect.analysis.payload",
-            "ref_url": "",
-            "test_outputs": []
-        }
-    },
-    {
-        "data": {
-            "item": "dummy-nvr",
-            "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
-            "scratch": False,
-            "taskid": 111111,
-            "type": "brew_build"
-        },
-        "outcome": "PASSED",
-        "ref_url": "",
-        "testcase": {
-            "name": "dist.rpminspect.analysis.header_metadata",
-            "ref_url": "",
-            "test_outputs": []
         }
     },
     {
@@ -191,57 +184,6 @@ ANALYSIS_PARSED_STDOUT = [
             ]
         }
     },
-    {
-        "data": {
-            "item": "dummy-nvr",
-            "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
-            "scratch": False,
-            "taskid": 111111,
-            "type": "brew_build"
-        },
-        "outcome": "PASSED",
-        "ref_url": "",
-        "testcase": {
-            "name": "dist.rpminspect.analysis.xml_files",
-            "ref_url": "",
-            "test_outputs": []
-        }
-    },
-    {
-        "data": {
-            "item": "dummy-nvr",
-            "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
-            "scratch": False,
-            "taskid": 111111,
-            "type": "brew_build"
-        },
-        "outcome": "PASSED",
-        "ref_url": "",
-        "testcase": {
-            "name": "dist.rpminspect.analysis.elf_object_properties",
-            "ref_url": "",
-            "test_outputs": []
-        }
-    },
-    {
-        "data": {
-            "item": "dummy-nvr",
-            "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
-            "scratch": False,
-            "taskid": 111111,
-            "type": "brew_build"
-        },
-        "outcome": "PASSED",
-        "ref_url": "",
-        "testcase": {
-            "name": "dist.rpminspect.analysis.desktop_entry_files",
-            "ref_url": "",
-            "test_outputs": []
-        }
-    },
 ]
 
 
@@ -260,6 +202,27 @@ COMPARISON_PARSED_STDOUT = [
         "testcase": {
             "name": "dist.rpminspect.comparison",
             "ref_url": ""
+        }
+    },
+    {
+        "data": {
+            "item": "dummy-nvr dummy-latest",
+            "newnvr": "dummy-nvr",
+            "oldnvr": "dummy-latest",
+            "scratch": False,
+            "taskid": 111111,
+            "type": "brew_build_pair"
+        },
+        "outcome": "PASSED",
+        "ref_url": "",
+        "testcase": {
+            "name": "dist.rpminspect.comparison.payload",
+            "ref_url": "",
+            "test_outputs": [
+                {
+                    'result': 'PASSED',
+                    'waiver_authorization': 'Not Waivable'
+                }]
         }
     },
     {
@@ -310,40 +273,6 @@ COMPARISON_PARSED_STDOUT = [
             "taskid": 111111,
             "type": "brew_build_pair"
         },
-        "outcome": "PASSED",
-        "ref_url": "",
-        "testcase": {
-            "name": "dist.rpminspect.comparison.payload",
-            "ref_url": "",
-            "test_outputs": []
-        }
-    },
-    {
-        "data": {
-            "item": "dummy-nvr dummy-latest",
-            "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
-            "scratch": False,
-            "taskid": 111111,
-            "type": "brew_build_pair"
-        },
-        "outcome": "PASSED",
-        "ref_url": "",
-        "testcase": {
-            "name": "dist.rpminspect.comparison.header_metadata",
-            "ref_url": "",
-            "test_outputs": []
-        }
-    },
-    {
-        "data": {
-            "item": "dummy-nvr dummy-latest",
-            "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
-            "scratch": False,
-            "taskid": 111111,
-            "type": "brew_build_pair"
-        },
         "outcome": "FAILED",
         "ref_url": "",
         "testcase": {
@@ -373,58 +302,7 @@ COMPARISON_PARSED_STDOUT = [
                 }
             ]
         }
-    },
-    {
-        "data": {
-            "item": "dummy-nvr dummy-latest",
-            "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
-            "scratch": False,
-            "taskid": 111111,
-            "type": "brew_build_pair"
-        },
-        "outcome": "PASSED",
-        "ref_url": "",
-        "testcase": {
-            "name": "dist.rpminspect.comparison.xml_files",
-            "ref_url": "",
-            "test_outputs": []
-        }
-    },
-    {
-        "data": {
-            "item": "dummy-nvr dummy-latest",
-            "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
-            "scratch": False,
-            "taskid": 111111,
-            "type": "brew_build_pair"
-        },
-        "outcome": "PASSED",
-        "ref_url": "",
-        "testcase": {
-            "name": "dist.rpminspect.comparison.elf_object_properties",
-            "ref_url": "",
-            "test_outputs": []
-        }
-    },
-    {
-        "data": {
-            "item": "dummy-nvr dummy-latest",
-            "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
-            "scratch": False,
-            "taskid": 111111,
-            "type": "brew_build_pair"
-        },
-        "outcome": "PASSED",
-        "ref_url": "",
-        "testcase": {
-            "name": "dist.rpminspect.comparison.desktop_entry_files",
-            "ref_url": "",
-            "test_outputs": []
-        }
-    },
+    }
 ]
 
 
@@ -438,6 +316,7 @@ def fixture_module(monkeypatch):
     module._config['tests'] = ['ALL']
     module._config['type'] = 'comparison'
     module._config['results-file'] = 'results-file'
+    module._config['artifacts-dir'] = 'artifacts'
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
