@@ -15,11 +15,47 @@ from gluetool import GlueError
 from gluetool.log import format_dict, log_dict
 from gluetool.proxy import Proxy
 from gluetool.result import Result
-from gluetool.utils import wait
+from gluetool.utils import requests, wait
 
 
 DEFAULT_JENKINSAPI_TIMEOUT = 120
 DEFAULT_JENKINSAPI_TIMEOUT_TICK = 30
+
+
+# Our "lazy" wrappers over jenkinsapi classes. When instantiated, Jenkins job representation inside jenkinsapi
+# tries to fetch info for all builds of the job. We are not interested in such information, therefore it's absolutely
+# pointless to torture Jenkins master with a bunch of queries.
+#
+# These classes bundle important info for jobs and builds - mostly their IDs - and also let's us get their jenkinsapi
+# counterparts when necessary.
+
+class JenkinsJob(object):
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, module, job_name):
+        self.module = module
+
+        self.name = job_name
+
+    @property
+    def jenkinsapi(self):
+        return self.module.jenkins(reconnect=True)[self.name]
+
+
+class JenkinsBuild(object):
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, module, job, build_id):
+        self.module = module
+
+        self.job = job
+
+        # pylint: disable=invalid-name
+        self.id = int(build_id)
+
+    @property
+    def jenkinsapi(self):
+        return self.job.jenkinsapi.get_build(self.id)
 
 
 class JenkinsProxy(Proxy):
@@ -128,11 +164,28 @@ class JenkinsProxy(Proxy):
         if not module.dryrun_allows('Invoking a job'):
             return None
 
-        queue_item = self[job_name].invoke(build_params=build_params)
+        # We could use `self[job_name].invoke()` but that `self[job_name]` *will* try to fech info for all
+        # builds of the job - that will stress Jenkins master. It is not necessary.
+        def _invoke():
+            with requests(logger=module.logger) as req:
+                response = req.post(
+                    '{}/job/{}/buildWithParameters'.format(
+                        module.option('url'),
+                        job_name
+                    ),
+                    data=build_params
+                )
+
+            return Result.Ok(response) if response.status_code in (200, 201, 303) else Result.Error(response.reason)
+
+        wait(
+            'invoking Jenkins job',
+            _invoke,
+            timeout=module.option('jenkins-api-timeout'),
+            tick=module.option('jenkins-api-timeout-tick')
+        )
 
         module.info("invoked job '{}' with given parameters".format(job_name))
-
-        return queue_item
 
 
 class CIJenkins(gluetool.Module):
@@ -277,9 +330,11 @@ class CIJenkins(gluetool.Module):
         if not job_name or not build_id:
             raise GlueError("Cannot search for the Jenkins build for '{}:{}'".format(job_name, build_id))
 
-        job = self.jenkins(reconnect=True)[job_name]
-
-        return job.get_build(int(build_id))
+        return JenkinsBuild(
+            self,
+            JenkinsJob(self, job_name),
+            build_id
+        )
 
     def create_jjb_config(self):
         password = self.option('password')
@@ -336,7 +391,7 @@ class CIJenkins(gluetool.Module):
                 response = req.get('{}/job/{}/{}/api/json?pretty=true'.format(
                     self.option('url'),
                     jenkins_build.job.name,
-                    jenkins_build.buildno
+                    jenkins_build.id
                 ))
 
             if response.status_code != 200:
