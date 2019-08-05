@@ -15,7 +15,7 @@ from gluetool import GlueError
 from gluetool.log import format_dict, log_dict
 from gluetool.proxy import Proxy
 from gluetool.result import Result
-from gluetool.utils import requests, wait
+from gluetool.utils import wait
 
 
 DEFAULT_JENKINSAPI_TIMEOUT = 120
@@ -162,27 +162,16 @@ class JenkinsProxy(Proxy):
         log_dict(module.debug, "invoking job '{}'".format(job_name), build_params)
 
         if not module.dryrun_allows('Invoking a job'):
-            return None
+            return
 
         # We could use `self[job_name].invoke()` but that `self[job_name]` *will* try to fech info for all
         # builds of the job - that will stress Jenkins master. It is not necessary.
-        def _invoke():
-            with requests(logger=module.logger) as req:
-                response = req.post(
-                    '{}/job/{}/buildWithParameters'.format(
-                        module.option('url'),
-                        job_name
-                    ),
-                    data=build_params
-                )
-
-            return Result.Ok(response) if response.status_code in (200, 201, 303) else Result.Error(response.reason)
-
-        wait(
-            'invoking Jenkins job',
-            _invoke,
-            timeout=module.option('jenkins-api-timeout'),
-            tick=module.option('jenkins-api-timeout-tick')
+        module.jenkins_rest(
+            '{}/job/{}/buildWithParameters'.format(
+                module.option('url'),
+                job_name
+            ),
+            **build_params
         )
 
         module.info("invoked job '{}' with given parameters".format(job_name))
