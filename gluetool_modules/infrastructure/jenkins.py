@@ -1,6 +1,5 @@
 import base64
 import ConfigParser
-import json
 import os
 import urllib
 import urllib2
@@ -12,7 +11,7 @@ from requests.exceptions import RequestException
 
 import gluetool
 from gluetool import GlueError
-from gluetool.log import format_dict, log_dict
+from gluetool.log import log_dict
 from gluetool.proxy import Proxy
 from gluetool.result import Result
 from gluetool.utils import wait
@@ -171,6 +170,9 @@ class JenkinsProxy(Proxy):
                 module.option('url'),
                 job_name
             ),
+            # 201 is indeed the only expected response, Jenkins reports "201 Created" since a new build is spawned
+            # from this job.
+            accepted_codes=[201],
             **build_params
         )
 
@@ -244,7 +246,7 @@ class CIJenkins(gluetool.Module):
 
         return self._jenkins
 
-    def jenkins_rest(self, url, wait_timeout=None, wait_tick=None, **data):
+    def jenkins_rest(self, url, wait_timeout=None, wait_tick=None, accepted_codes=None, **data):
         """
         Submit request to Jenkins via its http interface.
 
@@ -257,7 +259,9 @@ class CIJenkins(gluetool.Module):
         :returns: (response, resonse-content)
         """
 
-        self.debug("Jenkins REST request: url='{}'\n{}".format(url, format_dict(data)))
+        log_dict(self.debug, 'Jenkins REST request: {}'.format(url), data)
+
+        accepted_codes = accepted_codes or [200]
 
         if url.startswith('/'):
             url = self.option('url') + url
@@ -266,9 +270,19 @@ class CIJenkins(gluetool.Module):
             raise GlueError('Cross-site Jenkins REST request')
 
         if data:
-            data = urllib.urlencode({
-                'json': json.dumps(data)
-            })
+            # filter out names that don't have a value - name exists but value is None, which means "no value"
+            filtered_data = {
+                name: value
+                for name, value in data.iteritems()
+                if value is not None
+            }
+
+            log_dict(self.debug, 'filtered REST data', filtered_data)
+
+            encoded_data = urllib.urlencode(filtered_data)
+
+        else:
+            encoded_data = None
 
         username, password = self.option('username'), self.option('password')
 
@@ -279,22 +293,28 @@ class CIJenkins(gluetool.Module):
             request = urllib2.Request(url)
             base64string = base64.b64encode('{}:{}'.format(username, password))
             request.add_header('Authorization', 'Basic {}'.format(base64string))
-            response = urllib2.urlopen(request, data)
 
         else:
             request = url
 
         def _request():
-            response = urllib2.urlopen(request, data)
-            return Result.Ok(response) if response.getcode() == 200 else Result.Error(response)
+            response = urllib2.urlopen(request, encoded_data)
+
+            code = response.getcode()
+
+            if code not in accepted_codes:
+                return Result.Error(response)
+
+            content = response.read()
+
+            gluetool.log.log_blob(self.debug, 'Jenkins REST response: {}'.format(code), content)
+
+            return Result.Ok((response, content))
 
         timeout = wait_timeout or self.option('jenkins-api-timeout')
         tick = wait_tick or self.option('jenkins-api-timeout-tick')
 
-        response = wait('waiting for Jenkins to respond successfully', _request, timeout=timeout, tick=tick)
-
-        code, content = response.getcode(), response.read()
-        gluetool.log.log_blob(self.debug, 'response: {}'.format(code), content)
+        response, content = wait('waiting for Jenkins to respond successfully', _request, timeout=timeout, tick=tick)
 
         return response, content
 
