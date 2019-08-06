@@ -85,10 +85,12 @@ def test_jenkins_set_build_name(log, module, monkeypatch):
     _, module = module
     jenkins_proxy = JenkinsProxy(MagicMock(), module)
 
-    mocked_urlopen = MagicMock()
-    mocked_urlopen.getcode.return_value = 200
+    mocked_response = MagicMock(status_code=200)
+    mocked_requests = MagicMock(
+        post=MagicMock(return_value=mocked_response)
+    )
 
-    monkeypatch.setattr(urllib2, 'urlopen', MagicMock(return_value=mocked_urlopen))
+    monkeypatch.setattr(gluetool.utils, 'original_requests', mocked_requests)
 
     monkeypatch.setenv('BUILD_URL', '')
     module._config['url'] = 'dummy_jenkins_url'
@@ -110,10 +112,12 @@ def test_jenkins_set_build_name_credentials(log, module, monkeypatch):
 
     jenkins_proxy = JenkinsProxy(MagicMock(), module)
 
-    mocked_urlopen = MagicMock()
-    mocked_urlopen.getcode.return_value = 200
+    mocked_response = MagicMock(status_code=200)
+    mocked_requests = MagicMock(
+        post=MagicMock(return_value=mocked_response)
+    )
 
-    monkeypatch.setattr(urllib2, 'urlopen', MagicMock(return_value=mocked_urlopen))
+    monkeypatch.setattr(gluetool.utils, 'original_requests', mocked_requests)
 
     monkeypatch.setenv('BUILD_URL', '')
     module._config['url'] = 'dummy_jenkins_url'

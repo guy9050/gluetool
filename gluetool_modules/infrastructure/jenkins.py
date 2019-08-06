@@ -1,13 +1,11 @@
-import base64
 import ConfigParser
+import json
 import os
-import urllib
-import urllib2
 import sys
 
 import jq
+import requests
 from jenkinsapi.jenkins import Jenkins
-from requests.exceptions import RequestException
 
 import gluetool
 from gluetool import GlueError
@@ -120,10 +118,14 @@ class JenkinsProxy(Proxy):
 
         description = description or ''
 
-        module.jenkins_rest(build_url + '/configSubmit', **{
-            'displayName': name,
-            'description': description
-        })
+        module.jenkins_rest(
+            '{}/configSubmit'.format(build_url),
+            as_json=True,
+            **{
+                'displayName': name,
+                'description': description
+            }
+        )
 
         module.debug("build name set:\n  name='{}'\n  description='{}'".format(
             name, description))
@@ -246,17 +248,24 @@ class CIJenkins(gluetool.Module):
 
         return self._jenkins
 
-    def jenkins_rest(self, url, wait_timeout=None, wait_tick=None, accepted_codes=None, **data):
+    # pylint: disable=too-many-arguments
+    def jenkins_rest(self, url, wait_timeout=None, wait_tick=None, accepted_codes=None, as_json=False, **data):
         """
         Submit request to Jenkins via its http interface.
 
         :param str url: URL to send request to. Can be absolute, e.g. when
-          caller gets its base from BUILD_URL env var, or relative, starting
-          with '/'. Configured Jenkjins URL is prepended to relative URLS,
-          while absolute URLs must lead to this configured Jenkins instance.
+            caller gets its base from BUILD_URL env var, or relative, starting
+            with '/'. Configured Jenkins URL is prepended to relative URLS,
+            while absolute URLs must lead to this configured Jenkins instance.
+        :param int wait_timeout: if set, overrides value set by ``jenkins-api-timeout`` option. Wait this many
+            seconds before giving up on REST request.
+        :param int wait_tick: if set, overrides value set by ``jenkins-api-timeout-tick`` option. Try submit
+            request after waiting this many seconds.
+        :param list(int) accepted_codes: list of accepted HTTP response codes. If not set, only 200 is accepted.
+        :param bool as_json: if set, ``data`` would be dumped as JSON into a string which would be then submitted
+            as ``json`` field.
         :param dict data: data to submit to the URL.
-        :param int wait_timeout: number of seconds to wait for Jenkins successful response.
-        :returns: (response, resonse-content)
+        :returns: :py:mod:`requests` response object.
         """
 
         log_dict(self.debug, 'Jenkins REST request: {}'.format(url), data)
@@ -269,8 +278,12 @@ class CIJenkins(gluetool.Module):
         elif not url.startswith(self.option('url')):
             raise GlueError('Cross-site Jenkins REST request')
 
+        # We need to filter out data names without any value, and we may need to convert data to JSON string,
+        # depending on the endpoint we're submitting to.
+        filtered_data = None
+        submit_data = None
+
         if data:
-            # filter out names that don't have a value - name exists but value is None, which means "no value"
             filtered_data = {
                 name: value
                 for name, value in data.iteritems()
@@ -279,44 +292,50 @@ class CIJenkins(gluetool.Module):
 
             log_dict(self.debug, 'filtered REST data', filtered_data)
 
-            encoded_data = urllib.urlencode(filtered_data)
+        if filtered_data is not None:
+            # Some forms expect one field, `json`, that contains the actual form data as a string.
+            if as_json:
+                submit_data = {
+                    'json': json.dumps(filtered_data)
+                }
 
-        else:
-            encoded_data = None
+            else:
+                submit_data = filtered_data
 
         username, password = self.option('username'), self.option('password')
+
+        if username or password:
+            auth = requests.auth.HTTPBasicAuth(username, password)
+
+        else:
+            auth = None
 
         if not self.dryrun_allows('Submit REST request to jenkins'):
             return None, None
 
-        if username or password:
-            request = urllib2.Request(url)
-            base64string = base64.b64encode('{}:{}'.format(username, password))
-            request.add_header('Authorization', 'Basic {}'.format(base64string))
+        def _make_request():
+            with gluetool.utils.requests(logger=self.logger) as req:
+                try:
+                    if submit_data is None:
+                        response = req.get(url, auth=auth)
 
-        else:
-            request = url
+                    else:
+                        response = req.post(url, auth=auth, data=submit_data)
 
-        def _request():
-            response = urllib2.urlopen(request, encoded_data)
+                except requests.exceptions.RequestException as exc:
+                    return Result.Error(exc)
 
-            code = response.getcode()
-
-            if code not in accepted_codes:
+            if response.status_code not in accepted_codes:
                 return Result.Error(response)
 
-            content = response.read()
-
-            gluetool.log.log_blob(self.debug, 'Jenkins REST response: {}'.format(code), content)
-
-            return Result.Ok((response, content))
+            return Result.Ok(response)
 
         timeout = wait_timeout or self.option('jenkins-api-timeout')
         tick = wait_tick or self.option('jenkins-api-timeout-tick')
 
-        response, content = wait('waiting for Jenkins to respond successfully', _request, timeout=timeout, tick=tick)
+        response = wait('waiting for Jenkins to respond successfully', _make_request, timeout=timeout, tick=tick)
 
-        return response, content
+        return response
 
     def get_jenkins_build(self, job_name=None, build_id=None):
         """
@@ -501,7 +520,7 @@ class CIJenkins(gluetool.Module):
                               ssl_verify=ssl_verify,
                               timeout=self.option('jenkins-api-timeout'))
 
-        except RequestException as e:
+        except requests.exceptions.RequestException as e:
             self.debug('Connection error: {}'.format(e))
             raise gluetool.GlueError("could not connect to jenkins '{}': {}".format(url, str(e)))
 
