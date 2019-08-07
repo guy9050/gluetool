@@ -6,6 +6,27 @@ All notable changes to this project will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
 
+2019-08-07
+----------
+
+Added
+~~~~~
+
+- [install-mbs-build-execute] add odcs options (jhavlin@redhat.com)
+
+Changed
+~~~~~~~
+
+- Use LoggerMixin instead of logger.connect (mprchlik)
+- [jenkins] refactored jenkins_rest to use requests (mprchlik)
+- [jenkins] small tweaks of jenkins_rest to accept other status codes (mprchlik)
+- [jenkins] use jenkins_rest helper for invoke, instead of yet-another "http request" (mprchlik)
+- [jenkins] "lazy" wrappers over jenkinsapi job and build (mprchlik)
+- [jenkins] add retry for REST API requests (Anna Khaitovich)
+- [rpminspect] enable repos in moduleinfo (Evgeny Fedin)
+- [rpminspect] polishing (Evgeny Fedin)
+
+
 2019-07-26
 ----------
 
