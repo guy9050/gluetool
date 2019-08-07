@@ -145,7 +145,8 @@ def run(result, log, module, monkeypatch, tmpdir):
 
     module._config.update({
         'target_pattern': enabled_target,
-        'config-map': str(baseline_config)
+        'config-map': str(baseline_config),
+        'covscan-task-url-template': 'https://cov01.lab.eng.brq.redhat.com/covscanhub/task/{{ COVSCAN_TASK_ID }}/'
     })
 
     def mocked_urlopen(url):
@@ -233,7 +234,10 @@ def test_invalid_json(monkeypatch, tmpdir):
 
     monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan, 'urlopen', mocked_urlopen)
 
-    result = CovscanResult(MagicMock(task=111), 000)
+    module = MagicMock(task=111)
+    module.option = MagicMock(
+        return_value='https://cov01.lab.eng.brq.redhat.com/covscanhub/task/{{ COVSCAN_TASK_ID }}/')
+    result = CovscanResult(module, 000)
 
     with pytest.raises(CovscanFailedError):
         # pylint: disable=pointless-statement
@@ -259,7 +263,11 @@ def test_fetch_added(monkeypatch, tmpdir):
         return outfile
 
     monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan, 'urlopen', mocked_urlopen)
-    result = CovscanResult(MagicMock(task=111), 000)
+
+    module = MagicMock(task=111)
+    module.option = MagicMock(
+        return_value='https://cov01.lab.eng.brq.redhat.com/covscanhub/task/{{ COVSCAN_TASK_ID }}/')
+    result = CovscanResult(module, 000)
 
     assert result.added == ''
 
@@ -273,7 +281,11 @@ def test_fetch_fixed(monkeypatch, tmpdir):
         return outfile
 
     monkeypatch.setattr(gluetool_modules.static_analysis.covscan.covscan, 'urlopen', mocked_urlopen)
-    result = CovscanResult(MagicMock(task=111), 000)
+
+    module = MagicMock(task=111)
+    module.option = MagicMock(
+        return_value='https://cov01.lab.eng.brq.redhat.com/covscanhub/task/{{ COVSCAN_TASK_ID }}/')
+    result = CovscanResult(module, 000)
 
     assert result.fixed == ''
 
