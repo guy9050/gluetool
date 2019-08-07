@@ -108,7 +108,7 @@ class KojiTask(LoggerMixin, object):
     :param int task_id: Initialize from given Koji task ID.
     :param module: Module that created this task instance.
     :param gluetool.log.ContextLogger logger: logger used for logging
-    :param bool wait_timeout: Wait for task to become non-waiting
+    :param int wait_timeout: Wait this many seconds for task to become non-waiting
 
     :ivar int id: unique ID of the task on the Koji instance.
     """
