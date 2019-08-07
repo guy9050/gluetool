@@ -94,27 +94,6 @@ ANALYSIS_PARSED_STDOUT = [
             "taskid": 111111,
             "type": "brew_build"
         },
-        "outcome": "PASSED",
-        "ref_url": "",
-        "testcase": {
-            "name": "dist.rpminspect.analysis.payload",
-            "ref_url": "",
-            "test_outputs": [
-                {
-                    'result': 'PASSED',
-                    'waiver_authorization': 'Not Waivable'
-                }]
-        }
-    },
-    {
-        "data": {
-            "item": "dummy-nvr",
-            "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
-            "scratch": False,
-            "taskid": 111111,
-            "type": "brew_build"
-        },
         "outcome": "FAILED",
         "ref_url": "",
         "testcase": {
@@ -184,6 +163,27 @@ ANALYSIS_PARSED_STDOUT = [
             ]
         }
     },
+    {
+        "data": {
+            "item": "dummy-nvr",
+            "newnvr": "dummy-nvr",
+            "oldnvr": "dummy-latest",
+            "scratch": False,
+            "taskid": 111111,
+            "type": "brew_build"
+        },
+        "outcome": "PASSED",
+        "ref_url": "",
+        "testcase": {
+            "name": "dist.rpminspect.analysis.payload",
+            "ref_url": "",
+            "test_outputs": [
+                {
+                    'result': 'PASSED',
+                    'waiver_authorization': 'Not Waivable'
+                }]
+        }
+    }
 ]
 
 
@@ -202,27 +202,6 @@ COMPARISON_PARSED_STDOUT = [
         "testcase": {
             "name": "dist.rpminspect.comparison",
             "ref_url": ""
-        }
-    },
-    {
-        "data": {
-            "item": "dummy-nvr dummy-latest",
-            "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
-            "scratch": False,
-            "taskid": 111111,
-            "type": "brew_build_pair"
-        },
-        "outcome": "PASSED",
-        "ref_url": "",
-        "testcase": {
-            "name": "dist.rpminspect.comparison.payload",
-            "ref_url": "",
-            "test_outputs": [
-                {
-                    'result': 'PASSED',
-                    'waiver_authorization': 'Not Waivable'
-                }]
         }
     },
     {
@@ -302,7 +281,28 @@ COMPARISON_PARSED_STDOUT = [
                 }
             ]
         }
-    }
+    },
+    {
+        "data": {
+            "item": "dummy-nvr dummy-latest",
+            "newnvr": "dummy-nvr",
+            "oldnvr": "dummy-latest",
+            "scratch": False,
+            "taskid": 111111,
+            "type": "brew_build_pair"
+        },
+        "outcome": "PASSED",
+        "ref_url": "",
+        "testcase": {
+            "name": "dist.rpminspect.comparison.payload",
+            "ref_url": "",
+            "test_outputs": [
+                {
+                    'result': 'PASSED',
+                    'waiver_authorization': 'Not Waivable'
+                }]
+        }
+    },
 ]
 
 
