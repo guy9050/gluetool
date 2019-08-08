@@ -172,7 +172,12 @@ class KojiTask(LoggerMixin, object):
 
         # wait for task to be in CLOSED state
         # note that this can take some amount of time after it becomes non-waiting
-        wait('waiting for task to be closed', self._check_closed_task, timeout=wait_timeout)
+        wait_result = wait('waiting for task to be finished (closed, canceled or failed)',
+                           self._check_finished_task, timeout=wait_timeout)
+        if wait_result == koji.TASK_STATES['CANCELED']:
+            raise SoftGlueError("Task '{}' was canceled".format(self.id))
+        if wait_result == koji.TASK_STATES['FAILED']:
+            raise SoftGlueError("Task '{}' has failed".format(self.id))
 
         self._assign_build(build_id)
 
@@ -209,17 +214,23 @@ class KojiTask(LoggerMixin, object):
         except AttributeError:
             pass
 
-    def _check_closed_task(self):
+    def _check_finished_task(self):
         """
-        Verify that the task is closed.
+        Verify that the task is finished (closed, canceled or failed).
 
-        :returns: True if task is closed, False otherwise
+        :returns: True if task is closed, canceled or failed, False otherwise
         """
 
         self._flush_task_info()
 
-        if self._task_info['state'] == koji.TASK_STATES['CLOSED']:
-            return Result.Ok(True)
+        final_states = [
+            koji.TASK_STATES['CLOSED'],
+            koji.TASK_STATES['CANCELED'],
+            koji.TASK_STATES['FAILED']
+        ]
+
+        if self._task_info['state'] in final_states:
+            return Result.Ok(self._task_info['state'])
 
         return Result.Error('task is not closed')
 
