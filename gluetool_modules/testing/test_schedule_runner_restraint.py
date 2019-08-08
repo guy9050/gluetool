@@ -196,6 +196,11 @@ class RestraintRunner(gluetool.Module):
                     Not compatible with ``--use-snapshots``.
                     """,
             'default': None
+        },
+        'ignore-avc': {
+            'help': 'Don\'t report task with failed AVC checks as failed. (default: %(default)s',
+            'default': 'no',
+            'metavar': 'yes|no'
         }
     }
 
@@ -218,6 +223,12 @@ class RestraintRunner(gluetool.Module):
         # type: () -> bool
 
         return normalize_bool_option(self.option('on-error-continue'))
+
+    @gluetool.utils.cached_property
+    def ignore_avc(self):
+        # type: () -> bool
+
+        return normalize_bool_option(self.option('ignore-avc'))
 
     def _gather_task_set_results(self, schedule_entry, output):
         # type: (TestScheduleEntry, Any) -> TaskSetResults
@@ -404,6 +415,7 @@ class RestraintRunner(gluetool.Module):
         # Find out what are the results - `restraint` returned back to us, and even with a non-zero
         # exit status, there should be some results to pick up.
         results = self._gather_task_set_results(schedule_entry, output)
+
         _log_task_set_results(schedule_entry, 'task set results', results)
 
         exit_code = output.execution_output.exit_code
@@ -419,9 +431,34 @@ class RestraintRunner(gluetool.Module):
         schedule_entry.debug('restraint exited with invalid exit code {}'.format(exit_code))
 
         if exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_RESULT_ERROR:
-            # "One or more tasks failed" error - this is a good, well behaving error.
-            # We can safely move on and return results we have.
-            schedule_entry.error('One or more tasks failed')
+
+            if self.ignore_avc:
+                # In case no tasks that aren't AVC checks failed we don't want to report it as an error
+
+                def failed(phases):
+                    # type: (List[Dict[str, Any]]) -> bool
+
+                    # returns True if task run result has phases with 'FAIL' result and those phases are not AVC checks,
+                    # since we don't want to report failed AVC checks as a task's overall fail.
+                    # Otherwise returns False.
+                    return any([phase for phase in phases if phase['result'] == 'FAIL' and
+                                not phase['name'].endswith('avc_check')])
+
+                for task in results.tasks:
+                    for task_run in results.tasks[task]:
+                        if failed(task_run.results['bkr_phases']):
+                            schedule_entry.error('One or more tasks failed')
+                            self.shared('trigger_event', 'test-schedule-runner-restraint.task-set.finished',
+                                        schedule_entry=schedule_entry, task_set=task_set,
+                                        output=output, results=results)
+                            return results
+
+                schedule_entry.warning('AVC error(s) found')
+
+            else:
+                # "One or more tasks failed" error - this is a good, well behaving error.
+                # We can safely move on and return results we have.
+                schedule_entry.error('One or more tasks failed')
 
             self.shared('trigger_event', 'test-schedule-runner-restraint.task-set.finished',
                         schedule_entry=schedule_entry, task_set=task_set,
