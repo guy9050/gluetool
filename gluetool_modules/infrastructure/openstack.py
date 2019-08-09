@@ -819,6 +819,7 @@ class OpenstackGuest(NetworkedGuest):
     # "Public" API
     #
 
+    @property
     def supports_snapshots(self):
         return True
 
