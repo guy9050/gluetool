@@ -54,7 +54,7 @@ INSTALL_REQUIRES = [
     "mysql-connector-python==8.0.13",  # mysql
     "packaging==17.1",
     "proton==0.8.8",
-    "psycopg2==2.7.3.1",
+    "psycopg2==2.8.3",
     "pyOpenSSL==17.0.0",
     "pycurl==7.43.0",
     'pymemcache==2.0.0',  # memcache

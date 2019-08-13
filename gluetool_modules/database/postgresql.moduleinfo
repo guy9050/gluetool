@@ -6,4 +6,4 @@ dependencies:
   yum:
     - postgresql
   pip:
-    - psycopg2==2.7.1
+    - psycopg2==2.8.3
