@@ -6,6 +6,21 @@ All notable changes to this project will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
 
+2019-08-13
+----------
+
+Changed
+~~~~~~~
+
+- [ansible] Use guest.username as login for ansible connection (Jakub Haruda)
+- [covscan] Load covscan URL from config (Jakub Haruda)
+
+Fixed
+~~~~~
+
+- [test-schedule-runner-restraint] fix broken check for snapshot support (mprchlik)
+
+
 2019-08-07
 ----------
 
