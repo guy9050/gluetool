@@ -11,6 +11,7 @@ import gluetool
 from gluetool import GlueError
 from gluetool.action import Action
 from gluetool.log import log_blob, log_dict
+from gluetool.utils import dict_update
 
 from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.test_schedule import TestScheduleResult
@@ -210,6 +211,15 @@ sut     ansible_host={} ansible_user=root {}
 
             Action.set_thread_root(current_action)
 
+            variables = dict_update(
+                {},
+                {
+                    'artifacts': artifact_dirpath,
+                    'ansible_ssh_common_args': ' '.join(['-o ' + option for option in schedule_entry.guest.options])
+                },
+                schedule_entry.variables
+            )
+
             # `run_playbook` and log the output to the working directory
             self.shared(
                 'run_playbook',
@@ -219,10 +229,8 @@ sut     ansible_host={} ansible_user=root {}
                 cwd=artifact_dirpath,
                 json_output=False,
                 log_filepath=os.path.join(work_dirpath, STI_ANSIBLE_LOG_FILENAME),
-                variables={
-                    'artifacts': artifact_dirpath,
-                    'ansible_ssh_common_args': ' '.join(['-o ' + option for option in schedule_entry.guest.options])
-                })
+                variables=variables
+            )
 
         # monitor artifact directory
         notify = inotify.adapters.Inotify()

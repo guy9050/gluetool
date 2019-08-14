@@ -2,7 +2,7 @@ import glob
 import os.path
 
 import gluetool
-from gluetool import GlueError
+from gluetool import GlueError, utils
 
 import gluetool_modules
 from gluetool_modules.libs.testing_environment import TestingEnvironment
@@ -16,8 +16,8 @@ from typing import Any, List, Optional  # noqa
 class TestScheduleEntry(BaseTestScheduleEntry):
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, logger, playbook_filepath):
-        # type: (gluetool.log.ContextAdapter, str) -> None
+    def __init__(self, logger, playbook_filepath, variables):
+        # type: (gluetool.log.ContextAdapter, str, dict) -> None
         """
         Test schedule entry, suited for use with STI runners.
 
@@ -36,6 +36,7 @@ class TestScheduleEntry(BaseTestScheduleEntry):
         )
 
         self.playbook_filepath = playbook_filepath
+        self.variables = variables
         self.results = None  # type: Any
 
     def log_entry(self, log_fn=None):
@@ -73,6 +74,12 @@ class TestSchedulerSTI(gluetool.Module):
             'help': 'Use the given ansible playbook(s) for execution, skip dist-git retrieval.',
             'metavar': 'PLAYBOOK',
             'action': 'append'
+        },
+        'playbook-variables': {
+            'help': 'List of comma-separated pairs <variable name>=<variable value> (default: none).',
+            'metavar': 'KEY=VALUE',
+            'action': 'append',
+            'default': []
         }
     }
 
@@ -128,6 +135,21 @@ class TestSchedulerSTI(gluetool.Module):
 
         gluetool.log.log_dict(self.info, 'creating schedule for {} playbooks'.format(len(playbooks)), playbooks)
 
+        playbook_variables = utils.normalize_multistring_option(self.option('playbook-variables'))
+
+        variables = {}
+        context = self.shared('eval_context')
+
+        for variable in playbook_variables:
+            if not variable or '=' not in variable:
+                raise gluetool.GlueError("'{}' is not correct format of variable".format(variable))
+
+            # `maxsplit=1` is optional parameter in Python2 and keyword parameter in Python3
+            # using as optional to work properly in both
+            key, value = variable.split('=', 1)
+
+            variables[key] = gluetool.utils.render_template(value, logger=self.logger, **context)
+
         schedule = TestSchedule()
 
         # For each playbook, architecture and compose, create a schedule entry
@@ -144,7 +166,7 @@ class TestSchedulerSTI(gluetool.Module):
                     continue
 
                 for tec in testing_environment_constraints:
-                    schedule_entry = TestScheduleEntry(gluetool.log.Logging.get_logger(), playbook)
+                    schedule_entry = TestScheduleEntry(gluetool.log.Logging.get_logger(), playbook, variables)
 
                     if tec.arch == tec.ANY:
                         self.warn('STI scheduler does not support open constraints', sentry=True)
