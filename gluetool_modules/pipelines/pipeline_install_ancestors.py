@@ -1,7 +1,7 @@
 import six
 
 import gluetool
-from gluetool.utils import normalize_shell_option, normalize_multistring_option
+from gluetool.utils import normalize_shell_option
 from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath
 
 
@@ -14,8 +14,7 @@ class PipelineInstallAncestors(gluetool.Module):
     from ``primary_task`` component name. Then these component names are used to resolve specific brew
     builds on the given tag specifed by the option ``tag``.
 
-    Guest is setup by `guest-setup` module and by Ansible playbook(s) (specifed by the option ``playbook``).
-    List of primary task rpm urls is passed to the playbook as variable PACKAGE_URLS.
+    Guest is setup by `guest-setup` module.
     """
     name = 'pipeline-install-ancestors'
 
@@ -25,16 +24,10 @@ class PipelineInstallAncestors(gluetool.Module):
         },
         'tag': {
             'help': 'Tag to use when looking up ancestors.'
-        },
-        'playbooks': {
-            'help': 'Path to Ansible playbook(s) to run BEFORE installing the ancestors (default: none).',
-            'default': [],
-            'action': 'append'
         }
     }
 
     shared_functions = ('setup_guest',)
-    required_options = ('playbooks',)
 
     def setup_guest(self, guest, log_dirpath=None, **kwargs):
 
@@ -66,20 +59,6 @@ class PipelineInstallAncestors(gluetool.Module):
         def do_setup_guest(self):
             guest_setup_output.extend(self.shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs))
 
-        playbooks = normalize_multistring_option(self.option('playbooks'))
-        rpm_urls = self.shared('primary_task').rpm_urls
-        rpm_urls = ['"{}"'.format(rpm_url) for rpm_url in rpm_urls]
-
-        def run_playbook(self):
-            # run all playbooks specified
-            for playbook in playbooks:
-                self.shared(
-                    'run_playbook',
-                    playbook,
-                    guest,
-                    variables={'PACKAGE_URLS': '[{}]'.format(','.join(rpm_urls))},
-                )
-
         #
         # Run the installation of the ancestors in a separate pipeline. We are using a separate pipeline
         # so we do not spoil the parent pipeline with the build initialization.
@@ -96,9 +75,6 @@ class PipelineInstallAncestors(gluetool.Module):
             # kick then environment installation preparation according to ancestors build
             gluetool.glue.PipelineStepModule('guest-setup'),
             gluetool.glue.PipelineStepCallback('do_setup_guest', do_setup_guest),
-
-            # run the playbooks before installation
-            gluetool.glue.PipelineStepCallback('run_playbook', run_playbook),
 
             # kick the installation of the ancestors
             gluetool.glue.PipelineStepModule('brew-build-task-params'),
