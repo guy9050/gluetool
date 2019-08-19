@@ -16,6 +16,7 @@ from libci.sentry import PrimaryTaskFingerprintsMixin
 
 import gluetool_modules.libs.artifacts
 import gluetool_modules.libs.test_schedule
+from gluetool_modules.libs.sut_installation import SUTInstallationFailedError
 
 
 REQUIRED_COMMANDS = ['bkr', 'beaker-jobwatch', 'tcms-results']
@@ -26,13 +27,6 @@ DEFAULT_RESERVE_TIME = 24
 
 DEFAULT_FETCH_JOURNAL_TIMEOUT = 300
 DEFAULT_FETCH_JOURNAL_TICK = 15
-
-
-class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
-    def __init__(self, task, installation_logs):
-        super(SUTInstallationFailedError, self).__init__(task, 'SUT installation failed')
-
-        self.installation_logs = installation_logs
 
 
 class BeakerError(PrimaryTaskFingerprintsMixin, GlueError):
@@ -429,4 +423,9 @@ class Beaker(gluetool.Module):
 
         # for an SUT error we need to report a soft error
         if overall_result == 'ERROR':
-            raise SUTInstallationFailedError(self.shared('primary_task'), matrix_url)
+            raise SUTInstallationFailedError(
+                self.shared('primary_task'),
+                None,
+                installation_logs=matrix_url,
+                installation_logs_location=matrix_url
+            )

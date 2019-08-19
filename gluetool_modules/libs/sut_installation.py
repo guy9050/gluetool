@@ -34,8 +34,8 @@ SUTStep = collections.namedtuple('SUTStep', ['label', 'command', 'items', 'ignor
 
 class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
     # pylint: disable=too-many-arguments
-    def __init__(self, task, guest, items=None, reason=None, installation_logs=None):
-        # type: (Any, libci.guest.Guest, Any, Optional[str], Optional[str]) -> None
+    def __init__(self, task, guest, items=None, reason=None, installation_logs=None, installation_logs_location=None):
+        # type: (Any, libci.guest.Guest, Any, Optional[str], Optional[str], Optional[str]) -> None
 
         super(SUTInstallationFailedError, self).__init__(task, 'SUT installation failed')
 
@@ -43,6 +43,7 @@ class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
         self.items = items
         self.reason = reason
         self.installation_logs = installation_logs
+        self.installation_logs_location = installation_logs_location
 
 
 class SUTInstallation(object):
@@ -112,9 +113,9 @@ class SUTInstallation(object):
         if not os.path.exists(self.log_dirpath):
             os.mkdir(self.log_dirpath)
 
-        guest.info('artifact installation logs are in {}'.format(
-            artifacts_location(self.module, self.log_dirpath, logger=guest.logger)
-        ))
+        logs_location = artifacts_location(self.module, self.log_dirpath, logger=guest.logger)
+
+        guest.info('artifact installation logs are in {}'.format(logs_location))
 
         for i, step in enumerate(self.steps):
             guest.info(step.label)
@@ -135,7 +136,8 @@ class SUTInstallation(object):
                         self.primary_task,
                         guest,
                         reason=error_message,
-                        installation_logs=self.log_dirpath
+                        installation_logs=self.log_dirpath,
+                        installation_logs_location=logs_location
                     )
 
             for item in step.items:
@@ -158,14 +160,16 @@ class SUTInstallation(object):
                         guest,
                         items=item,
                         reason=error_message,
-                        installation_logs=self.log_dirpath
+                        installation_logs=self.log_dirpath,
+                        installation_logs_location=logs_location
                     )
 
                 raise SUTInstallationFailedError(
                     self.primary_task,
                     guest,
                     items=item,
-                    installation_logs=self.log_dirpath
+                    installation_logs=self.log_dirpath,
+                    installation_logs_location=logs_location
                 )
 
         guest.info('All packages have been successfully installed')

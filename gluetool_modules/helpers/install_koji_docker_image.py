@@ -116,10 +116,9 @@ class InstallKojiDockerImage(gluetool.Module):
         # output anyway, despite errors. Until that, each guest-setup-like module is responsible
         # for logging location of relevant logs.
         index_filepath = os.path.join(installation_log_dirpath, 'index.html')
+        index_location = artifacts_location(self, index_filepath, logger=guest.logger)
 
-        guest.info('Brew/Koji Docker image installation logs are in {}'.format(
-            artifacts_location(self, index_filepath, logger=guest.logger)
-        ))
+        guest.info('Brew/Koji Docker image installation logs are in {}'.format(index_location))
 
         if output.execution_output.exit_code != 0:
             self.debug('restraint exited with invalid exit code {}'.format(output.execution_output.exit_code))
@@ -127,7 +126,8 @@ class InstallKojiDockerImage(gluetool.Module):
             raise SUTInstallationFailedError(
                 self.shared('primary_task'),
                 guest,
-                installation_logs=index_filepath
+                installation_logs=index_filepath,
+                installation_logs_location=index_location
             )
 
         guest.info('All packages have been successfully installed')

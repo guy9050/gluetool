@@ -314,7 +314,10 @@ def fixture_result_modules(request, notify_email, monkeypatch):
     (
         gluetool_modules.libs.sut_installation.SUTInstallationFailedError,
         (None, None),
-        {'installation_logs': 'some install logs URL'},
+        {
+            'installation_logs': 'some install logs URL',
+            'installation_logs_location': 'some install logs location URL'
+        },
         asset('SUTInstallationFailedError.yaml'),
         {
             'JOB_NAME': 'ci-openstack',
