@@ -651,9 +651,21 @@ class OpenstackGuest(NetworkedGuest):
         self._os_nics = []
         self._os_details = details or {}
 
+        # Initialize logging as early as possible, before we call anything else. Note that this would
+        # yield "[<unknown guest>]" context in log messages, which wouldn't be much helpful. Try to
+        # provide better name, but don't try that hard - if we're initializing from an existing instance,
+        # we simply *do not* have any name at all.
+        self.init_logging(
+            module.logger,
+            name=details.get('name', None) if details else None
+        )
+
         # provision a new instance
         if instance_id is None:
             self._os_name = details['name']
+
+            # re-initialize logging as we know the name by now
+            self.init_logging(module.logger, name=self._os_name)
 
             self._acquire_floating_ip()
             self._acquire_nics()
@@ -661,10 +673,6 @@ class OpenstackGuest(NetworkedGuest):
 
             # we need to wait for an instance to become active before getting IP from network
             if self._os_details.get('network', None):
-
-                # initialize logger early
-                self.init_logging(module.logger, name=self._os_name)
-
                 self._wait_active()
                 self._acquire_network_ip()
 
@@ -679,12 +687,13 @@ class OpenstackGuest(NetworkedGuest):
 
             self._os_instance = self._call_api('servers.find', self._nova.servers.find, id=instance_id)
 
+            self._os_name = self._os_instance.to_dict()['name']
+
+            # re-initialize logging as we know the name by now
+            self.init_logging(module.logger, name=self._os_name)
+
             # we need to wait for an instance to become active before getting IP from network
             if self._os_details.get('network', None):
-
-                # initialize logger early
-                self.init_logging(module.logger, name=self._os_name)
-
                 self._wait_active()
                 self._acquire_network_ip()
 
