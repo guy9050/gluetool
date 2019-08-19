@@ -34,9 +34,7 @@ class PipelineInstallAncestors(gluetool.Module):
         log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
 
         # make sure previous setup_guest methods are called
-        guest_setup_output = self.overloaded_shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs)
-        if guest_setup_output is None:
-            guest_setup_output = []
+        guest_setup_output = self.overloaded_shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs) or []
 
         self.info('installing the ancestor {}'.format(self.shared('primary_task').nvr))
         brew_options = normalize_shell_option(self.option('brew-options'))

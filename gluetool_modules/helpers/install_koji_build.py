@@ -38,7 +38,7 @@ class InstallKojiBuild(gluetool.Module):
         guest_setup_output = []
 
         if not self.option('skip-overloaded-shared'):
-            guest_setup_output = self.overloaded_shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs)
+            guest_setup_output = self.overloaded_shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs) or []
 
         self.info('installing the artifact')
 
