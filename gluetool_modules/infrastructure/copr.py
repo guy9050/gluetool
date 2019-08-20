@@ -132,7 +132,7 @@ class CoprApi(object):
         if result_dir_url == 'UNKNOWN-COPR-RESULT-DIR-URL':
             return None
 
-        result_dir_url = '{}/builder-live.log'.format(result_dir_url)
+        result_dir_url = '{}/builder-live.log.gz'.format(result_dir_url)
         return self._get_text(result_dir_url, 'builder live log', full_url=True)
 
     def _find_in_log(self, regex, build_id, chroot_name):
