@@ -1,5 +1,3 @@
-# pylint: disable=too-many-lines
-
 """
 Guest cache
 -----------
@@ -146,8 +144,6 @@ class BeakerGuest(NetworkedGuest):
 
         # callback for `pattern` command
         def _pattern(instruction, command, argument, context):
-            # pylint: disable=unused-argument
-
             # either a single pattern or a list of patterns
             patterns = [argument] if isinstance(argument, str) else argument
 
@@ -163,8 +159,6 @@ class BeakerGuest(NetworkedGuest):
 
         # callback for `allow-any` command
         def _allow_any(instruction, command, argument, context):
-            # pylint: disable=unused-argument
-
             self.debug('current decision: {}'.format(result['decision']))
             self.debug("matchig service '{}' with allow-any '{}'".format(service, argument))
 
@@ -215,8 +209,6 @@ class BeakerGuest(NetworkedGuest):
         self.info('extended reservation till cca {} UTC ({} hours from now)'.format(use_by, hours))
 
         if not self._is_static and self._module.use_cache:
-            # pylint: disable=protected-access
-
             self._module._touch_dynamic_guest(self, use_by)
 
     def _refresh_reservation(self):
@@ -314,7 +306,6 @@ class BeakerGuest(NetworkedGuest):
         if self._is_static:
             return
 
-        # pylint: disable=protected-access
         self._module._release_dynamic_guest(self)
 
 
@@ -431,7 +422,6 @@ class BeakerProvisioner(gluetool.Module):
                 'help': 'Mapping of services which are allowed to be degraded while checking boot process status.'
             },
             'activation-timeout': {
-                # pylint: disable=line-too-long
                 'help': 'Wait SECOND for a guest to become reachable over network (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_ACTIVATION_TIMEOUT,
@@ -444,7 +434,6 @@ class BeakerProvisioner(gluetool.Module):
                 'metavar': 'SECONDS'
             },
             'boot-timeout': {
-                # pylint: disable=line-too-long
                 'help': 'Wait SECONDS for a guest to finish its booting process (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_BOOT_TIMEOUT,
@@ -623,7 +612,6 @@ class BeakerProvisioner(gluetool.Module):
         return '/'.join(args)
 
     def _grab_guest_by_fqdn(self, cache, environment, fqdn, ignore_used=False, ignore_use_by=False):
-        # pylint: disable=too-many-arguments,too-many-return-statements
         """
         Try to grab one specific guest from the cache.
 
@@ -968,7 +956,6 @@ class BeakerProvisioner(gluetool.Module):
         self._destroy_dynamic_guest(guest)
 
     def _destroy_dynamic_guest(self, guest):
-        # pylint: disable=no-self-use
         """
         Return the guest back to Beaker pool.
 
@@ -1014,8 +1001,6 @@ class BeakerProvisioner(gluetool.Module):
                 self.debug('  incompatible architecture')
                 continue
 
-            # `arch` is valid keyword arg, but pylint doesn't agree... no idea why
-            # pylint: disable=unexpected-keyword-arg
             guest = BeakerGuest(self, guest_def.fqdn,
                                 environment=environment, is_static=True,
                                 name=guest_def.fqdn,
@@ -1028,7 +1013,6 @@ class BeakerProvisioner(gluetool.Module):
         return guests
 
     def provision(self, environment, **kwargs):
-        # pylint: disable=unused-argument
         """
         Provision (possibly multiple) guests backed by Beaker machines.
 
@@ -1052,7 +1036,6 @@ class BeakerProvisioner(gluetool.Module):
         self.debug('waiting for guests to become alive')
 
         for guest in guests:
-            # pylint: disable=protected-access
             # guest is already running, check its status before moving on
             guest._wait_alive()
             guest.start_reservation_refresh()
@@ -1154,17 +1137,14 @@ class BeakerProvisioner(gluetool.Module):
         self.info('Pinging guest {} {}'.format(guest.name, guest.environment))
 
         try:
-            # pylint: disable=protected-access
             guest._wait_alive()
 
-        # pylint: disable=broad-except
         except Exception as exc:
             guest.error('Failed to respond: {}'.format(exc))
 
         else:
             guest.info('Alive and feeling well!')
 
-            # pylint: disable=protected-access
             guest._extend_reservation()
 
         self._release_dynamic_guest_to_cache(guest)

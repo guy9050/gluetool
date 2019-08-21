@@ -68,7 +68,6 @@ class PostgreSQL(gluetool.Module):
         return self._connection
 
     def db_cursor(self, cursor_factory=NamedTupleCursor, **kwargs):
-        # pylint: disable=unused-argument
         """
         Return :py:class:`psycopg2.connection.cursor` instance.
 

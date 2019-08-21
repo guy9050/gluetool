@@ -11,7 +11,6 @@ from gluetool_modules.libs import ANY
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from typing import TYPE_CHECKING, cast, Any, Dict, List  # noqa
 
 if TYPE_CHECKING:
@@ -34,18 +33,18 @@ class NoTestableArtifactsError(libci.sentry.PrimaryTaskFingerprintsMixin, SoftGl
     def __init__(self, task, supported_arches):
         # type: (Any, List[str]) -> None
 
-        # pylint: disable=line-too-long
         self.task_arches = task.task_arches.arches
         self.supported_arches = supported_arches
 
-        message = 'Task does not have any testable artifact - {} arches are not supported'.format(', '.join(self.task_arches))  # Ignore PEP8Bear
+        message = 'Task does not have any testable artifact - {} arches are not supported'.format(
+            ', '.join(self.task_arches)
+        )
 
         super(NoTestableArtifactsError, self).__init__(task, message)
 
     @property
     def submit_to_sentry(self):
         # type: () -> bool
-        # pylint: disable=no-self-use
         return False
 
 
@@ -70,7 +69,6 @@ class TestScheduler(gluetool.Module):
     name = 'test-scheduler'
     description = 'Prepares "test schedule" for other modules to perform.'
 
-    # pylint: disable=gluetool-option-hard-default
     options = {
         'arch-compatibility-map': {
             'help': """
@@ -111,7 +109,6 @@ class TestScheduler(gluetool.Module):
 
     def execute(self):
         # type: () -> None
-        # pylint: disable=too-many-statements
 
         self.require_shared('create_test_schedule', 'provisioner_capabilities')
 

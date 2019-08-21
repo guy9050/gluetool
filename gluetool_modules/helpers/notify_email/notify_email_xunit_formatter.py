@@ -95,7 +95,6 @@ class NotifyEmailxUnitFormatter(gluetool.Module):
             'FAILS': fails_body
         })
 
-    # pylint: disable=invalid-name
     def notify_email_xunit_formatter(self, notify_email, result, message):
         """
         Format message to represent the Beaker result. Updates body of given message.

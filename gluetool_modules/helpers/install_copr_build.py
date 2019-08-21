@@ -5,6 +5,10 @@ from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput
 from gluetool_modules.libs.sut_installation import SUTInstallation
 
+# Type annotations
+from typing import Any, List, Optional  # Ignore PyUnusedCodeBear
+from libci.guest import Guest
+
 
 class InstallCoprBuild(gluetool.Module):
     """

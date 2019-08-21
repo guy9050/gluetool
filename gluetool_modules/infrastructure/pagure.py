@@ -46,8 +46,6 @@ class PullRequestID(object):
     '[repository_name]:[repository_pr_id]:[comment_id]'
     """
 
-    # pylint: disable=too-few-public-methods
-
     def __init__(self, repository_name, repository_pr_id, comment_id=None):
         self.repository_name = repository_name
         self.repository_pr_id = repository_pr_id
@@ -64,11 +62,7 @@ class PullRequestID(object):
 
 
 class PagureProject(object):
-    # pylint: disable=too-few-public-methods
-
     def __init__(self, module, full_name):
-        # pylint: disable=invalid-name
-
         self.module = module
         self.logger = module.logger
 
@@ -82,13 +76,9 @@ class PagureProject(object):
 
 
 class PagurePullRequest(object):
-    # pylint: disable=too-few-public-methods
-
     ARTIFACT_NAMESPACE = 'dist-git-pr'
 
     def __init__(self, module, pull_request_id):
-        # pylint: disable=invalid-name
-
         self.module = module
         self.logger = module.logger
 
@@ -168,7 +158,6 @@ class Pagure(gluetool.Module):
 
     @property
     def eval_context(self):
-        # pylint: disable=unused-variable
         __content__ = {  # noqa
             'ARTIFACT_TYPE': """
                              Type of the artifact, ``dist-git-pr`` in the case of ``pagure`` module.

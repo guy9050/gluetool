@@ -24,7 +24,6 @@ MBS_INFO = {
     "context": "b09eea91",
     "id": 2178,
     "koji_tag": "module-rust-toolset-rhel8-820181105234334-b09eea91",
-    # pylint: disable=line-too-long
     "modulemd": "---\ndocument: modulemd\nversion: 2\ndata:\n  name: rust-toolset\n  stream: rhel8\n  version: 820181105234334\n  context: b09eea91\n  summary: Rust\n  description: >-\n    Rust Toolset\n  license:\n    module:\n    - MIT\n  xmd:\n    mbs:\n      scmurl: git://pkgs.devel.redhat.com/modules/rust-toolset?#7981ffe74ef8badda5dfcc5407fb2d9a84af0d62\n      buildrequires:\n        platform:\n          stream: el8\n          filtered_rpms: []\n          version: 2\n          koji_tag: module-rhel-8.0.0-build\n          context: 00000000\n          ref: virtual\n        llvm-toolset:\n          stream: rhel8\n          filtered_rpms: []\n          version: 820181030213659\n          koji_tag: module-llvm-toolset-rhel8-820181030213659-9edba152\n          context: 9edba152\n          ref: 32f47423126c0c2cc8b3cb0d3711da2b6999c9aa\n        rust-toolset:\n          stream: rhel8\n          filtered_rpms: []\n          version: 820181105191008\n          koji_tag: module-rust-toolset-rhel8-820181105191008-b09eea91\n          context: b09eea91\n          ref: 14bbba9cd56090bb4cb350cebaeebd6804abdd6d\n      mse: TRUE\n      rpms:\n        cargo-vendor:\n          ref: bac28fbd3452f187aa2c154e604898c0cef32437\n        rust:\n          ref: 13df2ea8a6f55619da6c030e4452f0170fcd3530\n        rust-toolset:\n          ref: fc700a92b0484d05ccb70e7f0de0bc4891c48efd\n      commit: 7981ffe74ef8badda5dfcc5407fb2d9a84af0d62\n  dependencies:\n  - buildrequires:\n      llvm-toolset: [rhel8]\n      platform: [el8]\n      rust-toolset: [rhel8]\n    requires:\n      llvm-toolset: [rhel8]\n      platform: [el8]\n  profiles:\n    default:\n      rpms:\n      - rust-toolset\n  api:\n    rpms:\n    - cargo\n    - cargo-doc\n    - cargo-vendor\n    - rls-preview\n    - rust\n    - rust-analysis\n    - rust-doc\n    - rust-gdb\n    - rust-lldb\n    - rust-src\n    - rust-std-static\n    - rustfmt-preview\n  components:\n    rpms:\n      cargo-vendor:\n        rationale: Tool for bundling Rust dependencies\n        repository: git://pkgs.devel.redhat.com/rpms/cargo-vendor\n        cache: http://pkgs.devel.redhat.com/repo/pkgs/cargo-vendor\n        ref: stream-rhel-8\n        buildorder: 1\n        arches: [aarch64, i686, ppc64le, s390x, x86_64]\n      rust:\n        rationale: Rust compiler and tools\n        repository: git://pkgs.devel.redhat.com/rpms/rust\n        cache: http://pkgs.devel.redhat.com/repo/pkgs/rust\n        ref: stream-rhel-8\n        arches: [aarch64, i686, ppc64le, s390x, x86_64]\n      rust-toolset:\n        rationale: Meta package for rust-toolset.\n        repository: git://pkgs.devel.redhat.com/rpms/rust-toolset\n        cache: http://pkgs.devel.redhat.com/repo/pkgs/rust-toolset\n        ref: stream-rhel-8\n        arches: [aarch64, i686, ppc64le, s390x, x86_64]\n...\n",  # Ignore PEP8Bear
     "name": "rust-toolset",
     "owner": "jistone",
@@ -87,9 +86,7 @@ def fixture_module(root_action):
 
 @pytest.fixture(name='tags')
 def fixture_tags(monkeypatch, module):
-    # pylint: disable=too-few-public-methods
     class KojiSession(object):
-        # pylint: disable=invalid-name,no-self-use,unused-argument
         def listTags(self, tag):
             return [
                 {'name': 'tag1'},
@@ -126,7 +123,6 @@ def fixture_get(monkeypatch):
 
         # NSVC search - no scm url
         elif location.startswith('None/module-build-service/1/module-builds/?context=no-scm-url'):
-            # pylint: disable=line-too-long
             MBS_INFO['scmurl'] = 'nourl'
             response.json.return_value = {'items': [MBS_INFO]}
 
@@ -139,17 +135,13 @@ def test_loadable(module):
     check_loadable(module.glue, 'gluetool_modules/infrastructure/mbs.py', 'MBS')
 
 
-# pylint: disable=unused-argument
 def test_invalid_nvr(module, get, tags):
-    # pylint: disable=protected-access
     module._config['nvr'] = ['virt-rhel-8-20190107132853:9edba152']
     with pytest.raises(gluetool.GlueError, match="'virt-rhel-8-20190107132853:9edba152' is not a valid module nvr"):
         module.execute()
 
 
-# pylint: disable=unused-argument
 def test_invalid_nsvc(module, get, tags):
-    # pylint: disable=protected-access
     module._config['nsvc'] = ['virt-rhel-8-20190107132853:9edba152']
     with pytest.raises(gluetool.GlueError, match="'virt-rhel-8-20190107132853:9edba152' is not a valid module nsvc"):
         module.execute()
@@ -162,23 +154,16 @@ def test_invalid_url(module, monkeypatch):
         module.execute()
 
 
-# pylint: disable=unused-argument
 def test_nsvc_not_found(module, get, tags):
-    # pylint: disable=protected-access
     module._config['nsvc'] = ['rust-toolset:rhel8:820181105234334:invalid']
 
-    # pylint: disable=line-too-long
     with pytest.raises(gluetool.GlueError, match="Could not find module with nsvc 'rust-toolset:rhel8:820181105234334:invalid'"):  # Ignore PEP8Bear
         module.execute()
 
 
-# pylint: disable=unused-argument
 def test_execute(module, tags, get):
-    # pylint: disable=protected-access
     module._config['build-id'] = ['2178', '2178']
-    # pylint: disable=protected-access
     module._config['nsvc'] = ['rust-toolset:rhel8:820181105234334:b09eea91']
-    # pylint: disable=protected-access
     module._config['nvr'] = ['rust-toolset-rhel8-820181105234334.b09eea91']
 
     assert module.eval_context == {}
@@ -215,7 +200,6 @@ def test_execute(module, tags, get):
 
 
 def test_scratch_build(module, get, tags):
-    # pylint: disable=protected-access
     module._config['nsvc'] = ['rust-toolset:rhel8:820181105234334:b09eea91']
 
     MBS_INFO['scratch'] = True
@@ -225,7 +209,6 @@ def test_scratch_build(module, get, tags):
     assert module.primary_task().nvr == 'rust-toolset-rhel8-820181105234334.b09eea91+2178'
 
 
-# pylint: disable=unused-argument
 def test_shared(module, get, tags):
     module.tasks(build_ids=['2178'])
 
@@ -246,11 +229,9 @@ def test_nsvc_from_nvr(nvr, nsvc):
 
 
 def test_no_dependencies(module, monkeypatch, get, tags):
-    # pylint: disable=protected-access
     module._config['nsvc'] = ['rust-toolset:rhel8:820181105234334:b09eea91']
 
     # remove dependencies from modulemd
-    # pylint: disable=line-too-long
     MBS_INFO['modulemd'] = "---\ndocument: modulemd\nversion: 2\ndata:\n  name: rust-toolset\n  stream: rhel8\n  version: 820181105234334\n  context: b09eea91\n  summary: Rust\n  description: >-\n    Rust Toolset\n  license:\n    module:\n    - MIT\n  xmd:\n    mbs:\n      scmurl: git://pkgs.devel.redhat.com/modules/rust-toolset?#7981ffe74ef8badda5dfcc5407fb2d9a84af0d62\n      buildrequires:\n        platform:\n          stream: el8\n          filtered_rpms: []\n          version: 2\n          koji_tag: module-rhel-8.0.0-build\n          context: 00000000\n          ref: virtual\n        llvm-toolset:\n          stream: rhel8\n          filtered_rpms: []\n          version: 820181030213659\n          koji_tag: module-llvm-toolset-rhel8-820181030213659-9edba152\n          context: 9edba152\n          ref: 32f47423126c0c2cc8b3cb0d3711da2b6999c9aa\n        rust-toolset:\n          stream: rhel8\n          filtered_rpms: []\n          version: 820181105191008\n          koji_tag: module-rust-toolset-rhel8-820181105191008-b09eea91\n          context: b09eea91\n          ref: 14bbba9cd56090bb4cb350cebaeebd6804abdd6d\n      mse: TRUE\n      rpms:\n        cargo-vendor:\n          ref: bac28fbd3452f187aa2c154e604898c0cef32437\n        rust:\n          ref: 13df2ea8a6f55619da6c030e4452f0170fcd3530\n        rust-toolset:\n          ref: fc700a92b0484d05ccb70e7f0de0bc4891c48efd\n      commit: 7981ffe74ef8badda5dfcc5407fb2d9a84af0d62\n  dependencies:\n  - buildrequires:\n      llvm-toolset: [rhel8]\n      platform: [el8]\n      rust-toolset: [rhel8]\n  profiles:\n    default:\n      rpms:\n      - rust-toolset\n  api:\n    rpms:\n    - cargo\n    - cargo-doc\n    - cargo-vendor\n    - rls-preview\n    - rust\n    - rust-analysis\n    - rust-doc\n    - rust-gdb\n    - rust-lldb\n    - rust-src\n    - rust-std-static\n    - rustfmt-preview\n  components:\n    rpms:\n      cargo-vendor:\n        rationale: Tool for bundling Rust dependencies\n        repository: git://pkgs.devel.redhat.com/rpms/cargo-vendor\n        cache: http://pkgs.devel.redhat.com/repo/pkgs/cargo-vendor\n        ref: stream-rhel-8\n        buildorder: 1\n        arches: [aarch64, i686, ppc64le, s390x, x86_64]\n      rust:\n        rationale: Rust compiler and tools\n        repository: git://pkgs.devel.redhat.com/rpms/rust\n        cache: http://pkgs.devel.redhat.com/repo/pkgs/rust\n        ref: stream-rhel-8\n        arches: [aarch64, i686, ppc64le, s390x, x86_64]\n      rust-toolset:\n        rationale: Meta package for rust-toolset.\n        repository: git://pkgs.devel.redhat.com/rpms/rust-toolset\n        cache: http://pkgs.devel.redhat.com/repo/pkgs/rust-toolset\n        ref: stream-rhel-8\n        arches: [aarch64, i686, ppc64le, s390x, x86_64]\n...\n"  # Ignore PEP8Bear
 
     module.execute()
@@ -260,7 +241,6 @@ def test_no_dependencies(module, monkeypatch, get, tags):
 
 
 def test_no_scm_url(module, get, tags):
-    # pylint: disable=protected-access
     module._config['nsvc'] = ['rust-toolset:rhel8:820181105234334:no-scm-url']
 
     module.execute()
@@ -269,7 +249,6 @@ def test_no_scm_url(module, get, tags):
 
 
 def test_no_platform_stream(module, get, tags):
-    # pylint: disable=protected-access
     module._config['nsvc'] = ['rust-toolset:rhel8:820181105234334:b09eea91']
 
     # make moduleinfo empty
@@ -281,7 +260,6 @@ def test_no_platform_stream(module, get, tags):
 
 # NOTE: MUST BE RUN AS LAST, AS IT REMOVES A KEY FROM MBS_INFO
 def test_nsvc_no_modulemd(module, get, tags):
-    # pylint: disable=protected-access
     module._config['nsvc'] = ['rust-toolset:rhel8:820181105234334:no-modulemd']
 
     with pytest.raises(gluetool.GlueError, match="Artifact build info does not include modulemd document"):

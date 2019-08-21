@@ -5,20 +5,17 @@ from gluetool import SoftGlueError
 from gluetool.log import log_dict, log_blob, LoggingFunctionType
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
-# pylint: disable=no-name-in-module
 from jq import jq
 
 from .artifacts import artifacts_location
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from typing import TYPE_CHECKING, cast, Any, Dict, List, Tuple, Union, Optional, Callable  # noqa
 
 if TYPE_CHECKING:
     import libci.guest # noqa
 
 #: Step callback type
-# pylint: disable=invalid-name
 StepCallbackType = Callable[[str, gluetool.utils.ProcessOutput], None]
 
 #: Describes one command used to SUT installtion
@@ -33,7 +30,6 @@ SUTStep = collections.namedtuple('SUTStep', ['label', 'command', 'items', 'ignor
 
 
 class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
-    # pylint: disable=too-many-arguments
     def __init__(self, task, guest, items=None, reason=None, installation_logs=None, installation_logs_location=None):
         # type: (Any, libci.guest.Guest, Any, Optional[str], Optional[str], Optional[str]) -> None
 
@@ -58,7 +54,6 @@ class SUTInstallation(object):
         self.logger = logger or gluetool.log.Logging.get_logger()
 
     def add_step(self, label, command, items=None, ignore_exception=False, callback=None):
-        # pylint: disable=too-many-arguments
         # type: (str, str, Union[Optional[str], Optional[List[str]]], bool, Optional[StepCallbackType]) -> None
 
         if not items:
@@ -92,7 +87,6 @@ class SUTInstallation(object):
                 error_message = callback(command, output)
 
             with open(log_filepath, 'a') as log_file:
-                # pylint: disable=unused-argument
                 def write_cover(text, **kwargs):
                     # type: (str) -> None
                     assert log_file is not None

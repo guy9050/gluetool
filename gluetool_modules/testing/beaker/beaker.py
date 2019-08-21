@@ -44,8 +44,6 @@ class BeakerJobwatchError(PrimaryTaskFingerprintsMixin, SoftGlueError):
 
 
 class BeakerTestResult(TestResult):
-    # pylint: disable=too-few-public-methods
-
     def __init__(self, glue, overall_result, matrix_url, **kwargs):
         urls = kwargs.pop('urls', {})
         urls['beaker_matrix'] = matrix_url
@@ -148,8 +146,6 @@ class Beaker(gluetool.Module):
         return load_yaml(self.option('critical-tasks-list'))
 
     def sanity(self):
-        # pylint: disable=too-many-statements
-
         utils.check_for_commands(REQUIRED_COMMANDS)
 
         for path in TCMS_RESULTS_LOCATIONS:
@@ -171,15 +167,12 @@ class Beaker(gluetool.Module):
         processed_results = self._processed_results = collections.OrderedDict()
 
         class TaskAggregator(tcms_results.TaskAggregator):
-            # pylint: disable=too-few-public-methods
-
             """
             This class makes use of tcms-result's unique gift of parsing and processing
             of beaker data, and simply observes and stores processed data, to let us
             simply store the gathered data and present them to the world.
             """
 
-            # pylint: disable=invalid-name
             def recordResult(self, task, caserun):
                 """
                 Overrides original method that does the actual processing of results.
@@ -256,8 +249,6 @@ class Beaker(gluetool.Module):
         tcms_results.TaskAggregator = TaskAggregator
 
     def _reuse_job(self, job_id):
-        # pylint: disable=no-self-use
-
         try:
             output = Command(['bkr', 'job-clone', '--dryrun', '--xml', 'J:{}'.format(job_id)], logger=self.logger).run()
 
@@ -267,7 +258,6 @@ class Beaker(gluetool.Module):
         return [(bs4.BeautifulSoup(output.stdout, 'xml'), [job_id])]
 
     def _run_wow(self):
-        # pylint: disable=too-many-statements
         """
         Create Beaker jobs XMLs for allowed distros.
 
@@ -342,8 +332,6 @@ class Beaker(gluetool.Module):
         # control all we can do is to flush stdout and stderr before doing any more logging from our code, to
         # avoid having tcms-results' output messing with our messages.
         def _flush_stdouts(*args, **kwargs):
-            # pylint: disable=unused-argument
-
             sys.stdout.flush()
             sys.stderr.flush()
 
@@ -406,10 +394,11 @@ class Beaker(gluetool.Module):
         # Pick all job IDs returned by wow invocation, merge them into a single list,
         # and insert them into a URL.
 
-        # pylint: disable=line-too-long
-        self.info('Initial Beaker matrix: https://beaker.engineering.redhat.com/matrix/?toggle_nacks_on=on&job_ids={}'.format(
-            '+'.join([str(job_id) for job_id in sum([job_ids for _, job_ids in jobs], [])])
-        ))
+        self.info(
+            'Initial Beaker matrix: https://beaker.engineering.redhat.com/matrix/?toggle_nacks_on=on&job_ids={}'.format(
+                '+'.join([str(job_id) for job_id in sum([job_ids for _, job_ids in jobs], [])])
+            )
+            )
 
         # beaker-jobwatch
         _, matrix_url = self._run_jobwatch(jobs)

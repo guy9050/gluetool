@@ -10,7 +10,6 @@ from gluetool.log import log_dict
 from libci.results import TestResult, publish_result
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
 from typing import cast, Any, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa
 
 # map RPMinspect test score to resultsdb 2.0 API outcome states
@@ -38,7 +37,6 @@ class RpminspectTestResult(TestResult):
     :param str test_type: one of 'analysis', 'comparison'
     :param str overall_result: general result of a test
     """
-    # pylint: disable=too-few-public-methods
 
     def __init__(self, glue, test_type, overall_result, **kwargs):
         # type: (gluetool.glue.Glue, str, str, **Any) -> None
@@ -91,7 +89,6 @@ class RpminspectSkippedTestResult(TestResult):
     """
     RPMinspect test result data container for a skipped test result
     """
-    # pylint: disable=too-few-public-methods
 
     def __init__(self, glue, **kwargs):
         # type: (gluetool.glue.Glue, **Any) -> None
@@ -115,8 +112,10 @@ class CIRpminspect(gluetool.Module):
             'default': 'comparison'
         },
         'tests': {
-            # pylint: disable=line-too-long
-            'help': 'List of tests to perform. If nothing is set, all tests would run. Run `rpminspect -l` to find out a list of all available types of tests  (default: ALL)',
+            'help': """
+                    List of tests to perform. If nothing is set, all tests would run. Run `rpminspect -l`
+                    to find out a list of all available types of tests  (default: ALL)
+                    """,
             'metavar': 'TESTS',
             'action': 'append',
             'default': []
@@ -267,7 +266,6 @@ class CIRpminspect(gluetool.Module):
             for test_name, test_info in data.iteritems():
 
                 # Return the worst result from test
-                # pylint: disable=cell-var-from-loop
                 def _outcome():
                     # type: () -> str
                     if not test_info:
@@ -277,7 +275,6 @@ class CIRpminspect(gluetool.Module):
                         max([RPMINSPECT_SCORE[test_entry['result']] for test_entry in test_info])
                     ]
 
-                # pylint: disable=cell-var-from-loop
                 def _test_outputs():
                     # type: () -> List[Dict[str, str]]
                     test_outputs = []
@@ -332,7 +329,6 @@ class CIRpminspect(gluetool.Module):
         publish_result(self, RpminspectTestResult, self.option('type'), overall_result, payload=payload)
 
     def rpminspect_xunit_serialize(self, test_suite, result):
-        # pylint: disable=no-self-use
         # type: (Any, Any, Any) -> Any
 
         if not result.payload:

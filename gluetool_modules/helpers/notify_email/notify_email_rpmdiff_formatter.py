@@ -51,6 +51,5 @@ class NotifyEmailRPMdiffFormatter(gluetool.Module):
             'RESULT': result
         })
 
-    # pylint: disable=invalid-name
     notify_email_rpmdiff_analysis_formatter = _notify_email_rpmdiff_formatter
     notify_email_rpmdiff_comparison_formatter = _notify_email_rpmdiff_formatter

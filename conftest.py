@@ -1,4 +1,3 @@
-# pylint: disable=unused-import
 import mock
 import pytest
 

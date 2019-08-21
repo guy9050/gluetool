@@ -1,5 +1,3 @@
-# pylint: skip-file
-
 import gluetool
 
 import mysql.connector
@@ -62,7 +60,6 @@ class MySQL(gluetool.Module):
         return self._connection
 
     def db_cursor(self, **kwargs):
-        # pylint: disable=unused-argument
         """
         Return a database cursor.
 

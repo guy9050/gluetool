@@ -12,7 +12,6 @@ import gluetool_modules
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
 from typing import cast, Any, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa
 
 
@@ -483,7 +482,6 @@ class GuessEnvironment(gluetool.Module):
 
     def _guess_force(self, source):
         # type: (Dict[str, Union[str, List[str]]]) -> None
-        # pylint: disable=no-self-use
         if source['type'] == 'distro':
             source['result'] = [s.strip() for s in source['specification']]
 
@@ -647,8 +645,6 @@ class GuessEnvironment(gluetool.Module):
         def _add_new_environment(arch, compose, context):
             # type: (str, str, Dict[str, Any])
 
-            # pylint: disable=unused-argument
-
             environment = TestingEnvironment(arch=arch, compose=render_template(compose, **context))
 
             self.debug('adding environment: {}'.format(environment))
@@ -656,16 +652,12 @@ class GuessEnvironment(gluetool.Module):
             output_constraints.append(environment)
 
         def _add_note(instruction, command, argument, context):
-            # pylint: disable=unused-argument
-
             if 'text' not in argument:
                 raise GlueError('Note text is not set')
 
             self.shared('add_note', argument['text'], level=argument.get('level', logging.INFO))
 
         def _add_environment(instruction, command, argument, context):
-            # pylint: disable=unused-argument
-
             if isinstance(argument, dict):
                 argument = [argument]
 
@@ -679,8 +671,6 @@ class GuessEnvironment(gluetool.Module):
                 _add_new_environment(environment['arch'], environment['compose'], context)
 
         def _remove_environment(instruction, command, argument, context):
-            # pylint: disable=unused-argument
-
             current_environment = context['ENVIRONMENT']
 
             self.debug('removing environment: {}'.format(current_environment))
@@ -688,8 +678,6 @@ class GuessEnvironment(gluetool.Module):
             output_constraints.remove(current_environment)
 
         def _set_compose(instruction, command, argument, context):
-            # pylint: disable=unused-argument
-
             current_environment = context['ENVIRONMENT']
 
             if isinstance(argument, str):

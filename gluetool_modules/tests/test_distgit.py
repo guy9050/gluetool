@@ -29,7 +29,6 @@ def test_sanity_shared(module):
 
 @pytest.mark.parametrize('method', ['artifact', 'force'])
 def test_sanity_missing_required_options(module, method):
-    # pylint: disable=protected-access
     module._config['method'] = method
 
     with pytest.raises(gluetool.utils.IncompatibleOptionsError,
@@ -42,7 +41,6 @@ def test_missing_primary_task(module):
 
 
 def test_force(monkeypatch, module):
-    # pylint: disable=protected-access
     module._config['method'] = 'force'
 
     mock_task = MagicMock(component='some-component')
@@ -53,7 +51,6 @@ def test_force(monkeypatch, module):
         'eval_context': {}
     })
 
-    # pylint: disable=protected-access
     with pytest.raises(gluetool.glue.GlueError,
                        match="Could not acquire dist-git clone URL"):
         module.execute()
@@ -80,7 +77,6 @@ def test_force(monkeypatch, module):
 
 
 def test_artifact(monkeypatch, module):
-    # pylint: disable=protected-access
     module._config['method'] = 'artifact'
 
     mock_task = MagicMock(component='some-component')
@@ -119,7 +115,6 @@ def test_repr(module, dummy_repository):
     assert dummy_repository.__repr__() == '<DistGitRepository(package="some-package", branch="some-branch")>'
 
 
-# pylint: disable=no-init,too-few-public-methods
 class MockRequests(object):
     status_code = 200
     response = '# recipients: batman, robin\ndata'

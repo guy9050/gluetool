@@ -11,15 +11,11 @@ from . import create_module
 
 @pytest.fixture(name='module')
 def fixture_module():
-    # pylint: disable=unused-argument
-
     return create_module(gluetool_modules.testing.testing_results.TestingResults)[1]
 
 
 @pytest.fixture(name='result')
 def fixture_result(module):
-    # pylint: disable=unused-argument
-
     return libci.results.TestResult(module.glue, 'dummy', 'PASS')
 
 
@@ -34,7 +30,6 @@ def assert_results(results, length=0, model=None):
 def test_shared(module):
     assert module.has_shared('results')
 
-    # pylint: disable=protected-access
     assert module.results() is module._results
 
 
@@ -58,7 +53,6 @@ def test_updatable(module, result):
     (['  foo :  bar  ', '  baz : mark '], [('foo', 'bar'), ('baz', 'mark')])
 ])
 def test_parse_formats(module, input_data, expected):
-    # pylint: disable=protected-access
     module._config['foo'] = input_data
 
     assert module._parse_formats('foo') == expected
@@ -67,7 +61,6 @@ def test_parse_formats(module, input_data, expected):
 def test_serialize_json(tmpdir, module, result):
     output_file = tmpdir.join('out.json')
 
-    # pylint: disable=protected-access
     module._results.append(result)
 
     with open(str(output_file), 'w') as f:
@@ -78,7 +71,6 @@ def test_serialize_json(tmpdir, module, result):
 
 
 def test_unknown_serializer(module):
-    # pylint: disable=protected-access
     module._config['results-file'] = ['foo:bar']
 
     with pytest.raises(gluetool.GlueError, match=r"Output format 'foo' is not supported"):
@@ -90,7 +82,6 @@ def test_store_not_set(log, module):
     Module should not save anything when --results-file is not set.
     """
 
-    # pylint: disable=protected-access
     module._config['results-file'] = []
 
     module.destroy()
@@ -99,7 +90,6 @@ def test_store_not_set(log, module):
 
 
 def test_store_dryrun(log, module):
-    # pylint: disable=protected-access
     module._config['results-file'] = ['foo:bar']
     module.glue._dryrun_level = gluetool.glue.DryRunLevels.DRY
 
@@ -116,7 +106,6 @@ def test_store(log, module, result, tmpdir):
     json_file = tmpdir.join('out.json')
     xunit_file = tmpdir.join('out.xml')
 
-    # pylint: disable=protected-access
     module._results.append(result)
 
     module._config['results-file'] = ['json:{}'.format(str(json_file)), 'xunit:{}'.format(str(xunit_file))]
@@ -141,7 +130,6 @@ def test_init_file_not_set(module):
     results1 = module.results()
     assert_results(results1)
 
-    # pylint: disable=protected-access
     assert module._config['init-file'] is None
     module.execute()
 
@@ -156,7 +144,6 @@ def test_init_file(module, result, tmpdir):
     init_file = tmpdir.join('fake-results.json')
     init_file.write(json.dumps([result.serialize('json')]))
 
-    # pylint: disable=protected-access
     module._config['init-file'] = 'json:{}'.format(str(init_file))
 
     module.execute()
@@ -178,7 +165,6 @@ def test_init_file_broken(module, result, tmpdir):
     init_file = tmpdir.join('bad-result.json')
     init_file.write(json.dumps([serialized_result]))
 
-    # pylint: disable=protected-access
     module._config['init-file'] = 'json:{}'.format(str(init_file))
 
     with pytest.raises(gluetool.GlueError, match=r"^init file is invalid, key 'test_type' not found$"):
@@ -195,12 +181,9 @@ def test_init_file_ioerror(module, monkeypatch, result, tmpdir):
     init_file = tmpdir.join('bad-result.json')
     init_file.write(json.dumps([result.serialize('json')]))
 
-    # pylint: disable=protected-access
     module._config['init-file'] = 'json:{}'.format(str(init_file))
 
     def buggy_load(stream):
-        # pylint: disable=unused-argument
-
         raise IOError('this is a fake IOError')
 
     monkeypatch.setattr(json, 'load', buggy_load)

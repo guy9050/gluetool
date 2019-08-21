@@ -136,8 +136,8 @@ class BuildDependencies(gluetool.Module):
         self.info('Looking for companions {}'.format(', '.join(self.companions)))
 
         task_ids = [
-            # pylint: disable=line-too-long
-            self._find_task_for_target_and_component(session, primary_task.target, companion) for companion in self.companions  # Ignore PEP8Bear
+            self._find_task_for_target_and_component(session, primary_task.target, companion)
+            for companion in self.companions
         ]
 
         # Filter out only the real task IDs, ignore "not found" represented by None
@@ -205,12 +205,14 @@ class BuildDependencies(gluetool.Module):
         self.companions_nvr = normalize_multistring_option(self.option('companions-nvr'))
 
         if (self.companions or self.companions_nvr) and not method:
-            # pylint: disable=line-too-long
-            raise gluetool.utils.IncompatibleOptionsError('--companions or --companions-nvr option specified but no --method selected')  # Ignore PEP8Bear
+            raise gluetool.utils.IncompatibleOptionsError(
+                '--companions or --companions-nvr option specified but no --method selected'
+            )
 
         if method == 'companions-from-copr' and self.companions_nvr:
-            # pylint: disable=line-too-long
-            raise gluetool.utils.IncompatibleOptionsError("--companions-nvr is not compatible with '{}'".format(method))  # Ignore PEP8Bear
+            raise gluetool.utils.IncompatibleOptionsError(
+                "--companions-nvr is not compatible with '{}'".format(method)
+            )
 
     def execute(self):
         self.require_shared('primary_task', 'tasks')
@@ -238,8 +240,9 @@ class BuildDependencies(gluetool.Module):
         method = self._methods.get(self.option('method'), None)
 
         if method is None:
-            # pylint: disable=line-too-long
-            raise gluetool.utils.IncompatibleOptionsError("Unknown 'guessing' method '{}'".format(self.option('method')))  # Ignore PEP8Bear
+            raise gluetool.utils.IncompatibleOptionsError(
+                "Unknown 'guessing' method '{}'".format(self.option('method'))
+            )
 
         additional_task_ids = method(self)
 

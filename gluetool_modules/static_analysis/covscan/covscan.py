@@ -20,7 +20,6 @@ def _unlink(filepath):
     try:
         os.unlink(filepath)
 
-    # pylint: disable=broad-except
     except Exception as exc:
         raise GlueError('Unable to remove {}: {}'.format(filepath, exc))
 
@@ -52,9 +51,6 @@ class NoCovscanBaselineFoundError(SoftGlueError):
 
 
 class CovscanTestResult(TestResult):
-    # pylint: disable=too-few-public-methods
-
-    # pylint: disable=too-many-arguments
     def __init__(self, glue, overall_result, covscan_result, task, baseline, **kwargs):
         urls = kwargs.pop('urls', {})
         urls.update({
@@ -241,7 +237,6 @@ class CICovscan(gluetool.Module):
         return CovscanResult(self, covscan_task_id)
 
     def covscan_xunit_serialize(self, test_suite, result):
-        # pylint: disable=no-self-use
         test_case = new_xml_element('testcase', _parent=test_suite, name=self.shared('primary_task').nvr,
                                     added=result.added, fixed=result.fixed, baseline=result.baseline.nvr,
                                     overall_result=result.overall_result, result_class=result.result_class,

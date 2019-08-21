@@ -89,7 +89,11 @@ def gather_module_data():
         modpath = re.sub(r'\.tox\..*\.gluetool_modules.', '', modpath)
 
         # pylint: disable=line-too-long
-        description = properties.klass.description if properties.klass.description else 'Module did not provide a description'
+        if properties.klass.description:
+            description = properties.klass.description
+
+        else:
+            description = 'Module did not provide a description'
 
         filepath = filepath.replace('-', '_')
 
@@ -131,7 +135,8 @@ def write_module_doc(module_data, output_dir):
     if shared_functions:
         module_data['shared_functions'] = '\n'.join([
             # pylint: disable=line-too-long
-            gluetool.utils.render_template(SHARED_TEMPLATE, shared_name=name, **module_data) for name in shared_functions
+            gluetool.utils.render_template(SHARED_TEMPLATE, shared_name=name, **module_data)
+            for name in shared_functions
         ])
 
     else:
@@ -159,7 +164,13 @@ def write_index_doc(modules, output_dir):
         with open('{}/modules.rst'.format(output_dir), 'w') as g:
             g.write(f.read().format(modules='\n'.join(sorted([
                 # pylint: disable=line-too-long
-                '{}\n'.format(gluetool.utils.render_template('`{{ name }} <modules/{{ name }}.html>`_\n\n  {{ description }}\n', **module_data)) for module_data in modules
+                '{}\n'.format(
+                    gluetool.utils.render_template(
+                        '`{{ name }} <modules/{{ name }}.html>`_\n\n  {{ description }}\n',
+                        **module_data
+                    )
+                )
+                for module_data in modules
             ]))))
             g.flush()
 

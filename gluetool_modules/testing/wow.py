@@ -50,8 +50,6 @@ class WowCommand(Command):
     # Following methods are exposed to ``evaluate_instructions`` shared function
     # as command callbacks.
     def add_options(self, instruction, command, argument, context):
-        # pylint: disable=unused-argument
-
         options = render_template(argument, logger=self.logger, **context)
         log_blob(self.debug, 'adding options', options)
 
@@ -62,8 +60,6 @@ class WowCommand(Command):
         log_dict(self.debug, 'current options', self.options)
 
     def modify_option(self, instruction, command, argument, context):
-        # pylint: disable=unused-argument
-
         assert isinstance(argument, dict)
 
         new_options = []
@@ -107,8 +103,6 @@ class WowCommand(Command):
         log_dict(self.debug, 'current options', new_options)
 
     def set_command(self, instruction, command, argument, context):
-        # pylint: disable=unused-argument
-
         command = render_template(argument, logger=self.logger, **context)
         self.debug("using command '{0}' to generate a job xml".format(command))
 
@@ -117,15 +111,11 @@ class WowCommand(Command):
         self.executable = shlex.split(command)
 
     def set_use_shell(self, instruction, command, argument, context):
-        # pylint: disable=unused-argument
-
         self.use_shell = bool(argument)
 
         self.debug('use-shell knob set to {}'.format(self.use_shell))
 
     def set_quote_args(self, instruction, command, argument, context):
-        # pylint: disable=unused-argument
-
         self.quote_args = bool(argument)
 
         self.debug('quote-args knob set to {}'.format(self.quote_args))
@@ -259,7 +249,6 @@ class WorkflowTomorrow(gluetool.Module):
         # for gluetool to provide legal way (e.g. self.option('foo', new_value)?)
         self._config['wow-options'] = fixed_wow_options
 
-    # pylint: disable=too-many-arguments
     def beaker_job_xml(self, distros=None, body_options=None, options=None, environment=None, task_params=None,
                        extra_context=None):
         """
@@ -295,8 +284,6 @@ class WorkflowTomorrow(gluetool.Module):
         :returns: List of elements representing Beaker jobs designed by ``workflow-tomorrow``, one
             for each distro.
         """
-
-        # pylint: disable=too-many-statements
 
         self.info('running workflow-tomorrow to get job description')
 
@@ -370,8 +357,6 @@ class WorkflowTomorrow(gluetool.Module):
         extra_context = extra_context or {}
 
         def _plan_job(distro, upstream_options):
-            # pylint: disable=too-many-statements
-
             formatted_upstream_options = gluetool.utils.format_command_line([
                 upstream_options
             ])
@@ -417,8 +402,6 @@ class WorkflowTomorrow(gluetool.Module):
             )
 
             def _add_note(instruction, command, argument, context):
-                # pylint: disable=unused-argument
-
                 if 'text' not in argument:
                     raise GlueError('Note text is not set')
 

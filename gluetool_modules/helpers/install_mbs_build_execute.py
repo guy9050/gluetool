@@ -166,7 +166,6 @@ class InstallMBSBuild(gluetool.Module):
         sut_installation = SUTInstallation(self, installation_log_dirpath, primary_task, logger=guest)
 
         # callback for 'commands' item in installation_workarounds
-        # pylint: disable=unused-argument
         def _add_step_callback(instruction, command, argument, context):
             for step in argument:
                 sut_installation.add_step(step['label'], step['command'])

@@ -7,8 +7,6 @@ from gluetool_modules.libs.brew_build_fail import run_command
 
 
 class BrewBuildTestResult(TestResult):
-
-    # pylint: disable=too-many-arguments
     def __init__(self, glue, overall_result, build_url, comment, process_output, **kwargs):
         super(BrewBuildTestResult, self).__init__(glue, 'brew-build', overall_result, **kwargs)
 

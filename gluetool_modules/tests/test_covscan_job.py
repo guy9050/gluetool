@@ -7,13 +7,10 @@ from . import create_module, check_loadable
 
 @pytest.fixture(name='module')
 def fixture_module():
-    # pylint: disable=unused-argument
-
     return create_module(gluetool_modules.static_analysis.covscan.covscan_job.CovscanJob)
 
 
 def test_sanity(module):
-    # pylint: disable=unused-argument
     pass
 
 

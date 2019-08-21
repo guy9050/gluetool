@@ -69,12 +69,11 @@ class CoprApi(object):
         return self._get_json(build_info['_links']['build_tasks']['href'], 'build tasks')['build_tasks']
 
     def get_build_task_info(self, build_id, chroot_name):
-        # pylint: disable=line-too-long
         build_task_info = self._get_json('api_2/build_tasks/{}/{}'.format(build_id, chroot_name), 'build tasks info')
 
         # copr api actually returns message with {}, no .format() is missing
         if build_task_info.get('message', '') == 'Build task {} for build {} not found' or \
-                build_task_info.get('error', '') == "Request wasn't successful, there is probably a bug in the API code.":
+                build_task_info.get('error', '') == "Request wasn't successful, there is probably a bug in the API code.":  # noqa: E501  # line too long
             self.module.warn('Build task {}:{} not found'.format(build_id, chroot_name))
             return {
                 'state': 'UNKNOWN-COPR-STATUS'
@@ -171,8 +170,6 @@ class BuildTaskID(object):
     one string, with following format: '[build_id]:[chroot_name]'
     """
 
-    # pylint: disable=too-few-public-methods
-
     def __init__(self, build_id, chroot_name):
         self.build_id = build_id
         self.chroot_name = chroot_name
@@ -192,14 +189,11 @@ class CoprTask(object):
     :param gluetool.Module module: Reference to parent's module (used eg. for logging).
     """
 
-    # pylint: disable=too-few-public-methods
-
     ARTIFACT_NAMESPACE = 'copr-build'
 
     def __init__(self, task_id, module):
         # as an "official ID", use string representation - some users might be confused by the object,
         # despite it has proper __str__ and __repr__
-        # pylint: disable=invalid-name
         self.id = self.dispatch_id = str(task_id)
         self.task_id = task_id
 
@@ -227,8 +221,6 @@ class CoprTask(object):
 
     @cached_property
     def has_artifacts(self):
-        # pylint: disable=no-self-use
-
         # We believe Copr keeps artifacts "forever" - or, at least, long enough to matter to us - therefore
         # we don't even bother to check for their presence.
         return True
@@ -336,7 +328,6 @@ class Copr(gluetool.Module):
 
     @property
     def eval_context(self):
-        # pylint: disable=unused-variable
         __content__ = {  # noqa
             'ARTIFACT_TYPE': """
                              Type of the artifact, ``copr-build`` in the case of ``copr`` module.

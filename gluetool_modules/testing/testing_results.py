@@ -53,7 +53,6 @@ class TestingResults(gluetool.Module):
         return self._results
 
     def _parse_formats(self, option):
-        # pylint: disable=no-self-use
         """
         Converts different forms on format:file specifications into a ``list``. These:
 
@@ -72,8 +71,9 @@ class TestingResults(gluetool.Module):
 
         for spec in specs:
             if ':' not in spec:
-                # pylint: disable=line-too-long
-                raise gluetool.GlueError("Value '{}' of option '{}' does not specify format and filename".format(spec, option))  # Ignore PEP8Bear
+                raise gluetool.GlueError(
+                    "Value '{}' of option '{}' does not specify format and filename".format(spec, option)
+                )
 
             parsed.append(tuple([s.strip() for s in spec.split(':')]))
 

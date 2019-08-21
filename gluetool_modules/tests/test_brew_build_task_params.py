@@ -46,7 +46,6 @@ def test_loadable(module):
 
 
 def test_regular_task(patched_module):
-    # pylint: disable=protected-access
     patched_module._config['install-method'] = 'foo-method'
     patched_module._config['install-rpms-blacklist'] = 'foo-blacklist'
 
@@ -67,7 +66,6 @@ def test_task_is_scratch_build(patched_module_scratch):
 
 
 def test_install_task_not_build(patched_module):
-    # pylint: disable=protected-access
     patched_module._config['install-task-not-build'] = 'yes'
 
     options = patched_module.brew_build_task_params()

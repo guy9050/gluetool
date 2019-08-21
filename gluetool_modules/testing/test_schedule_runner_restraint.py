@@ -46,14 +46,12 @@ from gluetool_modules.libs.test_schedule import TestScheduleResult
 from gluetool_modules.testing.test_scheduler_beaker_xml import TestScheduleEntry
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
 from typing import cast, Any, Dict, List, NamedTuple, Optional  # noqa
 
 
 # The exit status values come from restraint sources: https://github.com/p3ck/restraint/blob/master/src/errors.h
 # I failed to find any documentation on this...
 class RestraintExitCodes(enum.IntEnum):
-    # pylint: disable=invalid-name
     RESTRAINT_TASK_RUNNER_WATCHDOG_ERROR = 4
     RESTRAINT_TASK_RUNNER_RESULT_ERROR = 10
     RESTRAINT_SSH_ERROR = 14
@@ -174,8 +172,9 @@ class RestraintRunner(gluetool.Module):
             'metavar': 'yes|no'
         },
         'on-error-snapshot': {
-            # pylint: disable=line-too-long
-            'help': 'If set, on crash of restraint take a snapshot of the guest and download it (default: %(default)s).',
+            'help': """
+                    If set, on crash of restraint take a snapshot of the guest and download it (default: %(default)s).
+                    """,
             'default': 'no',
             'metavar': 'yes|no'
         },
@@ -310,7 +309,6 @@ class RestraintRunner(gluetool.Module):
                       actual_guest=None  # type: Optional[libci.guest.NetworkedGuest]
                      ):  # noqa
         # type: (...) -> TaskSetResults
-        # pylint: disable=too-many-arguments
         """
         Run a set of tasks on the guest.
 
@@ -357,7 +355,6 @@ class RestraintRunner(gluetool.Module):
 
                 schedule_entry.warn("Snapshot saved as '{}'".format(filename))
 
-            # pylint: disable=broad-except
             except Exception as exc:
                 schedule_entry.error('Exception raised when downloading a snapshot: {}'.format(exc))
 
@@ -555,7 +552,6 @@ class RestraintRunner(gluetool.Module):
 
     def _set_schedule_entry_result(self, schedule_entry):
         # type: (TestScheduleEntry) -> None
-        # pylint: disable=no-self-use
         """
         Try to find at least one task that didn't complete or didn't pass.
         """
@@ -618,7 +614,6 @@ class RestraintRunner(gluetool.Module):
         self.shared('trigger_event', 'test-schedule-runner-restraint.schedule-entry.finished',
                     schedule_entry=schedule_entry)
 
-    # pylint: disable=invalid-name
     def serialize_test_schedule_entry_results(self, schedule_entry, test_suite):
         # type: (TestScheduleEntry, Any) -> None
 

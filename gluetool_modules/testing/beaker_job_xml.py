@@ -39,7 +39,6 @@ class BeakerJobXML(gluetool.Module):
 
         return jobs
 
-    # pylint: disable=unused-argument
     def beaker_job_xml(self, **kwargs):
         """
         Return XML descriptions of Beaker jobs.

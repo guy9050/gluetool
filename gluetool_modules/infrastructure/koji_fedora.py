@@ -1,5 +1,3 @@
-# pylint: disable=too-many-lines
-
 import collections
 import re
 
@@ -98,8 +96,6 @@ def _call_api(session, logger, method, *args, **kwargs):
 
 
 class KojiTask(LoggerMixin, object):
-    # pylint: disable=too-many-public-methods
-
     """
     Provides abstraction of a koji build task, specified by task ID. For initialization
     koji instance details need to be passed via the instance dictionary with the following keys:
@@ -148,7 +144,6 @@ class KojiTask(LoggerMixin, object):
             self.id, build_id, self._build.get('nvr', '<unknown NVR>')
         ))
 
-    # pylint: disable=too-many-arguments
     def __init__(self, details, task_id, module, logger=None, wait_timeout=None, build_id=None):
         super(KojiTask, self).__init__(logger or Logging.get_logger())
 
@@ -156,7 +151,6 @@ class KojiTask(LoggerMixin, object):
 
         self._module = module
 
-        # pylint: disable=invalid-name
         self.id = self.dispatch_id = int(task_id)
         self.api_url = details['url']
         self.web_url = details['web_url']
@@ -195,8 +189,6 @@ class KojiTask(LoggerMixin, object):
 
         :rtype: bool
         """
-
-        # pylint: disable=protected-access
 
         if not self._module._valid_methods:
             return True
@@ -312,7 +304,6 @@ class KojiTask(LoggerMixin, object):
 
     @cached_property
     def _build(self):
-        # pylint: disable=method-hidden
         """
         Build info as returned by API, or ``None`` for scratch builds.
 
@@ -519,8 +510,6 @@ class KojiTask(LoggerMixin, object):
 
     @cached_property
     def branch(self):
-        # pylint: disable=no-self-use
-
         return None
 
     @cached_property
@@ -939,7 +928,6 @@ class BrewTask(KojiTask):
         if not all(key in details for key in required_instance_keys):
             raise GlueError('instance details do not contain all required keys')
 
-    # pylint: disable=too-many-arguments
     def __init__(self, details, task_id, module, logger=None, wait_timeout=None, build_id=None):
         super(BrewTask, self).__init__(details, task_id, module,
                                        logger=logger,
@@ -1051,7 +1039,6 @@ class BrewTask(KojiTask):
             # We can safely ignore "Cell variable url defined in loop" warning - yes, `url`
             # is updated by the loop and `_fetch` is called with the most actual value of
             # `url`, but that is correct.
-            # pylint: disable=cell-var-from-loop
             def _fetch():
                 try:
                     with gluetool.utils.requests(logger=self.logger) as req:
@@ -1408,7 +1395,6 @@ class BrewTask(KojiTask):
         # with different URLs leading to the same image, but we want to return them as repositories, as these
         # are the task artifacts.
         repositories = [
-            # pylint: disable=line-too-long
             ImageRepository(image['arch'], max(image['repositories'], key=len), image['repositories'], image['manifest'])  # noqa
             for image in images.itervalues()  # noqa
         ]
@@ -1579,7 +1565,6 @@ class Koji(gluetool.Module):
                                 build_ids=None,
                                 nvrs=None,
                                 names=None):
-        # pylint: disable=too-many-arguments
         """
         Tries to gather all available task IDs for different given inputs - build IDs, NVRs, package names
         and actual task IDs as well. Some of these may be unknown to the backend, some of them may not lead
@@ -1620,8 +1605,11 @@ class Koji(gluetool.Module):
         builds += self._objects_to_builds('nvr', nvrs,
                                           lambda nvr: [self._call_api('getBuild', nvr)])
         builds += self._objects_to_builds('name', names,
-                                          # pylint: disable=line-too-long
-                                          lambda name: self._call_api('listTagged', self.option('tag'), package=name, inherit=True, latest=True))  # Ignore PEP8Bear
+                                          lambda name: self._call_api('listTagged',
+                                                                      self.option('tag'),
+                                                                      package=name,
+                                                                      inherit=True,
+                                                                      latest=True))
 
         # Now extract task IDs.
         for build in builds:
@@ -1645,7 +1633,6 @@ class Koji(gluetool.Module):
             self.debug('No tasks specified.')
 
     def tasks(self, task_initializers=None, task_ids=None, build_ids=None, nvrs=None, names=None, **kwargs):
-        # pylint: disable=too-many-arguments
         """
         Returns a list of current tasks. If options are specified, new set of tasks is created using
         the provided options to find all available tasks, and this set becomes new set of current tasks,
@@ -1704,7 +1691,6 @@ class Koji(gluetool.Module):
 
     @property
     def eval_context(self):
-        # pylint: disable=unused-variable
         __content__ = {  # noqa
             # common for all artifact providers
             'ARTIFACT_TYPE': """
@@ -1794,7 +1780,6 @@ class Brew(Koji, (gluetool.Module)):
     description = 'Provide Brew task details to other modules'
 
     # Koji.options contain hard defaults
-    # pylint: disable=gluetool-option-hard-default
     options = Koji.options + (
         ('Brew options', {
             'automation-user-ids': {
@@ -1819,7 +1804,6 @@ class Brew(Koji, (gluetool.Module)):
     def task_factory(self, task_initializer, wait_timeout=None, details=None, task_class=None):
         # options checker does not handle multiple modules in the same file correctly, therefore it
         # raises "false" negative for the following use of parent's class options
-        # pylint: disable=gluetool-unknown-option
         details = dict_update({}, {
             'automation_user_ids': [int(user.strip()) for user in self.option('automation-user-ids').split(',')],
             'dist_git_commit_urls': [url.strip() for url in self.option('dist-git-commit-urls').split(',')]
@@ -1829,7 +1813,6 @@ class Brew(Koji, (gluetool.Module)):
                                               wait_timeout=wait_timeout)
 
     def _find_task_initializers(self, task_initializers=None, build_ids=None, **kwargs):
-        # pylint: disable=arguments-differ
         """
         Containers integration with Brew is messy.
 

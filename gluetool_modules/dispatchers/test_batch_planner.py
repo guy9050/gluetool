@@ -8,6 +8,9 @@ from gluetool import GlueError, SoftGlueError
 from gluetool.log import format_dict, log_dict
 from gluetool.utils import cached_property, load_yaml, PatternMap, render_template
 
+# Type annotations
+from typing import List, Tuple  # Ignore PyUnusedCodeBear
+
 
 class CommandsError(SoftGlueError):
     """
@@ -107,8 +110,10 @@ class TestBatchPlanner(gluetool.Module):
             'default': []
         },
         'sidetag-jobs': {
-            # pylint: disable=line-too-long
-            'help': 'List of jobs supporting sidetags, for which the module adds/modifies ``--build-dependencies-options`` (default: none).',  # Ignore PEP8Bear
+            'help': """
+                    List of jobs supporting sidetags, for which the module adds/modifies
+                    ``--build-dependencies-options`` (default: none).
+                    """,
             'metavar': 'JOB',
             'default': []
         },
@@ -191,7 +196,6 @@ class TestBatchPlanner(gluetool.Module):
         return load_yaml(self.option('job-priority-map'), logger=self.logger)
 
     def _reduce_section(self, commands, is_component=True, default_commands=None, all_commands=None):
-        # pylint: disable=too-many-statements
         """
         Reduce commands to a minimal set - apply filtering rules, apply global sections,
         and return set of command sets.
@@ -520,8 +524,11 @@ class TestBatchPlanner(gluetool.Module):
 
                 self.debug('added new build dependencies')
 
-                # pylint: disable=line-too-long
-                args.append('--build-dependencies-options=--method=companions-from-koji --companions-nvr={}'.format(','.join(companion_nvrs)))  # Ignore PEP8Bear
+                nvrs = ','.join(companion_nvrs)
+
+                args.append(
+                    '--build-dependencies-options=--method=companions-from-koji --companions-nvr={}'.format(nvrs)
+                )
 
             else:
                 # modify build dependencies with --companions-nvr option
@@ -689,13 +696,9 @@ class TestBatchPlanner(gluetool.Module):
             }
 
             def _dispatch_module(instruction, command, argument, context):
-                # pylint: disable=unused-argument,cell-var-from-loop
-
                 dispatch_command['dispatch-module'] = argument
 
             def _add_options(instruction, command, argument, context):
-                # pylint: disable=unused-argument,cell-var-from-loop
-
                 dispatch_command['options'].update({
                     '--{}'.format(detail): render_template(value, **context) for detail, value in argument.iteritems()
                 })
@@ -734,9 +737,7 @@ class TestBatchPlanner(gluetool.Module):
     def _get_ignored_methods(self):
         ignored_methods = []
 
-        # pylint: disable=unused-argument
         def _add_ignore_methods(instruction, command, argument, context):
-            # pylint: disable=unused-argument
             if not isinstance(argument, list):
                 raise GlueError('ignore-methods MUST be a list.')
 
@@ -791,8 +792,6 @@ class TestBatchPlanner(gluetool.Module):
         # Apply priorities where necessary
         for i, batch_command in enumerate(test_batch):
             def _set_priority(instruction, command, argument, context):
-                # pylint: disable=unused-argument,cell-var-from-loop
-
                 try:
                     priority = int(argument)
 

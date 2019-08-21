@@ -26,7 +26,7 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
 
     job_name = 'ci-beaker'
 
-    # pylint: disable=gluetool-option-hard-default
+    # pylint: disable=gluetool-option-no-default-in-help,gluetool-option-hard-default
     options = dict_update({}, libci.dispatch_job.DispatchJenkinsJobMixin.options, {
         'build-dependencies-options': {
             'help': 'Additional options for ``build-dependencies-options`` module.'
@@ -64,7 +64,6 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
 
         # following options passed to brew-build-task-params module
         'install-rpms-blacklist': {
-            # pylint: disable=line-too-long
             'help': """
                     Regexp pattern (compatible with ``egrep``) - when installing build, matching packages
                     will **not** be installed (default: %(default)s).

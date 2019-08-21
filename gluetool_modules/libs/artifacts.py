@@ -1,7 +1,6 @@
 import gluetool
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
 from typing import TYPE_CHECKING, cast, Any, Optional  # noqa
 
 if TYPE_CHECKING:

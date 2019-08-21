@@ -4,7 +4,6 @@ from gluetool_modules.libs.test_schedule import TestSchedule, TestScheduleResult
     TestScheduleEntryState
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
 from typing import cast, TYPE_CHECKING, Any, Dict, List, Optional  # noqa
 
 if TYPE_CHECKING:
@@ -68,7 +67,6 @@ class TestScheduleReport(gluetool.Module):
 
     def _overall_result_base(self, schedule):
         # type: (TestSchedule) -> None
-        # pylint: disable=no-self-use
         """
         Find out overall result of the schedule.
 
@@ -119,8 +117,6 @@ class TestScheduleReport(gluetool.Module):
 
         def _set_result(instruction, command, argument, context):
             # type: (Dict[str, Any], str, Any, Dict[str, Any]) -> None
-
-            # pylint: disable=unused-argument
 
             result_name = argument.toupper()
             result_value = TestScheduleResult.__members__.get(result_name, None)

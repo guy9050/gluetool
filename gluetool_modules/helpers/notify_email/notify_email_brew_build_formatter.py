@@ -26,7 +26,6 @@ class NotifyEmailBrewBuildFormatter((gluetool.Module)):
     required_options = ('template-root', 'body-template')
     shared_functions = ('notify_email_brew_build_formatter',)
 
-    # pylint: disable=invalid-name
     def notify_email_brew_build_formatter(self, notify_email, result, message):
         """
         Format message to represent the Brew build result. Updates body and footer of given message.

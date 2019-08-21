@@ -9,7 +9,6 @@ class _UniqObject(object):
     logs.
     """
 
-    # pylint: disable=too-few-public-methods
     def __init__(self, name):
         # type: (str) -> None
 

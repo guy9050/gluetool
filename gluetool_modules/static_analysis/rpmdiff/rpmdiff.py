@@ -48,7 +48,6 @@ class RpmdiffTestResult(TestResult):
     :param dict runinfo: informations about RPMdiff run
     :param str test_type: one of 'analysis', 'comparison'
     """
-    # pylint: disable=too-few-public-methods
 
     def __init__(self, glue, runinfo, test_type, **kwargs):
         overall_result = RPMDIFF_OVERALL_SCORE[runinfo['overall_score']['description']]
@@ -99,7 +98,6 @@ class RpmdiffSkippedTestResult(TestResult):
     """
     RPMdiff test result data container for a skipped test result
     """
-    # pylint: disable=too-few-public-methods
 
     def __init__(self, glue, **kwargs):
         super(RpmdiffSkippedTestResult, self).__init__(glue, 'rpmdiff-comparison', 'INFO', **kwargs)

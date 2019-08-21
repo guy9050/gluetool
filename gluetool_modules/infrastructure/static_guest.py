@@ -24,7 +24,6 @@ ProvisionerCapabilities = collections.namedtuple('ProvisionerCapabilities', ['av
 
 
 class StaticGuest(NetworkedGuest):
-    # pylint: disable=abstract-method
     """
     StaticGuest is like py:class:`libci.guests.NetworkedGuest`, just it does allow degraded services.
     """
@@ -72,14 +71,12 @@ class CIStaticGuest(gluetool.Module):
         }),
         ('Timeouts', {
             'boot-timeout': {
-                # pylint: disable=line-too-long
                 'help': 'Wait SECONDS for a guest to finish its booting process (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_BOOT_TIMEOUT,
                 'metavar': 'SECONDS'
             },
             'connect-timeout': {
-                # pylint: disable=line-too-long
                 'help': 'Wait SECOND for a guest to become reachable over network (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_CONNECT_TIMEOUT,
@@ -141,7 +138,6 @@ class CIStaticGuest(gluetool.Module):
             ]
         )
 
-    # pylint: disable=unused-argument
     def provision(self, environment, count=1, **kwargs):
         """
         Returns a list of N static guests, where N is specified by the parameter ``count``.

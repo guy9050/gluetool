@@ -8,7 +8,6 @@ from gluetool.log import format_blob, log_blob, log_dict
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
 from typing import cast, TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Tuple, Union  # noqa
 
 if TYPE_CHECKING:
@@ -121,7 +120,6 @@ class Ansible(gluetool.Module):
 
         return available_interpreters
 
-    # pylint: disable=too-many-arguments
     def run_playbook(self,
                      playbook_paths,  # type: Union[str, List[str]]
                      guest,  # type: libci.guest.NetworkedGuest

@@ -44,7 +44,6 @@ class ColdStore(gluetool.Module):
         if gluetool_modules.libs.is_recursion(__file__, 'eval_context'):
             return {}
 
-        # pylint: disable=unused-variable
         __content__ = {  # noqa
             'COLDSTORE_URL': """
                              URL of the "cold store" page containing artifacts of this particula pipeline.
@@ -97,8 +96,7 @@ class ColdStore(gluetool.Module):
         try:
             return gluetool.utils.treat_url(final_path, logger=self.logger)
 
-        # pylint: disable=bare-except
-        except:
+        except:  # noqa: E722  # do not use bare 'except'
             return final_path
 
     def execute(self):

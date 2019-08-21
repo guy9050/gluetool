@@ -2,21 +2,10 @@
 load-plugins = gluetool.pylint
 
 [BASIC]
-max-branches=20
-max-attributes=15
-good-names=_,c,e,f,g,i,j,p,s,ci
-defining-attr-methods=__init__,sanity
-generated-members=debug,verbose,info,warn,error,exception
-max-line-length=120
-module-rgx = (([a-z_][a-z0-9_-]*)|([A-Z][a-zA-Z0-9-]+))$
-function-rgx = [a-z_][a-z0-9_]{2,40}$
 
-[MESSAGES CONTROL]
-# Re-enable these ASAP
-disable=missing-docstring,logging-format-interpolation,too-many-locals,duplicate-code
 
-[TYPECHECK]
-# ignore kerberos module
-# it shows issues like
-# Module 'kerberos' has no 'authGSSClientInit' member (no-member)
-ignored-modules = kerberos
+# Disable *all* Pylint's checkers, but re-enable gluetool's custom checkers. The actual way how to achieve that
+# is a bit weird, "disable everything" and "enable some" are executed as steps by Pylint configuration. It works.
+[MESSAGE CONTROL]
+disable=R,C,W,E
+enable=E7631,E7632,E7633,E7621,E7611

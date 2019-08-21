@@ -1,4 +1,3 @@
-# pylint: disable=protected-access
 import collections
 import stomp
 import pytest
@@ -83,7 +82,6 @@ def test_session_connect_fail(module, mock_stomp):
     mock_stomp['session.connect'].side_effect = stomp.exception.ConnectFailedException('foo')
 
     with pytest.raises(gluetool.GlueError, match=r'could not connect to CI message bus'):
-        # pylint: disable=pointless-statement
         module._session  # Ignore PyUnusedCodeBear
 
 
@@ -93,7 +91,6 @@ def test_session_not_connected(module, mock_stomp):
     mock_stomp['session.is_connected'].return_value = False
 
     with pytest.raises(gluetool.GlueError, match=r'could not connect to CI message bus'):
-        # pylint: disable=pointless-statement
         module._session  # Ignore PyUnusedCodeBear
 
 

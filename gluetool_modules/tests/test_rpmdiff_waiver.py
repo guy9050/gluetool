@@ -39,13 +39,11 @@ def test_rpmdiff_waiver_matcher_success(matcher, pattern):
 
 
 def test_rpmdiff_waiver_matcher_success_multiple_waivers(matcher_multiple_waivers):
-    # pylint: disable=invalid-name
     assert matcher_multiple_waivers.can_waive()
 
 
 @pytest.mark.parametrize("subpackage", ["test", "", None, "dummy"])
 def test_rpmdiff_waiver_matcher_fail_subpackage(matcher, subpackage):
-    # pylint: disable=invalid-name
     matcher.waivers[0] = Waiver("1", subpackage, "Unassigned .*", "testname")
     assert not matcher.can_waive()
 
@@ -57,7 +55,6 @@ def test_rpmdiff_waiver_matcher_fail_content(matcher, pattern):
 
 
 def test_rpmdiff_waiver_matcher_only_one_matched(matcher_multiple_waivers):
-    # pylint: disable=invalid-name
     matcher = matcher_multiple_waivers
     matcher.waivers.pop(1)
     assert not matcher.can_waive()

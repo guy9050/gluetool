@@ -14,6 +14,9 @@ from gluetool.proxy import Proxy
 from gluetool.result import Result
 from gluetool.utils import wait
 
+# Type annotations
+from typing import Any, Dict  # Ignore PyUnusedCodeBear
+
 
 DEFAULT_JENKINSAPI_TIMEOUT = 120
 DEFAULT_JENKINSAPI_TIMEOUT_TICK = 30
@@ -27,8 +30,6 @@ DEFAULT_JENKINSAPI_TIMEOUT_TICK = 30
 # counterparts when necessary.
 
 class JenkinsJob(object):
-    # pylint: disable=too-few-public-methods
-
     def __init__(self, module, job_name):
         self.module = module
 
@@ -40,14 +41,11 @@ class JenkinsJob(object):
 
 
 class JenkinsBuild(object):
-    # pylint: disable=too-few-public-methods
-
     def __init__(self, module, job, build_id):
         self.module = module
 
         self.job = job
 
-        # pylint: disable=invalid-name
         self.id = int(build_id)
 
     @property
@@ -56,8 +54,6 @@ class JenkinsBuild(object):
 
 
 class JenkinsProxy(Proxy):
-    # pylint: disable=too-few-public-methods
-
     """
     Proxy wrapper of a Jenkins API instance. Instance of this class
     behaves exactly like the Jenkins API instance it wraps, user of such
@@ -248,7 +244,6 @@ class CIJenkins(gluetool.Module):
 
         return self._jenkins
 
-    # pylint: disable=too-many-arguments
     def jenkins_rest(self, url, wait_timeout=None, wait_tick=None, accepted_codes=None, as_json=False, **data):
         """
         Submit request to Jenkins via its http interface.
@@ -455,7 +450,6 @@ class CIJenkins(gluetool.Module):
 
             return params
 
-        # pylint: disable=broad-except
         except Exception:
             self.glue.sentry_submit_exception(gluetool.Failure(self, sys.exc_info()), logger=self.logger)
 
@@ -465,7 +459,6 @@ class CIJenkins(gluetool.Module):
 
     @property
     def eval_context(self):
-        # pylint: disable=unused-variable
         __content__ = {  # noqa
             'JENKINS_URL': """
                            URL of the Jenkins server running this module. If it cannot be determined,

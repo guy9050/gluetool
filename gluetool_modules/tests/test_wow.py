@@ -1,4 +1,3 @@
-# pylint: disable=protected-access
 import re
 import pytest
 
@@ -73,7 +72,6 @@ def fixture_configured_module(module_with_task):
 
 
 def sublist_exists(sublist):
-    # pylint: disable=no-member
     args, _ = gluetool.utils.run_command.call_args
     cmd = args[0]
     for i in range(len(cmd) - len(sublist) + 1):
@@ -116,7 +114,6 @@ def test_common_command_failures(module_with_task, monkeypatch, stderr):
     _, module = module_with_task
 
     def faulty_run_command(cmd, **kwargs):
-        # pylint: disable=unused-argument
         raise gluetool.GlueCommandError(cmd, MagicMock(exit_code=1, stderr=stderr))
 
     monkeypatch.setattr(gluetool.utils, 'run_command', faulty_run_command)
@@ -216,7 +213,6 @@ def test_without_primary_task(module, monkeypatch):
         ]),
 ])
 def test_with_basic_params(module_with_shared, options, environment, task_params, setup_phases, expected_sequencies):
-    # pylint: disable=too-many-arguments,no-member
     ci, module = module_with_shared
     module.beaker_job_xml(options=options, environment=environment, task_params=task_params, setup_phases=setup_phases)
     args, _ = gluetool.utils.run_command.call_args

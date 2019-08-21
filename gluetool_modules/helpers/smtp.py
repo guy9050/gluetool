@@ -5,8 +5,12 @@ from email.mime.text import MIMEText
 import gluetool
 from gluetool import utils
 
+# Type annotations
+from typing import List
+import gluetool_modules.libs.mail
 
-class SMTP((gluetool.Module)):
+
+class SMTP(gluetool.Module):
     """
     Send e-mails over SMTP.
     """
@@ -109,7 +113,7 @@ class SMTP((gluetool.Module)):
         return msg
 
     def _send_email(self, message, lowered_message):
-        # type: (email.mime.text.MIMEText) -> None
+        # type: (MIMEText) -> None
         """
         Send a single "lowered" message.
 

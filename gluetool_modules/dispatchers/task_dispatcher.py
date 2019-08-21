@@ -79,8 +79,11 @@ class TaskDispatcher(gluetool.Module):
         def _find_test_property(module, args, test_property, mapping):
             joined_args = ' '.join(args)
 
-            # pylint: disable=line-too-long
-            match = re.search(r"""--pipeline-state-reporter-options.+?--test-{}(?:\s+|=)([\w-]+)""".format(test_property), joined_args)  # Ignore PEP8Bear
+            match = re.search(
+                r'--pipeline-state-reporter-options.+?--test-{}(?:\s+|=)([\w-]+)'.format(test_property),
+                joined_args
+            )
+
             if match is not None:
                 return match.group(1)
 
@@ -95,9 +98,10 @@ class TaskDispatcher(gluetool.Module):
                 return mapping.match(' '.join(full_command))
 
             except gluetool.GlueError:
-                # pylint: disable=line-too-long
-
-                self.warn('Cannot find a test {} for job:\n{}'.format(test_property, gluetool.log.format_dict(full_command)), sentry=True)    # Ignore PEP8Bear
+                self.warn(
+                    'Cannot find a test {} for job:\n{}'.format(test_property, gluetool.log.format_dict(full_command)),
+                    sentry=True
+                )
 
                 return 'unknown'
 

@@ -9,6 +9,9 @@ from gluetool import GlueError
 from gluetool.utils import cached_property, normalize_multistring_option, render_template
 from gluetool.log import log_dict
 
+# Type annotations
+from typing import List
+
 
 def deduplicate(recipients):
     return {s: None for s in recipients}.keys()
@@ -118,7 +121,6 @@ class NotifyRecipients(gluetool.Module):
                 'default': []
             },
             'recipients-map': {
-                # pylint: disable=line-too-long
                 'help': "File with recipients mapping (default: %(default)s).",
                 'default': None,
                 'metavar': 'PATH'
@@ -291,7 +293,6 @@ class NotifyRecipients(gluetool.Module):
             raise GlueError("Cannot compile pattern '{}': {}".format(source, exc))
 
         def _replace(recipient):
-            # pylint: disable=cell-var-from-loop
             if not pattern.match(recipient):
                 return [recipient]
 

@@ -26,8 +26,9 @@ class CIMTF(gluetool.Module):
             module = trigger_message.get('msg', {}).get('name', None)
 
             if module is None:
-                # pylint: disable=line-too-long
-                raise GlueError("Cannot find module to test - either use --test-module option, or provide 'trigger_message' shared function")  # Ignore PEP8Bear
+                raise GlueError(
+                    "Cannot find module to test: use --test-module option, or provide 'trigger_message' shared function"
+                )
 
         self.shared('jenkins').set_build_name(module)
 

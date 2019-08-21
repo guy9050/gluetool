@@ -7,13 +7,10 @@ import gluetool.log
 import gluetool.utils
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
 from typing import cast, Optional  # cast, Any, Callable, Dict, List, NamedTuple, Optional, Tuple  # noqa
 
 
 class RemoteGitRepository(object):
-    # pylint: disable=too-few-public-methods
-
     """
     A remote Git repository representation.
 
@@ -31,7 +28,6 @@ class RemoteGitRepository(object):
         self.ref = ref
         self.web_url = web_url
 
-    # pylint: disable=too-many-arguments
     def clone(self,
               logger=None,  # type: Optional[gluetool.log.ContextAdapter]
               branch=None,  # type: Optional[str]
@@ -100,10 +96,9 @@ class RemoteGitRepository(object):
         # we'd rather let common users inside the repository when inspecting the pipeline artifacts. Therefore
         # setting clone directory permissions to ug=rwx,o=rx.
 
-        # pylint: disable=line-too-long
         os.chmod(
             actual_path,
-            stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
+            stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH  # noqa: E501  # line too long
         )
 
         if ref:

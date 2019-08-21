@@ -68,7 +68,6 @@ class Image(object):
         return self._image.attrs
 
 
-# pylint: disable=abstract-method
 class DockerGuest(libci.guest.Guest):
     """
     Guest backed by Docker containers and images.
@@ -103,7 +102,6 @@ class DockerGuest(libci.guest.Guest):
     :param Image image: image to instantiate.
     """
 
-    # pylint: disable=too-many-arguments
     def __init__(self, module, name, docker, image, volumes=None):
         super(DockerGuest, self).__init__(module, name)
 
@@ -206,7 +204,6 @@ class DockerGuest(libci.guest.Guest):
         try:
             container.start()
 
-        # pylint: disable=broad-except
         except Exception as exc:
             error = exc
 
@@ -365,8 +362,6 @@ class DockerGuest(libci.guest.Guest):
             self._docker.images.remove(image=image.name)
 
     def setup(self, variables=None, **kwargs):
-        # pylint: disable=arguments-differ
-
         variables = variables or {}
 
         if 'IMAGE_NAME' not in variables:
@@ -494,7 +489,6 @@ class DockerProvisioner(gluetool.Module):
 
         return self._determine_image_environment(environment)
 
-    # pylint: disable=unused-argument
     def provision(self, environment, count=1, image_name=None, name=DEFAULT_NAME, **kwargs):
         """
         Provision guest for the given environment.

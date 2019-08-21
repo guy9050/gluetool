@@ -8,13 +8,10 @@ from . import create_module, check_loadable
 
 @pytest.fixture(name='module')
 def fixture_module():
-    # pylint: disable=unused-argument
-
     return create_module(gluetool_modules.static_analysis.rpmdiff.rpmdiff_job.RpmdiffJob)
 
 
 def test_sanity(module):
-    # pylint: disable=unused-argument
     pass
 
 
@@ -35,7 +32,6 @@ def test_build_params(module_with_primary_task):
 def test_dispatch_analysis(module, monkeypatch):
     _, mod = module
 
-    # pylint: disable=protected-access
     mod._config['type'] = 'analysis'
 
     basic_test_dispatch(mod, monkeypatch, job_name='ci-rpmdiff-analysis')
@@ -44,7 +40,6 @@ def test_dispatch_analysis(module, monkeypatch):
 def test_dispatch_comparison(module, monkeypatch):
     _, mod = module
 
-    # pylint: disable=protected-access
     mod._config['type'] = 'comparison'
 
     basic_test_dispatch(mod, monkeypatch, job_name='ci-rpmdiff-comparison')

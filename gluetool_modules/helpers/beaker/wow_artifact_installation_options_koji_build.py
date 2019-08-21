@@ -12,7 +12,6 @@ class WowArtifactInstallationOptionsKojiBuild(gluetool.Module):
     description = 'Create options for ``workflow-options`` to install the Koji/Brew task.'
     shared_functions = ('wow_artifact_installation_options',)
 
-    # pylint: disable=invalid-name
     def wow_artifact_installation_options(self):
         """
         Return list of ``workflow-tomorrow`` options to install the Koji/Brew tasks.

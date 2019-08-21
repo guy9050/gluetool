@@ -90,7 +90,6 @@ class TestHandler(LoggerMixin, proton.handlers.MessagingHandler):
         event.container.connected = False
         ssl = proton.SSLDomain(proton.SSLDomain.MODE_CLIENT)
 
-        # pylint: disable=protected-access
         certificate = normalize_path(self._module._environment['certificate'])
         broker_ca = normalize_path(self._module._environment['broker-ca'])
 
@@ -309,7 +308,6 @@ class UMBPublisher((gluetool.Module)):
         self._environment = None
 
     def publish_bus_messages(self, messages, topic=None, **kwargs):
-        # pylint: disable=unused-argument
         """
         Publish one or more message to the message bus.
 

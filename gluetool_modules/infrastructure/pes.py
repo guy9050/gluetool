@@ -8,11 +8,9 @@ from gluetool.utils import cached_property, requests
 from gluetool.log import LoggerMixin, log_dict
 from gluetool.result import Result
 
-# pylint: disable=no-name-in-module
 from jq import jq
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from typing import TYPE_CHECKING, cast, Any, Dict, List, Optional, Tuple, Union  # noqa
 
 if TYPE_CHECKING:
@@ -24,7 +22,6 @@ DEFAULT_RETRY_TICK = 10
 
 
 class PESApi(LoggerMixin, object):
-    # pylint: disable=too-few-public-methods
     """
     API to Package Evolution Service
     """

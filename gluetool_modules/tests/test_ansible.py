@@ -15,8 +15,6 @@ from . import create_module, check_loadable
 
 @pytest.fixture(name='module')
 def fixture_module():
-    # pylint: disable=unused-argument
-
     module = create_module(gluetool_modules.helpers.ansible.Ansible)[1]
     module._config['ansible-playbook-options'] = []
     return module
@@ -117,7 +115,6 @@ def test_run_playbooks(module, local_guest, monkeypatch, assert_output):
     assert output.json_output is None
 
     mock_command_init.assert_called_once_with([
-        # pylint: disable=long-line
         'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key, os.path.abspath('playbook1'), os.path.abspath('playbook2')  # Ignore PEP8Bear
     ], logger=local_guest.logger)
 

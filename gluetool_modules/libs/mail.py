@@ -1,7 +1,6 @@
 from gluetool.log import log_blob, log_dict
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
 from typing import TYPE_CHECKING, Dict, List, Optional, Union  # noqa
 
 if TYPE_CHECKING:
@@ -25,7 +24,6 @@ class Message(object):
     :param str reply_to: if set, it is the value of ``Reply-To`` e-mail header.
     """
 
-    # pylint: disable=too-few-public-methods,too-many-arguments
     def __init__(self,
                  subject=None,     # type: Optional[str]
                  header=None,      # type: Optional[str]
@@ -45,7 +43,6 @@ class Message(object):
         self.footer = footer or ''
         self.body = body or ''
         self.recipients = recipients or []
-        # pylint: disable=invalid-name
         self.cc = cc or []
         self.bcc = bcc or []
         self.sender = sender or ''

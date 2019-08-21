@@ -10,9 +10,7 @@ from . import create_module, patch_shared, assert_shared, check_loadable
 
 @pytest.fixture(name='module')
 def fixture_module():
-    # pylint: disable=unused-argument
     module = create_module(gluetool_modules.helpers.guess_environment.GuessEnvironment)[1]
-    # pylint: disable=protected-access
     module._distro = {
         'type': 'distro',
         'specification': 'foo',
@@ -57,7 +55,6 @@ def fixture_module_for_recent(module, monkeypatch):
         'openstack': MagicMock(images=MagicMock(list=MagicMock(return_value=images)))
     })
 
-    # pylint: disable=protected-access
     module._image = {
         'type': 'image',
         'specification': r'image-(\d+)',
@@ -81,7 +78,6 @@ def test_loadable(module):
     ('target-autodetection', 'foo', True, 'ignored')
 ])
 def test_method_image_match(module, method, image, raises_exc, use):
-    # pylint: disable=protected-access
     module._config['image-method'] = method
     module._config['image'] = image
     module._config['image-pattern-map'] = 'foo'
@@ -105,7 +101,6 @@ def test_method_image_match(module, method, image, raises_exc, use):
     ('target-autodetection', 'foo', True, 'ignored')
 ])
 def test_method_distro_match(module, method, distro, raises_exc, use):
-    # pylint: disable=protected-access
     module._config['distro-method'] = method
     module._config['distro'] = distro
     module._config['distro-pattern-map'] = 'foo'
@@ -125,7 +120,6 @@ def test_method_distro_match(module, method, distro, raises_exc, use):
     ('target-autodetection', 'foo', True, 'ignored')
 ])
 def test_method_product_match(module, method, product, raises_exc, use):
-    # pylint: disable=protected-access
     module._config['product-method'] = method
     module._config['product'] = product
     module._config['product-pattern-map'] = 'foo'
@@ -143,12 +137,10 @@ def test_method_product_match(module, method, product, raises_exc, use):
     ('foo', False)
 ])
 def test_image_method_pattern_map_match(module, pattern_map, raises_exc):
-    # pylint: disable=protected-access
     module._config['image-method'] = 'target-autodetection'
     module._config['image-pattern-map'] = pattern_map
 
     if raises_exc:
-        # pylint: disable=line-too-long
         with pytest.raises(gluetool.GlueError, match=r"^--image-pattern-map option is required with method 'target-autodetection'$"):
             module.sanity()
 
@@ -161,12 +153,10 @@ def test_image_method_pattern_map_match(module, pattern_map, raises_exc):
     ('foo', False)
 ])
 def test_distro_method_pattern_map_match(module, pattern_map, raises_exc):
-    # pylint: disable=protected-access
     module._config['distro-method'] = 'target-autodetection'
     module._config['distro-pattern-map'] = pattern_map
 
     if raises_exc:
-        # pylint: disable=line-too-long
         with pytest.raises(gluetool.GlueError, match=r"^--distro-pattern-map option is required with method 'target-autodetection'$"):
             module.sanity()
 
@@ -179,12 +169,10 @@ def test_distro_method_pattern_map_match(module, pattern_map, raises_exc):
     ('foo', False)
 ])
 def test_product_method_pattern_map_match(module, pattern_map, raises_exc):
-    # pylint: disable=protected-access
     module._config['product-method'] = 'target-autodetection'
     module._config['product-pattern-map'] = pattern_map
 
     if raises_exc:
-        # pylint: disable=line-too-long
         with pytest.raises(gluetool.GlueError, match=r"^--product-pattern-map option is required with method 'target-autodetection'$"):
             module.sanity()
 
@@ -193,21 +181,18 @@ def test_product_method_pattern_map_match(module, pattern_map, raises_exc):
 
 
 def test_shared_image(module):
-    # pylint: disable=protected-access
     module._image['result'] = MagicMock()
 
     assert module.image() == module._image['result']
 
 
 def test_shared_distro(module):
-    # pylint: disable=protected-access
     module._distro['result'] = MagicMock()
 
     assert module.distro() == module._distro['result']
 
 
 def test_shared_product(module):
-    # pylint: disable=protected-access
     module._product['result'] = MagicMock()
 
     assert module.product() == module._product['result']
@@ -219,7 +204,6 @@ def test_image_pattern_map(module, monkeypatch):
 
     monkeypatch.setattr(gluetool_modules.helpers.guess_environment, 'PatternMap', map_class)
 
-    # pylint: disable=protected-access
     module._image['pattern-map'] = 'dummy-map.yml'
 
     assert module.pattern_map(module._image) == map_instance
@@ -233,7 +217,6 @@ def test_distro_pattern_map(module, monkeypatch):
 
     monkeypatch.setattr(gluetool_modules.helpers.guess_environment, 'PatternMap', map_class)
 
-    # pylint: disable=protected-access
     module._distro['pattern-map'] = 'dummy-map.yml'
 
 
@@ -243,7 +226,6 @@ def test_product_pattern_map(module, monkeypatch):
 
     monkeypatch.setattr(gluetool_modules.helpers.guess_environment, 'PatternMap', map_class)
 
-    # pylint: disable=protected-access
     module._product['pattern-map'] = 'dummy-map.yml'
 
     assert module.pattern_map(module._product) == map_instance
@@ -254,7 +236,6 @@ def test_product_pattern_map(module, monkeypatch):
 def test_image_force(module):
     image = 'dummy-image'
 
-    # pylint: disable=protected-access
     module._image['specification'] = image
 
     module._guess_force(module._image)
@@ -265,7 +246,6 @@ def test_image_force(module):
 def test_distro_force(module):
     distro = 'dummy-distro'
 
-    # pylint: disable=protected-access
     module._distro['specification'] = [distro]
 
     module._guess_force(module._distro)
@@ -276,7 +256,6 @@ def test_distro_force(module):
 def test_product_force(module):
     product = 'dummy-product'
 
-    # pylint: disable=protected-access
     module._product['specification'] = product
 
     module._guess_force(module._product)
@@ -288,7 +267,6 @@ def test_image_autodetection(module, monkeypatch):
     target = 'dummy-target'
     image = 'dummy-image'
 
-    # pylint: disable=protected-access
     module._image['method'] = 'target-autodetection'
 
     patch_shared(monkeypatch, module, {}, callables={
@@ -298,7 +276,6 @@ def test_image_autodetection(module, monkeypatch):
     # monkeypatching of @cached_property does not work, the property's __get__() gets called...
     module.pattern_map = MagicMock(return_value=MagicMock(match=MagicMock(return_value=image)))
 
-    # pylint: disable=protected-access
     module._guess_target_autodetect(module._image)
 
 
@@ -306,7 +283,6 @@ def test_distro_autodetection(module, monkeypatch):
     target = 'dummy-target'
     distro = 'dummy-distro'
 
-    # pylint: disable=protected-access
     module._distro['method'] = 'target-autodetection'
 
     patch_shared(monkeypatch, module, {}, callables={
@@ -316,7 +292,6 @@ def test_distro_autodetection(module, monkeypatch):
     # monkeypatching of @cached_property does not work, the property's __get__() gets called...
     module.pattern_map = MagicMock(return_value=MagicMock(match=MagicMock(return_value=distro)))
 
-    # pylint: disable=protected-access
     module._guess_target_autodetect(module._distro)
 
 
@@ -324,7 +299,6 @@ def test_product_autodetection(module, monkeypatch):
     target = 'dummy-target'
     product = 'dummy-product'
 
-    # pylint: disable=protected-access
     module._product['method'] = 'target-autodetection'
 
     patch_shared(monkeypatch, module, {}, callables={
@@ -334,17 +308,14 @@ def test_product_autodetection(module, monkeypatch):
     # monkeypatching of @cached_property does not work, the property's __get__() gets called...
     module.pattern_map = MagicMock(return_value=MagicMock(match=MagicMock(return_value=product)))
 
-    # pylint: disable=protected-access
     module._guess_target_autodetect(module._product)
 
 
 def test_autodetection_no_brew(module):
-    # pylint: disable=protected-access
     assert_shared('primary_task', module._guess_target_autodetect, MagicMock())
 
 
 def test_recent_no_openstack(module):
-    # pylint: disable=protected-access
     assert_shared('openstack', module._guess_recent, MagicMock())
 
 
@@ -355,24 +326,20 @@ def test_recent_broken_regexp(monkeypatch, module):
         'openstack': None
     })
 
-    # pylint: disable=protected-access
     module._image['specification'] = '[foo'
     module._image['method'] = 'recent'
 
-    # pylint: disable=line-too-long
     with pytest.raises(gluetool.GlueError, match=r"cannot compile hint pattern '\^\[foo\$': unexpected end of regular expression"):
         module._guess_recent(module._image)
 
 
 def test_recent(module_for_recent):
-    # pylint: disable=protected-access
     module_for_recent._guess_recent(module_for_recent._image)
 
     assert module_for_recent._image['result'] == 'image-20160109'
 
 
 def test_recent_no_match(module_for_recent):
-    # pylint: disable=protected-access
     module_for_recent._image['specification'] = r'foo-(\d+)'
 
     with pytest.raises(gluetool.GlueError, match=r"No image found for hint '\^foo-\(\\d\+\)\$'"):
@@ -380,7 +347,6 @@ def test_recent_no_match(module_for_recent):
 
 
 def test_recent_no_key(module_for_recent):
-    # pylint: disable=protected-access
     module_for_recent._image['specification'] = r'image-foo'
 
     with pytest.raises(gluetool.GlueError, match=r" key from image name 'image-foo'"):
@@ -388,19 +354,16 @@ def test_recent_no_key(module_for_recent):
 
 
 def test_execute_unknown_method(module):
-    # pylint: disable=protected-access
     with pytest.raises(gluetool.GlueError, match=r"Unknown 'guessing' method 'foo'"):
         module.execute_method(module._image)
 
 
 def test_execute(module, log):
     def _guess_foo(self, source):
-        # pylint: disable=protected-access,unused-argument
         source['result'] = 'dummy'
 
     guess_foo = MagicMock(side_effect=_guess_foo)
 
-    # pylint: disable=protected-access
     module._methods['foo'] = guess_foo
 
     module.distro()

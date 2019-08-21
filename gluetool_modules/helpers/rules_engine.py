@@ -10,7 +10,6 @@ from gluetool.utils import cached_property, load_yaml, normalize_multistring_opt
 import _ast
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order,invalid-name
 from typing import cast, Any, Callable, Dict, Iterator, List, Match, Optional, Tuple, Union  # noqa
 
 EntryType = Dict[str, Any]  # noqa
@@ -126,7 +125,6 @@ class RulesASTVisitor(ast.NodeTransformer):
         # type: (ast.AST) -> Any
 
         if not isinstance(node, RulesASTVisitor._valid_classes):
-            # pylint: disable=protected-access
             raise InvalidASTNodeError(self._rules._rules, node)
 
         return super(RulesASTVisitor, self).generic_visit(node)
@@ -138,21 +136,18 @@ class MatchableString(str):
     :py:ref:`re.match` and :py:ref:`re.search` as instance methods.
     """
 
-    # pylint: disable=invalid-name
-    def match(self, pattern, I=True):
+    def match(self, pattern, I=True):  # noqa: E741  # ambiguous variable name 'I'
         # type: (str, bool) -> Optional[Match[Any]]
 
         return re.match(pattern, str(self), re.I if I is True else 0)
 
-    def search(self, pattern, I=True):
+    def search(self, pattern, I=True):  # noqa: E741  # ambiguous variable name 'I'
         # type: (str, bool) -> Optional[Match[Any]]
 
         return re.search(pattern, str(self), re.I if I is True else 0)
 
 
 class Rules(object):
-    # pylint: disable=too-few-public-methods
-
     """
     Wrap compilation and evaluation of filtering rules.
 
@@ -209,7 +204,6 @@ class Rules(object):
 
         # eval is dangerous. This time I hope it's safe-guarded by AST filtering...
         try:
-            # pylint: disable=eval-used
             return eval(self._code, our_globals, our_locals)
 
         except NameError as exc:
@@ -468,8 +462,6 @@ class RulesEngine(gluetool.Module):
         :returns: whatever comes out from rules evaluation.
         """
 
-        # pylint: disable=no-self-use
-
         def _enhance_strings(variables):
             # type: (ContextType) -> ContextType
 
@@ -502,7 +494,6 @@ class RulesEngine(gluetool.Module):
 
         return result
 
-    # pylint: disable=too-many-arguments
     def evaluate_filter(self, entries, context=None, default_rule='True',
                         stop_at_first_hit=False):
         # type: (List[EntryType], Optional[Union[ContextType, ContextGetterType]], str, bool) -> List[EntryType]
@@ -538,7 +529,6 @@ class RulesEngine(gluetool.Module):
             entry for entry, _ in instruction_iterator
         ]
 
-    # pylint: disable=too-many-arguments
     def evaluate_instructions(self,
                               instructions,  # type: List[EntryType]
                               commands,  # type: Dict[str, CommandCallbackType]

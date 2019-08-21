@@ -23,7 +23,6 @@ class BeahXUnit(gluetool.Module):
     shared_functions = ('beah_xunit_serialize',)
 
     def beah_xunit_serialize(self, test_suite, result, payload=None):
-        # pylint: disable=no-self-use
         """
         Given ``testsuite`` XML element, it will fill it with data corresponding to given result.
 
@@ -65,14 +64,11 @@ class BeahXUnit(gluetool.Module):
                 try:
                     return gluetool.utils.treat_url(url, logger=self.logger)
 
-                # pylint: disable=bare-except
-                except:
+                except:  # noqa: E722  # do not use bare 'except'
                     return url
 
         else:
             def _get_test_source_url(test_name):
-                # pylint: disable=unused-argument
-
                 return '<unknown test source URL>'
 
         payload = payload or result.payload

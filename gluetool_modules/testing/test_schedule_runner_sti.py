@@ -17,7 +17,6 @@ from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.test_schedule import TestScheduleResult
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
 from typing import cast, Any, Callable, Dict, List, Optional, Tuple  # noqa
 from gluetool_modules.testing.test_scheduler_sti import TestScheduleEntry  # noqa
 
@@ -154,15 +153,14 @@ class STIRunner(gluetool.Module):
         # we'd rather let common users inside the directories when inspecting the pipeline artifacts. Therefore
         # setting their permissions to ug=rwx,o=rx.
 
-        # pylint: disable=line-too-long
         os.chmod(
             work_dir,
-            stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
+            stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH  # noqa: E501  # line too long
         )
 
         os.chmod(
             artifact_dir,
-            stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
+            stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH  # noqa: E501  # line too long
         )
 
         schedule_entry.info("working directory '{}'".format(work_dir))
@@ -186,7 +184,6 @@ sut     ansible_host={} ansible_user=root {}
         # Inventory file's permissions are limited to user only, u=rw,go=. That's far from being perfect, hard
         # to examine such file, hence one more chmod to u=rw,go=r
 
-        # pylint: disable=line-too-long
         os.chmod(
             inventory.name,
             stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH
@@ -324,7 +321,6 @@ sut     ansible_host={} ansible_user=root {}
         self.shared('trigger_event', 'test-schedule-runner-sti.schedule-entry.finished',
                     schedule_entry=schedule_entry)
 
-    # pylint: disable=invalid-name
     def serialize_test_schedule_entry_results(self, schedule_entry, test_suite):
         # type: (TestScheduleEntry, Any) -> None
 

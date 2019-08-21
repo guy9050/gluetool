@@ -5,7 +5,6 @@ from gluetool.log import LoggerMixin, log_table
 import libci.sentry
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from typing import TYPE_CHECKING, cast, Any, List, Optional  # noqa
 
 if TYPE_CHECKING:
@@ -100,8 +99,6 @@ class TestScheduleEntryAdapter(gluetool.log.ContextAdapter):
 
 
 class TestScheduleEntry(LoggerMixin, object):
-    # pylint: disable=too-few-public-methods
-
     """
     Internal representation of stuff to run, where to run it and other bits necessary for scheduling
     all things the module was asked to perform.
@@ -126,7 +123,6 @@ class TestScheduleEntry(LoggerMixin, object):
 
         super(TestScheduleEntry, self).__init__(TestScheduleEntryAdapter(logger, entry_id))
 
-        # pylint: disable=C0103
         self.id = entry_id
         self.runner_capability = runner_capability
 
@@ -157,8 +153,6 @@ class TestSchedule(List[TestScheduleEntry]):
     environment. Based on a list, supports basic sequence operations while adding convenience logging
     helper.
     """
-
-    # pylint: disable=too-few-public-methods
 
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
@@ -208,7 +202,6 @@ class TestSchedule(List[TestScheduleEntry]):
                 str(serialized[field]) for field in sorted(serialized.iterkeys())
             ])
 
-        # pylint: disable=invalid-name
         for se in self:
             se_environment = _env_to_str(se.testing_environment)
 

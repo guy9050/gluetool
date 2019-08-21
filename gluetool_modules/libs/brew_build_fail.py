@@ -1,7 +1,6 @@
 from gluetool import GlueCommandError, SoftGlueError
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from typing import TYPE_CHECKING  # noqa
 
 if TYPE_CHECKING:

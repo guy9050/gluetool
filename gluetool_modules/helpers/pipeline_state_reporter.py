@@ -118,8 +118,10 @@ class PipelineStateReporter(gluetool.Module):
         }),
         ('Test options', {
             'test-category': {
-                # pylint: disable=line-too-long
-                'help': "Category of tests performed in this pipeline. One of 'static-analysis', 'functional', 'integration' or 'validation'.",  # Ignore PEP8Bear
+                'help': """
+                        Category of tests performed in this pipeline. One of 'static-analysis', 'functional',
+                        'integration' or 'validation'.
+                        """,
                 'choices': ['static-analysis', 'functional', 'integration', 'validation']
             },
             'test-namespace': {
@@ -184,7 +186,6 @@ class PipelineStateReporter(gluetool.Module):
 
     @property
     def eval_context(self):
-        # pylint: disable=unused-variable
         __content__ = {  # noqa
             'PIPELINE_TEST_TYPE': """
                                   Type of tests provided in this pipeline, e.g. ``tier1``, ``rpmdiff-analysis``,
@@ -247,8 +248,6 @@ class PipelineStateReporter(gluetool.Module):
 
         # Callback for 'details' command, applies changes to `subject_info`
         def _details_callback(instruction, command, argument, context):
-            # pylint: disable=unused-argument
-
             if instruction.get('eval-as-rule', False):
                 subject_info.update({
                     detail: self.shared('evaluate_rules', value, context=context)
@@ -265,8 +264,6 @@ class PipelineStateReporter(gluetool.Module):
         # Callback for 'eval-as-rule' command - it does nothing, it is handled by 'details' callback,
         # but we must provide it anyway to make ``rules-engine`` happy (unhandled command).
         def _eval_as_rule_callback(instruction, command, argument, context):
-            # pylint: disable=unused-argument
-
             pass
 
         self.shared('evaluate_instructions', instructions, {
@@ -327,7 +324,6 @@ class PipelineStateReporter(gluetool.Module):
                               test_overall_result=None, test_results=None,
                               distros=None,
                               error_message=None, error_url=None):
-        # pylint: disable=too-many-arguments
         """
         Send out the message reporting the pipeline state.
 
@@ -442,16 +438,12 @@ class PipelineStateReporter(gluetool.Module):
         It is quite simple - xUnit representation already carries necessary value.
         """
 
-        # pylint: disable=no-self-use
-
         return test_results['overall-result']
 
     def _get_overall_result_legacy(self, results):
         """
         Decide what the overall result should be, based on internal representation of test results.
         """
-
-        # pylint: disable=no-self-use
 
         if not results:
             return 'unknown'
@@ -478,8 +470,6 @@ class PipelineStateReporter(gluetool.Module):
 
         # Callback for 'result' command
         def _result_callback(instruction, command, argument, context):
-            # pylint: disable=unused-argument
-
             overall_result.result = argument.strip()
 
             self.debug("final overall result set to '{}'".format(overall_result.result))

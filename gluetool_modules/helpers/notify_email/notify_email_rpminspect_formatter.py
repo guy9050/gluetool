@@ -49,6 +49,5 @@ class NotifyEmailRPMinspectFormatter(gluetool.Module):
 
         message.footer = notify_email.render_template(self.option('footer-template'))
 
-    # pylint: disable=invalid-name
     notify_email_rpminspect_analysis_formatter = _notify_email_rpminspect_formatter
     notify_email_rpminspect_comparison_formatter = _notify_email_rpminspect_formatter

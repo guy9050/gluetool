@@ -7,14 +7,11 @@ from gluetool_modules.libs.testing_environment import TestingEnvironment
 from gluetool_modules.libs.test_schedule import TestSchedule, TestScheduleEntry as BaseTestScheduleEntry
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
 from typing import cast, Any, List, Optional  # noqa
 import bs4  # noqa
 
 
 class TestScheduleEntry(BaseTestScheduleEntry):
-    # pylint: disable=too-few-public-methods
-
     def __init__(self, logger, job_index, recipe_set_index, recipe_set):
         # type: (gluetool.log.ContextAdapter, int, int, bs4.element.Tag) -> None
         """

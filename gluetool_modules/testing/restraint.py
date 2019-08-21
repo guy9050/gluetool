@@ -28,8 +28,6 @@ RestraintOutput = collections.namedtuple('RestraintOutput', ('execution_output',
 
 
 class StdStreamAdapter(ContextAdapter):
-    # pylint: disable=too-few-public-methods
-
     def __init__(self, logger, name):
         super(StdStreamAdapter, self).__init__(logger, {'ctx_stream': (100, name)})
 
@@ -74,12 +72,9 @@ class Restraint(gluetool.Module):
         gluetool.utils.check_for_commands(['restraint'])
 
     def _guest_restraint_address(self, guest, restraintd_port):
-        # pylint: disable=no-self-use
-
         return '{}:{}/{}'.format(guest.hostname, restraintd_port, guest.port)
 
     def restraint(self, guest, job, port=None, rename_dir_to=None):
-        # pylint: disable=too-many-arguments
         """
         Run a job on the guest.
 
@@ -164,10 +159,7 @@ class Restraint(gluetool.Module):
             stderr_logger = StdStreamAdapter(guest.logger, 'stderr')
 
             class StreamHandler(Bunch):
-                # pylint: disable=too-few-public-methods
-
                 def write(self):
-                    # pylint: disable=no-member,attribute-defined-outside-init,access-member-before-definition
                     self.logger(''.join(self.buff))
                     self.buff = []
 
@@ -252,7 +244,6 @@ class Restraint(gluetool.Module):
             try:
                 os.chmod(index_location, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
 
-            # pylint: disable=broad-except
             except Exception as exc:
                 raise gluetool.GlueError('Failed to change permissions of results index: {}'.format(exc))
 

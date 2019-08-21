@@ -10,8 +10,6 @@ from . import create_module, check_loadable
 
 @pytest.fixture(name='module')
 def fixture_module():
-    # pylint: disable=unused-argument
-
     return create_module(gluetool_modules.database.postgresql.PostgreSQL)
 
 
@@ -57,13 +55,11 @@ def test_shared_postgresql_cursor_fail(module, monkeypatch):
 
 
 def test_connect(configured_module, monkeypatch):
-    # pylint: disable=protected-access
     _, module = configured_module
     connection_mock = MagicMock()
     connect_mock = MagicMock(return_value=connection_mock)
     monkeypatch.setattr(psycopg2, "connect", connect_mock)
     assert module._connection is None
-    # pylint: disable=pointless-statement
     module.connection  # Ignore PyUnusedCodeBear
     connect_mock.assert_called_with(host="host1", port="1234", dbname="dbname1", user="user1", password="password1")
     assert module._connection is connection_mock
@@ -73,7 +69,6 @@ def test_connect_fail(module, monkeypatch):
     _, module = module
     monkeypatch.setattr(psycopg2, "connect", MagicMock(side_effect=Exception))
     with pytest.raises(gluetool.GlueError, match=r"Could not connect to PostgreSQL server 'None': "):
-        # pylint: disable=pointless-statement
         module.connection  # Ignore PyUnusedCodeBear
 
 

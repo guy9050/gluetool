@@ -12,8 +12,6 @@
 # to the configuration, but so far, we don't have such infrastructure...
 #
 
-# pylint: disable=line-too-long
-
 import os
 import sys
 
@@ -64,7 +62,6 @@ def fixture_notify_email(integration_config, monkeypatch):
     notify_email = create_module(gluetool_modules.helpers.notify_email.notify_email.Notify, name='notify-email')[1]
     glue = notify_email.glue
 
-    # pylint: disable=protected-access
     glue._config['module-config-path'] = [os.path.join(integration_config, 'config')]
 
     notify_email.parse_config()
@@ -244,7 +241,6 @@ def fixture_result_modules(request, notify_email, monkeypatch):
     testing_results = create_module(gluetool_modules.testing.testing_results.TestingResults, glue=glue,
                                     name='testing-results')[1]
 
-    # pylint: disable=protected-access
     testing_results._config['init-file'] = '{}:{}'.format(result_format, result_source)
     testing_results.execute()
 
@@ -343,7 +339,6 @@ def fixture_soft_modules(request, notify_email, integration_config, monkeypatch)
     for name, value in extra_env.iteritems():
         monkeypatch.setenv(name, value)
 
-    # pylint: disable=protected-access
     notify_email._config['add-frontend-url'] = True
 
     exc = soft_klass(*args, **kwargs)
@@ -385,7 +380,6 @@ def _test_message(notify_email, msg, expected):
 def test_result(result_modules):
     testing_results, notify_email, expected = result_modules
 
-    # pylint: disable=protected-access
     msg = notify_email._format_result(testing_results._results[0])
 
     _test_message(notify_email, msg, expected)
@@ -395,7 +389,6 @@ def test_result(result_modules):
 def test_failure(soft_modules):
     failure, notify_email, expected_message = soft_modules
 
-    # pylint: disable=protected-access
     msg = notify_email._format_failure(failure)
 
     _test_message(notify_email, msg, expected_message)

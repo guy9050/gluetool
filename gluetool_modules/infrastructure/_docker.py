@@ -33,9 +33,6 @@ class Docker(gluetool.Module):
         return self._docker
 
     def execute(self):
-        # for some reason, pylint doesn't see from_env... but it's there: I saw it,
-        # I used it, the code bellow is using it...
-        # pylint: disable=no-member
         self._docker = docker.from_env(version=self.option('protocol-version'))
 
         try:

@@ -104,7 +104,6 @@ class Listener(LoggerMixin, stomp.listener.ConnectionListener):
             try:
                 callback(*actual_args, **actual_kwargs)
 
-            # pylint: disable=broad-except
             except Exception:
                 self.exc_info = sys.exc_info()
                 self.stop()
@@ -205,8 +204,6 @@ class BusListener(gluetool.Module):
         specified using ``--queue-directory`` option.
         """
 
-        # pylint: disable=unused-argument
-
         msg_id = headers.get('message-id', None)
 
         if msg_id is None:
@@ -230,13 +227,9 @@ class BusListener(gluetool.Module):
         Dump message and its headers into debug log.
         """
 
-        # pylint: disable=unused-argument
-
         self.debug("message received:\nheaders: {}\nmessage: {}".format(format_dict(headers), format_dict(body)))
 
     def _on_error(self, listener, headers, body):
-        # pylint: disable=unused-argument
-
         if 'message' in headers and re.match(r'User name \[.*?\] or password is invalid\.', headers['message']):
             raise gluetool.GlueError('Invalid username or password')
 
@@ -248,8 +241,6 @@ class BusListener(gluetool.Module):
         is set by user via ``--count`` option.
         """
 
-        # pylint: disable=unused-argument
-
         self._count -= 1
 
         if self._count > 0:
@@ -258,8 +249,6 @@ class BusListener(gluetool.Module):
         listener.stop()
 
     def execute(self):
-        # pylint: disable=attribute-defined-outside-init
-
         try:
             self._connection = conn = stomp.Connection([(self.option('host'), self.option('port'))])
             self._listener = listener = Listener(self)

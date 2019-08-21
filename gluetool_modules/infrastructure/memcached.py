@@ -18,8 +18,6 @@ DEFAULT_DUMP_FETCH_TICK = 10
 # with their __repr__ which is usually not possible to deserialize. This way we can at least catch such
 # objects by raising an exception.
 def _json_serializer(key, value):
-    # pylint: disable=unused-argument
-
     # sends strings as they are, set flag to 1 to announce it's pure string
     if isinstance(value, str):
         return value, 1
@@ -29,8 +27,6 @@ def _json_serializer(key, value):
 
 
 def _json_deserializer(key, value, flags):
-    # pylint: disable=unused-argument
-
     # if the flag is 1, the value was a string
     if flags == 1:
         return value
@@ -178,8 +174,6 @@ class Cache(LoggerMixin, object):
 
         def _fetch_metadump():
             with self._lock:
-                # pylint: disable=protected-access
-
                 response = self._client._misc_cmd(['lru_crawler metadump all\r\n'], 'metadump all', False)
 
             log_dict(self.debug, 'metadump response', response)

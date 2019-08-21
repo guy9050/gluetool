@@ -32,7 +32,6 @@ class Dashboard(gluetool.Module):
         if gluetool_modules.libs.is_recursion(__file__, 'eval_context'):
             return {}
 
-        # pylint: disable=unused-variable
         __content__ = {  # noqa
             'DASHBOARD_URL': """
                              URL of the dashboard page containing details of CI runs for the artifact.

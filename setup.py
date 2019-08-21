@@ -14,16 +14,6 @@ DESCRIPTION = 'Gluetool & Citool modules'
 # way how to install it - there's a incoming support for pyproject.toml in pip but that's not
 # widely supported yet :/ Therefore, I ask developers to update these lists until we solve
 # this instance of chicken-and-egg problem.
-#
-# I'm leaving the necessary code in the setup.py but it's not being called.
-#
-
-# try:
-#    import gluetool
-#
-# except ImportError:
-#    print >> sys.stderr, 'Cannot import gluetool, please install it to install/build this package.'
-#    sys.exit(1)
 
 INSTALL_REQUIRES = [
     # required by all...
@@ -93,7 +83,6 @@ def _data_files(category_slug):
         dirpath,
         sorted([
             os.path.join(dirpath, filepath) for filepath in os.listdir(dirpath)
-            # pylint: disable=line-too-long
             if (filepath.endswith('.py') or filepath.endswith('.moduleinfo')) and filepath != '__init__.py'
         ])
     ]
@@ -116,65 +105,8 @@ DATA_FILES = [
     _data_files(category) for category in CATEGORIES
 ]
 
-# def get_install_requires():
-#    requirements = []
-#
-#    for root, _, files in os.walk('gluetool_modules'):
-#        for filename in files:
-#            if not filename.endswith('.moduleinfo'):
-#                continue
-#
-#            info = gluetool.utils.load_yaml(os.path.join(root, filename))
-#            if 'dependencies' not in info or 'pip' not in info['dependencies']:
-#                continue
-#
-#            requirements += info['dependencies']['pip']
-#
-#    requirements = sorted(requirements)
-#
-#    # filter out packages that are not in PYPI...
-#    dependency_links = [requirement for requirement in requirements if requirement.startswith('http')]
-#    # ... and remove them from requirements
-#    requirements = [requirement for requirement in requirements if requirement not in dependency_links]
-#
-#    return (requirements, dependency_links)
-
-
-# def get_data_files():
-#    file_collection = collections.defaultdict(list)
-#
-#    for root, _, files in os.walk('gluetool_modules'):
-#        for filename in files:
-#            if not filename.endswith('.moduleinfo'):
-#                continue
-#
-#            file_collection[root].append(os.path.splitext(filename)[0])
-#            continue
-#
-#    data_files = []
-#
-#    for root, names in file_collection.iteritems():
-#        data_files.append((
-#            'gluetool_modules/{}'.format(root),
-#            # pylint: disable=line-too-long
-#            ['{}/{}.py'.format(root, name) for name in names] + ['{}/{}.moduleinfo'.format(root, name) for name in names]
-#        ))
-#
-#    return data_files
-
 
 if __name__ == '__main__':
-    # gluetool.log.Logging.create_logger()
-
-    # INSTALL_REQUIRES, DEPENDENCY_LINKS = get_install_requires()
-    # DATA_FILES = get_data_files()
-
-    # pylint: disable=line-too-long
-    # for label, data in [('Install requires', INSTALL_REQUIRES), ('Dependency links', DEPENDENCY_LINKS), ('Data files', DATA_FILES)]:  # Ignore PEP8Bear
-    #    print '{}:'.format(label)
-    #    print gluetool.log.format_dict(data)
-    #    print
-
     setup(name='gluetool_modules',
           setup_requires=['setuptools_scm'],
           use_scm_version=True,

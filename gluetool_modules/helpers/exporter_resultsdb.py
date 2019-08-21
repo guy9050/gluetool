@@ -173,7 +173,6 @@ class CIExporterResultsDB(gluetool.Module):
         process_function = getattr(self, 'process_{}'.format(result.test_type.replace('-', '_')), None)
         if process_function is not None:
             # we're sure process_function *is* callable
-            # pylint: disable=not-callable
             process_function(result)
             self.info('{} results sent'.format(result.test_type))
         else:

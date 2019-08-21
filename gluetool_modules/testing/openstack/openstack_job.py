@@ -27,7 +27,7 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     job_name = 'ci-openstack'
 
     # DispatchJenkinsJobMixin.options contain hard defaults
-    # pylint: disable=gluetool-option-hard-default
+    # pylint: disable=gluetool-option-no-default-in-help,gluetool-option-hard-default
     options = dict_update({}, libci.dispatch_job.DispatchJenkinsJobMixin.options, {
         'build-dependencies-options': {
             'help': 'Additional options for ``build-dependencies-options`` module.'
@@ -76,7 +76,6 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
 
         # following options are passed to brew-build-task-params module
         'install-rpms-blacklist': {
-            # pylint: disable=line-too-long
             'help': """
                     Regexp pattern (compatible with ``egrep``) - when installing build, matching packages will
                     **not** be installed (default: %(default)s).

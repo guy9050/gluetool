@@ -2,12 +2,10 @@ import os.path
 
 import bs4
 
-# pylint: disable=wildcard-import
 from libci.tests import *  # noqa
 
 
 def check_loadable(glue, path, klass):
-    # pylint: disable=protected-access
     python_mod = glue._import_pm(path, 'pytest_foo')
 
     assert hasattr(python_mod, klass)

@@ -14,7 +14,6 @@ from . import create_module, patch_shared, assert_shared, check_loadable
 def fixture_module():
     ci, module = create_module(CIExporterResultsDB)
 
-    # pylint: disable=protected-access
     module._config['topic-pattern'] = 'topic://dummy/topic/{category}/foo'
 
     return ci, module

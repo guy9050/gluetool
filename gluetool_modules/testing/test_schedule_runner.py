@@ -6,7 +6,6 @@ from gluetool_modules.libs.jobs import JobEngine, Job, handle_job_errors
 from gluetool_modules.libs.test_schedule import TestScheduleEntryStage, TestScheduleEntryState
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from typing import TYPE_CHECKING, cast, Any, Callable, Dict, List, Optional  # noqa
 from gluetool_modules.libs.test_schedule import TestSchedule, TestScheduleEntry  # noqa
 from gluetool_modules.helpers.guest_setup import GuestSetupOutput
@@ -74,7 +73,6 @@ class TestScheduleRunner(gluetool.Module):
 
     def _setup_guest(self, schedule_entry):
         # type: (TestScheduleEntry) -> Any
-        # pylint: disable=no-self-use
 
         assert schedule_entry.guest is not None
 
@@ -153,8 +151,6 @@ class TestScheduleRunner(gluetool.Module):
         def _on_job_complete(result, schedule_entry):
             # type: (Any, TestScheduleEntry) -> None
 
-            # pylint: disable=unused-argument
-
             if schedule_entry.stage == TestScheduleEntryStage.GUEST_PROVISIONING:
                 schedule_entry.info('guest provisioning finished')
 
@@ -203,8 +199,6 @@ class TestScheduleRunner(gluetool.Module):
         def _on_job_error(exc_info, schedule_entry):
             # type: (Any, TestScheduleEntry) -> None
 
-            # pylint: disable=unused-argument
-
             exc = exc_info[1]
 
             if schedule_entry.stage == TestScheduleEntryStage.GUEST_PROVISIONING:
@@ -222,8 +216,6 @@ class TestScheduleRunner(gluetool.Module):
 
         def _on_job_done(remaining_count, schedule_entry):
             # type: (int, TestScheduleEntry) -> None
-
-            # pylint: disable=unused-argument
 
             # `remaining_count` is number of remaining jobs, but we're more interested in a number of remaining
             # schedule entries (one entry spawns multiple jobs, hence jobs are not usefull to us).

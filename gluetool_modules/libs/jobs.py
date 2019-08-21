@@ -11,7 +11,6 @@ import gluetool.log
 from six import reraise
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
 from typing import cast, Any, Callable, Dict, List, NamedTuple, Optional, Tuple  # noqa
 
 
@@ -30,7 +29,6 @@ Job = NamedTuple('Job', (
 ))
 
 
-# pylint: disable=invalid-name
 JobErrorType = Tuple[Job, gluetool.log.ExceptionInfoType]
 
 
@@ -71,7 +69,6 @@ def handle_job_errors(errors, exception_message, logger=None):
 
 
 class JobEngine(object):
-    # pylint: disable=too-many-arguments
     def __init__(self,
                  logger=None,  # type: Optional[gluetool.log.ContextAdapter]
                  max_workers=None,  # type: Optional[int]
@@ -235,7 +232,6 @@ class JobEngine(object):
         )
 
 
-# pylint: disable=too-many-arguments
 def run_jobs(jobs,  # type: List[Job]
              logger=None,  # type: Optional[gluetool.log.ContextAdapter]
              max_workers=None,  # type: Optional[int]

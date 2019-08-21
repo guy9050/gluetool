@@ -1,4 +1,3 @@
-# pylint: disable=protected-access
 import os
 import urllib2
 import pytest

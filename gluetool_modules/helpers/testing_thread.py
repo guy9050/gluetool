@@ -72,7 +72,6 @@ class TestingThread(gluetool.Module):
         if gluetool_modules.libs.is_recursion(__file__, 'eval_context'):
             return {}
 
-        # pylint: disable=unused-variable
         __content__ = {  # noqa
             'THREAD_ID': """
                          ID of the current testing thread.

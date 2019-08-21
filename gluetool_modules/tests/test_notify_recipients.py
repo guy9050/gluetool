@@ -11,8 +11,6 @@ from . import create_module, patch_shared, check_loadable
 
 @pytest.fixture(name='module')
 def fixture_module():
-    # pylint: disable=unused-argument
-
     return create_module(gluetool_modules.helpers.notify_recipients.NotifyRecipients)[1]
 
 
@@ -22,7 +20,6 @@ def fixture_configured_module(module, tmpdir):
     # we want to test. Not all tests use the "configured" version of module, and of those
     # who does, not all check every of the recipient options, they are usually exclusive.
 
-    # pylint: disable=protected-access
     module._config.update({
         'beaker-notify': ['def', 'ghi', 'to-be-removed-by-map'],
         'boc-notify': ['pqr, stu'],
@@ -80,7 +77,6 @@ def test_polish():
 
 
 def test_force_recipients(module):
-    # pylint: disable=protected-access
     module._config['force-recipients'] = ['foo', 'bar, baz']
 
     assert module.force_recipients == ['foo', 'bar', 'baz']
@@ -103,17 +99,14 @@ def test_prepare_target_recipients(module, target, expected):
 
 
 def test_add_mapped_recipients(module):
-    # pylint: disable=line-too-long
     assert module._add_recipients(['foo', 'bar'], {'VAR': 'baz'}, ['simple baz', 'complicated {{ VAR }}']) == ['foo', 'bar', 'simple baz', 'complicated baz']  # Ignore PEP8Bear
 
 
 def test_remove_mapped_recipients(module):
-    # pylint: disable=line-too-long
     assert module._remove_recipients(['foo', 'bar', 'simple baz', 'complicated baz'], {'VAR': 'baz'}, ['simple baz', 'complicated {{ VAR }}']) == ['foo', 'bar']  # Ignore PEP8Bear
 
 
 def test_replace_mapped_recipients(module):
-    # pylint: disable=line-too-long
     assert module._replace_recipients(['foo', 'simple baz', 'complicated baz'], {'VAR': 'baz'}, '.*? baz', ['just {{ VAR }}'])  # Ignore PEP8Bear
 
 
@@ -149,7 +142,6 @@ def test_recipients(configured_module):
     """
 
     # Configured module has foo-notify set, and that'd override our test
-    # pylint: disable=protected-access
     del configured_module._config['foo-notify']
 
     assert configured_module._recipients_by_result('foo') == [
@@ -163,7 +155,6 @@ def test_notify_recipients(configured_module):
     Tests whether ``*-notify`` overrides ``*-default-notify``, ``*-add-notify`` and ``recipients``.
     """
 
-    # pylint: disable=protected-access
     assert configured_module._recipients_by_result('foo') == [
         'xyz'
     ]
@@ -174,7 +165,6 @@ def test_notify_force_recipients(configured_module):
     Tests whether force-recipients overrides result-specific options.
     """
 
-    # pylint: disable=protected-access
     configured_module._config['force-recipients'] = ['even', 'more', 'powerful']
 
     assert configured_module._recipients_by_result('foo') == [
@@ -187,7 +177,6 @@ def test_overall_recipients(configured_module):
     Tests whether it's possible to get recipients for all known result types.
     """
 
-    # pylint: disable=protected-access
     assert configured_module._recipients_overall() == [
         'def', 'ghi', 'to-be-removed-by-map', 'pqr', 'stu',
         'generic recipient 1', 'generic recipient 2', 'generic recipient 3',
@@ -219,7 +208,6 @@ def test_finalize_recipients(log, configured_module, monkeypatch):
         }
     })
 
-    # pylint: disable=protected-access
     assert configured_module._finalize_recipients(['foo', 'bar', 'baz', 'to-be-removed-by-map']) \
         == ['bar', 'baz', 'foo', 'from-map-always-bar', 'from-map-always-foo']
 
@@ -228,7 +216,6 @@ def test_finalize_recipients(log, configured_module, monkeypatch):
     # Without result type, return all recipients
     (
         None,
-        # pylint: disable=line-too-long
         ['abc', 'def', 'from-map-always-bar', 'from-map-always-foo', 'generic recipient 1', 'generic recipient 2', 'generic recipient 3', 'ghi', 'jkl', 'mno', 'pqr', 'some-weird/recipient', 'stu', 'uvw']  # Ignore PEP8Bear
     ),
     # With specific type, return just its recipients

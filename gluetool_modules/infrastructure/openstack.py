@@ -1,5 +1,3 @@
-# pylint: disable=too-many-lines
-
 import collections
 import errno
 import gzip
@@ -126,12 +124,10 @@ class OpenStackImage(LoggerMixin, object):
             return self._resource
 
         try:
-            # pylint: disable=protected-access
             image = self.module._call_api('images.find', self.module.nova.images.find, name=self.name)
             self._resource = image
 
         except NotFound:
-            # pylint: disable=protected-access
             self.module._resource_not_found('images', self.name)
 
         except NoUniqueMatch:
@@ -142,7 +138,6 @@ class OpenStackImage(LoggerMixin, object):
 
             images = [
                 (image, image.to_dict())
-                # pylint: disable=protected-access
                 for image in self.module._call_api('images.findall', self.module.nova.images.findall, name=self.name)
             ]
 
@@ -238,8 +233,6 @@ class OpenstackGuest(NetworkedGuest):
 
         # callback for `pattern` command
         def _pattern(instruction, command, argument, context):
-            # pylint: disable=unused-argument
-
             # either a single pattern or a list of patterns
             patterns = [argument] if isinstance(argument, str) else argument
 
@@ -255,8 +248,6 @@ class OpenstackGuest(NetworkedGuest):
 
         # callback for `allow-any` command
         def _allow_any(instruction, command, argument, context):
-            # pylint: disable=unused-argument
-
             self.debug('current decision: {}'.format(result['decision']))
             self.debug("matchig service '{}' with allow-any '{}'".format(service, argument))
 
@@ -281,7 +272,6 @@ class OpenstackGuest(NetworkedGuest):
     # Low-level API, dealing directly with OpenStack resources and objects.
     #
 
-    # pylint: disable=too-many-arguments
     @staticmethod
     def _acquire_os_resource(resource, logger, timeout, tick, func_label, func, *args, **kwargs):
         """
@@ -481,7 +471,6 @@ class OpenstackGuest(NetworkedGuest):
                 f.write(console)
                 f.flush()
 
-        # pylint: disable=broad-except
         except Exception as exc:
             self.warn('Failed to store console output in the file: {}'.format(str(exc)), sentry=True)
 
@@ -593,7 +582,6 @@ class OpenstackGuest(NetworkedGuest):
         return self._get_resource_status(resource, rid) == status
 
     def _wait_for_resource_status(self, label, resource, rid, status, timeout, tick):
-        # pylint: disable=too-many-arguments
         def _check():
             if self._check_resource_status(resource, rid, status):
                 return Result.Ok(True)
@@ -751,7 +739,6 @@ class OpenstackGuest(NetworkedGuest):
         return str(self._os_network_ip) if self._os_network_ip else None
 
     @property
-    # pylint: disable=invalid-name
     def ip(self):
         """
         Property returns an available IP address of the machine, floating IP is preferred over network IP.
@@ -833,7 +820,6 @@ class OpenstackGuest(NetworkedGuest):
         return True
 
     def setup(self, variables=None, **kwargs):
-        # pylint: disable=arguments-differ
         """
         Custom setup for Openstack guests. Add a resolvable openstack hostname in case there
         is none.
@@ -1146,7 +1132,6 @@ class CIOpenstack(gluetool.Module):
                 'metavar': 'SECONDS'
             },
             'activation-timeout': {
-                # pylint: disable=line-too-long
                 'help': 'Wait SECOND for a guest to become reachable over network (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_ACTIVATION_TIMEOUT,
@@ -1159,14 +1144,12 @@ class CIOpenstack(gluetool.Module):
                 'metavar': 'SECONDS'
             },
             'boot-timeout': {
-                # pylint: disable=line-too-long
                 'help': 'Wait SECONDS for a guest to finish its booting process (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_BOOT_TIMEOUT,
                 'metavar': 'SECONDS'
             },
             'shutdown-timeout': {
-                # pylint: disable=line-too-long
                 'help': 'Wait SECONDS for a guest to finish its shutdown process (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_SHUTDOWN_TIMEOUT,
@@ -1178,14 +1161,18 @@ class CIOpenstack(gluetool.Module):
                 'help': 'Mapping of services which are allowed to be degraded while checking boot process status.'
             },
             'start-after-snapshot-attempts': {
-                # pylint: disable=line-too-long
-                'help': 'When starting guest after taking its snapshot, try this many times before giving up (default: %(default)s)',
+                'help': """
+                        When starting guest after taking its snapshot, try this many times before giving up
+                        (default: %(default)s)
+                        """,
                 'type': int,
                 'default': DEFAULT_START_AFTER_SNAPSHOT_ATTEMPTS
             },
             'restore-snapshot-attempts': {
-                # pylint: disable=line-too-long
-                'help': 'When rebuilding guest to restore a snapshot, try this many times before giving up (default: %(default)s)',
+                'help': """
+                        When rebuilding guest to restore a snapshot, try this many times before giving up
+                        (default: %(default)s)
+                        """,
                 'type': int,
                 'default': DEFAULT_RESTORE_SNAPSHOT_ATTEMPTS
             }
@@ -1213,7 +1200,6 @@ class CIOpenstack(gluetool.Module):
 
     @property
     def eval_context(self):
-        # pylint: disable=unused-variable
         __content__ = {  # noqa
             'OPENSTACK_GUESTS': """
                              List of `OpenstackGuest` object, which represents currently provisioned guests
@@ -1475,8 +1461,6 @@ class CIOpenstack(gluetool.Module):
         return None
 
     def provision(self, environment, count=1, name=None, image=None, flavor=None, **kwargs):
-        # pylint: disable=too-many-arguments,unused-argument
-
         assert count >= 1, 'count needs to >= 1'
 
         self.info('provisioning guest for environment {}'.format(environment))
@@ -1530,7 +1514,6 @@ class CIOpenstack(gluetool.Module):
         self.debug('created {} guests, waiting for them to become alive'.format(count))
 
         for guest in guests:
-            # pylint: disable=protected-access
             # instance is already started by OpenStack, check its status before moving on
             guest._wait_alive()
 

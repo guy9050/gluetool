@@ -165,7 +165,6 @@ class NotifyEmailBeahFormatter(gluetool.Module):
             'BEAKER_MATRIX_URL': beaker_matrix_url
         })
 
-    # pylint: disable=invalid-name
     def notify_email_beaker_formatter(self, notify_email, result, message):
         """
         Format message to represent the Beaker result. Updates body of given message.

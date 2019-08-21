@@ -1,4 +1,3 @@
-# pylint: disable=protected-access
 import pytest
 
 from gluetool_modules.helpers.envinject import EnvInject

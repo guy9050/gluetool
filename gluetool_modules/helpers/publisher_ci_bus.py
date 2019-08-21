@@ -12,8 +12,10 @@ class CIBusPublisher(gluetool.Module):
     """
 
     name = 'publisher-ci-bus'
-    # pylint: disable=line-too-long
-    description = 'This module provides shared function to send messages via a messaging server (such as Apollo or RabbitMQ) using the STOMP protocol.'
+    description = """
+                  This module provides shared function to send messages via a messaging server
+                  (such as Apollo or RabbitMQ) using the STOMP protocol.
+                  """
 
     options = {
         'destination': {
@@ -59,7 +61,6 @@ class CIBusPublisher(gluetool.Module):
         return session
 
     def publish_bus_messages(self, messages, **kwargs):
-        # pylint: disable=unused-argument
         """
         Publish one or more message to the message bus.
 

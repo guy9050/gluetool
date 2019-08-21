@@ -15,8 +15,6 @@ class DistGitRepository(LoggerMixin, gluetool_modules.libs.git.RemoteGitReposito
     """
 
     def __init__(self, module, package, clone_url=None, branch=None, ref=None, web_url=None):
-        # pylint: disable=too-many-arguments
-
         super(DistGitRepository, self).__init__(module.logger, clone_url, branch=branch, ref=ref, web_url=web_url)
 
         self._module = module
@@ -212,7 +210,6 @@ class DistGit(gluetool.Module):
 
     @property
     def eval_context(self):
-        # pylint: disable=unused-variable
         __content__ = {  # noqa
             'DIST_GIT_REPOSITORY': """
                                     Dist-git repository, represented as ``DistGitRepository`` instance.
@@ -241,7 +238,6 @@ class DistGit(gluetool.Module):
     def _artifact_branch(self, task):
         return self.branch_map.match(task.target)
 
-    # pylint: disable=no-self-use
     def _artifact_ref(self, task):
         return task.distgit_ref
 
@@ -251,19 +247,15 @@ class DistGit(gluetool.Module):
     def _artifact_web_url(self, task):
         return self.web_url_map.match(task.ARTIFACT_NAMESPACE)
 
-    # pylint: disable=unused-argument
     def _force_branch(self, *args):
         return self.option('branch')
 
-    # pylint: disable=unused-argument
     def _force_ref(self, *args):
         return self.option('ref')
 
-    # pylint: disable=unused-argument
     def _force_clone_url(self, *args):
         return self.option('clone-url')
 
-    # pylint: disable=unused-argument
     def _force_web_url(self, *args):
         return self.option('web-url')
 

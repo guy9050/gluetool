@@ -7,7 +7,6 @@ from gluetool.utils import normalize_path_option, render_template
 from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order,ungrouped-imports
 from typing import cast, TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union  # noqa
 
 if TYPE_CHECKING:

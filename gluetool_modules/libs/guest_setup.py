@@ -17,7 +17,6 @@ structure all ``setup_guest`` functions should return, and states few basic rule
 import os
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
 from typing import TYPE_CHECKING, Any, NamedTuple, Optional  # noqa
 
 if TYPE_CHECKING:

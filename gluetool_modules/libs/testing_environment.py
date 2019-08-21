@@ -4,11 +4,10 @@ from gluetool.utils import normalize_multistring_option
 import gluetool_modules.libs
 
 # Type annotations
-# pylint: disable=unused-import,wrong-import-order
 from typing import Any, Dict, List, Optional, Union  # noqa
 
 
-ComposeType = Union[str, gluetool_modules.libs._UniqObject]  # pylint: disable=invalid-name,protected-access
+ComposeType = Union[str, gluetool_modules.libs._UniqObject]
 ArchType = str
 
 

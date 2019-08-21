@@ -1,5 +1,3 @@
-# pylint: disable=too-many-arguments
-
 import pytest
 
 import gluetool_modules.testing.beah_result_parser
@@ -9,8 +7,6 @@ from . import create_module, check_loadable, xml as X
 
 @pytest.fixture(name='module')
 def fixture_module():
-    # pylint: disable=unused-argument
-
     return create_module(gluetool_modules.testing.beah_result_parser.BeahResultParser)
 
 
@@ -56,7 +52,6 @@ def test_arch(log, module, task, journal, recipe, expected):
 
     result = {}
 
-    # pylint: disable=protected-access
     mod._find_architecture(result, task, journal, recipe)
 
     if expected is None:
@@ -99,7 +94,6 @@ def test_version(log, module, task, journal, recipe, expected):
 
     result = {}
 
-    # pylint: disable=protected-access
     mod._find_version(result, task, journal, recipe)
 
     if expected is None:
@@ -142,7 +136,6 @@ def test_recipe_id(log, module, task, journal, recipe, expected):
 
     result = {}
 
-    # pylint: disable=protected-access
     mod._find_recipe_id(result, task, journal, recipe)
 
     if expected is None:
@@ -185,7 +178,6 @@ def test_distro(log, module, task, journal, recipe, expected):
 
     result = {}
 
-    # pylint: disable=protected-access
     mod._find_distro(result, task, journal, recipe)
 
     if expected is None:
@@ -228,7 +220,6 @@ def test_variant(log, module, task, journal, recipe, expected):
 
     result = {}
 
-    # pylint: disable=protected-access
     mod._find_variant(result, task, journal, recipe)
 
     if expected is None:
@@ -271,7 +262,6 @@ def test_params(log, module, task, journal, recipe, expected):
 
     result = {}
 
-    # pylint: disable=protected-access
     mod._find_params(result, task, journal, recipe)
 
     if expected is None:
@@ -321,7 +311,6 @@ def test_packages(log, module, task, journal, recipe, expected):
 
     result = {}
 
-    # pylint: disable=protected-access
     mod._find_packages(result, task, journal, recipe)
 
     if expected is None:
@@ -376,7 +365,6 @@ def test_machine(log, module, task, journal, recipe, expected):
 
     result = {}
 
-    # pylint: disable=protected-access
     mod._find_machine(result, task, journal, recipe)
 
     if expected is None:
@@ -402,7 +390,6 @@ def test_machine(log, module, task, journal, recipe, expected):
 def test_connectable_host(module, connectable_hostname, result, expected):
     _, mod = module
 
-    # pylint: disable=protected-access
     mod._find_connectable_host(result, connectable_hostname)
 
     assert result['connectable_host'] == expected
@@ -455,7 +442,6 @@ def test_duration(log, module, task, journal, recipe, expected):
 
     result = {}
 
-    # pylint: disable=protected-access
     mod._find_duration(result, task, journal, recipe)
 
     if expected is None:
@@ -497,7 +483,6 @@ def test_duration(log, module, task, journal, recipe, expected):
 def test_logs(module, element, expected):
     _, mod = module
 
-    # pylint: disable=protected-access
     logs = mod._find_logs(element, None)
 
     assert logs == expected
@@ -652,7 +637,6 @@ def test_phases(log, module, task, journal, expected):
 
     result = {}
 
-    # pylint: disable=protected-access
     mod._find_phases(result, task, journal, None)
 
     if expected is None:

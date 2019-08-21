@@ -1,4 +1,3 @@
-# pylint: disable=protected-access
 import os
 import pytest
 
@@ -226,7 +225,6 @@ def test_run_command_error(module, monkeypatch):
 
 def test_invalid_json(monkeypatch, tmpdir):
     def mocked_urlopen(url):
-        # pylint: disable=unused-argument
         file_name = 'dummy_file.html'
         outfile = tmpdir.join(file_name)
         outfile.write('{{{ some invalid json')
@@ -240,7 +238,6 @@ def test_invalid_json(monkeypatch, tmpdir):
     result = CovscanResult(module, 000)
 
     with pytest.raises(CovscanFailedError):
-        # pylint: disable=pointless-statement
         result.added
 
 
@@ -255,7 +252,6 @@ def test_no_baseline(module):
 
 def test_fetch_added(monkeypatch, tmpdir):
     def mocked_urlopen(url):
-        # pylint: disable=unused-argument
         file_name = 'dummy_file.html'
         outfile = tmpdir.join(file_name)
 
@@ -274,7 +270,6 @@ def test_fetch_added(monkeypatch, tmpdir):
 
 def test_fetch_fixed(monkeypatch, tmpdir):
     def mocked_urlopen(url):
-        # pylint: disable=unused-argument
         file_name = 'dummy_file.html'
         outfile = tmpdir.join(file_name)
         outfile.write(FIXED)

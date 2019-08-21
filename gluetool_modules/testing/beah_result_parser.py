@@ -22,8 +22,6 @@ class BeahResultParser(gluetool.Module):
     def _find_architecture(self, result, task, journal, recipe):
         # Architecture is not in <task/> but journal and recipe seem to be a reliable sources
 
-        # pylint: disable=unused-argument
-
         if recipe and 'arch' in recipe.attrs:
             result['bkr_arch'] = recipe['arch']
 
@@ -36,8 +34,6 @@ class BeahResultParser(gluetool.Module):
     def _find_connectable_host(self, result, connectable_hostname):
         # Connectable hostname
 
-        # pylint: disable=no-self-use
-
         if connectable_hostname is not None:
             result['connectable_host'] = connectable_hostname
 
@@ -46,8 +42,6 @@ class BeahResultParser(gluetool.Module):
 
     def _find_distro(self, result, task, journal, recipe):
         # Distro
-
-        # pylint: disable=unused-argument
 
         if recipe and 'distro' in recipe.attrs:
             result['bkr_distro'] = recipe['distro']
@@ -58,8 +52,6 @@ class BeahResultParser(gluetool.Module):
     def _find_duration(self, result, task, journal, recipe):
         # Task duration - Beaker provides this info in <task/>, restraint does not but it's possible
         # it stores the data into journal
-
-        # pylint: disable=unused-argument
 
         if task and task.has_attr('duration'):
             duration = 0
@@ -97,8 +89,6 @@ class BeahResultParser(gluetool.Module):
     def _find_machine(self, result, task, journal, recipe):
         # Machine the task ran on
 
-        # pylint: disable=unused-argument
-
         if task and task.roles and task.roles.find_all('system'):
             result['bkr_host'] = task.roles.find_all('system')[0]['value']
 
@@ -110,8 +100,6 @@ class BeahResultParser(gluetool.Module):
 
     def _find_packages(self, result, task, journal, recipe):
         # Packages - sometimes they are listed, sometimes not, but always in journal
-
-        # pylint: disable=unused-argument
 
         if journal:
             packages = {}
@@ -130,8 +118,6 @@ class BeahResultParser(gluetool.Module):
     def _find_params(self, result, task, journal, recipe):
         # Task params are just in <task/>
 
-        # pylint: disable=unused-argument
-
         if task and task.params:
             result['bkr_params'] = [
                 '{}=\"{}\"'.format(param['name'], param['value']) for param in task.params.find_all('param')
@@ -143,8 +129,6 @@ class BeahResultParser(gluetool.Module):
     def _find_recipe_id(self, result, task, journal, recipe):
         # Recipe ID is only in recipe
 
-        # pylint: disable=unused-argument
-
         if recipe and 'id' in recipe.attrs:
             result['bkr_recipe_id'] = int(recipe['id'])
 
@@ -153,8 +137,6 @@ class BeahResultParser(gluetool.Module):
 
     def _find_variant(self, result, task, journal, recipe):
         # Distro variant is only in recipe
-
-        # pylint: disable=unused-argument
 
         if recipe and 'variant' in recipe.attrs:
             result['bkr_variant'] = recipe['variant']
@@ -165,8 +147,6 @@ class BeahResultParser(gluetool.Module):
     def _find_version(self, result, task, journal, recipe):
         # Version - restraint does not export this
 
-        # pylint: disable=unused-argument
-
         if task and task.has_attr('version'):
             result['bkr_version'] = task['version']
 
@@ -174,7 +154,6 @@ class BeahResultParser(gluetool.Module):
             self.debug('Cannot deduce bkr version')
 
     def _find_logs(self, root, artifact_path):
-        # pylint: disable=no-self-use
         if root.logs is None:
             return []
 
@@ -223,7 +202,6 @@ class BeahResultParser(gluetool.Module):
             self.debug('Cannot deduce task phases')
 
     def parse_beah_result(self, task, journal=None, recipe=None, artifact_path=None, connectable_hostname=None):
-        # pylint: disable=line-too-long
         """
         Processes XML description of task result, complemented by the recipe XML and journal, if available,
         and returns dictionary with "standardized" keys, describing the result.
@@ -364,9 +342,7 @@ class BeahResultParser(gluetool.Module):
             the hostname may not be accessible - in that case, caller should specify the correct
             hostname via ``connectable_hostname`` parameter.
         :returns: ``dict`` describing the result.
-        """
-
-        # pylint: disable=too-many-arguments,too-many-branches,too-many-statements
+        """  # noqa: E501  # line too long
 
         log_blob(self.debug, 'task XML', task.prettify(encoding='utf-8'))
 

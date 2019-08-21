@@ -16,7 +16,6 @@ COMPOSECI_EXIT_CODES = {
 class ComposeTestResult(libci.results.TestResult):
     """ ComposeTest test result data container """
 
-    # pylint: disable-msg=too-many-arguments
     def __init__(self, glue, overall_result, tag_configuration, difflog, output_end, **kwargs):
         super(ComposeTestResult, self).__init__(
             glue, 'composetest', overall_result, **kwargs

@@ -11,7 +11,6 @@ from . import create_module, patch_shared, assert_shared, check_loadable
 def fixture_module():
     module = create_module(brew_tag_build.CIBrewTagBuild)[1]
 
-    # pylint: disable=protected-access
     module._config['tag-group'] = 'dummy-group'
     module._config['config'] = 'dummy-config'
 
@@ -45,7 +44,6 @@ def test_loadable(module):
 
 
 def test_execute_no_primary_task(module):
-    # pylint: disable=protected-access
     assert_shared('primary_task', module.execute)
 
 

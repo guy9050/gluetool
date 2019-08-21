@@ -28,8 +28,6 @@ def _load_from_assets(starts_with):
 
 @pytest.fixture(name='module')
 def fixture_module(monkeypatch):
-    # pylint: disable=unused-argument
-
     module = create_module(gluetool_modules.dispatchers.test_batch_planner.TestBatchPlanner)[1]
 
     patch_shared(monkeypatch, module, {
@@ -74,7 +72,6 @@ def test_reduce_section(module, script):
 
     raises = script.get('raises', None)
 
-    # pylint: disable=protected-access
     if raises is not None:
         klass_path = raises['klass'].split('.')
         module_path, klass_name = '.'.join(klass_path[0:-1]), klass_path[-1]
@@ -102,7 +99,6 @@ def test_reduce_section(module, script):
     )
 ])
 def test_config(module, config, expected):
-    # pylint: disable=protected-access
     actual = module._construct_command_sets(config, 'component-foo')
 
     gluetool.log.log_dict(module.debug, 'expected command sets', expected)
@@ -116,7 +112,6 @@ def test_config(module, config, expected):
     ('llvm-toolset', ['static-config', 'sti'])
 ])
 def test_ignore_methods(module, monkeypatch, component, ignored_methods):
-    # pylint: disable=protected-access
     module._config['ignore-methods-map'] = os.path.join(ASSETS_DIR, 'ignore-methods-map.yaml')
     rules_engine = gluetool_modules.helpers.rules_engine.RulesEngine(module.glue, 'rules-engine')
 

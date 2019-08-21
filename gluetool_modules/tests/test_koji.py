@@ -60,14 +60,12 @@ def fixture_koji_session(request, monkeypatch):
 
 @pytest.fixture(name='koji_module')
 def fixture_koji_module(monkeypatch):
-    # pylint: disable=unused-argument
     ci, mod = create_module(gluetool_modules.infrastructure.koji_fedora.Koji)
 
     # make sure task has required share function
     assert ci.has_shared('tasks')
     assert ci.has_shared('primary_task')
 
-    # pylint: disable=protected-access
     mod._config = {
         'url': 'https://koji.fedoraproject.org/kojihub',
         'pkgs-url': 'https://kojipkgs.fedoraproject.org',
@@ -82,14 +80,12 @@ def fixture_koji_module(monkeypatch):
 
 @pytest.fixture(name='brew_module')
 def fixture_brew_module(monkeypatch):
-    # pylint: disable=unused-argument
     ci, mod = create_module(gluetool_modules.infrastructure.koji_fedora.Brew)
 
     # make sure task has required share function
     assert ci.has_shared('tasks')
     assert ci.has_shared('primary_task')
 
-    # pylint: disable=protected-access
     mod._config = {
         'url': 'https://brewhub.engineering.redhat.com/brewhub',
         'pkgs-url': 'http://download.eng.bos.redhat.com/brewroot',
@@ -160,7 +156,6 @@ def test_task_by_task_id_option(koji_session, koji_module):
 
     task_id, has_artifacts = koji_session
 
-    # pylint: disable=protected-access
     koji_module._config['task-id'] = [task_id]
 
     koji_module.execute()
@@ -185,7 +180,6 @@ def test_task_by_nvr_option(koji_session, koji_module):
 
     task_id, nvr = koji_session
 
-    # pylint: disable=protected-access
     koji_module._config['nvr'] = [nvr]
 
     koji_module.execute()
@@ -203,7 +197,6 @@ def test_task_by_build_id_option(koji_session, koji_module):
 
     task_id, build_id = koji_session
 
-    # pylint: disable=protected-access
     koji_module._config['build-id'] = [build_id]
 
     koji_module.execute()
@@ -221,7 +214,6 @@ def test_task_by_name_and_tag_options(koji_session, koji_module):
 
     task_id, name, tag = koji_session
 
-    # pylint: disable=protected-access
     koji_module._config.update({
         'name': name,
         'tag': tag
@@ -264,7 +256,6 @@ def test_not_valid_build_tasks(koji_session, koji_module):
 
 
 def test_missing_name_option(koji_module):
-    # pylint: disable=protected-access
     koji_module._config['tag'] = 'f25'
 
     with pytest.raises(gluetool.GlueError, match=r"You need to specify package name with '--name' option"):
@@ -272,7 +263,6 @@ def test_missing_name_option(koji_module):
 
 
 def test_missing_tag_option(koji_module):
-    # pylint: disable=protected-access
     koji_module._config['name'] = 'bash'
 
     with pytest.raises(gluetool.GlueError, match=r"You need to specify 'tag' with package name"):
@@ -283,7 +273,6 @@ def test_missing_tag_option(koji_module):
     705705
 ], indirect=True)
 def test_invalid_build(koji_session, koji_module, log):
-    # pylint: disable=protected-access
     koji_module._config['build-id'] = [koji_session]
 
     koji_module.execute()

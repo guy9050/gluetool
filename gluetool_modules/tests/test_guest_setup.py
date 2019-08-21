@@ -13,8 +13,6 @@ from . import assert_shared, create_module, patch_shared
 
 @pytest.fixture(name='module')
 def fixture_module():
-    # pylint: disable=unused-argument
-
     return create_module(gluetool_modules.helpers.guest_setup.GuestSetup)[1]
 
 
@@ -83,7 +81,6 @@ def test_setup(log, module, local_guest, monkeypatch):
 
         return None
 
-    # pylint: disable=protected-access
     module._config['playbooks'] = ','.join(playbooks)
     module._config['extra-vars'] = ['key2=val2,key3=val3', 'key4=val4']
 

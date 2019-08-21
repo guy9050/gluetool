@@ -38,7 +38,6 @@ RPMDIFF_WEBUI_COMMENT = "Autowaived with citool with these rules: {}"
 
 
 class RpmDiffError(object):
-    # pylint: disable=too-few-public-methods
     """
     Helper class as data container for errors in RPMDiff Web UI
 
@@ -54,7 +53,6 @@ class RpmDiffError(object):
 
 
 class RpmDiffWaiverMatcher(object):
-    # pylint: disable=too-few-public-methods
     """
     Helper class for matching RPMDiff test errors against waivers
 
@@ -329,7 +327,6 @@ class RpmDiffWaiver(gluetool.Module):
         self.info("map brew tag '{}' to product version".format(target))
         try:
             errata_products = self._map_tag_to_product(target)
-        # pylint: disable=no-member
         except psycopg2.OperationalError as e:
             self.warn("TEIID returned error while querying for errata products:\n{}".format(str(e)), sentry=True)
             return
@@ -342,7 +339,6 @@ class RpmDiffWaiver(gluetool.Module):
         self.info("query waivers for product version: {}".format(errata_products))
         try:
             waivers = self.query_waivers(package, errata_products)
-        # pylint: disable=no-member
         except psycopg2.OperationalError as e:
             self.warn("TEIID returned error while querying for waivers:\n{}".format(str(e)), sentry=True)
             return

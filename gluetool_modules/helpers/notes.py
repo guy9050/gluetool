@@ -3,6 +3,9 @@ import logging
 
 import gluetool
 
+# Type annotations
+from typing import Any
+
 
 #: A note.
 #:
@@ -49,8 +52,6 @@ class Notes(gluetool.Module):
             attempts to convert it to levels of ``logging`` module.
         """
 
-        # pylint: disable=protected-access
-
         if isinstance(level, str):
             level_name = level.upper()
 
@@ -71,7 +72,6 @@ class Notes(gluetool.Module):
 
     @property
     def eval_context(self):
-        # pylint: disable=unused-variable
         __content__ = {  # noqa
             'NOTES': """
                      List of all gathered notes, sorted by their levels from the more important levels

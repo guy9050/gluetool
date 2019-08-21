@@ -164,8 +164,6 @@ class Events(gluetool.Module):
                     # Dummy, one-purpose callback that just passes commands from a map down to the shared
                     # function of execute-command module. Event arguments are passed as an extra context.
                     def _callback(triggered_event, commands=None, **kwargs):
-                        # pylint: disable=unused-argument
-
                         self.require_shared('execute_commands')
 
                         self.shared('execute_commands', commands, context_extra=kwargs)

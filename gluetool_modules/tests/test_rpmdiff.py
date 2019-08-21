@@ -1,4 +1,3 @@
-# pylint: disable=protected-access
 import logging
 import pytest
 
@@ -568,7 +567,6 @@ def fixture_task():
     mocked_component = PropertyMock(return_value="which")
 
     def tostring(self):
-        # pylint: disable=unused-argument
         return "1"
     mocked_task_id.__str__ = tostring
     type(mocked_task).scratch = mocked_scratch
@@ -632,19 +630,16 @@ def fixture_module_execute(configured_module, monkeypatch, task):
 
 
 def passed_run_command(cmd, **kwargs):
-    # pylint: disable=unused-argument
     if cmd and "results" in cmd[-1]:
         return Bunch(exit_code=0, stdout=PASSED_RESULTS_STDOUT, stderr="")
     return Bunch(exit_code=0, stdout=SUCCESS_STDOUT, stderr="")
 
 
 def faulty_run_command(cmd, **kwargs):
-    # pylint: disable=unused-argument
     raise gluetool.GlueCommandError(cmd, Bunch(exit_code=1, stderr="error msg"))
 
 
 def failed_run_command(cmd, **kwargs):
-    # pylint: disable=unused-argument
     if cmd and "results" in cmd[-1]:
         return Bunch(exit_code=0, stdout=PASSED_RESULTS_STDOUT, stderr="")
     return Bunch(exit_code=0, stdout=FAILED_STDOUT, stderr="")
@@ -823,7 +818,6 @@ def test_refresh_results(module_with_ciresults, monkeypatch):
 def test_execute_set_huburl(configured_module, url):
     _, module = configured_module
     module._config["url"] = url
-    # pylint: disable=line-too-long
     with pytest.raises(gluetool.GlueError, match=r"^Shared function 'primary_task' is required."):
         module.execute()
     assert module.hub_url == url

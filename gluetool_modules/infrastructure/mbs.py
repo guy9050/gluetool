@@ -6,7 +6,6 @@ import re
 from concurrent.futures import ThreadPoolExecutor, wait
 import requests
 
-# pylint: disable=no-name-in-module
 from jq import jq
 
 import gluetool
@@ -156,8 +155,9 @@ class MBSApi(object):
         try:
             return self._get_json(url, params=params)['items'][0]
         except (IndexError, KeyError):
-            # pylint: disable=line-too-long
-            raise gluetool.GlueError("Could not find module with nsvc '{}:{}:{}:{}'".format(name, stream, version, context))  # Ignore PEP8Bear
+            raise gluetool.GlueError(
+                "Could not find module with nsvc '{}:{}:{}:{}'".format(name, stream, version, context)
+            )
 
     def get_build_ui_url(self, build_id):
         """
@@ -171,13 +171,9 @@ class MBSApi(object):
 
 
 class MBSTask(LoggerMixin, object):
-    # pylint: disable=too-few-public-methods,too-many-instance-attributes
-
     ARTIFACT_NAMESPACE = 'redhat-module'
 
     def __init__(self, module, build_id=None, nsvc=None, nvr=None):
-        # pylint: disable=invalid-name
-
         super(MBSTask, self).__init__(module.logger)
 
         self.module = module
@@ -266,8 +262,6 @@ class MBSTask(LoggerMixin, object):
 
     @cached_property
     def has_artifacts(self):
-        # pylint: disable=no-self-use
-
         # We believe MBS - and Brew behind it keeps artifacts "forever" - or, at least, long enough to matter to us
         # - therefore we don't even bother to check for their presence.
 
@@ -459,7 +453,6 @@ class MBS(gluetool.Module):
 
     @property
     def eval_context(self):
-        # pylint: disable=unused-variable
         __content__ = {  # noqa
             'ARTIFACT_TYPE': """
                              Type of the artifact, ``mbs-build`` in the case of ``mbs`` module.
@@ -505,8 +498,12 @@ class MBS(gluetool.Module):
         return self._mbs_api
 
     def execute(self):
-        # pylint: disable=line-too-long
-        self.info("connected to MBS instance '{}' version '{}'".format(self.option('mbs-api-url'), self.mbs_api().about.version))  # Ignore PEP8Bear
+        self.info(
+            "connected to MBS instance '{}' version '{}'".format(
+                self.option('mbs-api-url'),
+                self.mbs_api().about.version
+            )
+        )
 
         # koji/brew is required to get module tags
         self.require_shared('koji_session')

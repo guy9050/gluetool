@@ -282,12 +282,11 @@ def test_destroy_sysexit(module):
     assert module.destroy(failure=MagicMock(exc_info=[None, SystemExit()])) == None
 
 
-def test_destroy(module, evaluate, mock_namespace):
+def test_destroy(module, evaluate, publish_messages, mock_namespace):
     # test with failure
     module.destroy(failure=MagicMock(sentry_event_url='sentry-url'))
 
     # test with failure and publish_bus_messages
-    publish_messages = fixture_publish_messages(module)
     module.destroy(failure=MagicMock(sentry_event_url='sentry-url'))
     assert publish_messages['message'].body['status'] == 'unknown'
     assert publish_messages['message'].body['issue_url'] == 'sentry-url'

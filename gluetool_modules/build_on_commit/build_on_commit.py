@@ -58,8 +58,7 @@ class CIBuildOnCommit(gluetool.Module):
             'help': 'Dist-git base URL used for cloning.'
         },
         'pattern-map': {
-            # pylint: disable=line-too-long
-            'help': 'Path to file with branch => build target patterns. (gluetool.Module) will be built only in case of a match.',  # Ignore PEP8Bear
+            'help': 'Path to file with branch => build target patterns. Build will be built only in case of a match.'
         },
     }
     required_options = ['branch', 'git-base-url', 'component', 'pattern-map']
