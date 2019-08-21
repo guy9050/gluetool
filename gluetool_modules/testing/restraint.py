@@ -6,11 +6,13 @@ import shutil
 import stat
 import tempfile
 
+from argparse import Namespace
+
 import gluetool
 from gluetool.action import Action
 from gluetool.log import log_xml, ContextAdapter
 from gluetool.result import Result
-from gluetool.utils import Bunch, Command
+from gluetool.utils import Command
 
 
 DEFAULT_RESTRAINTD_PORT = 8081
@@ -158,7 +160,7 @@ class Restraint(gluetool.Module):
             stdout_logger = StdStreamAdapter(guest.logger, 'stdout')
             stderr_logger = StdStreamAdapter(guest.logger, 'stderr')
 
-            class StreamHandler(Bunch):
+            class StreamHandler(Namespace):
                 def write(self):
                     self.logger(''.join(self.buff))
                     self.buff = []
