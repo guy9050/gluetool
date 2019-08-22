@@ -63,12 +63,16 @@ unit-tests:
   artifacts:
     paths:
       - coverage-report
+  tags:
+    - shared
 
 # Static analysis - pylint, flake8
 static-analysis:
   stage: test
   script:
     - tox -e py27-static-analysis
+  tags:
+    - shared
 
 # Static analysis - coala
 #
@@ -78,12 +82,16 @@ static-analysis-coala:
   image: coala/base
   script:
     - /usr/bin/coala --non-interactive --config .coafile
+  tags:
+    - shared
 
 # Static analysis - type checks
 type-check:
   stage: test
   script:
     - tox -e type-check
+  tags:
+    - shared
 
 # Run integration tests
 #
@@ -100,6 +108,8 @@ integration-tests:
     - git clone https://gitlab.cee.redhat.com/baseos-qe/citool-config.git ~/.citool.d
     - pushd ~/.citool.d && git checkout production && popd
     - tox -e py27-integration-tests -- --integration-config=$(echo ~/.citool.d)
+  tags:
+    - shared
 
 # Generate documentation from the sources
 #
@@ -114,6 +124,8 @@ generate-docs:
   artifacts:
     paths:
       - .tox/py27-doctest/tmp/docs/build/html
+  tags:
+    - shared
 
 
 #
@@ -127,6 +139,8 @@ build-rpm-packages:
     - master@baseos-qe/gluetool-modules
   script:
     - tower-cli job launch --monitor -J "[BaseOS CI] [build] [rpm] citool-modules-full"
+  tags:
+    - shared
 
 build-rpm-packages-devel:
   stage: build-rpm
@@ -134,6 +148,8 @@ build-rpm-packages-devel:
     - devel@baseos-qe/gluetool-modules
   script:
     - tower-cli job launch --monitor -J "[BaseOS CI] [build] [rpm] citool-modules-full-devel"
+  tags:
+    - shared
 
 # Trigger Docker build
 build-docker-images:
@@ -143,6 +159,8 @@ build-docker-images:
   script:
     - tower-cli workflow_job launch --monitor -W "[BaseOS CI] [build] [docker] Production chain - Fedora 29" | tee tower_output.log
     - grep 'failed' tower_output.log && { echo 'At least one of subtasks failed!'; exit 1; } || exit 0
+  tags:
+    - shared
 
 build-docker-images-devel:
   stage: build-docker
@@ -151,6 +169,8 @@ build-docker-images-devel:
   script:
     - tower-cli workflow_job launch --monitor -W "[BaseOS CI] [build] [docker] Devel chain - Fedora 29" | tee tower_output.log
     - grep 'failed' tower_output.log && { echo 'At least one of subtasks failed!'; exit 1; } || exit 0
+  tags:
+    - shared
 
 # Trigger staging deployment
 deploy-to-staging:
@@ -159,6 +179,8 @@ deploy-to-staging:
     - devel@baseos-qe/gluetool-modules
   script:
     - tower-cli job launch --monitor -J "[BaseOS CI] [deploy] [stage] Image"
+  tags:
+    - shared
 
 
 #
@@ -173,6 +195,8 @@ upload-docs:
     - generate-docs
   script:
     - rsync -avz -e "ssh $SSH_OPTIONS" .tox/py27-doctest/tmp/docs/build/html/ "${DOCS_SPACE}-${CI_COMMIT_REF_NAME}"
+  tags:
+    - shared
 
 
 # Upload coverage report to the remote location
@@ -183,6 +207,8 @@ upload-coverage:
     - unit-tests
   script:
     - rsync -avz -e "ssh $SSH_OPTIONS" coverage-report/ "${COVERAGE_SPACE}-${CI_COMMIT_REF_NAME}"
+  tags:
+    - shared
 
 
 # Add a status comment
@@ -197,3 +223,5 @@ update-status:
     # Add the comment
     - |
       curl --insecure --silent --header "Private-Token: $MODULES_REPO_TOKEN" --request POST --data-binary "body=${MERGE_REQUEST_STATUS}" "$GITLAB_API_URL/merge_requests/$(cat merge-request-iid)/notes"
+  tags:
+    - shared
