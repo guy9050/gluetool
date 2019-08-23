@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+2019-08-23
+----------
+
+Added
+~~~~~
+
+- koji_fedora: Add check for canceled and failed tasks (jhavlin@redhat.com)
+- openstack-job: add `test-schedule-sti-options` option (Martin Kluson)
+- sti scheduler and runner: pass custum variables to playbook (Martin Kluson)
+- Added log setup, log propagation, and return value propagation (jhavlin@redhat.com)
+- Provide installation logs location aside from their local path (mprchlik)
+
+Changed
+~~~~~~~
+
+- use newer psycopg2 version (jhavlin@redhat.com)
+- pipeline-install-ancestors: remove playbook call (Martin Kluson)
+
+Fixed
+~~~~~
+
+- restraint: fix deprecated function warning (jhavlin@redhat.com)
+- copr: builder-live.log was moved to builder-live.log.gz (Martin Kluson)
+- Check empty guest_setup_output (jhavlin@redhat.com)
+- openstack: init logger early (jhavlin@redhat.com)
+
 
 2019-08-13
 ----------
