@@ -7,7 +7,7 @@ body: |-
       * packages have dependencies that could not be solved in CI environment,
       * there's already a package with newer NVR installed or available.
 
-  Installation logs: some install logs URL
+  Installation logs: some install logs location URL
 
   If you are not sure about the root cause of this issue, contact the CI stuff on #tft
   IRC channel, who will help you out analyzing and resolving this issue.
