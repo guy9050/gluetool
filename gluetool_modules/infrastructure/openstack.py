@@ -568,6 +568,9 @@ class OpenstackGuest(NetworkedGuest):
 
         self.debug("status of resource '{}' within '{}' is '{}'".format(rid, resource, status))
 
+        if status == u'ERROR':
+            raise GlueError("resource {} {} is in ERROR state".format(resource, rid))
+
         return status
 
     def _check_resource_status(self, resource, rid, status):
