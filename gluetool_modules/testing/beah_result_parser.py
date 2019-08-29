@@ -2,7 +2,6 @@ import datetime
 
 import gluetool
 from gluetool.log import log_blob
-from gluetool.utils import treat_url
 
 
 class BeahResultParser(gluetool.Module):
@@ -173,7 +172,7 @@ class BeahResultParser(gluetool.Module):
         return [
             {
                 'name': str(log[name_attr]),
-                'href': treat_url(artifact_path(log[path_attr]))
+                'href': artifact_path(log[path_attr])
             } for log in logs
         ]
 
