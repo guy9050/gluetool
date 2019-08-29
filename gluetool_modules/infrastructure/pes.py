@@ -35,7 +35,7 @@ class PESApi(LoggerMixin, object):
         self.module = module  # type: gluetool.Module
 
     def _post_payload(self, location, payload):
-        # type: (str, Dict) -> orig_requests.Response
+        # type: (str, Dict[str, Any]) -> orig_requests.Response
         url = urljoin(self.api_url, location)
 
         self.debug('[PES API]: {}'.format(url))

@@ -9,12 +9,12 @@ from gluetool_modules.libs.testing_environment import TestingEnvironment
 from gluetool_modules.libs.test_schedule import TestSchedule, TestScheduleEntry as BaseTestScheduleEntry
 
 # Type annotations
-from typing import Any, List, Optional  # noqa
+from typing import Any, Dict, List, Optional  # noqa
 
 
 class TestScheduleEntry(BaseTestScheduleEntry):
     def __init__(self, logger, playbook_filepath, variables):
-        # type: (gluetool.log.ContextAdapter, str, dict) -> None
+        # type: (gluetool.log.ContextAdapter, str, Dict[str, Any]) -> None
         """
         Test schedule entry, suited for use with STI runners.
 

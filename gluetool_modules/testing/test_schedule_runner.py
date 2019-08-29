@@ -93,7 +93,7 @@ class TestScheduleRunner(gluetool.Module):
         # type: (TestSchedule) -> None
 
         def _job(schedule_entry, name, target):
-            # type: (TestScheduleEntry, str, Callable) -> Job
+            # type: (TestScheduleEntry, str, Callable[[TestScheduleEntry], Any]) -> Job
 
             return Job(
                 logger=schedule_entry.logger,

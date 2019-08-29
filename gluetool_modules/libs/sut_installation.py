@@ -67,8 +67,12 @@ class SUTInstallation(object):
     def run(self, guest):
         # type: (libci.guest.NetworkedGuest) -> None
 
-        def _run_and_log(command, log_filepath, callback):
-            # type: (str, str, Optional[Callable]) -> Tuple[bool, Optional[str]]
+        def _run_and_log(command,  # type: str
+                         log_filepath,  # type: str
+                         callback  # type: Optional[Callable[[str, gluetool.utils.ProcessOutput], str]]
+                        ):  # noqa
+            # type: (...) -> Tuple[bool, Optional[str]]
+
             # Set to `True` when the exception was raised by a command - we cannot immediately
             # raise `SUTInstallationFailedError` because we want to log output of the command,
             # and we cannot use `exc` and check whether it's not `None` because Python will
@@ -88,7 +92,8 @@ class SUTInstallation(object):
 
             with open(log_filepath, 'a') as log_file:
                 def write_cover(text, **kwargs):
-                    # type: (str) -> None
+                    # type: (str, **Any) -> None
+
                     assert log_file is not None
                     log_file.write('{}\n\n'.format(text))
 

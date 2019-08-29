@@ -30,7 +30,7 @@ def _get_context(context):
 jinja2.defaults.DEFAULT_NAMESPACE['EVAL_CONTEXT'] = _get_context
 
 
-class AttrDict(dict):
+class AttrDict(Dict[str, Any]):
     """
     Access dictonary items as its attributes.
     """
@@ -344,11 +344,11 @@ class RulesEngine(gluetool.Module):
 
     @cached_property
     def functions(self):
-        # type: () -> Dict[str, Callable]
+        # type: () -> Dict[str, Callable[..., Any]]
 
         sources = normalize_multistring_option(self.option('functions'))
 
-        functions = {}  # type: Dict[str, Callable]
+        functions = {}  # type: Dict[str, Callable[..., Any]]
 
         for source_filename in sources:
             source_filepath = gluetool.utils.normalize_path(source_filename)
@@ -383,7 +383,7 @@ class RulesEngine(gluetool.Module):
         variables = {}  # type: Any
 
         def _assert_var_names(d, *path):
-            # type: (Dict, *str) -> None
+            # type: (Dict[str, Any], *str) -> None
             """
             Make sure no key in the dictionary collides with any dictionary method. Should there be any collision,
             value of the key would replace the method, and calling such method would result in error since it's
