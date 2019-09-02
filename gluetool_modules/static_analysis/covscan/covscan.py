@@ -8,7 +8,7 @@ from urlgrabber.grabber import urlgrab
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.glue import DryRunLevels
-from gluetool.log import log_blob, log_dict, format_dict
+from gluetool.log import log_dict, format_dict
 from gluetool.utils import cached_property, Command, check_for_commands, new_xml_element, GlueCommandError, \
     dict_update, Bunch, PatternMap
 from libci.results import TestResult, publish_result
@@ -125,7 +125,7 @@ class CovscanResult(object):
             diff = json.loads(diff_json)
         except ValueError:
             raise CovscanFailedError(url)
-        log_blob(self.module.debug, 'This is what we got from covscan', diff)
+        log_dict(self.module.debug, 'This is what we got from covscan', diff)
         defects = diff['defects']
         self.module.debug('Defects:\n{}\nfetched from {}'.format(format_dict(defects), url))
         return defects
