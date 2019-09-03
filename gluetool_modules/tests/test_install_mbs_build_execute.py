@@ -411,7 +411,10 @@ def test_execute_command_fail(module, monkeypatch, tmpdir):
     primary_task_mock = MagicMock()
     primary_task_mock.nsvc = NSVC
     execute_mock = MagicMock()
-    execute_mock.side_effect = gluetool.glue.GlueCommandError('dummy_error', MagicMock(exit_code=1, stdout='', stderr=''))
+    execute_mock.side_effect = gluetool.glue.GlueCommandError(
+        'dummy_error',
+        MagicMock(exit_code=1, stdout='', stderr='')
+    )
     run_mock = MagicMock(stdout=ODCS_OUTPUT, stderr='')
 
     module._config['log-dir-name'] = LOG_DIR_NAME
