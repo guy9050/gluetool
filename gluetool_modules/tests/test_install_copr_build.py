@@ -74,7 +74,7 @@ def test_loadable(module):
 def test_setup_guest(module_shared_patched, tmpdir):
     module, primary_task_mock = module_shared_patched
 
-    execute_mock = MagicMock()
+    execute_mock = MagicMock(return_value=MagicMock(stdout='', stderr=''))
     guest = mock_guest(execute_mock)
 
     module.setup_guest(guest, log_dirpath=str(tmpdir))
@@ -97,8 +97,8 @@ def test_no_yum(module_shared_patched, tmpdir):
 
     def execute_mock_side_effect(cmd):
         if cmd == 'command -v yum':
-            raise gluetool.glue.GlueCommandError('dummy_error', MagicMock(exit_code=1))
-        return MagicMock()
+            raise gluetool.glue.GlueCommandError('dummy_error', MagicMock(exit_code=1, stdout='', stderr=''))
+        return MagicMock(stdout='', stderr='')
 
     execute_mock = MagicMock()
     execute_mock.side_effect = execute_mock_side_effect
@@ -124,8 +124,8 @@ def test_nvr_check_fails(module_shared_patched, tmpdir):
 
     def execute_mock(cmd):
         if cmd.startswith('rpm -q') or cmd.startswith('yum -y downgrade'):
-            raise gluetool.glue.GlueCommandError('dummy_error', MagicMock(exit_code=1))
-        return MagicMock()
+            raise gluetool.glue.GlueCommandError('dummy_error', MagicMock(exit_code=1, stdout='', stderr=''))
+        return MagicMock(stdout='', stderr='')
 
     guest = mock_guest(execute_mock)
 
@@ -140,8 +140,8 @@ def test_repo_download_fails(module_shared_patched, tmpdir):
 
     def execute_mock(cmd):
         if cmd.startswith('curl'):
-            raise gluetool.glue.GlueCommandError('dummy_error', MagicMock(exit_code=1))
-        return MagicMock()
+            raise gluetool.glue.GlueCommandError('dummy_error', MagicMock(exit_code=1, stdout='', stderr=''))
+        return MagicMock(stdout='', stderr='')
 
     guest = mock_guest(execute_mock)
 

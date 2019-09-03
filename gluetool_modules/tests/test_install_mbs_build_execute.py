@@ -257,8 +257,8 @@ def test_guest_setup(module, monkeypatch, tmpdir):
     primary_task_mock = MagicMock()
     primary_task_mock.nsvc = NSVC
     primary_task_mock.stream = STREAM
-    execute_mock = MagicMock(return_value=MagicMock(stdout=INFO_OUTPUT))
-    run_mock = MagicMock(stdout=ODCS_OUTPUT)
+    execute_mock = MagicMock(return_value=MagicMock(stdout=INFO_OUTPUT, stderr=''))
+    run_mock = MagicMock(stdout=ODCS_OUTPUT, stderr='')
 
     monkeypatch.setattr(
         'gluetool_modules.helpers.install_mbs_build_execute.Command.run',
@@ -294,8 +294,8 @@ def test_use_devel_module_and_profile(module, monkeypatch, tmpdir):
     primary_task_mock.stream = STREAM
     primary_task_mock.version = VERSION
     primary_task_mock.context = CONTEXT
-    execute_mock = MagicMock(return_value=MagicMock(stdout=INFO_OUTPUT))
-    run_mock = MagicMock(stdout=ODCS_OUTPUT)
+    execute_mock = MagicMock(return_value=MagicMock(stdout=INFO_OUTPUT, stderr=''))
+    run_mock = MagicMock(stdout=ODCS_OUTPUT, stderr='')
 
     monkeypatch.setattr(
         'gluetool_modules.helpers.install_mbs_build_execute.Command.run',
@@ -327,8 +327,8 @@ def test_workarounds(module, monkeypatch, tmpdir):
     primary_task_mock = MagicMock()
     primary_task_mock.nsvc = NSVC
     primary_task_mock.stream = STREAM
-    execute_mock = MagicMock(return_value=MagicMock(stdout=INFO_OUTPUT))
-    run_mock = MagicMock(stdout=ODCS_OUTPUT)
+    execute_mock = MagicMock(return_value=MagicMock(stdout=INFO_OUTPUT, stderr=''))
+    run_mock = MagicMock(stdout=ODCS_OUTPUT, stderr='')
 
     def evaluate_instructions_mock(workarounds, callbacks):
         callbacks['steps']('instructions', 'commands', workarounds, 'context')
@@ -411,9 +411,8 @@ def test_execute_command_fail(module, monkeypatch, tmpdir):
     primary_task_mock = MagicMock()
     primary_task_mock.nsvc = NSVC
     execute_mock = MagicMock()
-    execute_mock.side_effect = gluetool.glue.GlueCommandError('dummy_error', MagicMock(exit_code=1))
-    run_mock = MagicMock()
-    run_mock.stdout = ODCS_OUTPUT
+    execute_mock.side_effect = gluetool.glue.GlueCommandError('dummy_error', MagicMock(exit_code=1, stdout='', stderr=''))
+    run_mock = MagicMock(stdout=ODCS_OUTPUT, stderr='')
 
     module._config['log-dir-name'] = LOG_DIR_NAME
 
@@ -445,8 +444,8 @@ def test_sut_installation_fail(module, monkeypatch, info_output, tmpdir):
     primary_task_mock = MagicMock()
     primary_task_mock.nsvc = NSVC
     primary_task_mock.stream = STREAM
-    execute_mock = MagicMock(return_value=MagicMock(stdout=info_output))
-    run_mock = MagicMock(stdout=ODCS_OUTPUT)
+    execute_mock = MagicMock(return_value=MagicMock(stdout=info_output, stderr=''))
+    run_mock = MagicMock(stdout=ODCS_OUTPUT, stderr='')
 
     module._config['log-dir-name'] = LOG_DIR_NAME
 
