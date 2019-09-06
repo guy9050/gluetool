@@ -30,6 +30,8 @@ variables:
 
     [Documentation](${DOCS_URL}-${CI_COMMIT_REF_NAME}/) | [Coverage](${COVERAGE_URL}-${CI_COMMIT_REF_NAME}/)
 
+
+# Use our custom image. See https://gitlab.cee.redhat.com/baseos-qe/ansible-baseos-ci/tree/master/gitlab-cicd
 image: "docker-registry.engineering.redhat.com/baseos-ci/baseosci-gitlab-cicd-centos7"
 
 
@@ -41,13 +43,6 @@ before_script:
   - echo "$HTTP_SPACE_KEY" > http-space.key
   - chmod u=rw,go= http-space.key
 
-  - echo "$TOWER_CLI_CONFIG" > ~/.tower_cli.cfg
-  - chmod u=rw,go= ~/.tower_cli.cfg
-
-  # virtualenv, running under tox, tries to download the most recent versions of several packages,
-  # including pip - and pip 19 removed --process-dependency-links option, which gluetool-modules
-  # use. Until we get rid of it, we need a workaround :/
-  - pip install tox-virtualenv-no-download
 
 #
 # TEST steps
@@ -59,7 +54,7 @@ before_script:
 unit-tests:
   stage: test
   script:
-    - tox -e py27-unit-tests -- --cov=gluetool_modules --cov-report=html:coverage-report
+    - tox -v -e py27-unit-tests -- --cov=gluetool_modules --cov-report=html:coverage-report
   artifacts:
     paths:
       - coverage-report
@@ -70,7 +65,7 @@ unit-tests:
 static-analysis:
   stage: test
   script:
-    - tox -e py27-static-analysis
+    - tox -v -e py27-static-analysis
   tags:
     - shared
 
@@ -89,7 +84,7 @@ static-analysis-coala:
 type-check:
   stage: test
   script:
-    - tox -e type-check
+    - tox -v -e type-check
   tags:
     - shared
 
@@ -107,7 +102,7 @@ integration-tests:
     - update-ca-trust
     - git clone https://gitlab.cee.redhat.com/baseos-qe/citool-config.git ~/.citool.d
     - pushd ~/.citool.d && git checkout production && popd
-    - tox -e py27-integration-tests -- --integration-config=$(echo ~/.citool.d)
+    - tox -v -e py27-integration-tests -- --integration-config=$(echo ~/.citool.d)
   tags:
     - shared
 
@@ -120,7 +115,7 @@ integration-tests:
 generate-docs:
   stage: test
   script:
-    - tox -e py27-doctest -- ./docs
+    - tox -v -e py27-doctest -- ./docs
   artifacts:
     paths:
       - .tox/py27-doctest/tmp/docs/build/html
