@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
+
+2019-09-06
+----------
+
+Fixed
+~~~~~
+
+- Missing coldstore module caused problems with artifact path (Martin Kluson)
+- covscan: use log_dict instead of log_blob to log structure (Milos Prchlik)
+- koji_fedora: document wait as 'int', not 'bool' (Ondrej Ptak)
+
+Added
+~~~~~
+
+- CI: profile Ansible playbooks (mprchlik)
+- test_schedule_runner_restraint: add --ignore-avc option (Anna Khaitovich)
+
+Changed
+~~~~~~~
+
+- Removing setuptools-scm as it is not used at all, and complicates things (Milos Prchlik)
+- Update/fix tests to actually work with Python3-capable gluetool (Milos Prchlik)
+- Install citool directly from its repository (Milos Prchlik)
+- openstack: raise exception when resource is in ERROR state (mprchlik)
+
+
 2019-08-23
 ----------
 
