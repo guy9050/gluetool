@@ -89,17 +89,20 @@ class PESApi(LoggerMixin, object):
         # Note: srpm-events endpoint MUST end with /
         response = self._post_payload('srpm-events/', {'name': package})
 
-        # PES returns 'not found' if package has no events, which can mean actually two things:
+        # When no entries are found empty list is returned.
+        # We can assume package has not changed between releases, but rather no guessing in this step.
+        # Consumers of this function can guess the ancestor, or try to find them some other way.
+        if response.status_code == 404:
+            return []
+
+        # Note state presence actually means two thing:
         #
         # 1. package was present in previous release
         # 2. it is a new package, previously not present in previous release
         #
         # The case 2. needs to be handled later in the pipeline, i.e. not existing ancestor build
-        if response.status_code == 404:
-            return [package]
 
-        # we are interested in srpm nams only and exclude present packages (as advised by the leapp team)
-        query = '.[] | select(.action!=0) | .in_packageset.srpm | .[]'
+        query = '.[] | .in_packageset.srpm | .[]'
 
         ancestors = jq(query).transform(response.json(), multiple_output=True)
 
@@ -110,7 +113,7 @@ class PESApi(LoggerMixin, object):
 class PES(gluetool.Module):
     """
     Provides API to Package Evolution Service via `pes_api` shared function.
-    Provides function to find ancestors for a given package from previous major relases. Used for upgrades testing.
+    Provides function to find ancestors for a given package from previous major releases. Used for upgrades testing.
     """
     name = 'pes'
     description = 'Provides API to Package Evolution Service (PES)'

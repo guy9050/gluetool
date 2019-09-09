@@ -6,3 +6,4 @@ ancestors:
   - python
   - python-enum34
   - python-ipaddress
+  - python3

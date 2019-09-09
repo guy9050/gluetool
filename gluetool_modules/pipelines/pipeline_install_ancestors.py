@@ -2,6 +2,7 @@ import six
 
 import gluetool
 from gluetool.utils import normalize_shell_option
+from gluetool.log import log_dict
 from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath
 
 
@@ -29,6 +30,18 @@ class PipelineInstallAncestors(gluetool.Module):
 
     shared_functions = ('setup_guest',)
 
+    def __init__(self, *args, **kwargs):
+        super(PipelineInstallAncestors, self).__init__(*args, **kwargs)
+
+        self.context = {}
+
+    def _build_exists(self, name, tag):
+        self.require_shared('koji_session')
+        koji_session = self.shared('koji_session')
+        builds = koji_session.listTagged(tag, package=name, inherit=True, latest=True)
+
+        return len(builds) > 0
+
     def setup_guest(self, guest, log_dirpath=None, **kwargs):
 
         log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
@@ -37,21 +50,37 @@ class PipelineInstallAncestors(gluetool.Module):
         guest_setup_output = self.overloaded_shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs) or []
 
         self.info('installing the ancestor {}'.format(self.shared('primary_task').nvr))
-        brew_options = normalize_shell_option(self.option('brew-options'))
+        brew_options = normalize_shell_option(self.option('brew-options')) or ''
 
         # get ancestors of the package in our pipeline and construct options for koji module
         if self.has_shared('ancestors'):
 
             if not self.option('tag'):
                 raise gluetool.glue.GlueError("Option 'tag' is required if used with 'ancestors' shared function.")
-
-            if brew_options:
-                self.warn('replacing brew_options from ancestors shared function')
+            tag = self.option('tag')
 
             self.require_shared('primary_task')
-            ancestors = self.shared('ancestors', self.shared('primary_task').component)
+            component = self.shared('primary_task').component
+            ancestors = self.shared('ancestors', component)
 
-            brew_options = '--tag {} --name {}'.format(self.option('tag'), ','.join(ancestors))
+            if ancestors:
+                log_dict(self.info, "Ancestors of '{}'".format(component), ancestors)
+            else:
+                self.info("No ancestors of '{}' found, assume ancestor's name is the same.".format(component))
+                ancestors = [component]
+
+            self.info("Filter out ancestors without builds tagged '{}'".format(tag))
+            ancestors = [ancestor for ancestor in ancestors if self._build_exists(ancestor, tag)]
+
+            if ancestors:
+                log_dict(self.info, "Ancestors of '{}' with builds tagged '{}'".format(component, tag), ancestors)
+
+                if brew_options:
+                    self.warn('Replacing `brew_options` from ancestors shared function.')
+
+                brew_options = '--tag {} --name {}'.format(tag, ','.join(ancestors))
+            else:
+                self.info('No ancestors left, nothing will be installed on SUT.')
 
         # callback to initiate setup guest in separate pipeline
         def do_setup_guest(self):
@@ -66,19 +95,31 @@ class PipelineInstallAncestors(gluetool.Module):
         # function ``do_guest_setup``.
         #
 
-        modules = [
-            # initiliaze the ancestors builds
-            gluetool.glue.PipelineStepModule('brew', argv=normalize_shell_option(brew_options)),
+        modules = []
 
+        if brew_options:
+            modules += [
+                # initiliaze the ancestors builds
+                gluetool.glue.PipelineStepModule('brew', argv=normalize_shell_option(brew_options))
+            ]
+        else:
+            self.context = {
+                'BUILD_TARGET': self.option('tag'),
+            }
+
+        modules += [
             # kick then environment installation preparation according to ancestors build
             gluetool.glue.PipelineStepModule('guest-setup'),
-            gluetool.glue.PipelineStepCallback('do_setup_guest', do_setup_guest),
-
-            # kick the installation of the ancestors
-            gluetool.glue.PipelineStepModule('brew-build-task-params'),
-            gluetool.glue.PipelineStepModule('install-koji-build', argv=['--skip-overloaded-shared']),
             gluetool.glue.PipelineStepCallback('do_setup_guest', do_setup_guest)
         ]
+
+        if brew_options:
+            modules += [
+                # kick the installation of the ancestors
+                gluetool.glue.PipelineStepModule('brew-build-task-params'),
+                gluetool.glue.PipelineStepModule('install-koji-build', argv=['--skip-overloaded-shared']),
+                gluetool.glue.PipelineStepCallback('do_setup_guest', do_setup_guest)
+            ]
 
         failure_execute, failure_destroy = self.glue.run_modules(modules)
 
@@ -89,3 +130,14 @@ class PipelineInstallAncestors(gluetool.Module):
             six.reraise(*failure_destroy.exc_info)
 
         return guest_setup_output
+
+    @property
+    def eval_context(self):
+        __content__ = {  # noqa
+            'BUILD_TARGET': """
+                            Build target of build we were looking for in case nothing found.
+                            If build was found, this value is provided by artifact provider (etc. koji, brew or copr).
+                            """
+        }
+
+        return self.context
