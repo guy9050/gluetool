@@ -27,7 +27,8 @@ def create_openstack_build_params(mod, **kwargs):
         'test_schedule_runner_options': 'some test-schedule-runner options',
         'test_schedule_runner_restraint_options': 'some test-schedule-runner-restraint options',
         'brew_build_task_params_options': 'some brew-build options',
-        'dist_git_options': 'some dist-git options'
+        'dist_git_options': 'some dist-git options',
+        'pipeline_install_ancestors_options': 'some pipeline-install-ancestors options'
     }
 
     params.update(kwargs)

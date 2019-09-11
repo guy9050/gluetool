@@ -62,6 +62,9 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
         'test-schedule-runner-restraint-options': {
             'help': 'Additional options for test-schedule-runner-restraint module.'
         },
+        'pipeline-install-ancestors-options': {
+            'help': 'Additional options for pipeline-install-ancestors module.'
+        },
         'wow-options-separator': {
             'help': """
                     Due to technical limitations of Jenkins, when jobs want to pass multiple ``--wow-options``
@@ -116,5 +119,6 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             'brew_build_task_params_options': brew_build_task_params_options,
             'test_scheduler_sti_options': self.option('test-scheduler-sti-options'),
             'test_schedule_runner_options': self.option('test-schedule-runner-options'),
-            'test_schedule_runner_restraint_options': self.option('test-schedule-runner-restraint-options')
+            'test_schedule_runner_restraint_options': self.option('test-schedule-runner-restraint-options'),
+            'pipeline_install_ancestors_options': self.option('pipeline-install-ancestors-options')
         })
