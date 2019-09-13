@@ -6,6 +6,21 @@ All notable changes to this project will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_.
 
 
+2019-09-13
+----------
+
+Fixed
+~~~~~
+
+- pipeline-install-ancestors: handle no entries and entry state==0 (Martin Kluson)
+- test-schedule-runner-restraint: add missing output.directory to artifact path (mprchlik)
+
+Added
+~~~~~
+
+- openstack-job: add option `pipeline-install-ancestors-options` (Martin Kluson)
+
+
 2019-09-06
 ----------
 
