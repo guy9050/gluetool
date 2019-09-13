@@ -33,7 +33,6 @@ import enum
 import bs4
 
 from six import reraise
-from functools import partial
 
 import gluetool
 from gluetool import GlueError
@@ -255,7 +254,14 @@ class RestraintRunner(gluetool.Module):
 
         results = TaskSetResults(tasks=collections.OrderedDict())
 
-        artifact_path = partial(artifacts_location, self, logger=schedule_entry.logger)
+        def artifact_path(current_location):
+            # type: (str) -> str
+
+            return artifacts_location(
+                self,
+                os.path.join(output.directory, current_location),
+                logger=schedule_entry.logger
+            )
 
         for task_results in job_results.recipeSet.recipe.find_all('task'):
             task_name = task_results['name']
