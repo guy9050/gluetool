@@ -110,24 +110,6 @@
         msg: "Install package providing qe.py (usually provided qa-tools-workstation)"
       when: qepy_present.stat.isreg is not defined or not qepy_present.stat.isreg
 
-      #- name: "Check whether Koji Python package is available"
-      #stat:
-      #  path: "/usr/lib/python2.7/site-packages/koji"
-      #register: koji_present
-
-      #- fail:
-      #  msg: "Install package providing Python package for Koji (e.g. python-koji or similar)"
-      #when: koji_present.stat.isdir is not defined or not koji_present.stat.isdir
-
-      #- name: "Check whether Koji CLI Python package is available"
-      #stat:
-      #  path: "/usr/lib/python2.7/site-packages/koji_cli"
-      #register: koji_cli_present
-
-      #- fail:
-      #  msg: "Install package providing Python package for Koji CLI (e.g. python-koji or similar)"
-      #when: koji_cli_present.stat.isdir is not defined or not koji_cli_present.stat.isdir
-
     #
     # Modify `activate` script to set additional variables
     #
@@ -178,15 +160,3 @@
         path: "{{ virtualenv_path }}/lib64/python2.7/site-packages/qe.py"
         state: link
         src: "/usr/share/qa-tools/python-modules/qe.py"
-
-      #- name: Inject system koji package into virtualenv
-      #file:
-      #  path: "{{ virtualenv_path }}/lib64/python2.7/site-packages/koji"
-      #  state: link
-      #  src: /usr/lib/python2.7/site-packages/koji
-
-      #- name: Inject system koji_cli package into virtualenv
-      #file:
-      #  path: "{{ virtualenv_path }}/lib64/python2.7/site-packages/koji_cli"
-      #  state: link
-      #  src: /usr/lib/python2.7/site-packages/koji_cli

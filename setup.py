@@ -17,7 +17,8 @@ DESCRIPTION = 'Gluetool & Citool modules'
 
 INSTALL_REQUIRES = [
     # required by all...
-    "typing==3.6.6",
+    'typing==3.7.4',
+    'typing-extensions==3.7.4',
 
     # required to enable tracing - not included in gluetool, it's optional
     "jaeger-client==4.0.0",
@@ -26,7 +27,9 @@ INSTALL_REQUIRES = [
     "commonmark==0.8.0",
 
     "ansible==2.7.5",
-    "composeci",  # composetest
+    # composetest
+    'composeci @ git+https://gitlab.cee.redhat.com/bkabrda/composeci.git#egg=composeci-9876543210',
+
     "cmd2==0.8.6",
     "beautifulsoup4==4.6.3",
     "python-dateutil==2.6.1",
@@ -39,7 +42,7 @@ INSTALL_REQUIRES = [
     "jenkins-job-builder==1.6.2",
     "jenkinsapi==0.3.8",
     "jq==0.1.6",
-    "koji",  # composetest
+    'koji',
     "mako==1.0.6",
     "mysql-connector-python==8.0.13",  # mysql
     "packaging==17.1",
@@ -61,11 +64,6 @@ INSTALL_REQUIRES = [
     # cannot use the "nitrate" - pip would then fail to build pycurl with the correct SSL backend
     # "git+https://github.com/psss/python-nitrate.git@1.3-2#egg=nitrate"
     "nitrate==1.3.1"
-]
-
-DEPENDENCY_LINKS = [
-    "git+https://gitlab.cee.redhat.com/bkabrda/composeci.git#egg=composeci-9876543210",  # composetest
-    "https://releases.pagure.org/koji/koji-1.16.0.tar.bz2#egg=koji-9876543210",  # composetest
 ]
 
 
@@ -142,7 +140,6 @@ if __name__ == '__main__':
               'sphinx-argparse==0.2.0',
               'sphinxcontrib-programoutput==0.11'
           ] + INSTALL_REQUIRES,
-          dependency_links=DEPENDENCY_LINKS,
           description=DESCRIPTION,
           long_description=DESCRIPTION,
           author='Miroslav Vadkerti',
