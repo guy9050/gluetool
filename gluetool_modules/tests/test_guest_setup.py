@@ -76,6 +76,7 @@ def test_setup(log, module, local_guest, monkeypatch):
         }
         assert kwargs == {
             'dummy_option': 17,
+            'json_output': False,
             'log_filepath': 'guest-setup-{}/guest-setup-output.txt'.format(local_guest.name)
         }
 

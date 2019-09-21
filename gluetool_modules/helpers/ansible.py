@@ -126,6 +126,7 @@ class Ansible(gluetool.Module):
                      variables=None,  # type: Optional[Dict[str, Any]]
                      inventory=None,  # type: Optional[str]
                      cwd=None,  # type: Optional[str]
+                     env=None,  # type: Optional[Dict[str, Any]]
                      json_output=True,  # type: bool
                      log_filepath=None  # type: Optional[str]
                     ):  # noqa
@@ -140,6 +141,7 @@ class Ansible(gluetool.Module):
         :param str inventory: A path to the inventory file. You can use it if you
             want to cheat the ansible module e.g. to overshadow localhost with another host.
         :param str cwd: A path to a directory where ansible will be executed from.
+        :param dict(str, object) env: environment variables to use instead of the default, inherited environ.
         :param bool json_output: Ansible returns response as json if set.
         :param str log_filepath: Path to a file to store Ansible output in. If not set, ``ansible-output.txt``
             is created in the current directory.
@@ -155,6 +157,8 @@ class Ansible(gluetool.Module):
         assert guest.environment is not None
 
         inventory = inventory or '{},'.format(guest.hostname)  # note the comma
+
+        env = env or os.environ.copy()
 
         cmd = [
             'ansible-playbook',
@@ -182,10 +186,23 @@ class Ansible(gluetool.Module):
 
         cmd += [gluetool.utils.normalize_path(path) for path in playbook_paths]
 
-        env_variables = os.environ.copy()
-
         if json_output:
-            env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'json'})
+            env.update({
+                'ANSIBLE_STDOUT_CALLBACK': 'json'
+            })
+
+        else:
+            # When coupled with `-v`, provides structured and more readable output. But only if user didn't try
+            # their own setup.
+            if 'ANSIBLE_STDOUT_CALLBACK' in env:
+                guest.debug('ansible "debug" callback cannot be used, ANSIBLE_STDOUT_CALLBACK is already set')
+
+            else:
+                env.update({
+                    'ANSIBLE_STDOUT_CALLBACK': 'debug'
+                })
+
+                cmd += ['-v']
 
         with Action(
             'running playbooks',
@@ -200,7 +217,7 @@ class Ansible(gluetool.Module):
             }
         ):
             try:
-                ansible_call = Command(cmd, logger=guest.logger).run(cwd=cwd, env=env_variables)
+                ansible_call = Command(cmd, logger=guest.logger).run(cwd=cwd, env=env)
 
             except gluetool.GlueCommandError as exc:
                 ansible_call = exc.output

@@ -221,6 +221,7 @@ class GuestSetup(gluetool.Module):
                 playbooks,
                 guest,
                 variables=variables,
+                json_output=False,
                 log_filepath=log_filepath,
                 **kwargs
             )

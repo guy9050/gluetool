@@ -69,7 +69,8 @@ class InstallMBSBuild(gluetool.Module):
                 'REPO_URL': repo_url,
                 'MODULE_NSVC': nsvc,
                 'ansible_python_interpreter': '/usr/bin/python3'
-            }
+            },
+            json_output=False
         )
 
         check_ansible_sut_installation(ansible_output, guest, self.shared('primary_task'))
