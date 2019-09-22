@@ -127,7 +127,7 @@ class Ansible(gluetool.Module):
                      inventory=None,  # type: Optional[str]
                      cwd=None,  # type: Optional[str]
                      env=None,  # type: Optional[Dict[str, Any]]
-                     json_output=True,  # type: bool
+                     json_output=False,  # type: bool
                      log_filepath=None  # type: Optional[str]
                     ):  # noqa
         # type: (...) -> AnsibleOutput

@@ -62,7 +62,7 @@ def test_run_playbook_json(module, local_guest, monkeypatch, assert_output):
     monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
-    output = module.run_playbook('dummy playbook file', local_guest)
+    output = module.run_playbook('dummy playbook file', local_guest, json_output=True)
 
     assert output.execution_output is mock_output
     assert output.json_output == json_output
@@ -86,7 +86,7 @@ def test_run_playbook_plaintext(module, local_guest, monkeypatch, assert_output)
     monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
-    output = module.run_playbook('dummy playbook file', local_guest, json_output=False)
+    output = module.run_playbook('dummy playbook file', local_guest)
 
     assert output.execution_output is mock_output
     assert output.json_output is None
@@ -165,7 +165,7 @@ def test_extra_vars(module, local_guest, monkeypatch, assert_output):
     ], logger=local_guest.logger)
 
     env_variables = os.environ.copy()
-    env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'json'})
+    env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'debug'})
 
     mock_command_run.assert_called_once_with(cwd='foo', env=env_variables)
 
@@ -190,7 +190,7 @@ def test_dryrun(module, local_guest, monkeypatch, assert_output):
     ], logger=local_guest.logger)
 
     env_variables = os.environ.copy()
-    env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'json'})
+    env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'debug'})
 
     mock_command_run.assert_called_once_with(cwd=None, env=env_variables)
 
