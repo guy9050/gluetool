@@ -26,7 +26,7 @@ INSTALL_REQUIRES = [
     # required to build documentation - workaround, this will end up in gluetool upstream
     "commonmark==0.8.0",
 
-    "ansible==2.7.5",
+    "ansible==2.8.5",
     # composetest
     'composeci @ git+https://gitlab.cee.redhat.com/bkabrda/composeci.git#egg=composeci-9876543210',
 
