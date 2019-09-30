@@ -184,21 +184,11 @@ class InstallMBSBuild(gluetool.Module):
             items=repo_url
         )
 
-        def _find_odcs_part(output):
-            for part in output.split('\n\n'):
-                if re.search(r'Repo\s*:\s*odcs-\d+', part):
-                    return part
-
-            return None
-
         def _verify_profile(command, output):
-            odcs_part = _find_odcs_part(output.stdout)
-
-            if not odcs_part:
-                return "Module '{}' is not provided by ODCS repo".format(nsvc)
+            module_info = output.stdout
 
             profiles = None
-            match = re.search(r'Profiles\s*:\s*(.+)', odcs_part)
+            match = re.search(r'Profiles\s*:\s*(.+)', module_info)
             if match:
                 profiles = match.group(1).split(',')
                 profiles = [re.sub(r'\s*(?:\[d\])?(?: \[i])?', '', item) for item in profiles]
@@ -209,7 +199,7 @@ class InstallMBSBuild(gluetool.Module):
             log_dict(self.debug, 'Available profiles', profiles)
 
             if not profile:
-                match = re.search(r'Default profiles\s*:\s*(.*)', odcs_part)
+                match = re.search(r'Default profiles\s*:\s*(.*)', module_info)
                 if match:
                     profile['profile'] = match.group(1)
                     self.info("Using default profile '{}'".format(profile['profile']))
@@ -226,13 +216,14 @@ class InstallMBSBuild(gluetool.Module):
             """
             Process output of `yum module info` command and returns description of issue, when output is not correct.
             """
+            module_info = output.stdout
 
-            odcs_part = _find_odcs_part(output.stdout)
+            if not module_info:
+                return "Module '{}' was not found, module info is empty".format(primary_task.nsvc)
 
-            if not odcs_part:
-                return "Module '{}' is not provided by ODCS repo".format(nsvc)
+            stream_regex = re.compile(r'Stream\s*:\s*{} (?:\[d\])?\[e\] ?\[a\]'.format(primary_task.stream))
 
-            if not re.search(r'Stream\s*:\s*{} (?:\[d\])?\[e\] ?\[a\]'.format(primary_task.stream), odcs_part):
+            if not stream_regex.search(module_info):
                 return "Stream '{}' is not active or enabled".format(primary_task.stream)
 
             return None
@@ -243,12 +234,11 @@ class InstallMBSBuild(gluetool.Module):
             Process output of `yum module info` command and returns description of issue, when output is not correct.
             """
 
-            odcs_part = _find_odcs_part(output.stdout)
+            module_info = output.stdout
 
-            if not odcs_part:
-                return "Module '{}' is not provided by ODCS repo".format(nsvc)
+            profile_regex = re.compile(r'Profiles\s*:.*{}(?: \[d\])? \[i\]'.format(profile['profile']))
 
-            if not re.search(r'Profiles\s*:.*{}(?: \[d\])? \[i\]'.format(profile['profile']), odcs_part):
+            if not (module_info and profile_regex.search(module_info)):
                 return "Profile '{}' is not installed".format(profile['profile'])
 
             return None
