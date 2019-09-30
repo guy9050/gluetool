@@ -146,8 +146,18 @@ class STIRunner(gluetool.Module):
         work_dir_prefix = 'work-{}'.format(os.path.basename(schedule_entry.playbook_filepath))
         artifact_dir_prefix = 'tests-'
 
-        work_dir = tempfile.mkdtemp(dir=os.getcwd(), prefix=work_dir_prefix)
-        artifact_dir = tempfile.mkdtemp(dir=work_dir, prefix=artifact_dir_prefix)
+        # tempfile.mkdtemp returns an absolute path to the directory, but the unspoken convention says
+        # we must use paths that are relative to the current working directory. Therefore we must make
+        # both schedule entry's work dir and artifact dir relative to the CWD.
+        work_dir = os.path.relpath(
+            tempfile.mkdtemp(dir=os.getcwd(), prefix=work_dir_prefix),
+            os.getcwd()
+        )
+
+        artifact_dir = os.path.relpath(
+            tempfile.mkdtemp(dir=work_dir, prefix=artifact_dir_prefix),
+            os.getcwd()
+        )
 
         # Make sure it's possible to enter our directories for other parties. We're not that concerned with privacy,
         # we'd rather let common users inside the directories when inspecting the pipeline artifacts. Therefore
@@ -211,7 +221,9 @@ sut     ansible_host={} ansible_user=root {}
             variables = dict_update(
                 {},
                 {
-                    'artifacts': artifact_dirpath,
+                    # Internally we're working with CWD-relative path but we have to feed ansible
+                    # with the absolute one because it operates from its own, different cwd.
+                    'artifacts': os.path.abspath(artifact_dirpath),
                     'ansible_ssh_common_args': ' '.join(['-o ' + option for option in schedule_entry.guest.options])
                 },
                 schedule_entry.variables
