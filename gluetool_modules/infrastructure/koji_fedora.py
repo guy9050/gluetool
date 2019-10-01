@@ -795,6 +795,28 @@ class KojiTask(LoggerMixin, object):
         raise GlueError('Cannot find component info for task {}'.format(self.id))
 
     @cached_property
+    def dist_git_repository_name(self):
+        """
+        Extract dist-git repository name from the source field. This can be different from the package name.
+
+        If repository name cannot be extracted from source (e.g. build built from src.rpm, not git) `component`
+        property is returned.
+
+        :rtype: str
+        """
+
+        try:
+            # Examples of possible sources:
+            #   git://pkgs.fedoraproject.org/rpms/bash?#d430777020da4c1e68807f59b0ffd38324adbdb7
+            #   git://pkgs.devel.redhat.com/rpms/mead-cron-scripts#dcdc64da7180ae49361756a373c8a5de3a59e732
+            #   git+https://src.fedoraproject.org/rpms/bash.git#1f2779c9385142e93c875274eba0621e29a49146
+            return re.match(r'.*/([^#\?]*)\??#.*', self.source).group(1)
+        except (AttributeError, re.error) as error:
+            self.debug('Could not extract component name from source field: {}'.format(error))
+
+        return self.component
+
+    @cached_property
     def version(self):
         """
         Version of the built package (``V`` of ``NVR``).

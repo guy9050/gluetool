@@ -2,6 +2,7 @@
 
 build_id: 876056
 component: 'go-toolset-container'
+dist_git_repository_name: 'go-toolset'
 destination_tag: null
 full_name: "task '21018165' build 'go-toolset-container-1.11.5-3.1554788828' target 'devtools-2019.1-go-toolset-rhel-7-container-candidate'"
 issuer: freshmaker

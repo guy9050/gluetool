@@ -2,6 +2,7 @@
 
 build_id: 805705
 component: 'bash'
+dist_git_repository_name: 'bash'
 destination_tag: 'f25-updates-candidate'
 full_name: task '15869828' build 'bash-4.3.43-4.fc25' target 'f25-candidate'
 has_artifacts: True
