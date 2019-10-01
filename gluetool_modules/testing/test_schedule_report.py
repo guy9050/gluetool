@@ -166,16 +166,17 @@ class TestScheduleReport(gluetool.Module):
 
         properties = gluetool.utils.new_xml_element('properties', _parent=test_suite)
 
-        gluetool.utils.new_xml_element(
-            'property', _parent=properties,
-            name='baseosci.overall-result', value=schedule.result.name
-        )
-
+        # When adding new property, keep them sorted by the property name.
         if self.shared('thread_id'):
             gluetool.utils.new_xml_element(
                 'property', _parent=properties,
                 name='baseosci.id.testing-thread', value=self.shared('thread_id')
             )
+
+        gluetool.utils.new_xml_element(
+            'property', _parent=properties,
+            name='baseosci.overall-result', value=schedule.result.name
+        )
 
         for schedule_entry in schedule:
             self.shared('serialize_test_schedule_entry_results', schedule_entry, test_suite)

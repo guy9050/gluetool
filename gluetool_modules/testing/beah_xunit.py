@@ -1,7 +1,7 @@
 import itertools
 
 import gluetool
-from gluetool.log import log_dict
+from gluetool.log import log_dict, log_xml
 from gluetool.utils import new_xml_element
 
 
@@ -44,6 +44,19 @@ class BeahXUnit(gluetool.Module):
 
         def _add_package(packages, nvr):
             return new_xml_element('package', _parent=packages, nvr=nvr)
+
+        def _sort_children(parent, key_getter):
+            log_xml(self.verbose, 'before sorting', parent)
+
+            sorted_children = sorted(parent.children, key=key_getter)
+
+            for el in parent.children:
+                el.extract()
+
+            for el in sorted_children:
+                parent.append(el)
+
+            log_xml(self.verbose, 'after sorting', parent)
 
         if self.option('test-source-template'):
             def _get_test_source_url(test_name):
@@ -138,6 +151,8 @@ class BeahXUnit(gluetool.Module):
                     for log in phase['logs']:
                         _add_log(test_phase_logs, log['name'], log['href'])
 
+                    _sort_children(test_phase_logs, lambda child: child.attrs['name'])
+
                 if run['bkr_status'].lower() != 'completed':
                     new_xml_element('error', _parent=test_case, message='Test did not complete')
 
@@ -149,6 +164,16 @@ class BeahXUnit(gluetool.Module):
 
                     for field, value in environment.iteritems():
                         new_xml_element('property', _parent=testing_environment, name=field, value=value)
+
+                    _sort_children(testing_environment, lambda child: child.attrs['name'])
+
+                _sort_children(test_case_properties, lambda child: child.attrs['name'])
+                _sort_children(test_case_params, lambda child: child.attrs['value'])
+                _sort_children(test_case_logs, lambda child: child.attrs['name'])
+                _sort_children(test_case_packages, lambda child: child.attrs['nvr'])
+
+                # We're not sorting testing-environments but we should. It may require wrapping them into their
+                # own parent element.
 
                 # main_logs = [log for log in run['bkr_logs'] if log['name'].lower() in ('taskout.log',)]
                 # if main_logs:
