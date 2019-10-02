@@ -184,8 +184,6 @@ class Ansible(gluetool.Module):
 
             cmd += ['-C']
 
-        cmd += [gluetool.utils.normalize_path(path) for path in playbook_paths]
-
         if json_output:
             env.update({
                 'ANSIBLE_STDOUT_CALLBACK': 'json'
@@ -194,7 +192,7 @@ class Ansible(gluetool.Module):
         else:
             # When coupled with `-v`, provides structured and more readable output. But only if user didn't try
             # their own setup.
-            if 'ANSIBLE_STDOUT_CALLBACK' in env:
+            if 'ANSIBLE_STDOUT_CALLBACK' in env and env['ANSIBLE_STDOUT_CALLBACK'] != 'debug':
                 guest.debug('ansible "debug" callback cannot be used, ANSIBLE_STDOUT_CALLBACK is already set')
 
             else:
@@ -203,6 +201,8 @@ class Ansible(gluetool.Module):
                 })
 
                 cmd += ['-v']
+
+        cmd += [gluetool.utils.normalize_path(path) for path in playbook_paths]
 
         with Action(
             'running playbooks',
