@@ -329,6 +329,10 @@ class MBSTask(LoggerMixin, object):
             self.debug('Distgit ref not found in scmurl: {}'.format(self._build_info['scmurl']))
         return None
 
+    @cached_property
+    def dist_git_repository_name(self):
+        return self.component
+
 
 class MBS(gluetool.Module):
     name = 'mbs'

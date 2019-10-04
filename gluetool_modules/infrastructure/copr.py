@@ -274,6 +274,10 @@ class CoprTask(object):
 
         return ' '.join(name)
 
+    @cached_property
+    def dist_git_repository_name(self):
+        return self.component
+
 
 class Copr(gluetool.Module):
 
