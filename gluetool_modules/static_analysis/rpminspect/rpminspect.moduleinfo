@@ -16,5 +16,10 @@ dependencies:
       gpgcheck: 0
 
   yum:
-    - rpminspect
+  #
+  # The order is important here. Yum installs rpminspect-data-fedora as a dependency of rpminspect.
+  # However, we need rpminspect-data-redhat instead for internal testing.
+  # So the rpminspect-data-redhat needs to be installed first, otherwise, the installation fails.
+  #
     - rpminspect-data-redhat
+    - rpminspect
