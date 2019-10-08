@@ -202,6 +202,10 @@ class GuestSetup(gluetool.Module):
         log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
         log_filepath = os.path.join(log_dirpath, 'guest-setup-output.txt')
 
+        if not playbooks:
+            self.warn('no playbooks to run, skipping')
+            return []
+
         guest.info('setting up with playbooks {}'.format(', '.join(playbooks)))
 
         with Action(
