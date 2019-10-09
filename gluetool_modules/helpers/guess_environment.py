@@ -846,4 +846,8 @@ class GuessEnvironment(gluetool.Module):
 
     def execute(self):
         # Nobody uses this information, but we want to examine it from time to time, in logs.
-        self.testing_environments()
+        # Also avoid running it every time the module is invoked - often this may happen in
+        # a pipeline without any artifact, and the module would simply die because of missing
+        # primary artifact.
+        if self.has_shared('primary_task'):
+            self.testing_environments()
