@@ -168,15 +168,24 @@ build-docker-images-devel:
     - shared
 
 # Trigger staging deployment
-deploy-to-staging:
+deploy-to-staging-static:
   stage: deploy-staging
   only:
     - devel@baseos-qe/gluetool-modules
   script:
-    - tower-cli job launch --monitor -J "[BaseOS CI] [deploy] [stage] Image"
+    - tower-cli job launch --monitor -J "[BaseOS CI] [deploy] [stage] Image - static"
   tags:
     - shared
 
+# Trigger staging deployment to openshift
+deploy-to-staging-openshift:
+  stage: deploy-staging
+  only:
+    - devel@baseos-qe/gluetool-modules
+  script:
+    - tower-cli job launch --monitor -J "[BaseOS CI] [deploy] [stage] Image - openshift"
+  tags:
+    - shared
 
 #
 # ACCESSORIES steps
