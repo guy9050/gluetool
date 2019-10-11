@@ -173,7 +173,7 @@ deploy-to-staging-static:
   only:
     - devel@baseos-qe/gluetool-modules
   script:
-    - tower-cli job launch --monitor -J "[BaseOS CI] [deploy] [stage] Image - static"
+    - tower-cli job launch --monitor -J "[BaseOS CI] [deploy] [staging] Image - static"
   tags:
     - shared
 
@@ -183,7 +183,7 @@ deploy-to-staging-openshift:
   only:
     - devel@baseos-qe/gluetool-modules
   script:
-    - tower-cli job launch --monitor -J "[BaseOS CI] [deploy] [stage] Image - openshift"
+    - tower-cli job launch --monitor -J "[BaseOS CI] [deploy] [staging] Image - openshift"
   tags:
     - shared
 
