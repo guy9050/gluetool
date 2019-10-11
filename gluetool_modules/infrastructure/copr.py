@@ -114,6 +114,10 @@ class CoprApi(object):
             self.module.warn('Project {} not found'.format(project_id))
             return unknown_project
 
+        if project_info['project'] is None:
+            self.module.warn('Api provided no information about project `{}`'.format(project_id))
+            return unknown_project
+
         return project_info['project']
 
     def get_project_builds(self, project_id):
