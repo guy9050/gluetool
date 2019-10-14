@@ -4,6 +4,7 @@ import shutil
 import gluetool
 from mock import MagicMock, call
 from gluetool_modules.helpers.install_mbs_build_execute import InstallMBSBuild
+from gluetool_modules.libs.guest_setup import GuestSetupStage
 from gluetool_modules.libs.sut_installation import SUTInstallationFailedError
 from . import create_module, patch_shared, check_loadable
 
@@ -271,7 +272,7 @@ def test_guest_setup(module, monkeypatch, tmpdir):
     })
 
     guest = mock_guest(execute_mock)
-    module.setup_guest(guest, log_dirpath=str(tmpdir))
+    module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
 
     calls = [
         call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)),
@@ -308,7 +309,7 @@ def test_use_devel_module_and_profile(module, monkeypatch, tmpdir):
     })
 
     guest = mock_guest(execute_mock)
-    module.setup_guest(guest, log_dirpath=str(tmpdir))
+    module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
 
     calls = [
         call('curl -v {} --output /etc/yum.repos.d/mbs_build.repo'.format(REPO_URL)),
@@ -348,7 +349,7 @@ def test_workarounds(module, monkeypatch, tmpdir):
     )
 
     guest = mock_guest(execute_mock)
-    module.setup_guest(guest, log_dirpath=str(tmpdir))
+    module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
 
     calls = [
         call('workaround command'),
@@ -432,7 +433,7 @@ def test_execute_command_fail(module, monkeypatch, tmpdir):
     guest = mock_guest(execute_mock)
 
     with pytest.raises(SUTInstallationFailedError):
-        module.setup_guest(guest, log_dirpath=str(tmpdir))
+        module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
 
 
 @pytest.mark.parametrize('info_output', [
@@ -465,4 +466,4 @@ def test_sut_installation_fail(module, monkeypatch, info_output, tmpdir):
     guest = mock_guest(execute_mock)
 
     with pytest.raises(SUTInstallationFailedError):
-        module.setup_guest(guest, log_dirpath=str(tmpdir))
+        module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))

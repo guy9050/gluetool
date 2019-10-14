@@ -2,13 +2,13 @@ import libci.guest
 import gluetool
 from gluetool.action import Action
 from gluetool.utils import normalize_bool_option
+from gluetool_modules.libs.guest_setup import GuestSetupOutput, GuestSetupStage
 from gluetool_modules.libs.jobs import JobEngine, Job, handle_job_errors
 from gluetool_modules.libs.test_schedule import TestScheduleEntryStage, TestScheduleEntryState
 
 # Type annotations
 from typing import TYPE_CHECKING, cast, Any, Callable, Dict, List, Optional  # noqa
 from gluetool_modules.libs.test_schedule import TestSchedule, TestScheduleEntry  # noqa
-from gluetool_modules.helpers.guest_setup import GuestSetupOutput
 
 
 class TestScheduleRunner(gluetool.Module):
@@ -78,8 +78,44 @@ class TestScheduleRunner(gluetool.Module):
 
         schedule_entry.info('starting guest setup')
 
-        with Action('guest setup', parent=schedule_entry.action, logger=schedule_entry.logger):
-            return schedule_entry.guest.setup()
+        results = []  # type: List[GuestSetupOutput]
+
+        with Action(
+            'pre-artifact-installation guest setup',
+            parent=schedule_entry.action,
+            logger=schedule_entry.logger
+        ):
+            results += schedule_entry.guest.setup(stage=GuestSetupStage.PRE_ARTIFACT_INSTALLATION)
+
+        with Action(
+            'pre-artifact-installation-workarounds guest setup',
+            parent=schedule_entry.action,
+            logger=schedule_entry.logger
+        ):
+            results += schedule_entry.guest.setup(stage=GuestSetupStage.PRE_ARTIFACT_INSTALLATION_WORKAROUNDS)
+
+        with Action(
+            'artifact-installation guest setup',
+            parent=schedule_entry.action,
+            logger=schedule_entry.logger
+        ):
+            results += schedule_entry.guest.setup(stage=GuestSetupStage.ARTIFACT_INSTALLATION)
+
+        with Action(
+            'post-artifact-installation-workarounds guest setup',
+            parent=schedule_entry.action,
+            logger=schedule_entry.logger
+        ):
+            results += schedule_entry.guest.setup(stage=GuestSetupStage.POST_ARTIFACT_INSTALLATION_WORKAROUNDS)
+
+        with Action(
+            'post-artifact-installation guest setup',
+            parent=schedule_entry.action,
+            logger=schedule_entry.logger
+        ):
+            results += schedule_entry.guest.setup(stage=GuestSetupStage.POST_ARTIFACT_INSTALLATION)
+
+        return results
 
     def _run_tests(self, schedule_entry):
         # type: (TestScheduleEntry) -> None

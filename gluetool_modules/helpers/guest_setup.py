@@ -1,30 +1,85 @@
 import os
+import re
 
 import gluetool
 from gluetool.action import Action
 from gluetool.log import log_dict
 from gluetool.utils import normalize_path_option, render_template
-from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput
+from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput, GuestSetupStage, \
+    GuestSetupStageAdapter
 
 # Type annotations
-from typing import cast, TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union  # noqa
+from typing import cast, TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union  # noqa
 
 if TYPE_CHECKING:
     import libci.guest  # noqa
     import gluetool_modules.helpers.ansible  # noqa
 
 
+ConfigFileMapType = Dict[str, List[str]]
+ConfigInstructionMapType = Dict[str, List[Any]]
+ConfigVarsMapType = Dict[str, Dict[str, str]]
+
+ConfigMapType = Union[
+    ConfigFileMapType,
+    ConfigInstructionMapType,
+    ConfigVarsMapType
+]
+
+ConfigValueCallbackType = Callable[
+    [
+        ConfigMapType,
+        str,
+        str
+    ],
+    None
+]
+
+
+STAGE_SPEC_PATTERN = re.compile(r'^(?:({}):)?(.+)$'.format(
+    '|'.join([
+        'pre-artifact-installation',
+        'pre-artifact-installation-workarounds',
+        'artifact-installation',
+        'post-artifact-installation-workarounds',
+        'post-artifact-installation'
+    ])
+))
+
+
 class GuestSetup(gluetool.Module):
     """
-    Prepare guests for testing process. This is implemented by Ansible
-    playbooks. When asked, module will play them on provided guests.
+    Prepare guests for testing process. This is implemented by running Ansible playbooks, in a sequence of stages.
+    When set via options, module will run the playbooks on a given guest.
 
-    The playbooks to play can be specified by following ways:
+    Stages
+    ======
 
-    * a configuration file, ``playbooks-map``, which specifies playbooks and conditions under
-      which the playbook should be played on the guest.
-    * the ``playbooks`` option can be used to force play from these playbooks, instead of playbooks
-      provided by the configuration file
+    There are 5 stages:
+
+    * ``pre-artifact-installation``
+    * ``pre-artifact-installation-workarounds``
+    * ``artifact-installation``
+    * ``post-artifact-installation-workarounds``
+    * ``post-artifact-installation``
+
+    There is an obvious overlap between ``pre-artifact-installation`` and ``pre-artifact-installation-workarounds``
+    the difference is that the former stage should cover the generic steps while the later one is supposed to
+    focus on the artifact, component and workflow exceptions and workarounds. Tasks like "ignore AVC denials
+    when installing component X" or "add repository Y when testing component Z" should be executed during
+    ``pre-artifact-installation-workarounds``.
+
+    The same rule of thumb applies to ``post-artifact-installation-workarounds`` and ``post-artifact-installation``.
+
+    Playbooks
+    =========
+
+    The playbooks to play can be specified by following ways (for each stage):
+
+    * a configuration file, ``playbooks-map``, which specifies playbooks and conditions under which the playbook
+      should be played on the guest.
+    * the ``playbooks`` option can be used to force play from the specified playbooks instead of those
+      provided by the configuration file.
 
 
     playbooks-map
@@ -57,51 +112,150 @@ class GuestSetup(gluetool.Module):
     options = {
         'extra-vars': {
             'help': """
-                    Comma-separated list of KEY=VALUE variables passed to ``run-playbook``
-                    shared function. This option overrides mapped gathered from the mapping file
-                    specified via the ``--playbooks-map`` option and also the shared function
-                    variables argument (default: none).
+                    Comma-separated list of ``KEY=VALUE`` variables passed to ``run_playbook``
+                    shared function. This option overrides variables gathered from the mapping file
+                    specified via the ``--playbooks-map`` option and also the shared function variables
+                    argument. If ``STAGE`` is omitted, ``pre-artifact-installation`` is used as a default
+                    stage. (default: none).
                     """,
             'action': 'append',
-            'default': []
+            'default': [],
+            'metavar': 'STAGE:VAR=VALUE,STAGE2:VAR2=VALUE2,...'
         },
         'playbooks': {
             'help': """
-                    Comma-separated list of Ansible playbooks to execute on guests,
-                    overrides mapped values from ``--playbooks-map`` option (default: none).
+                    Comma-separated list of Ansible playbooks to execute on guests, overrides mapped values from
+                    ``--playbooks-map`` option. If ``STAGE`` is omitted, ``pre-artifact-installation`` is used as
+                    a default stage. (default: none).
                     """,
             'action': 'append',
-            'default': []
+            'default': [],
+            'metavar': 'STAGE:FILEPATH,STAGE2:FILEPATH2,...'
         },
         'playbooks-map': {
-            'help': 'Path to a file with preconfigured ``--playbooks`` options (default: %(default)s).',
-            'default': None,
-            'metavar': 'FILE'
+            'help': """
+                    Path to a file with preconfigured ``--playbooks`` options. If ``STAGE`` is omitted,
+                    ``pre-artifact-installation`` is used as a default stage. (default: none).
+                    """,
+            'action': 'append',
+            'default': [],
+            'metavar': 'STAGE:FILE,STAGE2:FILE2,...'
         }
     }
 
     shared_functions = ['setup_guest']
 
-    def sanity(self):
-        # type: () -> None
+    def _parse_staged_option(
+        self,
+        option_name,  # type: str
+        value_callback,  # type: ConfigValueCallbackType
+        stage_initializer=list  # type: Any
+    ):
+        # type: (...) -> ConfigMapType
 
-        if not any([self.option('playbooks'), self.option('playbooks-map')]):
-            raise gluetool.GlueError("One of the options 'playbooks' or 'playbooks-map' is required")
+        self.debug('parsing value of {} option'.format(option_name))
+
+        # Since one option can carry data for multiple stages, for each stage we gather its data
+        # in this dictionary.
+        stages = {}  # type: ignore  # ConfigMapType
+
+        values = gluetool.utils.normalize_multistring_option(self.option(option_name))
+
+        for value in values:
+            match = STAGE_SPEC_PATTERN.match(value)
+
+            if not match:
+                raise gluetool.GlueError(
+                    'Cannot parse option value (should be [STAGE:]VALUE format): {}'.format(value)
+                )
+
+            stage, actual_value = match.groups()
+
+            # When stage's not set, we use the default one.
+            if stage is None:
+                stage = 'pre-artifact-installation'
+
+            # If this is the first thing we'd like to save for this stage, we need to initialize stage's
+            # storage with the given callback. It is usualy some basic type like dict or list.
+            if stage not in stages:
+                stages[stage] = stage_initializer()
+
+            # Store the value itself - again, we don't do it ourself, we leave it to the given callback because
+            # our caller know better what to do with the value - the caller might verify it somehow before
+            # putting it into `stages`.
+            value_callback(stages, stage, actual_value.strip())
+
+        return stages
 
     @gluetool.utils.cached_property
-    def playbooks_map(self):
-        # type: () -> List[Any]
+    def _playbooks_map(self):
+        # type: () -> ConfigInstructionMapType
 
-        if not self.option('playbooks-map'):
-            return []
+        def _load_map(stages, stage, filepath):
+            # type: (ConfigMapType, str, str) -> None
+
+            cast(
+                ConfigInstructionMapType,
+                stages
+            )[stage].extend(
+                gluetool.utils.load_yaml(filepath, logger=self.logger)
+            )
 
         return cast(
-            List[Any],
-            gluetool.utils.load_yaml(self.option('playbooks-map'), logger=self.logger)
+            ConfigInstructionMapType,
+            self._parse_staged_option(
+                'playbooks-map',
+                _load_map
+            )
         )
 
-    def _get_details_from_map(self):
-        # type: () -> Tuple[List[str], Dict[str, str]]
+    @gluetool.utils.cached_property
+    def _extra_vars(self):
+        # type: () -> ConfigFileMapType
+
+        def _to_keyval_pair(stages, stage, keyval_pair):
+            # type: (ConfigMapType, str, str) -> None
+
+            key, value = keyval_pair.split('=', 1)
+
+            cast(
+                ConfigVarsMapType,
+                stages
+            )[stage][key.strip()] = value.strip()
+
+        return cast(
+            ConfigFileMapType,
+            self._parse_staged_option(
+                'extra-vars',
+                _to_keyval_pair,
+                stage_initializer=dict
+            )
+        )
+
+    @gluetool.utils.cached_property
+    def _playbooks(self):
+        # type: () -> ConfigVarsMapType
+
+        def _add_playbook_path(stages, stage, filepath):
+            # type: (ConfigMapType, str, str) -> None
+
+            cast(
+                ConfigFileMapType,
+                stages
+            )[stage].append(
+                gluetool.utils.normalize_path(filepath)
+            )
+
+        return cast(
+            ConfigVarsMapType,
+            self._parse_staged_option(
+                'playbooks',
+                _add_playbook_path
+            )
+        )
+
+    def _get_details_from_map(self, stage):
+        # type: (GuestSetupStage) -> Tuple[List[str], Dict[str, str]]
         """
         Returns a tuple with list of playbooks and extra vars from the processed mapping file
         """
@@ -114,7 +268,9 @@ class GuestSetup(gluetool.Module):
 
             return render_template(playbook, logger=self.logger, **self.shared('eval_context'))
 
-        for playbooks_set in self.playbooks_map:
+        playbooks_map = self._playbooks_map.get(stage.value, [])
+
+        for playbooks_set in playbooks_map:
             gluetool.log.log_dict(self.debug, 'evaluating following playbooks set rule', playbooks_set)
 
             if not self.shared('evaluate_rules',
@@ -140,6 +296,7 @@ class GuestSetup(gluetool.Module):
 
     def setup_guest(self,
                     guest,  # type: libci.guest.NetworkedGuest
+                    stage=GuestSetupStage.PRE_ARTIFACT_INSTALLATION,  # type: GuestSetupStage
                     variables=None,  # type: Optional[Dict[str, str]]
                     log_dirpath=None,  # type: Optional[str]
                     **kwargs  # type: Any
@@ -151,6 +308,8 @@ class GuestSetup(gluetool.Module):
         Only networked guests, accessible over SSH, are supported.
 
         :param libci.guest.NetworkedGuest guest: Guest to setup.
+        :param str stage: pipeline stage in which we're running the playbooks. It is exported to playbooks
+            as ``GUEST_SETUP_STAGE`` variable.
         :param dict(str, str) variables: additional variables to pass to each playbook.
         :param str log_dirpath: if specified, try to store all setup logs inside the given directory.
         :param dict kwargs: Additional arguments which will be passed to
@@ -162,12 +321,40 @@ class GuestSetup(gluetool.Module):
 
         assert guest.environment is not None
 
-        variables = variables or {}
+        log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
+        log_filepath = os.path.join(log_dirpath, 'guest-setup-output-{}.txt'.format(stage.value))
 
-        (playbooks, variables_from_map) = self._get_details_from_map()
+        logger = GuestSetupStageAdapter(guest.logger, stage)
 
-        # updated variables with variables from mapping file
-        variables.update(variables_from_map)
+        # Detect playbooks and extra vars from the playbook map...
+        playbooks_from_map, variables_from_map = self._get_details_from_map(stage)
+
+        # ... and command-line/config file options.
+        playbooks_from_config = self._playbooks.get(stage.value, [])
+        variables_from_config = self._extra_vars.get(stage.value, {})
+
+        # For the final list of playbooks, command-line/configuration has higher priority.
+        playbooks = playbooks_from_config or playbooks_from_map
+
+        if not playbooks:
+            logger.info('no setup playbooks')
+
+            return []
+
+        # The same applies to extra variables - those specified by command-line/configuration override all other
+        # variables.
+        if variables_from_config:
+            variables = variables_from_config
+
+        else:
+            variables = variables or {}
+
+            variables.update(variables_from_map)
+
+        # Make type checking happy
+        assert variables is not None
+
+        variables['GUEST_SETUP_STAGE'] = stage.value
 
         # Detect Python interpreter for Ansible - this depends on the guest, it cannot be based
         # just on the artifact properties (some artifacts may need to be tested on a mixture
@@ -175,43 +362,23 @@ class GuestSetup(gluetool.Module):
         # of course, told otherwise by the caller.
         #
         # Also if user is specifying it's own playbooks, always autodetect ansible_python_interpreter
-        if 'ansible_python_interpreter' not in variables or self.option('playbooks'):
+        if 'ansible_python_interpreter' not in variables:
             guest_interpreters = self.shared('detect_ansible_interpreter', guest)
 
-            log_dict(guest.debug, 'detected interpreters', guest_interpreters)
+            log_dict(logger.debug, 'detected interpreters', guest_interpreters)
 
             if not guest_interpreters:
-                guest.warn('Cannot deduce Python interpreter for Ansible', sentry=True)
+                logger.warn('Cannot deduce Python interpreter for Ansible', sentry=True)
 
             else:
                 variables['ansible_python_interpreter'] = guest_interpreters[0]
 
-        # ``--playbooks`` option overrides playbooks from mapping file
-        if self.option('playbooks'):
-            playbooks = gluetool.utils.normalize_path_option(self.option('playbooks'))
-
-        # ``--extra_vars`` option overrides extra_vars from mapping file and shared function argument
-        # convert the list to a dictionary which variables is expected to by run_playbook
-        if self.option('extra-vars'):
-            variables_serialized = gluetool.utils.normalize_multistring_option(self.option('extra-vars'))
-
-            variables = {
-                key: value for key, value in [var.split('=') for var in variables_serialized]
-            }
-
-        log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
-        log_filepath = os.path.join(log_dirpath, 'guest-setup-output.txt')
-
-        if not playbooks:
-            self.warn('no playbooks to run, skipping')
-            return []
-
-        guest.info('setting up with playbooks {}'.format(', '.join(playbooks)))
+        log_dict(logger.info, 'setting up with playbooks', playbooks)
 
         with Action(
             'configuring guest with playbooks',
             parent=Action.current_action(),
-            logger=guest.logger,
+            logger=logger,
             tags={
                 'guest': {
                     'hostname': guest.hostname,
@@ -226,12 +393,14 @@ class GuestSetup(gluetool.Module):
                 guest,
                 variables=variables,
                 json_output=False,
+                logger=logger,
                 log_filepath=log_filepath,
                 **kwargs
             )
 
         return [
             GuestSetupOutput(
+                stage=stage,
                 label='guest setup',
                 log_path=log_filepath,
                 additional_data=ansible_output

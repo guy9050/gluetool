@@ -6,6 +6,7 @@ from mock import MagicMock
 from mock import call
 from gluetool_modules.helpers.install_copr_build import InstallCoprBuild
 from gluetool_modules.libs.sut_installation import SUTInstallationFailedError
+from gluetool_modules.libs.guest_setup import GuestSetupStage
 from . import create_module, patch_shared, check_loadable
 
 LOG_DIR_NAME = 'artifact-installation'
@@ -77,7 +78,7 @@ def test_setup_guest(module_shared_patched, tmpdir):
     execute_mock = MagicMock(return_value=MagicMock(stdout='', stderr=''))
     guest = mock_guest(execute_mock)
 
-    module.setup_guest(guest, log_dirpath=str(tmpdir))
+    module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
 
     calls = [
         call('curl -v dummy_repo_url --output /etc/yum.repos.d/copr_build.repo'),
@@ -104,7 +105,7 @@ def test_no_yum(module_shared_patched, tmpdir):
     execute_mock.side_effect = execute_mock_side_effect
 
     guest = mock_guest(execute_mock)
-    module.setup_guest(guest, log_dirpath=str(tmpdir))
+    module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
 
     calls = [
         call('curl -v dummy_repo_url --output /etc/yum.repos.d/copr_build.repo'),
@@ -130,7 +131,7 @@ def test_nvr_check_fails(module_shared_patched, tmpdir):
     guest = mock_guest(execute_mock)
 
     with pytest.raises(SUTInstallationFailedError):
-        module.setup_guest(guest, log_dirpath=str(tmpdir))
+        module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
 
     assert_log_files(guest, str(tmpdir))
 
@@ -146,6 +147,6 @@ def test_repo_download_fails(module_shared_patched, tmpdir):
     guest = mock_guest(execute_mock)
 
     with pytest.raises(SUTInstallationFailedError):
-        module.setup_guest(guest, log_dirpath=str(tmpdir))
+        module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
 
     assert_log_files(guest, str(tmpdir), file_names=['0-Download-copr-repository.txt'])

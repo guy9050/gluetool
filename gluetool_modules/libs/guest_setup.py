@@ -16,11 +16,56 @@ structure all ``setup_guest`` functions should return, and states few basic rule
 
 import os
 
+import enum
+import gluetool.log
+
 # Type annotations
 from typing import TYPE_CHECKING, Any, NamedTuple, Optional  # noqa
 
 if TYPE_CHECKING:
     import libci.guest  # noqa
+
+
+class GuestSetupStage(enum.Enum):
+    """
+    Different stages supported by guest setup workflow.
+    """
+
+    #: This is the first stage, and as such serves as the default, initial stage.
+    #:
+    #: Everything that should happen before pipeline can install the artifact, except...
+    PRE_ARTIFACT_INSTALLATION = 'pre-artifact-installation'
+
+    #: ... except artifact- and workflow-specific tasks requested by users or dictated by infrastructure
+    #: issues we need to overcome.
+    #:
+    #: There is an obvious overlap with ``PRE_ARTIFACT_INSTALLATION``, the difference is that the previous
+    #: stage should cover the generic steps while this one is supposed to cover only the very component
+    #: and workflow exceptions and workarounds. Easy, right? Things like "ignore AVC denials for component X"
+    #: or "add repository Y when testing component Z".
+    #:
+    #: ``PRE_ARTIFACT_INSTALLATION`` should remain clean of these exceptions as much as possible for us to be
+    #: able to use just that stage to set up the guest for any generic testing/work.
+    PRE_ARTIFACT_INSTALLATION_WORKAROUNDS = 'pre-artifact-installation-workarounds'
+
+    #: Everything that should happen to install the artifact.
+    ARTIFACT_INSTALLATION = 'artifact-installation'
+
+    #: Optional rollback of workarounds/exceptions performed in ``PRE_ARTIFACT_INSTALLATION_WORKAROUNDS``.
+    #: The very same set of rules applies when it comes to the difference between this stage and the next one.
+    POST_ARTIFACT_INSTALLATION_WORKAROUNDS = 'post-artifact-installation-workarounds'
+
+    #: Everything that should happen after the pipeline installed the artifact.
+    POST_ARTIFACT_INSTALLATION = 'post-artifact-installation'
+
+
+class GuestSetupStageAdapter(gluetool.log.ContextAdapter):
+    def __init__(self, logger, stage):
+        # type: (gluetool.log.ContextAdapter, GuestSetupStage) -> None
+
+        super(GuestSetupStageAdapter, self).__init__(logger, {
+            'ctx_guest_setup_stage': (300, stage.value)
+        })
 
 
 #: Represents one action taken by "guest setup" module and pointer to its logs.
@@ -29,6 +74,7 @@ if TYPE_CHECKING:
 #: :ivar str log_path: local path to a directory or file where log lives.
 #: :ivar additional_data: anything else module considers interesting for its users.
 GuestSetupOutput = NamedTuple('GuestSetupOutput', (
+    ('stage', GuestSetupStage),
     ('label', str),
     ('log_path', str),
     ('additional_data', Any)

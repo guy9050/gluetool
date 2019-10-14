@@ -8,7 +8,7 @@ from gluetool.utils import Command, normalize_shell_option, render_template
 from gluetool import GlueError
 
 from gluetool_modules.libs.artifacts import artifacts_location
-from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput
+from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput, GuestSetupStage
 from gluetool_modules.libs.sut_installation import SUTInstallation
 
 
@@ -108,23 +108,28 @@ class InstallMBSBuild(gluetool.Module):
 
         return gluetool.utils.load_yaml(self.option('installation-workarounds'), logger=self.logger)
 
-    def setup_guest(self, guest, log_dirpath=None, **kwargs):
+    def setup_guest(self, guest, stage=GuestSetupStage.PRE_ARTIFACT_INSTALLATION, log_dirpath=None, **kwargs):
         self.require_shared('primary_task', 'evaluate_instructions')
 
         log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
+
+        guest_setup_output = self.overloaded_shared(
+            'setup_guest',
+            guest,
+            stage=stage,
+            log_dirpath=log_dirpath,
+            **kwargs
+        ) or []
+
+        if stage != GuestSetupStage.ARTIFACT_INSTALLATION:
+            return guest_setup_output
+
+        guest.info('installing the artifact')
 
         installation_log_dirpath = os.path.join(
             log_dirpath,
             '{}-{}'.format(self.option('log-dir-name'), guest.name)
         )
-
-        log_dict(guest.debug, 'setup log directories', [
-            log_dirpath, installation_log_dirpath
-        ])
-
-        guest_setup_output = self.overloaded_shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs) or []
-
-        guest.info('installing the artifact')
 
         primary_task = self.shared('primary_task')
 
@@ -288,6 +293,7 @@ class InstallMBSBuild(gluetool.Module):
 
         return guest_setup_output + [
             GuestSetupOutput(
+                stage=stage,
                 label='module installation',
                 log_path=installation_log_dirpath,
                 additional_data=sut_installation

@@ -2,7 +2,7 @@ import os
 
 import gluetool
 from gluetool_modules.libs.artifacts import artifacts_location
-from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput
+from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput, GuestSetupStage
 from gluetool_modules.libs.sut_installation import SUTInstallation
 
 # Type annotations
@@ -28,21 +28,30 @@ class InstallCoprBuild(gluetool.Module):
 
     shared_functions = ('setup_guest',)
 
-    def setup_guest(self, guest, log_dirpath=None, **kwargs):
+    def setup_guest(self, guest, stage=GuestSetupStage.PRE_ARTIFACT_INSTALLATION, log_dirpath=None, **kwargs):
         # type: (Guest, Optional[str], **Any) -> List[GuestSetupOutput]
 
         self.require_shared('primary_task')
 
         log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
 
+        guest_setup_output = self.overloaded_shared(
+            'setup_guest',
+            guest,
+            stage=stage,
+            log_dirpath=log_dirpath,
+            **kwargs
+        ) or []
+
+        if stage != GuestSetupStage.ARTIFACT_INSTALLATION:
+            return guest_setup_output
+
+        guest.info('installing the artifact')
+
         installation_log_dirpath = os.path.join(
             log_dirpath,
             '{}-{}'.format(self.option('log-dir-name'), guest.name)
         )
-
-        guest_setup_output = self.overloaded_shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs) or []
-
-        guest.info('installing the artifact')
 
         primary_task = self.shared('primary_task')
 
@@ -81,6 +90,7 @@ class InstallCoprBuild(gluetool.Module):
 
         return guest_setup_output + [
             GuestSetupOutput(
+                stage=stage,
                 label='Copr build installation',
                 log_path=installation_log_dirpath,
                 additional_data=sut_installation

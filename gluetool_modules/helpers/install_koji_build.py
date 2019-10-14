@@ -4,7 +4,7 @@ import gluetool
 
 from gluetool.action import Action
 from gluetool_modules.libs.artifacts import artifacts_location
-from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput
+from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput, GuestSetupStage
 from gluetool_modules.libs.sut_installation import SUTInstallationFailedError
 
 
@@ -25,22 +25,31 @@ class InstallKojiBuild(gluetool.Module):
 
     shared_functions = ('setup_guest',)
 
-    def setup_guest(self, guest, log_dirpath=None, **kwargs):
+    def setup_guest(self, guest, stage=GuestSetupStage.PRE_ARTIFACT_INSTALLATION, log_dirpath=None, **kwargs):
         self.require_shared('restraint', 'brew_build_task_params', 'beaker_job_xml')
 
         log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
+
+        guest_setup_output = []
+
+        if not self.option('skip-overloaded-shared'):
+            guest_setup_output = self.overloaded_shared(
+                'setup_guest',
+                guest,
+                stage=stage,
+                log_dirpath=log_dirpath,
+                **kwargs
+            ) or []
+
+        if stage != GuestSetupStage.ARTIFACT_INSTALLATION:
+            return guest_setup_output
+
+        self.info('installing the artifact')
 
         installation_log_dirpath = os.path.join(
             log_dirpath,
             'artifact-installation-{}'.format(guest.name)
         )
-
-        guest_setup_output = []
-
-        if not self.option('skip-overloaded-shared'):
-            guest_setup_output = self.overloaded_shared('setup_guest', guest, log_dirpath=log_dirpath, **kwargs) or []
-
-        self.info('installing the artifact')
 
         brew_build_task_params = self.shared('brew_build_task_params')
 
@@ -128,6 +137,7 @@ class InstallKojiBuild(gluetool.Module):
 
         return guest_setup_output + [
             GuestSetupOutput(
+                stage=stage,
                 label='Brew/Koji build installation',
                 log_path=index_filepath,
                 additional_data=output

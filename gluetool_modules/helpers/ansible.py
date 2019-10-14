@@ -128,6 +128,7 @@ class Ansible(gluetool.Module):
                      cwd=None,  # type: Optional[str]
                      env=None,  # type: Optional[Dict[str, Any]]
                      json_output=False,  # type: bool
+                     logger=None,  # type: Optional[gluetool.log.ContextAdapter]
                      log_filepath=None  # type: Optional[str]
                     ):  # noqa
         # type: (...) -> AnsibleOutput
@@ -143,15 +144,18 @@ class Ansible(gluetool.Module):
         :param str cwd: A path to a directory where ansible will be executed from.
         :param dict(str, object) env: environment variables to use instead of the default, inherited environ.
         :param bool json_output: Ansible returns response as json if set.
+        :param logger: Optional logger to use for logging. If no set, guest's logger is used by default.
         :param str log_filepath: Path to a file to store Ansible output in. If not set, ``ansible-output.txt``
             is created in the current directory.
         :returns: Instance of :py:class:`AnsibleOutput`.
         """
 
+        logger = logger or guest.logger
+
         if isinstance(playbook_paths, str):
             playbook_paths = [playbook_paths]
 
-        log_dict(guest.debug, 'running playbooks', playbook_paths)
+        log_dict(logger.debug, 'running playbooks', playbook_paths)
 
         assert guest.key is not None
         assert guest.environment is not None
@@ -180,7 +184,7 @@ class Ansible(gluetool.Module):
         cmd += self.additional_options
 
         if not self.dryrun_allows('Running a playbook in non-check mode'):
-            guest.debug("dry run enabled, telling ansible to use 'check' mode")
+            logger.debug("dry run enabled, telling ansible to use 'check' mode")
 
             cmd += ['-C']
 
@@ -193,7 +197,7 @@ class Ansible(gluetool.Module):
             # When coupled with `-v`, provides structured and more readable output. But only if user didn't try
             # their own setup.
             if 'ANSIBLE_STDOUT_CALLBACK' in env and env['ANSIBLE_STDOUT_CALLBACK'] != 'debug':
-                guest.debug('ansible "debug" callback cannot be used, ANSIBLE_STDOUT_CALLBACK is already set')
+                logger.debug('ansible "debug" callback cannot be used, ANSIBLE_STDOUT_CALLBACK is already set')
 
             else:
                 env.update({
@@ -207,7 +211,7 @@ class Ansible(gluetool.Module):
         with Action(
             'running playbooks',
             parent=Action.current_action(),
-            logger=guest.logger,
+            logger=logger,
             tags={
                 'guest': {
                     'hostname': guest.hostname,
@@ -217,7 +221,7 @@ class Ansible(gluetool.Module):
             }
         ):
             try:
-                ansible_call = Command(cmd, logger=guest.logger).run(cwd=cwd, env=env)
+                ansible_call = Command(cmd, logger=logger).run(cwd=cwd, env=env)
 
             except gluetool.GlueCommandError as exc:
                 ansible_call = exc.output
@@ -240,15 +244,17 @@ class Ansible(gluetool.Module):
         def show_ansible_errors(output):
             # type: (gluetool.utils.ProcessOutput) -> None
 
+            assert logger is not None
+
             if output.stdout:
                 log_blob(
-                    guest.error,
+                    logger.error,
                     'Last 30 lines of Ansible stdout', '\n'.join(output.stdout.splitlines()[-30:])
                 )
 
             if output.stderr:
                 log_blob(
-                    guest.error,
+                    logger.error,
                     'Last 30 lines of Ansible stderr', '\n'.join(output.stderr.splitlines()[-30:])
                 )
 
@@ -269,7 +275,7 @@ class Ansible(gluetool.Module):
             ansible_json_output = from_json(ansible_call.stdout[match.start():])
 
             log_dict(
-                guest.debug,
+                logger.debug,
                 'Ansible json output', ansible_json_output
             )
 

@@ -1,10 +1,13 @@
 import os
 import pytest
 
+import mock
 from mock import MagicMock
 
 import gluetool
 import libci.guest
+import gluetool_modules.libs.guest_setup
+import gluetool_modules.libs.testing_environment
 import gluetool_modules.helpers.guest_setup
 import gluetool_modules.helpers.rules_engine
 
@@ -31,20 +34,69 @@ def test_sanity_shared(module):
     assert module.glue.has_shared('setup_guest') is True
 
 
-def test_sanity_no_required_options(module):
-    with pytest.raises(gluetool.GlueError, match=r"^One of the options 'playbooks' or 'playbooks-map' is required"):
-        module.sanity()
-
-
-def test_sanity_both_options(module):
-    module._config['playbooks'] = ['dummy1.yml', 'dummy2.yml']
-    module._config['playbooks-map'] = 'map.yml'
-
-    module.sanity()
-
-
 def test_playbook_map_empty(module):
-    assert module.playbooks_map == []
+    assert module._playbooks_map == {}
+
+
+@pytest.mark.parametrize('option_name, raw, expected', [
+    (
+        'playbooks',
+        ['foo'],
+        {'pre-artifact-installation': ['foo']}
+    ),
+    (
+        'playbooks',
+        ['foo', 'bar'],
+        {'pre-artifact-installation': ['foo', 'bar']}
+    ),
+    (
+        'playbooks',
+        ['foo,bar'],
+        {'pre-artifact-installation': ['foo', 'bar']}
+    ),
+    (
+        'playbooks',
+        ['post-artifact-installation:foo'],
+        {'post-artifact-installation': ['foo']}
+    ),
+    (
+        'playbooks',
+        [
+            'foo',
+            'post-artifact-installation:bar,baz'
+        ],
+        {
+            'pre-artifact-installation': ['foo'],
+            'post-artifact-installation': ['bar', 'baz']
+        }
+    ),
+    (
+        'extra-vars',
+        [
+            'foo=1',
+            'post-artifact-installation:bar=2,baz=3,artifact-installation:extra=not,another=stillnot'
+        ],
+        {
+            'pre-artifact-installation': {
+                'foo': '1',
+                'baz': '3',
+                'another': 'stillnot'
+            },
+            'artifact-installation': {
+                'extra': 'not'
+            },
+            'post-artifact-installation': {
+                'bar': '2'
+            }
+        }
+    ),
+])
+def test_options(module, option_name, raw, expected):
+    property_name = '_{}'.format(option_name.replace('-', '_'))
+
+    module._config[option_name] = raw
+
+    getattr(module, property_name) == expected
 
 
 def test_missing_required_shared(module, monkeypatch):
@@ -63,21 +115,22 @@ def test_setup(log, module, local_guest, monkeypatch):
     playbooks = ['dummy-playbook-1.yml', 'dummy-playbook-2.yml']
 
     def dummy_run_playbook(_playbook, _guest, variables=None, **kwargs):
-        assert log.match(message='setting up with playbooks {}'.format(', '.join([
-            os.path.join(os.getcwd(), playbook) for playbook in playbooks
-        ])))
+        assert log.match(message="""setting up with playbooks:
+{}""".format(gluetool.log.format_dict([os.path.join(os.getcwd(), playbook) for playbook in playbooks])))
 
         assert _guest == local_guest
         # key1:val1 is gone because extra-vars option overrides it
         assert variables == {
             'key2': 'val2',
             'key3': 'val3',
-            'key4': 'val4'
+            'key4': 'val4',
+            'GUEST_SETUP_STAGE': 'pre-artifact-installation'
         }
         assert kwargs == {
             'dummy_option': 17,
             'json_output': False,
-            'log_filepath': 'guest-setup-{}/guest-setup-output.txt'.format(local_guest.name)
+            'logger': mock.ANY,
+            'log_filepath': 'guest-setup-{}/guest-setup-output-pre-artifact-installation.txt'.format(local_guest.name)
         }
 
         return None
@@ -101,7 +154,7 @@ def test_playbook_map_guest_setup(module, monkeypatch):
         'detect_ansible_interpreter': []
     })
 
-    monkeypatch.setattr(module, "_get_details_from_map", lambda: ([], {}))
+    monkeypatch.setattr(module, "_get_details_from_map", lambda stage: ([], {}))
 
     module.shared('setup_guest', MagicMock())
 
@@ -141,4 +194,5 @@ def test_playbook_map(module, monkeypatch):
 
     monkeypatch.setattr(gluetool.utils, "load_yaml", load_yaml)
 
-    assert module._get_details_from_map() == ([os.path.join(os.getcwd(), 'default.yaml')], {'key': 'value'})
+    assert module._get_details_from_map(gluetool_modules.libs.guest_setup.GuestSetupStage.PRE_ARTIFACT_INSTALLATION) \
+        == ([os.path.join(os.getcwd(), 'default.yaml')], {'key': 'value'})
