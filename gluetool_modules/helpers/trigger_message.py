@@ -48,6 +48,23 @@ class TriggerMessage(gluetool.Module):
 
         self._message = None
 
+    @property
+    def eval_context(self):
+        # pylint: disable=unused-variable
+        __content__ = {  # noqa
+            'TRIGGER_MESSAGE': """
+                               Trigger message.
+                               """,
+        }
+
+        if not self._message:
+            self.debug('No trigger message available, cannot pass it to eval_context')
+            return {}
+
+        return {
+            'TRIGGER_MESSAGE': self._message
+        }
+
     def trigger_message(self):
         return self._message
 
