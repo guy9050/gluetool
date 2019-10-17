@@ -2,6 +2,7 @@ import logging
 import pytest
 
 from mock import MagicMock
+import __builtin__
 
 import gluetool
 from gluetool.utils import from_json
@@ -317,6 +318,7 @@ def fixture_module(monkeypatch):
     module._config['type'] = 'comparison'
     module._config['results-file'] = 'results-file'
     module._config['artifacts-dir'] = 'artifacts'
+    module._config['verbose-log-file'] = 'verbose'
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
@@ -340,7 +342,8 @@ def test_loadable(module):
 def test_run_rpminspect(module, monkeypatch):
 
     mock_runinfo = MagicMock()
-    mock_runinfo.stdout = None
+    mock_runinfo.stdout = ''
+    mock_runinfo.stderr = ''
     mock_command_run = MagicMock(return_value=mock_runinfo)
 
     mock_command = MagicMock(return_value=MagicMock(run=mock_command_run))
@@ -352,6 +355,8 @@ def test_run_rpminspect(module, monkeypatch):
     mock_primary_task.latest = 'dummy-latest'
     mock_primary_task.scratch = False
     mock_primary_task.id = 111111
+
+    monkeypatch.setattr(__builtin__, 'open', MagicMock())
 
     module._run_rpminspect(mock_primary_task, ['ALL'], 'workdir')
 
@@ -372,21 +377,43 @@ def test_run_rpminspect_no_baseline(module, monkeypatch):
     mock_primary_task = MagicMock()
     mock_primary_task.latest = None
 
+    monkeypatch.setattr(__builtin__, 'open', MagicMock())
+
     with pytest.raises(gluetool.GlueError, match=r"^Not provided baseline for comparison"):
         module._run_rpminspect(mock_primary_task, ['ALL'], 'workdir')
 
 
 def test_run_rpminspect_fail(module, monkeypatch):
 
-    mock_error = gluetool.GlueCommandError([], output=MagicMock(stdout='{"msg": "dummy error message"}'))
+    mock_error = gluetool.GlueCommandError([], output=MagicMock(
+        stdout='{"msg": "dummy error message"}', stderr='Some error', exit_code=2))
+
     mock_command_run = MagicMock(side_effect=mock_error)
 
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
 
     mock_primary_task = MagicMock()
 
-    with pytest.raises(gluetool.GlueError, match=r"^rpminspect failed during execution with: Command '\[\]' failed with exit code "):
+    monkeypatch.setattr(__builtin__, 'open', MagicMock())
+
+    with pytest.raises(gluetool.GlueError, match=r"^Rpminspect failed during execution with exit code 2"):
         module._run_rpminspect(mock_primary_task, ['ALL'], 'workdir')
+
+
+def test_run_rpminspect_tests_failed(module, monkeypatch, log):
+
+    mock_error = gluetool.GlueCommandError([], output=MagicMock(stdout='Tests failed', stderr='', exit_code=1))
+    mock_command_run = MagicMock(side_effect=mock_error)
+
+    monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
+
+    mock_primary_task = MagicMock()
+
+    monkeypatch.setattr(__builtin__, 'open', MagicMock())
+
+    module._run_rpminspect(mock_primary_task, ['ALL'], 'workdir')
+
+    assert log.records[-1].message == "Result of testing: FAILED"
 
 
 def test_parse_comparison_runinfo(module):
@@ -416,21 +443,27 @@ def test_parse_analysis_runinfo(module):
 
 def test_execute(module, monkeypatch, log):
     mock_runinfo = MagicMock()
-    mock_runinfo.stdout = None
+    mock_runinfo.stdout = ''
+    mock_runinfo.stderr = ''
     mock_command_run = MagicMock(return_value=mock_runinfo)
 
     monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
     monkeypatch.setattr(gluetool_modules.static_analysis.rpminspect.rpminspect, 'load_json', MagicMock(return_value={}))
 
+    monkeypatch.setattr(__builtin__, 'open', MagicMock())
+
     module.execute()
     mock_command_run.assert_called_once()
 
     assert 'rpminspect returned' in log.records[-2].message
-    assert log.records[-3].message == "running comparison for task '111111' compared to dummy-latest"
+    assert log.records[-4].message == "running comparison for task '111111' compared to dummy-latest"
+    assert log.records[-3].message == "Result of testing: PASSED"
 
 
 def test_execute_no_latest(module, monkeypatch, log):
     module.task.latest = None
+
+    monkeypatch.setattr(__builtin__, 'open', MagicMock())
 
     module.execute()
 
@@ -464,6 +497,8 @@ def test_execute_no_latest(module, monkeypatch, log):
 
 def test_execute_nvr_is_latest(module, monkeypatch, log):
     module.task.latest = module.task.nvr
+
+    monkeypatch.setattr(__builtin__, 'open', MagicMock())
 
     module.execute()
 

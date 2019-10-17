@@ -1,3 +1,4 @@
+import enum
 import os
 import re
 import shutil
@@ -6,11 +7,14 @@ import tempfile
 import gluetool
 from gluetool import GlueError, GlueCommandError
 from gluetool.utils import Command, check_for_commands, load_json, normalize_multistring_option, new_xml_element
-from gluetool.log import log_dict
+from gluetool.log import log_dict, format_blob
 from libci.results import TestResult, publish_result
 
 # Type annotations
-from typing import cast, Any, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa
+from typing import cast, TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa
+
+if TYPE_CHECKING:
+    from gluetool.utils import ProcessOutput  # noqa
 
 # map RPMinspect test score to resultsdb 2.0 API outcome states
 # http://docs.resultsdb20.apiary.io/
@@ -28,6 +32,12 @@ RPMINSPECT_SCORE = {
 
 # required commands of module
 REQUIRED_CMDS = ['rpminspect']
+
+
+class RpminspectExitCodes(enum.IntEnum):
+    RPMINSPECT_TESTS_SUCCESS = 0
+    RPMINSPECT_TESTS_FAILURE = 1
+    RPMINSPECT_PROGRAM_ERROR = 2
 
 
 class RpminspectTestResult(TestResult):
@@ -180,15 +190,39 @@ class CIRpminspect(gluetool.Module):
 
         command.append(task.nvr)
 
+        def _write_log(output):
+            # type: (ProcessOutput) -> None
+            """
+            Store a verbose log to a file
+            :param log: a log string
+            """
+            if output is None:
+                return
+
+            with open(os.path.join(workdir, self.option('verbose-log-file')), 'w') as output_file:
+                def _write(label, s):
+                    # type: (str, str) -> None
+                    output_file.write('{}\n{}\n\n'.format(label, s))
+
+                _write('# STDOUT:', format_blob(cast(str, output.stdout)))
+                _write('# STDERR:', format_blob(cast(str, output.stderr)))
+
+                output_file.flush()
+
         try:
             output = Command(command).run()
+            self.info('Result of testing: PASSED')
+            _write_log(output)
+
         except GlueCommandError as exc:
-            raise GlueError('rpminspect failed during execution with: {}'.format(exc))
+            _write_log(exc.output)
+
+            if exc.output.exit_code == RpminspectExitCodes.RPMINSPECT_TESTS_FAILURE:
+                self.error('Result of testing: FAILED')
+            else:
+                raise GlueError('Rpminspect failed during execution with exit code {}'.format(exc.output.exit_code))
 
         # output is verbose log, store it to a file
-        if output.stdout is not None:
-            with open(os.path.join(workdir, self.option('verbose-log-file')), 'w') as output_file:
-                output_file.write(output.stdout)
 
     def _publish_skipped_result(self, task):
         # type: (Any) -> None
