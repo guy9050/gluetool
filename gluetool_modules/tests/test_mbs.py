@@ -189,6 +189,7 @@ def test_execute(module, tags, get):
     assert primary_task.issuer == 'jistone'
     assert primary_task.nsvc == 'rust-toolset:rhel8:820181105234334:b09eea91'
     assert primary_task.nvr == 'rust-toolset-rhel8-820181105234334.b09eea91'
+    assert primary_task.devel_nvr == 'rust-toolset-devel-rhel8-820181105234334.b09eea91'
     assert primary_task.component_id == 'rust-toolset:rhel8'
     assert primary_task.has_artifacts is True
     assert primary_task.dependencies == ['llvm-toolset:rhel8', 'platform:el8']

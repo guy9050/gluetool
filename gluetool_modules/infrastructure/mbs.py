@@ -215,6 +215,11 @@ class MBSTask(LoggerMixin, object):
         if self.scratch:
             self.nvr = '{}+{}'.format(self.nvr, self.id)
 
+        # make devel module nvr available for convenience
+        self.devel_nvr = '{}-devel-{}-{}.{}'.format(
+            self.name, self.stream.replace('-', '_'), self.version, self.context
+        )
+
         # build tags from brew
         self.tags = [tag['name'] for tag in self.module.shared('koji_session').listTags(self.nvr)]
 
