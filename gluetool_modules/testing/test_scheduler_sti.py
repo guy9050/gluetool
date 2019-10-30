@@ -34,6 +34,9 @@ class TestScheduleEntry(BaseTestScheduleEntry):
 
         self.playbook_filepath = playbook_filepath
         self.variables = variables
+        self.work_dirpath = None  # type: Optional[str]
+        self.artifact_dirpath = None  # type: Optional[str]
+        self.inventory_filepath = None  # type: Optional[str]
         self.results = None  # type: Any
 
     def log_entry(self, log_fn=None):

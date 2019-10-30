@@ -11,7 +11,7 @@ import gluetool
 from gluetool import GlueError
 from gluetool.action import Action
 from gluetool.log import log_blob, log_dict
-from gluetool.utils import dict_update
+from gluetool.utils import dict_update, new_xml_element
 
 from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.test_schedule import TestScheduleResult
@@ -19,7 +19,6 @@ from gluetool_modules.libs.test_schedule import TestScheduleResult
 # Type annotations
 from typing import cast, Any, Callable, Dict, List, Optional, Tuple  # noqa
 from gluetool_modules.testing.test_scheduler_sti import TestScheduleEntry  # noqa
-
 
 # Check whether Ansible finished running tests every 5 seconds.
 DEFAULT_WATCH_TIMEOUT = 5
@@ -315,12 +314,15 @@ sut     ansible_host={} ansible_user=root {}
         # We don't need the working directory actually - we need artifact directory, which is
         # a subdirectory of working directory. But one day, who knows...
         work_dirpath, artifact_dirpath, inventory_filepath = self._prepare_environment(schedule_entry)
+        schedule_entry.work_dirpath = work_dirpath
+        schedule_entry.artifact_dirpath = artifact_dirpath
+        schedule_entry.inventory_filepath = inventory_filepath
 
         ansible_log_filepath = os.path.join(work_dirpath, STI_ANSIBLE_LOG_FILENAME)
 
-        schedule_entry.info('Ansible logs are in {}'.format(
-            artifacts_location(self, ansible_log_filepath, logger=schedule_entry.logger)
-        ))
+        artifacts = artifacts_location(self, ansible_log_filepath, logger=schedule_entry.logger)
+
+        schedule_entry.info('Ansible logs are in {}'.format(artifacts))
 
         results = self._run_playbook(schedule_entry, work_dirpath, artifact_dirpath, inventory_filepath)
 
@@ -336,8 +338,71 @@ sut     ansible_host={} ansible_user=root {}
     def serialize_test_schedule_entry_results(self, schedule_entry, test_suite):
         # type: (TestScheduleEntry, Any) -> None
 
+        def _add_property(properties, name, value):
+            # type: (Any, str, str) -> Any
+            return new_xml_element('property', _parent=properties, name='baseosci.{}'.format(name), value=value or '')
+
+        def _add_log(logs, name, href):
+            # type: (Any, str, str) -> Any
+            return new_xml_element('log', _parent=logs, name=name, href=href)
+
+        def _add_testing_environment(test_case, name, arch, compose):
+            # type: (Any, str, Any, Any) -> Any
+            parent_elem = new_xml_element('testing-environment', _parent=test_case, name=name)
+            new_xml_element('property', _parent=parent_elem, name='arch', value=arch)
+            new_xml_element('property', _parent=parent_elem, name='compose', value=compose)
+
+        def _sort_children(parent, key_getter):
+            # type: (Any, Optional[Callable[[Any], Any]]) -> None
+
+            sorted_children = sorted(parent.children, key=key_getter)
+
+            for el in parent.children:
+                el.extract()
+
+            for el in sorted_children:
+                parent.append(el)
+
         if schedule_entry.runner_capability != 'sti':
             self.overloaded_shared('serialize_test_schedule_entry_results', schedule_entry, test_suite)
             return
 
-        # So far, nothing to do here
+        for task in schedule_entry.results:
+
+            test_case = new_xml_element('testcase', _parent=test_suite, name=task.name, result=task.result)
+            properties = new_xml_element('properties', _parent=test_case)
+            logs = new_xml_element('logs', _parent=test_case)
+
+            if task.result == 'FAIL':
+                new_xml_element('failure', _parent=test_case)
+
+            if task.result == 'ERROR':
+                new_xml_element('error', _parent=test_case)
+
+            # test properties
+            assert schedule_entry.guest is not None
+            assert schedule_entry.guest.environment is not None
+            _add_property(properties, 'arch', schedule_entry.guest.environment.arch)
+            _add_property(properties, 'connectable_host', schedule_entry.guest.hostname)
+            _add_property(properties, 'distro', schedule_entry.guest.environment.compose)
+            _add_property(properties, 'status', schedule_entry.stage.value.capitalize())
+            _add_property(properties, 'testcase.source.url', self.shared('dist_git_repository').web_url)
+            _add_property(properties, 'variant', '')
+
+            # logs
+            assert schedule_entry.testing_environment is not None
+            assert schedule_entry.artifact_dirpath is not None
+            artifacts_location_url = artifacts_location(
+                self, schedule_entry.artifact_dirpath, logger=schedule_entry.logger)
+            _add_log(logs, name="log_dir", href=artifacts_location_url)
+
+            _add_testing_environment(test_case, 'requested', schedule_entry.testing_environment.arch,
+                                     schedule_entry.testing_environment.compose)
+            _add_testing_environment(test_case, 'provisioned', schedule_entry.guest.environment.arch,
+                                     schedule_entry.guest.environment.compose)
+
+            # sorting
+            _sort_children(properties, lambda child: child.attrs['name'])
+            _sort_children(logs, lambda child: child.attrs['name'])
+
+        test_suite['tests'] = len(schedule_entry.results)
