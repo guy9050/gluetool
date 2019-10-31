@@ -7,7 +7,8 @@ import tempfile
 import gluetool
 from gluetool import GlueError, GlueCommandError
 from gluetool.utils import Command, check_for_commands, load_json, normalize_multistring_option, new_xml_element
-from gluetool.log import log_dict, format_blob
+from gluetool.log import format_blob
+from gluetool_modules.libs.artifacts import artifacts_location
 from libci.results import TestResult, publish_result
 
 # Type annotations
@@ -447,9 +448,13 @@ class CIRpminspect(gluetool.Module):
 
             self._run_rpminspect(task, tests, workdir)
 
-            json_results = load_json(os.path.join(workdir, self.option('results-file')))
+            results_filepath = os.path.join(workdir, self.option('results-file'))
+            results_location = artifacts_location(self, results_filepath, logger=self.logger)
 
-            log_dict(self.info, 'rpminspect returned', json_results)
+            self.info('Rpminspect results are in {}'.format(results_location))
+
+            json_results = load_json(results_filepath)
+
             self._publish_results(task, json_results)
 
         finally:

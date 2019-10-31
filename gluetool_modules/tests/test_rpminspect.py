@@ -455,7 +455,7 @@ def test_execute(module, monkeypatch, log):
     module.execute()
     mock_command_run.assert_called_once()
 
-    assert 'rpminspect returned' in log.records[-2].message
+    assert 'Rpminspect results are in ' in log.records[-2].message
     assert log.records[-4].message == "running comparison for task '111111' compared to dummy-latest"
     assert log.records[-3].message == "Result of testing: PASSED"
 
