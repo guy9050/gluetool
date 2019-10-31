@@ -427,7 +427,7 @@ class CIRpminspect(gluetool.Module):
         # It can't be done in destroy method for multithread supporting.
         try:
             tests = normalize_multistring_option(self.option('tests'))
-            workdir = tempfile.mkdtemp(dir=os.getcwd())
+            workdir = os.path.relpath(tempfile.mkdtemp(dir=os.getcwd()), os.getcwd())
             test_type = self.option('type')
 
             self.require_shared('primary_task')
