@@ -79,15 +79,21 @@ class TaskDispatcher(gluetool.Module):
         def _find_test_property(module, args, test_property, mapping):
             joined_args = ' '.join(args)
 
+            log_dict(self.debug, "find test property '{}' for job".format(test_property), args)
+
             match = re.search(
-                r'--pipeline-state-reporter-options.+?--test-{}(?:\s+|=)([\w-]+)'.format(test_property),
+                r'--test-{}(?:\s+|=)([\w-]+)'.format(test_property),
                 joined_args
             )
 
-            if match is not None:
-                return match.group(1)
+            if match:
+                self.debug("  test property is '{}'".format(match.group(1)))
+
+                return match.group(1).strip()
 
             if mapping is None:
+                self.debug('  test property not found, and there is no mapping')
+
                 return 'unknown'
 
             full_command = [module] + args
@@ -95,11 +101,18 @@ class TaskDispatcher(gluetool.Module):
             try:
                 # try to match our command with an entry from the mapping, to get what
                 # configurator thinks would be an appropriate default value for such command
-                return mapping.match(' '.join(full_command))
+                ret = mapping.match(' '.join(full_command))
+
+                self.debug("  test property found in mapping: '{}'".format(ret))
+
+                return ret
 
             except gluetool.GlueError:
                 self.warn(
-                    'Cannot find a test {} for job:\n{}'.format(test_property, gluetool.log.format_dict(full_command)),
+                    'Cannot find a test property {} for job:\n{}'.format(
+                        test_property,
+                        gluetool.log.format_dict(full_command)
+                    ),
                     sentry=True
                 )
 
