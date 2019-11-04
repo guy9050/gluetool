@@ -81,7 +81,13 @@ class TestSchedulerUpgrades(gluetool.Module):
                 key=lambda pair: int(pair[1].group(1))
             )
         except ValueError:
-            raise gluetool.GlueError('Unable to find compose for primary task: {}'.format(primary_task.id))
+            raise gluetool.SoftGlueError(
+                "Unable to find OSCI compose for {} ({}) in '{}' directory".format(
+                    primary_task.component,
+                    primary_task.id,
+                    composes_subdir_path
+                )
+            )
 
         compose = winning_pair[0]
 
