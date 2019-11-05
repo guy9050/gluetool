@@ -2,6 +2,7 @@ import enum
 import os
 import re
 import shutil
+import stat
 import tempfile
 
 import gluetool
@@ -427,8 +428,15 @@ class CIRpminspect(gluetool.Module):
         # It can't be done in destroy method for multithread supporting.
         try:
             tests = normalize_multistring_option(self.option('tests'))
-            workdir = os.path.relpath(tempfile.mkdtemp(dir=os.getcwd()), os.getcwd())
             test_type = self.option('type')
+
+            workdir = os.path.relpath(tempfile.mkdtemp(dir=os.getcwd()), os.getcwd())
+
+            # Fixing permissions of workdir which, created via `mkdtemp`, is set to u=rwx,go= only.
+            os.chmod(
+                workdir,
+                stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
+            )
 
             self.require_shared('primary_task')
             task = self.shared('primary_task')

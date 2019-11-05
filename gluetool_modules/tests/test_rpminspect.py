@@ -308,9 +308,14 @@ COMPARISON_PARSED_STDOUT = [
 
 
 @pytest.fixture(name='module')
-def fixture_module(monkeypatch):
-    monkeypatch.setattr(gluetool_modules.static_analysis.rpminspect.rpminspect.tempfile,
-                        "mkdtemp", MagicMock(return_value='dummy-tmpdir'))
+def fixture_module(monkeypatch, tmpdir):
+    workdir = tmpdir.mkdir('rpminspect-workdir')
+
+    monkeypatch.setattr(
+        gluetool_modules.static_analysis.rpminspect.rpminspect.tempfile,
+        "mkdtemp",
+        MagicMock(return_value=str(workdir))
+    )
 
     module = create_module(gluetool_modules.static_analysis.rpminspect.rpminspect.CIRpminspect)[1]
 
