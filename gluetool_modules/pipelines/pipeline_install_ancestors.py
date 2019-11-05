@@ -25,7 +25,14 @@ class PipelineInstallAncestors(gluetool.Module):
         },
         'tag': {
             'help': 'Tag to use when looking up ancestors.'
-        }
+        },
+        'install-rpms-blacklist': {
+            'help': """
+                Value is passed to inner called `brew-build-task-params` module (default: %(default)s).
+                """,
+            'type': str,
+            'default': ''
+        },
     }
 
     shared_functions = ('setup_guest',)
@@ -147,8 +154,11 @@ class PipelineInstallAncestors(gluetool.Module):
         if stage == GuestSetupStage.ARTIFACT_INSTALLATION and self._brew_options:
             self.info('installing the ancestor {}'.format(self.shared('primary_task').nvr))
 
+            blacklist = self.option('install-rpms-blacklist')
+            brew_build_task_params_argv = ['--install-rpms-blacklist', blacklist] if blacklist else []
+
             modules += [
-                gluetool.glue.PipelineStepModule('brew-build-task-params'),
+                gluetool.glue.PipelineStepModule('brew-build-task-params', argv=brew_build_task_params_argv),
                 gluetool.glue.PipelineStepModule('install-koji-build', argv=['--skip-overloaded-shared']),
                 gluetool.glue.PipelineStepCallback('do_setup_guest', do_setup_guest)
             ]
