@@ -127,13 +127,23 @@ class TestSchedulerUpgrades(gluetool.Module):
         if not binary_rpms_list:
             self.warn('No binary rpm names found for package: "{}"'.format(primary_task_nevr_pattern))
 
+        new_variables = {
+            'compose_url': primary_task_compose_url,
+            'binary_rpms_list': binary_rpms_list
+        }
+
         schedule = self.overloaded_shared(
             'create_test_schedule',
             testing_environment_constraints=testing_environment_constraints
         )
 
         for schedule_entry in schedule:
-            schedule_entry.variables['compose_url'] = primary_task_compose_url
-            schedule_entry.variables['binary_rpms_list'] = binary_rpms_list
+            log_dict(self.debug, 'old variables', schedule_entry.variables)
+
+            # `schedule_entry.variables` can contain variables given by user, we do not want to overwrite them
+            new_variables.update(schedule_entry.variables)
+            schedule_entry.variables = new_variables
+
+            log_dict(self.debug, 'new variables', schedule_entry.variables)
 
         return schedule
