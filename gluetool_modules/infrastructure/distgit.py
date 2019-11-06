@@ -154,11 +154,10 @@ class DistGit(gluetool.Module):
     Module provides details of a dist-git repository. The repository is made available via the shared
     function ```dist_git_repository```, which returns an instance of py:class:`DistGitRepository` class.
 
-    The module supports two methods for resolving the dist-git repository details:
+    The module supports currently one method for resolving the dist-git repository details:
 
-    * ``artifact``: Resolved dist-git repository for the primary artifact in the pipeline.
-
-    * ``force``: Force repository and branch from the command line.
+    * ``artifact``: Resolve dist-git repository for the primary artifact in the pipeline. If some of the options
+                    ``branch``, ``ref``, ``web-url`` or ``clone-url`` are specified they override the resolved values.
     """
 
     name = 'dist-git'
@@ -169,7 +168,7 @@ class DistGit(gluetool.Module):
         ('General options', {
             'method': {
                 'help': 'What method to use for resolving dist-git repository (default: %(default)s).',
-                'choices': ('artifact', 'force'),
+                'choices': ('artifact',),
                 'default': 'artifact'
             },
         }),
@@ -182,22 +181,20 @@ class DistGit(gluetool.Module):
             },
             'web-url-map': {
                 'help': 'Path to a pattern map for mapping artifact type to dist-git repository web URL'
-            }
-        }),
-        ("Options for method 'force'", {
+            },
             'branch': {
-                'help': 'Dist-git branch'
+                'help': 'Force dist-git branch'
             },
             'ref': {
-                'help': 'Dist-git ref'
+                'help': 'Force dist-git ref'
             },
             'clone-url': {
-                'help': 'Dist-git repository clone URL'
+                'help': 'Force dist-git repository clone URL'
             },
             'web-url': {
-                'help': 'Dist-git repository web URL'
+                'help': 'Force dist-git repository web URL'
             }
-        }),
+        })
     ]
 
     required_options = ('method',)
@@ -236,66 +233,53 @@ class DistGit(gluetool.Module):
         return PatternMap(self.option('web-url-map'), logger=self.logger)
 
     def _artifact_branch(self, task):
-        return self.branch_map.match(task.target)
+        # if ref is specified, we cannot use also branch, conflict of both checked in sanity
+        if self.option('ref'):
+            return None
+
+        return self.option('branch') or self.branch_map.match(task.target)
 
     def _artifact_ref(self, task):
-        return task.distgit_ref
+        # if branch is specified, we cannot use also ref, conflict of both checked in sanity
+        if self.option('branch'):
+            return None
+
+        return self.option('ref') or task.distgit_ref
 
     def _artifact_clone_url(self, task):
-        return self.clone_url_map.match(task.ARTIFACT_NAMESPACE)
+        return self.option('clone-url') or self.clone_url_map.match(task.ARTIFACT_NAMESPACE)
 
     def _artifact_web_url(self, task):
-        return self.web_url_map.match(task.ARTIFACT_NAMESPACE)
-
-    def _force_branch(self, *args):
-        return self.option('branch')
-
-    def _force_ref(self, *args):
-        return self.option('ref')
-
-    def _force_clone_url(self, *args):
-        return self.option('clone-url')
-
-    def _force_web_url(self, *args):
-        return self.option('web-url')
+        return self.option('web-url') or self.web_url_map.match(task.ARTIFACT_NAMESPACE)
 
     _methods_branch = {
         'artifact': _artifact_branch,
-        'force': _force_branch
     }
 
     _methods_ref = {
         'artifact': _artifact_ref,
-        'force': _force_ref
     }
 
     _methods_clone_url = {
         'artifact': _artifact_clone_url,
-        'force': _force_clone_url
     }
 
     _methods_web_url = {
         'artifact': _artifact_web_url,
-        'force': _force_web_url
     }
 
     def sanity(self):
-        method = self.option('method')
-        artifact_options = ['branch-map', 'clone-url-map', 'web-url-map']
-        force_options = ['clone-url', 'web-url']
+        required_options = [
+            ('branch-map', 'branch'),
+            ('clone-url-map', 'clone-url'),
+            ('web-url-map', 'web-url')
+        ]
 
-        if method == 'artifact' and not all([self.option(option) for option in artifact_options]):
+        if not all([self.option(option[0]) or self.option(option[1]) for option in required_options]):
             raise IncompatibleOptionsError("missing required options for method 'artifact'")
 
-        if method == 'force':
-            if not all([self.option(option) for option in force_options]):
-                raise IncompatibleOptionsError("missing required options for method 'force'")
-
-            if self.option('ref') and self.option('branch'):
-                raise IncompatibleOptionsError("You can force only one of 'ref' or 'branch'")
-
-            if not self.option('ref') and not self.option('branch'):
-                raise IncompatibleOptionsError("You have to force either 'ref' or 'branch'")
+        if self.option('ref') and self.option('branch'):
+            raise IncompatibleOptionsError("You can use only one of 'ref' or 'branch'")
 
     def dist_git_repository(self):
         """
@@ -313,8 +297,7 @@ class DistGit(gluetool.Module):
 
     def _acquire_param(self, name, error_message=None):
         """
-        For a given repo parameter, pick one of its getter methods, either one using autodetection
-        or the one based on ``force`` options, and return the value.
+        For a given repo parameter, pick one of its getter methods and return the value.
 
         :param str name: name of the repository parameter.
         :param str error_message: if set and the value of parameter is not provided by the getter,

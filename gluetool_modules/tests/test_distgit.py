@@ -27,7 +27,7 @@ def test_sanity_shared(module):
     assert module.glue.has_shared('dist_git_repository') is True
 
 
-@pytest.mark.parametrize('method', ['artifact', 'force'])
+@pytest.mark.parametrize('method', ['artifact'])
 def test_sanity_missing_required_options(module, method):
     module._config['method'] = method
 
@@ -38,42 +38,6 @@ def test_sanity_missing_required_options(module, method):
 
 def test_missing_primary_task(module):
     assert_shared('primary_task', module.execute)
-
-
-def test_force(monkeypatch, module):
-    module._config['method'] = 'force'
-
-    mock_task = MagicMock(component='some-component')
-    mock_other_task = MagicMock(component='other-component')
-
-    patch_shared(monkeypatch, module, {
-        'primary_task': mock_task,
-        'eval_context': {}
-    })
-
-    with pytest.raises(gluetool.glue.GlueError,
-                       match="Could not acquire dist-git clone URL"):
-        module.execute()
-
-    module._config['clone-url'] = 'some-clone-url'
-
-    with pytest.raises(gluetool.glue.GlueError,
-                       match="Could not acquire dist-git web URL"):
-        module.execute()
-
-    module._config['web-url'] = 'some-web-url'
-
-    module._config['branch'] = 'some-branch'
-    module._config['ref'] = 'some-ref'
-
-    module.execute()
-    repository = module.dist_git_repository()
-
-    assert repository.package == 'some-component'
-    assert repository.clone_url == 'some-clone-url'
-    assert repository.web_url == 'some-web-url'
-    assert repository.branch == 'some-branch'
-    assert repository.ref == 'some-ref'
 
 
 def test_artifact(monkeypatch, module):
@@ -97,6 +61,36 @@ def test_artifact(monkeypatch, module):
     assert repository.clone_url == 'a-value'
     assert repository.web_url == 'a-value'
     assert repository.branch == 'a-value'
+
+
+def test_artifact_override(monkeypatch, module):
+    module._config['method'] = 'artifact'
+
+    mock_task = MagicMock(component='some-component')
+    patch_shared(monkeypatch, module, {
+        'primary_task': mock_task,
+        'eval_context': {}
+    })
+
+    pattern_map_mock = MagicMock(match=MagicMock)
+
+    monkeypatch.setattr(gluetool_modules.infrastructure.distgit, 'PatternMap', pattern_map_mock)
+
+    # note: make sure render_template does nothing, so the overridden parameter stays intact
+    monkeypatch.setattr(gluetool_modules.infrastructure.distgit, 'render_template', lambda a: a)
+
+    module._config['clone-url'] = 'override-clone-url'
+    module._config['web-url'] = 'override-web-url'
+    module._config['branch'] = 'override-branch'
+
+    module.execute()
+    repository = module.dist_git_repository()
+
+    assert repository.package == 'some-component'
+    assert repository.clone_url == 'override-clone-url'
+    assert repository.web_url == 'override-web-url'
+    assert repository.branch == 'override-branch'
+    assert repository.ref == None
 
 
 def test_eval_context(module, dummy_repository, monkeypatch):
