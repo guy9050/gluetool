@@ -43,7 +43,7 @@ class TestSchedulerUpgrades(gluetool.Module):
         self.require_shared('primary_task')
         primary_task = self.shared('primary_task')
 
-        matched_target = re.match(r'(rhel-\d\.\d\.\d(?:-z)?)-.*', primary_task.target)
+        matched_target = re.match(r'(rhel-\d\.\d\.\d(?:-z)?)-.*', primary_task.destination_tag)
 
         if matched_target is None:
             raise gluetool.GlueError('Unsupported primary task target: {}'.format(primary_task.target))
