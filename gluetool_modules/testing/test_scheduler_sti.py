@@ -132,7 +132,7 @@ class TestSchedulerSTI(gluetool.Module):
 
         gluetool.log.log_dict(self.info, 'creating schedule for {} playbooks'.format(len(playbooks)), playbooks)
 
-        playbook_variables = utils.normalize_multistring_option(self.option('playbook-variables'))
+        playbook_variables = utils.normalize_multistring_option(self.option('playbook-variables'), separator=' ')
 
         variables = {}
         context = self.shared('eval_context')
