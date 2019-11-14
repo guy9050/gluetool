@@ -373,10 +373,10 @@ sut     ansible_host={} ansible_user=root {}
             properties = new_xml_element('properties', _parent=test_case)
             logs = new_xml_element('logs', _parent=test_case)
 
-            if task.result == 'FAIL':
+            if task.result.upper() == 'FAIL':
                 new_xml_element('failure', _parent=test_case)
 
-            if task.result == 'ERROR':
+            if task.result.upper() == 'ERROR':
                 new_xml_element('error', _parent=test_case)
 
             # test properties
@@ -390,12 +390,18 @@ sut     ansible_host={} ansible_user=root {}
             _add_property(properties, 'variant', '')
 
             # logs
-            assert schedule_entry.testing_environment is not None
             assert schedule_entry.artifact_dirpath is not None
+
+            for log in task.logs:
+                log_path = os.path.join(schedule_entry.artifact_dirpath, log)
+                artifacts_location_url = artifacts_location(self, log_path, logger=schedule_entry.logger)
+                _add_log(logs, name=log, href=artifacts_location_url)
+
             artifacts_location_url = artifacts_location(
                 self, schedule_entry.artifact_dirpath, logger=schedule_entry.logger)
             _add_log(logs, name="log_dir", href=artifacts_location_url)
 
+            assert schedule_entry.testing_environment is not None
             _add_testing_environment(test_case, 'requested', schedule_entry.testing_environment.arch,
                                      schedule_entry.testing_environment.compose)
             _add_testing_environment(test_case, 'provisioned', schedule_entry.guest.environment.arch,
