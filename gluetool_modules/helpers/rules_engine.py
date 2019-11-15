@@ -1,3 +1,4 @@
+import functools
 import imp
 import re
 import ast
@@ -240,7 +241,8 @@ class RulesEngine(gluetool.Module):
 
     Custom functions are supported via ``--functions`` option. Listed files are loaded and
     any global object with name not starting with `_` becomes part of ``rules-engine`` eval
-    context.
+    context. These functions can be called, and they are given eval context as their first
+    argument implicitly.
 
     Custom variables are supported via ``--variables`` option. Listed YAML files are loaded
     and become part of ``rules-engine`` eval context.
@@ -350,6 +352,15 @@ class RulesEngine(gluetool.Module):
 
         functions = {}  # type: Dict[str, Callable[..., Any]]
 
+        def _wrapper(wrapped, *args, **kwargs):
+            # type: (Callable[..., Any], *Any, **Any) -> Any
+
+            return wrapped(
+                self.shared('eval_context'),
+                *args,
+                **kwargs
+            )
+
         for source_filename in sources:
             source_filepath = gluetool.utils.normalize_path(source_filename)
 
@@ -370,7 +381,42 @@ class RulesEngine(gluetool.Module):
                 if not callable(fn):
                     continue
 
-                functions[member_name] = fn
+                # Here we employ one of Python's quirks: default values of keyword arguments are evaluated
+                # when the function is defined. That's why one shouldn't use mutables as default values. But,
+                # it can help us solve problem with closures and loops.
+                #
+                # Functions loaded from the file expect eval context as their first argument, and may accept
+                # multiple other arguments. Because of reasons, they have no direct access to eval context
+                # namespace, it must be given to them. Currently caller passes the eval context to them, but
+                # that prolongs the function call, and leads to messy YAML files. It would be much better to
+                # pass eval context to the functions automagically. So, loop over each function, wrap it with
+                # a thin function that acquires eval context and calls the wrapped function, and let users call
+                # our wrappers. Easy, right?
+                #
+                # for fn in functions:
+                #     def wrapper():
+                #         fn()
+                #
+                # Wrong! Wrappers would use our loop variable, `fn`, to call the function, but since closures
+                # close over values, nor variables, wrapper would get the value of `fn` *at the runtime* - no
+                # matter what wrapper we would call, its `fn` would always point to the last function in the
+                # list.
+                #
+                # So, to overcome that, we pass the function to wrapper as a default value of a keyword argument.
+                # That way, for each `fn` we would get its own wrapper which would not be misled by our loop variable,
+                # because `fn` would be located in wrapper's scope \o/
+                #
+                # for fn in functions:
+                #     def wrapper(wrapped=fn, *args, **kwargs):
+                #         wrapped(*args, **kwargs)
+                #
+                # Wrong! Because of Python 2 limitations:
+                #   - _wrapper(wrapped=fn, *args, **kwargs) won't work in Python 2,
+                #   - _wrapper(wrapped=fn, *args) would work, but the first positional argument overrides `wrapped`.
+                #
+                # So, functools.partial it is...
+
+                functions[member_name] = functools.partial(_wrapper, fn)
 
         return functions
 
