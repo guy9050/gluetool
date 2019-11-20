@@ -257,6 +257,8 @@ listTagged:
       id: 805705
       nvr: bash-4.3.43-4.fc25
 
+  f25-updates-candidate:
+
   f25-candidate:
     - build_id: 805705
       tag_name: f25

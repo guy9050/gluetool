@@ -274,6 +274,7 @@ getUser:
     krb_principal:
 
 listTagged:
+  f27-pending:
   rawhide:
     - build_id: 1044142
       tag_name: f27-updates

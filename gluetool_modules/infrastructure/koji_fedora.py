@@ -462,22 +462,27 @@ class KojiTask(LoggerMixin, object):
 
         return "{}/taskinfo?taskID={}".format(self.web_url, self.id)
 
-    def latest_released(self, tag=None):
+    def latest_released(self, tags=None):
         """
-        Returns task of the latest released package with the same build target or ``None`` if none found.
+        Returns task of the latest builds tagged with the same destination tag or build target.
 
-        In case the released package is the same as this build, the previous relased is returned.
+        If no builds are found ``None`` is returned.
 
-        The tag for checking the latest package can be overriden with the tag parameter.
+        In case the build found is the same as this build, the previous build is returned.
 
+        The tags for checking can be overriden with the ``tags`` parameter. First match wins.
+
+        :param list(str) tags: Tags to use for searching.
         :rtype: :py:class:`KojiTask`
         """
-        tag = tag or self.target
+        tags = tags or [self.destination_tag, self.target]
 
-        builds = self._call_api('listTagged', tag, None, True, latest=2, package=self.component)
-
-        if not builds:
-            self.debug("no latest builds found for package '{}' on tag '{}'".format(self.component, tag))
+        for tag in tags:
+            builds = self._call_api('listTagged', tag, None, True, latest=2, package=self.component)
+            if builds:
+                break
+        else:
+            log_dict(self.debug, "no latest builds found for package '{}' on tags".format(self.component), tags)
             return None
 
         # for scratch builds the latest released package is the latest tagged

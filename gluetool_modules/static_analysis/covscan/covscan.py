@@ -353,10 +353,8 @@ class CICovscan(gluetool.Module):
         enabled_targets = self.option('target_pattern')
         self.verbose('enabled targets: {}'.format(enabled_targets))
 
-        # Legacy: in case destination tag is available, use it to lookup the latest released package
-        #         instead of build target
-        baseline_tag = self.task.destination_tag if self.task.destination_tag else self.task.build_target
-        self._baseline = self.task.latest_released(tag=baseline_tag)
+        # note: latest_released looks first for destination_tag builds with fallback to build_target
+        self._baseline = self.task.latest_released()
 
         if enabled_targets and any((re.compile(regex.strip()).match(target) for regex in enabled_targets.split(','))):
             self.info('Running covscan for {} on {}'.format(self.task.component, target))
