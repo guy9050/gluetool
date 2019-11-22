@@ -1,6 +1,6 @@
 import pytest
 
-from mock import MagicMock
+from mock import call, MagicMock
 
 import gluetool
 import gluetool_modules.helpers.guess_environment
@@ -345,13 +345,14 @@ def test_product_autodetection(module, monkeypatch):
 def test_wow_relevancy_autodetection(module, monkeypatch):
     target = 'dummy-target'
     distro = 'dummy-distro'
+    destination_tag = 'dummy-destination-tag'
     wow_relevancy_distro = 'dummy-wow_relevancy_distro'
 
     # pylint: disable=protected-access
     module._wow_relevancy_distro['method'] = 'target-autodetection'
 
     patch_shared(monkeypatch, module, {}, callables={
-        'primary_task': MagicMock(return_value=MagicMock(target=target))
+        'primary_task': MagicMock(return_value=MagicMock(target=target, destination_tag=destination_tag))
     })
 
     # monkeypatching of @cached_property does not work, the property's __get__() gets called...
@@ -361,6 +362,31 @@ def test_wow_relevancy_autodetection(module, monkeypatch):
     module._guess_target_autodetect(module._wow_relevancy_distro, distro)
 
     assert module._wow_relevancy_distro['result'] == wow_relevancy_distro
+
+
+def test_autodetection_fallback(module, monkeypatch):
+    target = 'dummy-target'
+    destination_tag = 'dummy-destination-tag'
+
+    # pylint: disable=protected-access
+    module._distro['method'] = 'target-autodetection'
+
+    patch_shared(monkeypatch, module, {}, callables={
+        'primary_task': MagicMock(return_value=MagicMock(target=target, destination_tag=destination_tag))
+    })
+
+    match_mock = MagicMock(side_effect=gluetool.GlueError('Could not match string'))
+    module.pattern_map = MagicMock(return_value=MagicMock(match=match_mock))
+
+    # pylint: disable=protected-access
+    with pytest.raises(gluetool.GlueError, match="Failed to autodetect 'distro', no match found"):
+        module._guess_target_autodetect(module._distro)
+
+    # check if pattern map's match method twice with fallback to build target
+    match_mock.assert_has_calls([
+        call(destination_tag, multiple=True),
+        call(target, multiple=True)
+    ])
 
 
 def test_autodetection_no_brew(module):

@@ -1,7 +1,10 @@
+import bs4
 import collections
 import logging
 import re
-import bs4
+import sys
+
+from six import reraise
 
 import gluetool
 from gluetool import GlueError
@@ -63,6 +66,10 @@ class GuessEnvironment(gluetool.Module):
 
        We are not that far yet, the code is present for testing purposes, there is no user of ``testing_environments``
        shared function, but there will be and we'll be slowly moving toward that goal.
+
+    .. note::
+       For guessing we use destination tag with a fallback to build target where applicable. Destination tag provides
+       the most relevant information, build target is kept for backward compatibility.
 
     **Compose map**
 
@@ -517,18 +524,24 @@ class GuessEnvironment(gluetool.Module):
         else:
             source['result'] = source['specification']
 
-    def _guess_autodetect_by_target(self, source, *args):
-        # type: (Dict[str, Union[str, List[str]]]) -> None
-        self.require_shared('primary_task')
+    def _guess_autodetect(self, source, tag, *args):
+        # type: (Dict[str, Union[str, List[str]]], str) -> bool
 
-        target = self.shared('primary_task').target
-
-        # wow relevancy distro is related not only to target, but on beaker distro as well
+        # wow relevancy distro is related not only to tag, but on beaker distro as well
         if source['type'] == 'wow_relevancy_distro':
             # wow relevancy distro is passed from the *args
-            target = SEPARATOR.join([target, args[0]])
+            tag = SEPARATOR.join([tag, args[0]])
 
-        source['result'] = self.pattern_map(source).match(target, multiple=(source['type'] == 'distro'))
+        try:
+            source['result'] = self.pattern_map(source).match(tag, multiple=(source['type'] == 'distro'))
+            return True
+
+        except GlueError as exc:
+            if exc.message.startswith('Could not match string'):
+                return False
+
+            # in case ther matching failed for some unexpected reason
+            reraise(*sys.exc_info())
 
     def _guess_autodetect_environments(self, source):
         self.require_shared('evaluate_instructions', 'primary_task')
@@ -641,7 +654,13 @@ class GuessEnvironment(gluetool.Module):
                     self.debug('testing environments: no arch-completeness map, no environments')
                     return
 
-                constraint_arches = self._arch_completeness_map.match(self.shared('primary_task').target, multiple=True)
+                primary_task = self.shared('primary_task')
+
+                # primarly we use destination_tag for matching, with fallback to build target
+                try:
+                    constraint_arches = self._arch_completeness_map.match(primary_task.destination_tag, multiple=True)
+                except GlueError:
+                    constraint_arches = self._arch_completeness_map.match(primary_task.target, multiple=True)
 
             # On the other hand, if provisioner can support just a limited set of arches, don't be greedy.
             else:
@@ -756,7 +775,18 @@ class GuessEnvironment(gluetool.Module):
             self._guess_autodetect_environments(source)
 
         else:
-            self._guess_autodetect_by_target(source, *args)
+            primary_task = self.shared('primary_task')
+
+            # by default we match with destination_tag
+            result = self._guess_autodetect(source, primary_task.destination_tag, *args)
+
+            # we fallback to build target for legacy reasons
+            if not result:
+                result = self._guess_autodetect(source, primary_task.target, *args)
+
+            # raise and error if no match
+            if not result:
+                raise GlueError("Failed to autodetect '{}', no match found".format(source['type']))
 
     _methods = {
         'autodetect': _guess_target_autodetect,
