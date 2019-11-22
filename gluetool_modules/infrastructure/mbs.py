@@ -230,6 +230,9 @@ class MBSTask(LoggerMixin, object):
         # release the module is built for, similarly to what build target in Brew/Koji does
         self.target = self.platform_stream
 
+        # required API for our modules providing artifacts, we have no destination_tags for modules, use target
+        self.destination_tag = self.target
+
     @cached_property
     def platform_stream(self):
         """

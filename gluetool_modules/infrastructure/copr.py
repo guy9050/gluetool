@@ -213,6 +213,8 @@ class CoprTask(object):
         self.status = build_task['state']
         self.component = build['package_name']
         self.target = task_id.chroot_name
+        # required API for our modules providing artifacts, we have no tags in copr, use target
+        self.destination_tag = self.target
         self.nvr = '{}-{}'.format(self.component, build['package_version'])
         self.owner = project['owner']
         self.project = project['name']
