@@ -1,6 +1,7 @@
 import collections
 import json
 import os
+import stat
 import tempfile
 import urlparse
 
@@ -60,6 +61,9 @@ class Beaker(gluetool.Module):
                                          dir=os.getcwd(), delete=False) as job_file:
             job_file.write(job.prettify(encoding='utf-8'))
             job_file.flush()
+
+        # Temporary file has limited permissions, but we'd like to make the file inspectable.
+        os.chmod(job_file.name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
 
         # submit the job to beaker
         try:
