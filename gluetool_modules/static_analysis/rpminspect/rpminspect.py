@@ -8,7 +8,7 @@ import tempfile
 import gluetool
 from gluetool import GlueError, GlueCommandError
 from gluetool.utils import Command, check_for_commands, load_json, normalize_multistring_option, new_xml_element
-from gluetool.log import format_blob
+from gluetool.log import format_blob, log_blob
 from gluetool_modules.libs.artifacts import artifacts_location
 from libci.results import TestResult, publish_result
 
@@ -222,6 +222,8 @@ class CIRpminspect(gluetool.Module):
             if exc.output.exit_code == RpminspectExitCodes.RPMINSPECT_TESTS_FAILURE:
                 self.error('Result of testing: FAILED')
             else:
+                if exc.output.stderr is not None:
+                    log_blob(self.error, 'Rpminspect stderr', exc.output.stderr)
                 raise GlueError('Rpminspect failed during execution with exit code {}'.format(exc.output.exit_code))
 
         # output is verbose log, store it to a file
