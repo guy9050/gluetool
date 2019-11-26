@@ -197,19 +197,34 @@ class GuessEnvironment(gluetool.Module):
                 'default': None
             },
             'compose-map': {
-                'help': 'Path to a file with instructions for artifact => environment(s) mapping.'
+                'help': 'Test and path to a file with instructions for environment(s) mapping (default: none).',
+                'metavar': '(destination_tag|build_target):PATH',
+                'action': 'append',
+                'default': []
             },
             'distro-pattern-map': {
-                'help': 'Path to a file with target => distro patterns.'
+                'help': 'Test and path to a file with distro patterns (default: none).',
+                'metavar': '(destination_tag|build_target):PATH',
+                'action': 'append',
+                'default': []
             },
             'image-pattern-map': {
-                'help': 'Path to a file with target => image patterns.'
+                'help': 'Test and path to a file with image patterns (default: none).',
+                'metavar': '(destination_tag|build_target):PATH',
+                'action': 'append',
+                'default': []
             },
             'product-pattern-map': {
-                'help': 'Path to a file with target => product patterns.'
+                'help': 'Test and path to a file with product patterns (default: none).',
+                'metavar': '(destination_tag|build_target):PATH',
+                'action': 'append',
+                'default': []
             },
             'wow-relevancy-distro-pattern-map': {
-                'help': 'Path to a file with target => wow relevancy distro patterns.'
+                'help': 'Test and path to a file with wow relevancy distro patterns (default: none).',
+                'metavar': '(destination_tag|build_target):PATH',
+                'action': 'append',
+                'default': []
             }
         })
     ]
@@ -319,7 +334,7 @@ class GuessEnvironment(gluetool.Module):
 
         return gluetool.utils.load_yaml(gluetool.utils.normalize_path(self.option('compose-map')))
 
-    def pattern_map(self, source):
+    def pattern_map(self, source, test):
         # type: (Dict[str, Union[str, List[str]]]) -> PatternMap
         def _create_buc_repl(hint_repl):
             # type: (Any) -> Any
@@ -356,7 +371,12 @@ class GuessEnvironment(gluetool.Module):
         spices = {'BUC': _create_buc_repl,
                   'NIGHTLY': _create_nightly_repl} if source['type'] == "distro" else None
 
-        return PatternMap(source['pattern-map'],
+        pattern_map_path = source['pattern-map'].get(test, None)
+
+        if not pattern_map_path:
+            return None
+
+        return PatternMap(pattern_map_path,
                           allow_variables=True,
                           spices=spices,
                           logger=self.logger)
@@ -524,7 +544,7 @@ class GuessEnvironment(gluetool.Module):
         else:
             source['result'] = source['specification']
 
-    def _guess_autodetect(self, source, tag, *args):
+    def _guess_autodetect(self, source, test, tag, *args):
         # type: (Dict[str, Union[str, List[str]]], str) -> bool
 
         # wow relevancy distro is related not only to tag, but on beaker distro as well
@@ -533,7 +553,13 @@ class GuessEnvironment(gluetool.Module):
             tag = SEPARATOR.join([tag, args[0]])
 
         try:
-            source['result'] = self.pattern_map(source).match(tag, multiple=(source['type'] == 'distro'))
+            pattern_map = self.pattern_map(source, test)
+
+            if not pattern_map:
+                self.warn("no map for test '{}'".format(test))
+                return False
+
+            source['result'] = pattern_map.match(tag, multiple=(source['type'] == 'distro'))
             return True
 
         except GlueError as exc:
@@ -778,11 +804,11 @@ class GuessEnvironment(gluetool.Module):
             primary_task = self.shared('primary_task')
 
             # by default we match with destination_tag
-            result = self._guess_autodetect(source, primary_task.destination_tag, *args)
+            result = self._guess_autodetect(source, 'destination_tag', primary_task.destination_tag, *args)
 
             # we fallback to build target for legacy reasons
             if not result:
-                result = self._guess_autodetect(source, primary_task.target, *args)
+                result = self._guess_autodetect(source, 'build_target', primary_task.target, *args)
 
             # raise and error if no match
             if not result:
@@ -803,39 +829,56 @@ class GuessEnvironment(gluetool.Module):
         This solution provides the same parameters for guessing methods
         what makes guessing methods universal for all types of guessing target
         """
+
+        def _parse_pattern_map(option):
+            maps = {}
+
+            for pattern_map_spec in gluetool.utils.normalize_multistring_option(self.option(option)):
+                try:
+                    test, path = pattern_map_spec.split(':', 1)
+
+                except ValueError:
+                    # Keep things backward compatible - if there's no test, assume build target.
+                    test = 'build_target'
+                    path = pattern_map_spec
+
+                maps[test] = path
+
+            return maps
+
         self._testing_environments = {
             'type': 'environment',
             'specification': self.option('environment'),
             'method': self.option('environment-method'),
-            'pattern-map': self.option('compose-map'),
+            'pattern-map': _parse_pattern_map('compose-map'),
             'result': None
         }
         self._distro = {
             'type': 'distro',
             'specification': self.option('distro'),
             'method': self.option('distro-method'),
-            'pattern-map': self.option('distro-pattern-map'),
+            'pattern-map': _parse_pattern_map('distro-pattern-map'),
             'result': None
         }
         self._image = {
             'type': 'image',
             'specification': self.option('image'),
             'method': self.option('image-method'),
-            'pattern-map': self.option('image-pattern-map'),
+            'pattern-map': _parse_pattern_map('image-pattern-map'),
             'result': None
         }
         self._product = {
             'type': 'product',
             'specification': self.option('product'),
             'method': self.option('product-method'),
-            'pattern-map': self.option('product-pattern-map'),
+            'pattern-map': _parse_pattern_map('product-pattern-map'),
             'result': None
         }
         self._wow_relevancy_distro = {
             'type': 'wow_relevancy_distro',
             'specification': self.option('wow-relevancy-distro'),
             'method': self.option('wow-relevancy-distro-method'),
-            'pattern-map': self.option('wow-relevancy-distro-pattern-map'),
+            'pattern-map': _parse_pattern_map('wow-relevancy-distro-pattern-map'),
             'result': None
         }
 
@@ -850,7 +893,7 @@ class GuessEnvironment(gluetool.Module):
 
         for source in [self._distro, self._image, self._product, self._wow_relevancy_distro]:
 
-            if source['method'] == 'target-autodetection' and source['pattern-map'] is None:
+            if source['method'] == 'target-autodetection' and not source['pattern-map']:
                 raise GlueError(
                     "--{}-pattern-map option is required with method '{}'".format(
                         source['type'], source['method']))

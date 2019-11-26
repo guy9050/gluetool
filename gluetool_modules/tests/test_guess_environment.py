@@ -15,28 +15,28 @@ def fixture_module():
         'type': 'distro',
         'specification': 'foo',
         'method': 'foo',
-        'pattern-map': 'foo',
+        'pattern-map': {},
         'result': None
     }
     module._image = {
         'type': 'image',
         'specification': 'foo',
         'method': 'foo',
-        'pattern-map': 'foo',
+        'pattern-map': {},
         'result': None
     }
     module._product = {
         'type': 'product',
         'specification': 'foo',
         'method': 'foo',
-        'pattern-map': 'foo',
+        'pattern-map': {},
         'result': None
     }
     module._wow_relevancy_distro = {
         'type': 'wow_relevancy_distro',
         'specification': 'foo',
         'method': 'foo',
-        'pattern-map': 'foo',
+        'pattern-map': {},
         'result': None
     }
     return module
@@ -66,7 +66,7 @@ def fixture_module_for_recent(module, monkeypatch):
         'type': 'image',
         'specification': r'image-(\d+)',
         'method': 'recent',
-        'pattern-map': 'foo',
+        'pattern-map': {},
         'result': None
     }
     return module
@@ -218,9 +218,11 @@ def test_image_pattern_map(module, monkeypatch):
 
     monkeypatch.setattr(gluetool_modules.helpers.guess_environment, 'PatternMap', map_class)
 
-    module._image['pattern-map'] = 'dummy-map.yml'
+    module._image['pattern-map'] = {
+        'build_target': 'dummy-map.yml'
+    }
 
-    assert module.pattern_map(module._image) == map_instance
+    assert module.pattern_map(module._image, 'build_target') == map_instance
     map_class.assert_called_once_with('dummy-map.yml', allow_variables=True,
                                       spices=None, logger=module.logger)
 
@@ -240,9 +242,11 @@ def test_product_pattern_map(module, monkeypatch):
 
     monkeypatch.setattr(gluetool_modules.helpers.guess_environment, 'PatternMap', map_class)
 
-    module._product['pattern-map'] = 'dummy-map.yml'
+    module._product['pattern-map'] = {
+        'build_target': 'dummy-map.yml'
+    }
 
-    assert module.pattern_map(module._product) == map_instance
+    assert module.pattern_map(module._product, 'build_target') == map_instance
     map_class.assert_called_once_with('dummy-map.yml', allow_variables=True,
                                       spices=None, logger=module.logger)
 
