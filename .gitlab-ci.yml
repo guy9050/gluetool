@@ -4,45 +4,16 @@ stages:
   - test
   - build-rpm
   - build-docker
-  - deploy-staging
-  - accessories
-  - status
-
+  - deploy
 
 variables:
-  MODULES_REPO_ID: "8896"
-  MODULES_REPO_TOKEN: "bSBxviSe_8p3ZrDNsZa4"
-  GITLAB_API_URL: "https://gitlab.cee.redhat.com/api/v4/projects/${MODULES_REPO_ID}/"
-
-  SSH_OPTIONS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i http-space.key"
-  DOCS_SPACE: "mprchlik@liver3.lab.eng.brq.redhat.com:/home/mprchlik/webspace/testing/docs/gluetool-modules"
-  COVERAGE_SPACE: "mprchlik@liver3.lab.eng.brq.redhat.com:/home/mprchlik/webspace/testing/coverage/gluetool-modules"
-
-  DOCS_URL: "http://liver3.lab.eng.brq.redhat.com/gluetool/testing/docs/gluetool-modules"
-  COVERAGE_URL: "http://liver3.lab.eng.brq.redhat.com/gluetool/testing/coverage/gluetool-modules"
-
   # This one keeps popping up again and again and again... It works locally while tox is not
   # psssing this variable to its command... That should not work at all :/
   PYCURL_SSL_LIBRARY: nss
 
-  MERGE_REQUEST_STATUS: >
-    ## Merge Request Status for ${CI_COMMIT_SHA}
-
-    [Documentation](${DOCS_URL}-${CI_COMMIT_REF_NAME}/) | [Coverage](${COVERAGE_URL}-${CI_COMMIT_REF_NAME}/)
-
 
 # Use our custom image. See https://gitlab.cee.redhat.com/baseos-qe/ansible-baseos-ci/tree/master/gitlab-cicd
 image: "docker-registry.engineering.redhat.com/baseos-ci/baseosci-gitlab-cicd-centos7"
-
-
-#
-# Runs before each and every pipeline job.
-#
-before_script:
-  # This one is *not* handled by CI image because it depends on repository being cloned in the container
-  - echo "$HTTP_SPACE_KEY" > http-space.key
-  - chmod u=rw,go= http-space.key
-
 
 #
 # TEST steps
@@ -85,24 +56,6 @@ type-check:
   stage: test
   script:
     - tox -v -e type-check
-  tags:
-    - shared
-
-# Run integration tests
-#
-# Note: integration tests have - so far - the configuration available. While making use
-# of dry-run levels, they may be able to test integration of modules or even whole pipelines.
-#
-# Might deserve a better integration with CI process, this will run into issues when testing
-# against changes in the configuration that were not merged yet :/
-integration-tests:
-  stage: test
-  script:
-    - wget --no-check-certificate -O /etc/pki/ca-trust/source/anchors/RH-IT-Root-CA.crt https://password.corp.redhat.com/RH-IT-Root-CA.crt
-    - update-ca-trust
-    - git clone https://gitlab.cee.redhat.com/baseos-qe/citool-config.git ~/.citool.d
-    - pushd ~/.citool.d && git checkout production && popd
-    - tox -v -e py27-integration-tests -- --integration-config=$(echo ~/.citool.d)
   tags:
     - shared
 
@@ -168,64 +121,13 @@ build-docker-images-devel:
     - shared
 
 # Trigger staging deployment
-deploy-to-staging-static:
-  stage: deploy-staging
+deploy-to-staging:
+  stage: deploy
   only:
     - devel@baseos-qe/gluetool-modules
   script:
-    - tower-cli job launch --monitor -J "[BaseOS CI] [deploy] [staging] Image - static"
-  tags:
-    - shared
+    - tower-cli workflow_job launch --monitor -W "[BaseOS CI] [deploy] [staging] Image" | tee tower_output.log
+    - grep 'failed' tower_output.log && { echo 'At least one of subtasks failed!'; exit 1; } || exit 0
 
-# Trigger staging deployment to openshift
-deploy-to-staging-openshift:
-  stage: deploy-staging
-  only:
-    - devel@baseos-qe/gluetool-modules
-  script:
-    - tower-cli job launch --monitor -J "[BaseOS CI] [deploy] [staging] Image - openshift"
-  tags:
-    - shared
-
-#
-# ACCESSORIES steps
-#
-
-# Upload documentation to the remote location
-upload-docs:
-  stage: accessories
-  allow_failure: true
-  dependencies:
-    - generate-docs
-  script:
-    - rsync -avz -e "ssh $SSH_OPTIONS" .tox/py27-doctest/tmp/docs/build/html/ "${DOCS_SPACE}-${CI_COMMIT_REF_NAME}"
-  tags:
-    - shared
-
-
-# Upload coverage report to the remote location
-upload-coverage:
-  stage: accessories
-  allow_failure: true
-  dependencies:
-    - unit-tests
-  script:
-    - rsync -avz -e "ssh $SSH_OPTIONS" coverage-report/ "${COVERAGE_SPACE}-${CI_COMMIT_REF_NAME}"
-  tags:
-    - shared
-
-
-# Add a status comment
-update-status:
-  stage: status
-  allow_failure: true
-  script:
-    # Find out what the MR IID is
-    - |
-      curl --insecure --silent --header "Private-Token: $MODULES_REPO_TOKEN" "$GITLAB_API_URL/merge_requests?state=opened" | jq -r ".[]|select(.sha == \"${CI_COMMIT_SHA}\")|.iid" > merge-request-iid
-
-    # Add the comment
-    - |
-      curl --insecure --silent --header "Private-Token: $MODULES_REPO_TOKEN" --request POST --data-binary "body=${MERGE_REQUEST_STATUS}" "$GITLAB_API_URL/merge_requests/$(cat merge-request-iid)/notes"
   tags:
     - shared
