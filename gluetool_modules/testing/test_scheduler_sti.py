@@ -80,6 +80,14 @@ class TestSchedulerSTI(gluetool.Module):
             'metavar': 'KEY=VALUE',
             'action': 'append',
             'default': []
+        },
+        'sti-tests': {
+            'help': """
+                    Use the given glob when searching for STI tests in the dist-git
+                    repository clone (default: %(default)s).
+                    """,
+            'metavar': 'GLOB',
+            'default': 'tests/tests*.yml'
         }
     }
 
@@ -93,7 +101,7 @@ class TestSchedulerSTI(gluetool.Module):
         :param str repodir: clone of a dist-git repository.
         """
 
-        playbooks = glob.glob('{}/tests/tests*.yml'.format(repodir))
+        playbooks = glob.glob('{}/{}'.format(repodir, self.option('sti-tests')))
 
         if not playbooks:
             raise gluetool_modules.libs.test_schedule.EmptyTestScheduleError(self.shared('primary_task'))
