@@ -27,6 +27,13 @@ class BeakerJobwatch(gluetool.Module):
         'jobwatch-options': {
             'help': 'Additional options for beaker-jobwatch'
         },
+        'skip-broken-machines': {
+            'help': """
+                    If set, beaker-jobwatch will avoid machines where the jobs already
+                    crashed (default: %(default)s).
+                    """,
+            'default': 'yes'
+        },
         'matrix-baseurl': {
             'help': 'A base URL to beaker matrix'
         }
@@ -87,12 +94,15 @@ class BeakerJobwatch(gluetool.Module):
 
         critical_tasks = critical_tasks or []
 
-        cmd = gluetool.utils.Command(['beaker-jobwatch'], logger=self.logger, options=[
-            '--skip-broken-machines'
-        ])
+        cmd = gluetool.utils.Command(['beaker-jobwatch'], logger=self.logger, options=[])
 
         if self.option('jobwatch-options'):
             cmd.options += shlex.split(self.option('jobwatch-options'))
+
+        if gluetool.utils.normalize_bool_option(self.option('skip-broken-machines')):
+            cmd.options += [
+                '--skip-broken-machines'
+            ]
 
         for job_id in jobs:
             cmd.options += [
