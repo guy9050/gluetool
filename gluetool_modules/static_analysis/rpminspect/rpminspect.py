@@ -401,10 +401,10 @@ class CIRpminspect(gluetool.Module):
                 self.warn('Unknown outcome {} in test {}', outcome, testcase['name'])
 
             logs = new_xml_element('logs', _parent=test_case)
-            new_xml_element('log', _parent=logs,
-                            name='test-ref-url', value=_test['ref_url'])
-            new_xml_element('log', _parent=logs,
-                            name='testcase-ref-url', value=testcase['ref_url'])
+            new_xml_element('log',
+                            _parent=logs,
+                            name='results.json',
+                            url=artifacts_location(self, 'results.json', logger=self.logger))
 
             if 'test_outputs' in testcase:
 
