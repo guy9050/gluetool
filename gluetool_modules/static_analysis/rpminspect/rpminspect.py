@@ -18,15 +18,15 @@ from typing import cast, TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tup
 if TYPE_CHECKING:
     from gluetool.utils import ProcessOutput  # noqa
 
-# map RPMinspect test score to resultsdb 2.0 API outcome states
-# http://docs.resultsdb20.apiary.io/
-# note: waived is mapped to info
-RPMINSPECT_MAP = ['PASSED', 'INFO', 'INFO', 'NEEDS_INSPECTION', 'FAILED']
+# Map RPMINSPECT_SCORE to resultsdb 2.0 API outcome states - http://docs.resultsdb20.apiary.io/
+# Note: WAIVED score is mapped to INFO
+RPMINSPECT_MAP = ['INFO', 'PASSED', 'INFO', 'NEEDS_INSPECTION', 'FAILED']
 
 # Helping dict for calculating overall_result
+# Note: numbers represent the priority of the result and also position in RPMINSPECT_MAP list
 RPMINSPECT_SCORE = {
-    'OK': 0,
-    'INFO': 1,
+    'INFO': 0,
+    'OK': 1,
     'WAIVED': 2,
     'VERIFY': 3,
     'BAD': 4
