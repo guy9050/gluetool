@@ -448,7 +448,10 @@ class PipelineStateReporter(gluetool.Module):
         if not results:
             return 'unknown'
 
-        if all([result.overall_result.lower() in ('pass', 'passed') for result in results]):
+        if all([result.overall_result.lower() in ('info',) for result in results]):
+            return 'info'
+
+        if all([result.overall_result.lower() in ('pass', 'passed', 'info') for result in results]):
             return 'passed'
 
         return 'failed'

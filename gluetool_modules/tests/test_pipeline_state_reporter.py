@@ -306,10 +306,14 @@ def test_destroy_with_results_and_recipients(module, evaluate, mock_namespace, p
     assert publish_messages['message'].body['recipients'] == 'batman'
 
 
-@pytest.mark.parametrize('result', [
-    'passed', 'failed'
+@pytest.mark.parametrize('expected,results', [
+    ('info', ['info', 'info', 'info']),
+    ('passed', ['passed', 'info', 'passed']),
+    ('passed', ['passed', 'passed', 'passed']),
+    ('failed', ['passed', 'failed', 'info']),
+    ('failed', ['info', 'failed', 'failed']),
 ])
-def test_get_test_results(module, result):
-    results = [MagicMock(overall_result=result)]
+def test_get_test_results(module, expected, results):
+    results = [MagicMock(overall_result=result) for result in results]
 
-    assert module._get_overall_result_legacy(results) == result
+    assert module._get_overall_result_legacy(results) == expected
