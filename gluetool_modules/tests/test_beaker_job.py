@@ -18,7 +18,7 @@ def create_beaker_build_params(mod, **kwargs):
             'some w-t options',
             'other w-t options'
         ],
-        'jobwatch_options': 'some jobwatch options',
+        'beaker_jobwatch_options': 'some beaker jobwatch options',
         'beaker_options': 'some beaker options',
         'brew_build_task_params_options': 'some brew-build options'
     }

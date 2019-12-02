@@ -39,8 +39,9 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             'action': 'append',
             'default': []
         },
-        'jobwatch-options': {
-            'help': 'Additional options for ``beaker-jobwatch``.'
+        'beaker-jobwatch-options': {
+            'help': 'Additional options for ``beaker-jobwatch`` module (default: %(default)s).',
+            'default': ''
         },
         'beaker-options': {
             'help': 'Additional options for ``beaker`` module (default: %(default)s).',
@@ -100,7 +101,7 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             'build_dependencies_options': self.option('build-dependencies-options'),
             'guess_environment_options': self.option('guess-environment-options'),
             'wow_options': wow_options,
-            'jobwatch_options': self.option('jobwatch-options'),
+            'beaker_jobwatch_options': self.option('beaker-jobwatch-options'),
             'beaker_options': self.option('beaker-options'),
             'brew_build_task_params_options': brew_build_task_params_options
         })
