@@ -254,8 +254,8 @@ class CICovscan(gluetool.Module):
                 log_name = "{}.{}".format(log_type, log_ext)
                 new_xml_element("log", _parent=logs, name=log_name, href=_log_url(log_name))
 
-        new_xml_element('log', _parent=logs, name='src.rpm', url=logs_url.format(result.baseline.nvr + '.src.rpm'))
-        new_xml_element('log', _parent=logs, name='tar.gz', url=logs_url.format(result.baseline.nvr + '.tar.gz'))
+        new_xml_element('log', _parent=logs, name='src.rpm', href=logs_url.format(result.baseline.nvr + '.src.rpm'))
+        new_xml_element('log', _parent=logs, name='tar.gz', href=logs_url.format(result.baseline.nvr + '.tar.gz'))
 
         return test_suite
 
