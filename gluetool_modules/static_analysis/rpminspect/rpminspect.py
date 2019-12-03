@@ -403,8 +403,8 @@ class CIRpminspect(gluetool.Module):
             logs = new_xml_element('logs', _parent=test_case)
             new_xml_element('log',
                             _parent=logs,
-                            name='results.json',
-                            url=artifacts_location(self, 'results.json', logger=self.logger))
+                            href=artifacts_location(self, 'results.json', logger=self.logger),
+                            name='results.json')
 
             if 'test_outputs' in testcase:
 
