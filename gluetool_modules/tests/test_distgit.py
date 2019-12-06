@@ -10,7 +10,7 @@ import gluetool_modules.infrastructure.distgit
 from gluetool_modules.infrastructure.distgit import DistGitRepository
 from . import assert_shared, create_module, patch_shared
 
-Response = collections.namedtuple('Response', ['status_code', 'content'])
+Response = collections.namedtuple('Response', ['status_code', 'content', 'text'])
 
 
 @pytest.fixture(name='module')
@@ -111,7 +111,8 @@ def test_repr(module, dummy_repository):
 
 class MockRequests(object):
     status_code = 200
-    response = '# recipients: batman, robin\ndata'
+    content = '# recipients: batman, robin\ndata'
+    text = 'this is a test'
 
     def __enter__(self, *args):
         return self
@@ -121,7 +122,7 @@ class MockRequests(object):
 
     @staticmethod
     def get(_):
-        return Response(MockRequests.status_code, MockRequests.response)
+        return Response(MockRequests.status_code, MockRequests.content, MockRequests.text)
 
 
 def test_gating(module, dummy_repository, monkeypatch, log):
@@ -130,12 +131,44 @@ def test_gating(module, dummy_repository, monkeypatch, log):
 
     assert dummy_repository.has_gating
     assert log.match(message=(
-        "gating configuration 'some-web-url/raw/some-branch/f/gating.yaml':\n"
+        "gating configuration 'some-web-url/plain/gating.yaml?id=some-branch':\n"
         "---v---v---v---v---v---\n"
         "# recipients: batman, robin\n"
         "data\n"
         "---^---^---^---^---^---"
     ))
+
+
+def test_sti_tests(module, dummy_repository, monkeypatch, log):
+    monkeypatch.setattr(gluetool.utils, 'requests', MockRequests)
+
+    assert dummy_repository.sti_tests_url == 'some-web-url/tree/tests?id=some-branch'
+    assert dummy_repository.has_sti_tests
+    assert log.match(message='has STI tests')
+
+
+def test_no_sti_tests(module, dummy_repository, monkeypatch, log):
+    monkeypatch.setattr(gluetool.utils, 'requests', MockRequests)
+    monkeypatch.setattr(MockRequests, 'status_code', 404)
+
+    assert dummy_repository.has_sti_tests is False
+    assert log.match(message='does not have STI tests')
+
+
+def test_ci_config(module, dummy_repository, monkeypatch, log):
+    monkeypatch.setattr(gluetool.utils, 'requests', MockRequests)
+
+    assert dummy_repository.ci_config_url == 'some-web-url/plain/ci.fmf?id=some-branch'
+    assert dummy_repository.has_ci_config
+    assert log.match(message='contains CI configuration')
+
+
+def test_no_ci_config(module, dummy_repository, monkeypatch, log):
+    monkeypatch.setattr(gluetool.utils, 'requests', MockRequests)
+    monkeypatch.setattr(MockRequests, 'status_code', 404)
+
+    assert dummy_repository.has_ci_config is False
+    assert log.match(message='does not contain CI configuration')
 
 
 def test_no_gating(module, dummy_repository, monkeypatch, log):
@@ -144,7 +177,7 @@ def test_no_gating(module, dummy_repository, monkeypatch, log):
     monkeypatch.setattr(MockRequests, 'status_code', 400)
 
     assert dummy_repository.has_gating is False
-    assert log.match(message="dist-git repository has no gating.yaml 'some-web-url/raw/some-branch/f/gating.yaml'")
+    assert log.match(message="dist-git repository has no gating.yaml 'some-web-url/plain/gating.yaml?id=some-branch'")
 
 
 def test_repository_persistance(module, dummy_repository):
@@ -163,6 +196,6 @@ def test_gating_recipients(module, dummy_repository, monkeypatch):
 def test_no_gating_recipients(module, dummy_repository, monkeypatch):
     # gating configuration found
     monkeypatch.setattr(gluetool.utils, 'requests', MockRequests)
-    monkeypatch.setattr(MockRequests, 'response', 'data')
+    monkeypatch.setattr(MockRequests, 'content', 'data')
 
     assert dummy_repository.gating_recipients == []

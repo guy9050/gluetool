@@ -32,7 +32,12 @@ class DistGitRepository(LoggerMixin, gluetool_modules.libs.git.RemoteGitReposito
 
         # In the future, this must cover greater variety of options - FMF allows multiple
         # ways how to specify "/ci" node.
-        return '{}/raw/{}/f/ci.fmf'.format(self.web_url, self.ref if self.ref else self.branch)
+
+        # NOTE: url for Pagure instances, move to config later ideally
+        # return '{}/raw/{}/f/ci.fmf'.format(self.web_url, self.ref if self.ref else self.branch)
+
+        # NOTE: url for cgit instance
+        return '{}/plain/ci.fmf?id={}'.format(self.web_url, self.ref if self.ref else self.branch)
 
     @cached_property
     def sti_tests_url(self):
@@ -42,11 +47,20 @@ class DistGitRepository(LoggerMixin, gluetool_modules.libs.git.RemoteGitReposito
 
         # Currently we check only tests/ folder, which should be a pretty solid indication of STI tests.
         # The STI tests can be tests/tests*.yml, which is a bit hard to check via URL as we would need to parse html.
-        return '{}/blob/{}/f/tests'.format(self.web_url, self.ref if self.ref else self.branch)
+
+        # NOTE: url for Pagure instances, move to config later ideally
+        # return '{}/blob/{}/f/tests'.format(self.web_url, self.ref if self.ref else self.branch)
+
+        # NOTE: url for cgit instance
+        return '{}/tree/tests?id={}'.format(self.web_url, self.ref if self.ref else self.branch)
 
     @cached_property
     def gating_config_url(self):
-        return '{}/raw/{}/f/gating.yaml'.format(self.web_url, self.ref if self.ref else self.branch)
+        # NOTE: url for Pagure instances, move to config later ideally
+        # return '{}/raw/{}/f/gating.yaml'.format(self.web_url, self.ref if self.ref else self.branch)
+
+        # NOTE: url for cgit instance
+        return '{}/plain/gating.yaml?id={}'.format(self.web_url, self.ref if self.ref else self.branch)
 
     def _get_url(self, url, success_message, failure_message):
         with gluetool.utils.requests() as request:
