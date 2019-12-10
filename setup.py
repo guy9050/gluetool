@@ -36,13 +36,13 @@ INSTALL_REQUIRES = [
     "docker==3.5.1",  # docker
     "docker-pycreds==0.3.0",  # docker
     "enum34==1.1.6",
-    'fmf==0.6.1',  # test-batch-planner
+    "fmf==0.6.1",  # test-batch-planner
     'futures==3.2.0; python_version == "2.7"',  # restraint-scheduler
     "inotify==0.2.10",  # sti
     "jenkins-job-builder==1.6.2",
     "jenkinsapi==0.3.8",
     "jq==0.1.6",
-    'koji',
+    "koji",
     "mako==1.0.6",
     "mysql-connector-python==8.0.13",  # mysql
     "packaging==17.1",
@@ -50,7 +50,7 @@ INSTALL_REQUIRES = [
     "psycopg2==2.8.3",
     "pyOpenSSL==17.0.0",
     "pycurl==7.43.0",
-    'pymemcache==2.0.0',  # memcache
+    "pymemcache==2.0.0",  # memcache
     "python-glanceclient==2.8.0",
     "python-novaclient==7.1.0",
     "python-openstackclient==3.9.0",
@@ -58,6 +58,7 @@ INSTALL_REQUIRES = [
     "requests-kerberos==0.11.0",
     "requests==2.19.1",
     "requestsexceptions==1.2.0",
+    "six==1.12.0",
     "stomp.py==4.1.17",
     "urlgrabber==3.10.2",
     "warlock==1.2.0",
