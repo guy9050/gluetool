@@ -1,7 +1,7 @@
 import gluetool
 
 # Type annotations
-from typing import TYPE_CHECKING, cast, Any, Optional  # noqa
+from typing import TYPE_CHECKING, cast, Any, Optional, Tuple  # noqa
 
 if TYPE_CHECKING:
     from gluetool.log import ContextAdapter  # noqa
@@ -56,3 +56,42 @@ def artifacts_location(module, local_path, logger=None):
         )
 
     return local_path
+
+
+# With python3 we can use `Subject` from `dnf` package
+# see https://bugzilla.redhat.com/show_bug.cgi?id=1452801#c7
+
+def splitFilename(filename):
+    # type: (str) -> Tuple[str, ...]
+    """
+    Split N(E)VRA to its pieces
+
+    :param nevra to split
+    :returns: a name, version, release, epoch, arch
+
+    Code taken from rpmUtils.miscutils.splitFilename,
+    which is unavailable in Fedora 31.
+    Original code modified to accept N(E)VRA instead (E)NVRA
+    """
+    if filename[-4:] == '.rpm':
+        filename = filename[:-4]
+
+    archIndex = filename.rfind('.')
+    arch = filename[archIndex+1:]
+
+    relIndex = filename[:archIndex].rfind('-')
+    rel = filename[relIndex+1:archIndex]
+
+    verIndex = filename[:relIndex].rfind('-')
+    ver = filename[verIndex+1:relIndex]
+
+    epochIndex = ver.find(':')
+    if epochIndex == -1:
+        epoch = ''
+    else:
+        epoch = ver[:epochIndex]
+        ver = ver[epochIndex+1:]
+
+    name = filename[:verIndex]
+
+    return name, ver, rel, epoch, arch

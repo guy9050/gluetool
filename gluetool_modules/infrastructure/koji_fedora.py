@@ -5,7 +5,8 @@ import koji
 import requests.exceptions
 
 from bs4 import BeautifulSoup
-from rpmUtils.miscutils import compareEVR, splitFilename
+from gluetool_modules.libs.artifacts import splitFilename
+from rpm import labelCompare
 
 import gluetool
 from gluetool import GlueError, SoftGlueError
@@ -932,7 +933,12 @@ class KojiTask(LoggerMixin, object):
         except AttributeError:
             raise GlueError("nvr '{}' seems to be invalid".format(nvr))
 
-        return compareEVR((self.component, self.version, self.release), (name, version, release))
+        if self.component != name:
+            raise GlueError("Compared nvrs belong to different components {} {}".format(self.component, nvr))
+
+        # Since `labelCompare` compares EVR (epoch, version, release) and we have only VR
+        # we have to add `0` as dummy epoch to both sides
+        return labelCompare(('0', self.version, self.release), ('0', version, release))
 
     @cached_property
     def is_newer_than_latest(self):

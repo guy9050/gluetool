@@ -4,7 +4,7 @@ import ftplib
 
 from gluetool.log import log_dict
 from six.moves.urllib.parse import urlsplit
-from rpmUtils.miscutils import splitFilename
+from gluetool_modules.libs.artifacts import splitFilename
 
 
 class TestSchedulerUpgrades(gluetool.Module):
@@ -27,12 +27,6 @@ class TestSchedulerUpgrades(gluetool.Module):
         self.debug('nevr regex: "{}"'.format(nevr_pattern))
 
         return nevr_pattern
-
-    def nevr_to_nvr(self, nevr):
-        nvr = re.sub(r'-\d+:', '-', nevr)
-        self.debug('nvr: "{}"'.format(nvr))
-
-        return nvr
 
     def create_test_schedule(self, testing_environment_constraints=None):
         """
@@ -120,12 +114,6 @@ class TestSchedulerUpgrades(gluetool.Module):
 
         binary_rpms_list = [package.encode('utf-8') for package in binary_rpms_list if package.endswith('.x86_64')]
         log_dict(self.debug, 'binary rpm nevrs', binary_rpms_list)
-
-        # We have to transform `nevr` back to `nvr` by ourself, because `splitFilename` is unable to split `nevr`.
-        # With python3 we can use `Subject` from `dnf` package
-        # see https://bugzilla.redhat.com/show_bug.cgi?id=1452801#c7
-        binary_rpms_list = [self.nevr_to_nvr(package) for package in binary_rpms_list]
-        log_dict(self.debug, 'binary rpm nvrs', binary_rpms_list)
 
         binary_rpms_list = [splitFilename(package)[0] for package in binary_rpms_list]
         log_dict(self.info, 'binary rpm names', binary_rpms_list)

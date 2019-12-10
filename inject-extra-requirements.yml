@@ -74,24 +74,6 @@
       - automake
       - libtool
 
-      #- name: "Check whether RPM bindings for Python are available"
-      #  stat:
-      #    path: "/usr/lib64/python2.7/site-packages/rpm"
-      #  register: rpm_present
-
-      #- fail:
-      #    msg: "Install package providing Python bindings for RPM packages (e.g. python-rpm, python2-rpm or similar)"
-      #  when: rpm_present.stat.isdir is not defined or not rpm_present.stat.isdir
-
-    - name: "Check whether yum bindings for Python are available"
-      stat:
-        path: "/usr/lib/python2.7/site-packages/rpmUtils"
-      register: rpmutils_present
-
-    - fail:
-        msg: "Install package providing Python bindings for Yum (usually provided by yum or dnf)"
-      when: rpmutils_present.stat.isdir is not defined or not rpmutils_present.stat.isdir
-
     - name: "Check whether krb5.h is available"
       stat:
         path: "/usr/include/krb5.h"
@@ -143,17 +125,6 @@
     #
     # Inject system packages into the virtualenv
     #
-    #- name: "Inject system rpm package into virtualenv"
-    #  file:
-    #    path: "{{ virtualenv_path }}/lib64/python2.7/site-packages/rpm"
-    #    state: link
-    #    src: "/usr/lib64/python2.7/site-packages/rpm"
-
-    - name: "Inject system rpmUtils package into virtualenv"
-      file:
-        path: "{{ virtualenv_path }}/lib64/python2.7/site-packages/rpmUtils"
-        state: link
-        src: "/usr/lib/python2.7/site-packages/rpmUtils"
 
     - name: "Inject qe.py into virtualenv"
       file:
