@@ -199,9 +199,10 @@ class InstallMBSBuild(gluetool.Module):
             log_dict(self.debug, 'Available profiles', profiles)
 
             if not profile:
-                match = re.search(r'Default profiles\s*:\s*(.*)', module_info)
-                if match:
-                    profile['profile'] = match.group(1)
+                match = re.search(r'Default profiles\s*:\s*([^\s]*)$', module_info, re.MULTILINE)
+                profile['profile'] = match.group(1) if match else None
+
+                if profile['profile']:
                     self.info("Using default profile '{}'".format(profile['profile']))
                 else:
                     return "Module '{}' doesn't have default profile set".format(nsvc)
