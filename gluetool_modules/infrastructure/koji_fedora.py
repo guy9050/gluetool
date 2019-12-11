@@ -161,17 +161,26 @@ class KojiTask(LoggerMixin, object):
         if not self._is_valid:
             raise NotBuildTaskError(self.id)
 
-        # wait for the task to be non-waiting and closed
-        wait('waiting for task to be non waiting', self._check_nonwaiting_task, timeout=wait_timeout)
+        # Wait for the task to be non-waiting
+        wait(
+            'waiting for task to be non waiting',
+            self._check_nonwaiting_task,
+            timeout=wait_timeout
+        )
 
-        # wait for task to be in CLOSED state
-        # note that this can take some amount of time after it becomes non-waiting
-        wait_result = wait('waiting for task to be finished (closed, canceled or failed)',
-                           self._check_finished_task, timeout=wait_timeout)
-        if wait_result == koji.TASK_STATES['CANCELED']:
-            raise SoftGlueError("Task '{}' was canceled".format(self.id))
-        if wait_result == koji.TASK_STATES['FAILED']:
-            raise SoftGlueError("Task '{}' has failed".format(self.id))
+        # Wait for the task to be finished. This can take some amount of time after the task becomes non-waiting.
+        wait_result = wait(
+            'waiting for task to be finished (closed, canceled or failed)',
+            self._check_finished_task,
+            timeout=wait_timeout
+        )
+
+        if not gluetool.utils.normalize_bool_option(module.option('accept-failed-tasks')):
+            if wait_result == koji.TASK_STATES['CANCELED']:
+                raise SoftGlueError("Task '{}' was canceled".format(self.id))
+
+            if wait_result == koji.TASK_STATES['FAILED']:
+                raise SoftGlueError("Task '{}' has failed".format(self.id))
 
         self._assign_build(build_id)
 
@@ -965,13 +974,13 @@ class BrewTask(KojiTask):
         self.dist_git_commit_urls = details['dist_git_commit_urls']
 
         if self.is_build_container_task:
-            if not self._result:
-                raise GlueError('Container task {} does not have a result'.format(self.id))
-
             # Try to assign build for container task only when there was no build ID specified.
             # If `build_id` is set, we already have a build, specified explicitly by the caller.
 
             if build_id is None:
+                if not self._result:
+                    raise GlueError('Container task {} does not have a result'.format(self.id))
+
                 if 'koji_builds' not in self._result or not self._result['koji_builds']:
                     self.warn('Container task {} does not have a build assigned'.format(self.id))
 
@@ -1504,6 +1513,13 @@ class Koji(gluetool.Module):
             }
         }),
         ('Workarounds', {
+            'accept-failed-tasks': {
+                'help': """
+                        If set, even failed task will be accepted without stopping the pipeline (default: %(default)s).
+                        """,
+                'metavar': 'yes|no',
+                'default': 'no'
+            },
             'commit-fetch-timeout': {
                 'help': """
                         The maximum time for trying to fetch one (dist-git) URL with commit info
@@ -1521,7 +1537,7 @@ class Koji(gluetool.Module):
                 'metavar': 'SECONDS',
                 'type': int,
                 'default': DEFAULT_COMMIT_FETCH_TICKS
-            }
+            },
         })
     )
 
