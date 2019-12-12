@@ -8,7 +8,7 @@ from gluetool.log import format_blob, log_blob, log_dict
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 # Type annotations
-from typing import cast, TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Tuple, Union  # noqa
+from typing import cast, TYPE_CHECKING, Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union  # noqa
 
 if TYPE_CHECKING:
     import libci.guest  # noqa
@@ -61,6 +61,10 @@ class Ansible(gluetool.Module):
             'help': "Additional ansible-playbook options, for example '-vvv'. (default: none)",
             'action': 'append',
             'default': []
+        },
+        'use-pipelining': {
+            'help': 'If set, Ansible pipelining would be enabled for playbooks (default: %(default)s).',
+            'default': 'no'
         }
     }
 
@@ -188,6 +192,22 @@ class Ansible(gluetool.Module):
 
             cmd += ['-C']
 
+        def _update_env(var_name, var_value, on_present, on_missing):
+            # type: (str, str, Callable[[], None], Callable[[], None]) -> None
+
+            assert env is not None
+
+            if var_name in env and env[var_name] != var_value:
+                on_present()
+
+                return
+
+            env.update({
+                var_name: var_value
+            })
+
+            on_missing()
+
         if json_output:
             env.update({
                 'ANSIBLE_STDOUT_CALLBACK': 'json'
@@ -196,15 +216,44 @@ class Ansible(gluetool.Module):
         else:
             # When coupled with `-v`, provides structured and more readable output. But only if user didn't try
             # their own setup.
-            if 'ANSIBLE_STDOUT_CALLBACK' in env and env['ANSIBLE_STDOUT_CALLBACK'] != 'debug':
+            def _json_on_present():
+                # type: () -> None
+
+                assert logger is not None
+
                 logger.debug('ansible "debug" callback cannot be used, ANSIBLE_STDOUT_CALLBACK is already set')
 
-            else:
+            _update_env(
+                'ANSIBLE_STDOUT_CALLBACK',
+                'debug',
+                _json_on_present,
+                lambda: cmd.append('-v')
+            )
+
+        if gluetool.utils.normalize_bool_option(self.option('use-pipelining')):
+            # Don't forget to set ANSIBLE_SSH_PIPELINING too, ANSIBLE_PIPELINING alone is not enough.
+            def _env_on_missing():
+                # type: () -> None
+
+                assert logger is not None
+
+                logger.debug('ansible pipelining cannot be used, ANSIBLE_PIPELINING is already set')
+
+            def _env_on_present():
+                # type: () -> None
+
+                assert env is not None
+
                 env.update({
-                    'ANSIBLE_STDOUT_CALLBACK': 'debug'
+                    'ANSIBLE_SSH_PIPELINING': 'True'
                 })
 
-                cmd += ['-v']
+            _update_env(
+                'ANSIBLE_PIPELINING',
+                'True',
+                _env_on_present,
+                _env_on_missing
+            )
 
         cmd += [gluetool.utils.normalize_path(path) for path in playbook_paths]
 
