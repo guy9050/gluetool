@@ -4,7 +4,7 @@ from gluetool_modules.libs.test_schedule import TestSchedule, TestScheduleResult
     TestScheduleEntryState
 
 # Type annotations
-from typing import cast, TYPE_CHECKING, Any, Dict, List, Optional  # noqa
+from typing import cast, TYPE_CHECKING, Any, Dict, List  # noqa
 
 if TYPE_CHECKING:
     import bs4  # noqa
@@ -14,27 +14,40 @@ class TestScheduleReport(gluetool.Module):
     """
     Report test results, carried by schedule entries, and prepare serialized version of these results
     in a form of xUnit document.
+
+    Optionally, make the xunit polarion friendly.
     """
 
     name = 'test-schedule-report'
 
-    options = {
-        'overall-result-map': {
-            'help': """
-                    Instructions for overruling the default decision on the overall schedule result
-                    (default: none).
-                    """,
-            'action': 'append',
-            'default': [],
-            'metavar': 'FILE'
-        },
-        'xunit-file': {
-            'help': 'File to save the results into, in an xUnit format (default: %(default)s).',
-            'action': 'store',
-            'default': None,
-            'metavar': 'FILE'
-        }
-    }
+    options = [
+        ('General Options', {
+            'overall-result-map': {
+                'help': """
+                        Instructions for overruling the default decision on the overall schedule result
+                        (default: none).
+                        """,
+                'action': 'append',
+                'default': [],
+                'metavar': 'FILE'
+            },
+            'xunit-file': {
+                'help': 'File to save the results into, in an xUnit format (default: %(default)s).',
+                'action': 'store',
+                'default': None,
+                'metavar': 'FILE'
+            }
+        }),
+        ('Polarion Options', {
+            'enable-polarion': {
+                'help': 'Make the xUnit RH Polarion friendly.',
+                'action': 'store_true'
+            },
+            'polarion-project-id': {
+                'help': 'Polarion project ID to use.'
+            }
+        })
+    ]
 
     shared_functions = ['test_schedule_results', 'results']
 
@@ -44,6 +57,14 @@ class TestScheduleReport(gluetool.Module):
         super(TestScheduleReport, self).__init__(*args, **kwargs)
 
         self._result = None  # type: bs4.element.Tag
+
+    def sanity(self):
+        # type: () -> None
+        if self.option('enable-polarion') and not self.option('polarion-project-id'):
+            raise gluetool.GlueError("option 'polarion-project-id' is required for Polarion.")
+
+        if not self.option('enable-polarion') and self.option('polarion-project-id'):
+            self.warn("option 'polarion-project-id' is ignored because 'enable-polarion' was not specified.")
 
     @gluetool.utils.cached_property
     def _overall_result_instructions(self):
@@ -166,17 +187,35 @@ class TestScheduleReport(gluetool.Module):
 
         properties = gluetool.utils.new_xml_element('properties', _parent=test_suite)
 
-        # When adding new property, keep them sorted by the property name.
         if self.shared('thread_id'):
             gluetool.utils.new_xml_element(
                 'property', _parent=properties,
                 name='baseosci.id.testing-thread', value=self.shared('thread_id')
             )
 
+        # When adding new property, keep them sorted by the property name.
         gluetool.utils.new_xml_element(
             'property', _parent=properties,
             name='baseosci.overall-result', value=schedule.result.name
         )
+
+        if self.option('enable-polarion'):
+            # we use Test Case ID as test id in Polarion
+            gluetool.utils.new_xml_element(
+                'property', _parent=properties,
+                name='polarion-custom-lookup-method-field-id', value='Test Case ID'
+            )
+
+            gluetool.utils.new_xml_element(
+                'property', _parent=properties,
+                name='polarion-project-id', value=self.option('polarion-project-id')
+            )
+
+            if self.shared('thread_id'):
+                gluetool.utils.new_xml_element(
+                    'property', _parent=properties,
+                    name='polarion-testrun-id', value=self.shared('thread_id')
+                )
 
         for schedule_entry in schedule:
             self.shared('serialize_test_schedule_entry_results', schedule_entry, test_suite)
@@ -197,6 +236,7 @@ class TestScheduleReport(gluetool.Module):
 
     def execute(self):
         # type: () -> None
+        self.require_shared('test_schedule')
 
         self._serialize_results(self._schedule)
         self._report_final_result(self._schedule)

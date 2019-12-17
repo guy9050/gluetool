@@ -1,4 +1,5 @@
 import itertools
+import re
 
 import gluetool
 from gluetool.log import log_dict, log_xml
@@ -15,12 +16,27 @@ class BeahXUnit(gluetool.Module):
     description = 'xUnit serializer for Beaker and Restraint testing results.'
 
     options = {
+        'enable-polarion': {
+            'help': 'Make generated xUnit RH Polarion friendly.',
+            'action': 'store_true'
+        },
+        'missing-caseid-tasks-list': {
+            'help': 'Yaml file with list of tasks ignored if caseid not found. By default Sentry warning emitted.',
+            'metavar': 'PATH'
+         },
         'test-source-template': {
             'help': 'Template to render test source location.'
         }
     }
 
     shared_functions = ('beah_xunit_serialize',)
+
+    @gluetool.utils.cached_property
+    def missing_caseid_tasks_list(self):
+        if not self.option('missing-caseid-tasks-list'):
+            return []
+
+        return gluetool.utils.load_yaml(gluetool.utils.normalize_path(self.option('missing-caseid-tasks-list')))
 
     def beah_xunit_serialize(self, test_suite, result, payload=None):
         """
@@ -57,6 +73,24 @@ class BeahXUnit(gluetool.Module):
                 parent.append(el)
 
             log_xml(self.verbose, 'after sorting', parent)
+
+        def _get_polarion_case_id(bkr_params):
+            if not self.option('enable-polarion'):
+                return None
+
+            try:
+                # Extract tcms test case id from bkr_params, e.g. CASEID="578756"
+                # For Polarion the test case id must be in form TC#{ID}
+                case_id = filter(lambda param: param.startswith('CASEID='), bkr_params)[0]
+                return 'TC#{}'.format(case_id.split('=')[1].strip('"'))
+
+            except IndexError:
+                if any(re.match(task, test_name) for task in self.missing_caseid_tasks_list):
+                    self.debug("Expected that TCMS test case ID is missing for '{}'".format(test_name))
+                else:
+                    self.warn("Failed to find TCMS test case ID for '{}'".format(test_name), sentry=True)
+
+            return None
 
         if self.option('test-source-template'):
             def _get_test_source_url(test_name):
@@ -122,6 +156,10 @@ class BeahXUnit(gluetool.Module):
                     _add_property(test_case_properties, name, run[value])
 
                 _add_property(test_case_properties, 'testcase.source.url', _get_test_source_url(test_name))
+
+                case_id = _get_polarion_case_id(run['bkr_params'])
+                if case_id:
+                    _add_property(test_case_properties, 'polarion-testcase-id', case_id)
 
                 for param in run['bkr_params']:
                     _add_param(test_case_params, param)
