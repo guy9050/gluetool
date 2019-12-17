@@ -159,7 +159,11 @@ class BeahXUnit(gluetool.Module):
 
                 case_id = _get_polarion_case_id(run['bkr_params'])
                 if case_id:
-                    _add_property(test_case_properties, 'polarion-testcase-id', case_id)
+                    # we are not using _add_property here as it adds 'baseosci.' prefix to name attribute
+                    new_xml_element(
+                        'property', _parent=test_case_properties,
+                        name='polarion-testcase-id', value=case_id
+                    )
 
                 for param in run['bkr_params']:
                     _add_param(test_case_params, param)
