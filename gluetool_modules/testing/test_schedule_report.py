@@ -182,40 +182,42 @@ class TestScheduleReport(gluetool.Module):
         test_suites = gluetool.utils.new_xml_element('testsuites')
         test_suites['overall-result'] = self._overall_result(schedule).name.lower()
 
-        test_suite = gluetool.utils.new_xml_element('testsuite', _parent=test_suites, tests='0')
-        test_suites['overall-result'] = self._overall_result(schedule).name.lower()
-
-        properties = gluetool.utils.new_xml_element('properties', _parent=test_suite)
-
-        if self.shared('thread_id'):
-            gluetool.utils.new_xml_element(
-                'property', _parent=properties,
-                name='baseosci.id.testing-thread', value=self.shared('thread_id')
-            )
-
-        # When adding new property, keep them sorted by the property name.
-        gluetool.utils.new_xml_element(
-            'property', _parent=properties,
-            name='baseosci.overall-result', value=schedule.result.name
-        )
+        testsuites_properties = gluetool.utils.new_xml_element('properties', _parent=test_suites)
 
         if self.option('enable-polarion'):
             # we use Test Case ID as test id in Polarion
             gluetool.utils.new_xml_element(
-                'property', _parent=properties,
+                'property', _parent=testsuites_properties,
                 name='polarion-custom-lookup-method-field-id', value='Test Case ID'
             )
 
             gluetool.utils.new_xml_element(
-                'property', _parent=properties,
+                'property', _parent=testsuites_properties,
                 name='polarion-project-id', value=self.option('polarion-project-id')
             )
 
             if self.shared('thread_id'):
                 gluetool.utils.new_xml_element(
-                    'property', _parent=properties,
+                    'property', _parent=testsuites_properties,
                     name='polarion-testrun-id', value=self.shared('thread_id')
                 )
+
+        test_suite = gluetool.utils.new_xml_element('testsuite', _parent=test_suites, tests='0')
+        test_suite['overall-result'] = self._overall_result(schedule).name.lower()
+
+        testsuite_properties = gluetool.utils.new_xml_element('properties', _parent=test_suite)
+
+        if self.shared('thread_id'):
+            gluetool.utils.new_xml_element(
+                'property', _parent=testsuite_properties,
+                name='baseosci.id.testing-thread', value=self.shared('thread_id')
+            )
+
+        # When adding new property, keep them sorted by the property name.
+        gluetool.utils.new_xml_element(
+            'property', _parent=testsuite_properties,
+            name='baseosci.overall-result', value=schedule.result.name
+        )
 
         for schedule_entry in schedule:
             self.shared('serialize_test_schedule_entry_results', schedule_entry, test_suite)
