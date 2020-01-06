@@ -487,7 +487,14 @@ class KojiTask(LoggerMixin, object):
         tags = tags or [self.destination_tag, self.target]
 
         for tag in tags:
-            builds = self._call_api('listTagged', tag, None, True, latest=2, package=self.component)
+            try:
+                builds = self._call_api('listTagged', tag, None, True, latest=2, package=self.component)
+            except koji.GenericError as error:
+                self.warn(
+                    "ignoring error while listing latest builds tagged to '{}': {}".format(tag, error),
+                    sentry=True
+                )
+                continue
             if builds:
                 break
         else:

@@ -277,7 +277,10 @@ def test_invalid_build(koji_session, koji_module, log):
 
     koji_module.execute()
 
-    log.match(levelno=logging.WARN, message='Looking for build 705705, remote server returned None - skipping this ID')
+    assert log.match(
+        levelno=logging.WARN,
+        message='Looking for build 705705, remote server returned None - skipping this ID'
+    )
     assert koji_module._tasks == []
 
 
@@ -295,3 +298,33 @@ def test_request_missing(koji_session, koji_module):
 def test_request_length_invalid(koji_session, koji_module):
     with pytest.raises(gluetool.GlueError, match=r'Task 10166985 has unexpected number of items in request field'):
         koji_module.tasks(task_ids=[10166985])
+
+
+@pytest.mark.parametrize('koji_session', [
+    15869828,
+], indirect=True)
+def test_invalid_tag_latest(koji_session, koji_module, log):
+    """
+    Test if latestTagged api call traceback is correctly handled
+    """
+
+    koji_module.tasks(task_ids=[koji_session])
+    task = koji_module.primary_task()
+
+    # we need to first cache candidate, target and destination_tag as we will be mocking _call_api
+    task.component
+    task.destination_tag
+    task.target
+
+    # make _call_api traceback as latest_released calls it to simulate the behaviour
+    task._call_api = MagicMock(side_effect=koji.GenericError('koji error'))
+
+    assert task.latest_released() == None
+    assert log.match(
+        levelno=logging.WARN,
+        message="ignoring error while listing latest builds tagged to 'f25-updates-candidate': koji error"
+    )
+    assert log.match(
+        levelno=logging.WARN,
+        message="ignoring error while listing latest builds tagged to 'f25-candidate': koji error"
+    )
