@@ -5,6 +5,7 @@ import gluetool
 from gluetool.action import Action
 from gluetool.log import log_dict
 from gluetool.utils import normalize_path_option, render_template
+from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput, GuestSetupStage, \
     GuestSetupStageAdapter
 
@@ -325,6 +326,9 @@ class GuestSetup(gluetool.Module):
         log_filepath = os.path.join(log_dirpath, 'guest-setup-output-{}.txt'.format(stage.value))
 
         logger = GuestSetupStageAdapter(guest.logger, stage)
+
+        log_location = artifacts_location(self, log_filepath, logger=logger)
+        logger.info('guest setup log is in {}'.format(log_location))
 
         # Detect playbooks and extra vars from the playbook map...
         playbooks_from_map, variables_from_map = self._get_details_from_map(stage)
