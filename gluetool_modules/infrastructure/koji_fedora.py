@@ -1578,7 +1578,7 @@ class Koji(gluetool.Module):
 
         task = task_class(details, task_initializer.task_id, self,
                           logger=self.logger,
-                          wait_timeout=wait_timeout,
+                          wait_timeout=wait_timeout if wait_timeout else self.option('wait'),
                           build_id=task_initializer.build_id)
 
         return task
@@ -1860,7 +1860,7 @@ class Brew(Koji, (gluetool.Module)):
         }, details or {})
 
         return super(Brew, self).task_factory(task_initializer, details=details, task_class=BrewTask,
-                                              wait_timeout=wait_timeout)
+                                              wait_timeout=wait_timeout if wait_timeout else self.option('wait'))
 
     def _find_task_initializers(self, task_initializers=None, build_ids=None, **kwargs):
         """
