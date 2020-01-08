@@ -43,6 +43,12 @@ class TestScheduleReport(gluetool.Module):
                 'help': 'Make the xUnit RH Polarion friendly.',
                 'action': 'store_true'
             },
+            'polarion-lookup-method': {
+                'help': 'Polarion lookup method.'
+            },
+            'polarion-lookup-method-field-id': {
+                'help': 'Polarion lookup method field id.'
+            },
             'polarion-project-id': {
                 'help': 'Polarion project ID to use.'
             }
@@ -60,11 +66,17 @@ class TestScheduleReport(gluetool.Module):
 
     def sanity(self):
         # type: () -> None
-        if self.option('enable-polarion') and not self.option('polarion-project-id'):
-            raise gluetool.GlueError("option 'polarion-project-id' is required for Polarion.")
+        required_polarion_options = [
+            'polarion-project-id',
+            'polarion-lookup-method',
+            'polarion-lookup-method-field-id'
+        ]
 
-        if not self.option('enable-polarion') and self.option('polarion-project-id'):
-            self.warn("option 'polarion-project-id' is ignored because 'enable-polarion' was not specified.")
+        if self.option('enable-polarion') and not all(self.option(option) for option in required_polarion_options):
+            raise gluetool.GlueError('missing required options for Polarion.')
+
+        if not self.option('enable-polarion') and any(self.option(option) for option in required_polarion_options):
+            self.warn("polarion options have no effect because 'enable-polarion' was not specified.")
 
     @gluetool.utils.cached_property
     def _overall_result_instructions(self):
@@ -185,10 +197,14 @@ class TestScheduleReport(gluetool.Module):
         testsuites_properties = gluetool.utils.new_xml_element('properties', _parent=test_suites)
 
         if self.option('enable-polarion'):
-            # we use Test Case ID as test id in Polarion
+            # we use custom lookup method with Test Case ID as test id in Polarion
             gluetool.utils.new_xml_element(
                 'property', _parent=testsuites_properties,
-                name='polarion-custom-lookup-method-field-id', value='Test Case ID'
+                name='polarion-lookup-method', value=self.option('polarion-lookup-method')
+            )
+            gluetool.utils.new_xml_element(
+                'property', _parent=testsuites_properties,
+                name='polarion-custom-lookup-method-field-id', value=self.option('polarion-lookup-method-field-id')
             )
 
             gluetool.utils.new_xml_element(
