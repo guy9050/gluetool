@@ -1,5 +1,6 @@
 import gluetool
 import libci.dispatch_job
+from gluetool.utils import cached_property, dict_update
 
 
 class BrewBuildJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
@@ -16,3 +17,17 @@ class BrewBuildJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     description = 'Create and run ci-test-pagure-brew_build job'
 
     job_name = 'ci-test-pagure-brew_build'
+
+    # DispatchJenkinsJobMixin.options contain hard defaults
+    # pylint: disable=gluetool-option-no-default-in-help,gluetool-option-hard-default
+    options = dict_update({}, libci.dispatch_job.DispatchJenkinsJobMixin.options, {
+        'brew-builder-options': {
+            'help': 'Additional options for ``brew-builder`` module.'
+        }
+    })
+
+    @cached_property
+    def build_params(self):
+        return dict_update(super(BrewBuildJob, self).build_params, {
+            'brew_builder_options': self.option('brew-builder-options')
+        })
