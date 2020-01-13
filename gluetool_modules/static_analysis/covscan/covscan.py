@@ -183,9 +183,6 @@ class CICovscan(gluetool.Module):
     task = None
 
     options = {
-        'blacklist': {
-            'help': 'A comma separated list of blacklisted package names'
-        },
         'task-id': {
             'help': 'Do not schedule Covscan task, just report from given task id',
         },
@@ -341,13 +338,6 @@ class CICovscan(gluetool.Module):
         self.require_shared('primary_task')
 
         self.task = self.shared('primary_task')
-
-        blacklist = self.option('blacklist')
-        if blacklist is not None:
-            self.verbose('blacklisted packages: {}'.format(blacklist))
-            if self.task.component in [splitted.strip() for splitted in blacklist.split(',')]:
-                self.info('Package {} is blacklisted, skipping job'.format(self.task.component))
-                return
 
         target = self.task.target
         enabled_targets = self.option('target_pattern')

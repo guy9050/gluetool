@@ -94,21 +94,6 @@ def test_no_brew(module):
     assert_shared('primary_task', module.execute)
 
 
-def test_blacklisted_component(log, module, monkeypatch):
-    component_name = 'kernel'
-
-    _, module = module
-    module._config['blacklist'] = '{},libreoffice'.format(component_name)
-
-    patch_shared(monkeypatch, module, {}, callables={
-        'primary_task': MagicMock(return_value=MagicMock(component=component_name))
-    })
-
-    module.execute()
-
-    assert log.records[-1].message == 'Package {} is blacklisted, skipping job'.format(component_name)
-
-
 def test_not_enabled_target(log, module, monkeypatch):
     enabled_target = '(rhel|RHEL)-[67].[0-9]+(-z)?-candidate,rhel-7.1-ppc64le(-z)?-candidate'
     component_name = 'ssh'
