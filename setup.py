@@ -27,8 +27,6 @@ INSTALL_REQUIRES = [
     "commonmark==0.8.0",
 
     "ansible==2.8.5",
-    # composetest
-    'composeci @ git+https://gitlab.cee.redhat.com/bkabrda/composeci.git#egg=composeci-9876543210',
 
     "cmd2==0.8.6",
     "beautifulsoup4==4.6.3",
@@ -97,7 +95,7 @@ CATEGORIES = [
     'pipelines',
     'provision',
     'static_analysis', 'static_analysis/covscan', 'static_analysis/rpmdiff', 'static_analysis/rpminspect',
-    'testing', 'testing/beaker', 'testing/composetest', 'testing/openstack', 'testing/pull_request_builder'
+    'testing', 'testing/beaker', 'testing/openstack', 'testing/pull_request_builder'
 ]
 
 DATA_FILES = [
@@ -114,7 +112,6 @@ if __name__ == '__main__':
               'gluetool_modules.{}'.format(subpackage) for subpackage in [
                   'testing',
                   'testing.beaker',
-                  'testing.composetest',
                   'testing.openstack',
                   'testing.pull_request_builder',
                   'tests',

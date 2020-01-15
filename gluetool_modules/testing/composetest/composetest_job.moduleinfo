@@ -1,7 +1,0 @@
----
-
-name: composetest-job
-description: Jenkins ComposeTest job
-dependencies:
-  pip:
-    - jenkins-job-builder==1.6.2
