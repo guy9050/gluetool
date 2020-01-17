@@ -132,6 +132,11 @@ class CIRpminspect(gluetool.Module):
             'action': 'append',
             'default': []
         },
+        'profile': {
+            'help': "RPMinspect profile to use.",
+            'type': str,
+            'metavar': 'NAME',
+        },
         'results-file': {
             'help': 'A file for storing not formated rpminspect results (default: %(default)s)',
             'metavar': 'FILE',
@@ -171,6 +176,10 @@ class CIRpminspect(gluetool.Module):
             '-F', 'json',
             '-T', ','.join(tests) if tests and tests != [''] else 'ALL'
         ]
+
+        if self.option('profile'):
+            cmd += ['-p', self.option('profile')]
+
         return cmd
 
     def _run_rpminspect(self, task, tests, workdir):

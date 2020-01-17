@@ -374,6 +374,39 @@ def test_run_rpminspect(module, monkeypatch):
                                      'dummy-latest', 'dummy-nvr'])
 
 
+def test_run_rpminspect_profile(module, monkeypatch):
+
+    module._config['profile'] = 'profile'
+
+    mock_runinfo = MagicMock()
+    mock_runinfo.stdout = ''
+    mock_runinfo.stderr = ''
+    mock_command_run = MagicMock(return_value=mock_runinfo)
+
+    mock_command = MagicMock(return_value=MagicMock(run=mock_command_run))
+
+    monkeypatch.setattr(gluetool_modules.static_analysis.rpminspect.rpminspect, 'Command', mock_command)
+
+    mock_primary_task = MagicMock()
+    mock_primary_task.nvr = 'dummy-nvr'
+    mock_primary_task.latest = 'dummy-latest'
+    mock_primary_task.scratch = False
+    mock_primary_task.id = 111111
+
+    monkeypatch.setattr(__builtin__, 'open', MagicMock())
+
+    module._run_rpminspect(mock_primary_task, ['ALL'], 'workdir')
+
+    mock_command.assert_called_with(['rpminspect',
+                                     '-v',
+                                     '-w', 'workdir/artifacts',
+                                     '-o', 'workdir/results-file',
+                                     '-F', 'json',
+                                     '-T', 'ALL',
+                                     '-p', 'profile',
+                                     'dummy-latest', 'dummy-nvr'])
+
+
 def test_run_rpminspect_no_baseline(module, monkeypatch):
 
     mock_command = MagicMock()

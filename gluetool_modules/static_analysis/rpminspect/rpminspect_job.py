@@ -27,10 +27,18 @@ class RpminspectJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module)
         'type': {
             'help': 'Test type: analysis or comparison',
             'choices': ('analysis', 'comparison')
+        },
+        'profile': {
+            'help': 'RPMinspect profile to use',
         }
     })
 
     required_options = ('type',)
 
     def execute(self):
+        if self.option('profile'):
+            gluetool.utils.dict_update(self.build_params, {
+                'rpminspect_profile': self.options('profile')
+            })
+
         self.shared('jenkins').invoke_job('ci-test-brew-rpminspect_{}'.format(self.option('type')), self.build_params)
