@@ -9,8 +9,7 @@ from libci.guest import NetworkedGuest
 
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 
-from typing import Dict  # noqa
-from typing import Optional  # noqa
+from typing import Any, Dict, List, Optional, Tuple, cast  # noqa
 
 DEFAULT_PRIORIY_GROUP = 'default-priority'
 DEFAULT_READY_TIMEOUT = 300
@@ -29,11 +28,13 @@ ProvisionerCapabilities = collections.namedtuple('ProvisionerCapabilities', ['av
 
 
 class ArtemisAPIError(SoftGlueError):
-    def __init__(self, response):
+    def __init__(self, response, error=None):
+        # type: (Any, Optional[str]) -> None
 
         self.status_code = response.status_code
-        self.json = {}
-        self.text = response.text
+        self.json = {}  # type: Dict[str, str]
+        self.text = response.text.encode('ascii', 'replace')  # type: str
+        self._errors = error
 
         # We will look at response's headers to try to guess if response's content is json serializable
         # If yes, we will expect it to either have 'message' or 'errors' key, it's value could be used in exception
@@ -44,7 +45,7 @@ class ArtemisAPIError(SoftGlueError):
             try:
                 self.json = response.json()
             except Exception as exc:
-                self.json = {'errors': {'exception': exc}}
+                self.json['errors'] = str(exc)
 
         super(ArtemisAPIError, self).__init__(
             'Call to Artemis API failed, HTTP {}: {}'.format(
@@ -54,12 +55,14 @@ class ArtemisAPIError(SoftGlueError):
     def errors(self):
         # type: () -> str
 
+        if self._errors:
+            return self._errors
+
         if self.json.get('message'):
             return self.json['message']
 
         if self.json.get('errors'):
-            errors = self.json['errors']
-            return ', '.join(['{}: {}'.format(key, errors[key]) for key in errors])
+            return self.json['errors']
 
         return self.text
 
@@ -72,8 +75,32 @@ class ArtemisAPI(object):
 
         self.module = module
         self.url = treat_url(api_url)
+        self.check_if_artemis()
+
+    def check_if_artemis(self):
+        # type: () -> None
+        '''
+        Checks if `url` actually points to ArtemisAPI by calling '/guests' endpoint (which should always return a list)
+        '''
+
+        def error(response):
+            # type: (Any) -> ArtemisAPIError
+            err_msg = 'URL {} does not point to Artemis API. Expected list, got {}' \
+                .format(self.url, response.text.encode('ascii', 'replace'))
+            err = ArtemisAPIError(response, error=err_msg)
+            return err
+
+        with gluetool.utils.requests() as request:
+            response = request.get('{}guests/'.format(self.url))
+
+        try:
+            if response.status_code != 200 or not isinstance(response.json(), list):
+                raise Exception
+        except Exception:
+            raise error(response)
 
     def create_guest(self, environment, keyname=None, priority=None, compose_type=None):
+        # type: (TestingEnvironment, Optional[str], Optional[str], Optional[str]) -> Any
         '''
         Submits a guest request to Artemis API.
 
@@ -92,7 +119,6 @@ class ArtemisAPI(object):
         :rtype: dict
         :returns: Artemis API response serialized as dictionary or ``None`` in case of failure.
         '''
-        # type: (TestingEnvironment, Optional[str], Optional[str], Optional[str]) -> Dict
 
         compose = environment.compose
 
@@ -100,10 +126,10 @@ class ArtemisAPI(object):
             'keyname': keyname,
             'environment': {
                 'arch': environment.arch,
-                'compose': None
+                'compose': {}
             },
             'priority_group': priority
-        }
+        }  # type: Dict[str, Any]
 
         if not compose_type or compose_type == 'id':
             # probably this was called within provision(), called as a shared function from pipeline,
@@ -114,17 +140,20 @@ class ArtemisAPI(object):
             data['environment']['compose'] = {
                 'beaker': {
                     'distro': compose
-                }}
+                }
+            }
         elif compose_type == 'openstack':
             data['environment']['compose'] = {
                 'openstack': {
                     'image': compose
-                }}
+                }
+            }
         elif compose_type == 'aws':
             data['environment']['compose'] = {
                 'aws': {
                     'image': compose
-                }}
+                }
+            }
 
         with gluetool.utils.requests() as request:
             response = request.post('{}guests/'.format(self.url), json=data)
@@ -135,6 +164,7 @@ class ArtemisAPI(object):
         raise ArtemisAPIError(response)
 
     def inspect_guest(self, guest_id):
+        # type: (str) -> Any
         '''
         Requests Artemis API for data abput a specific guest.
 
@@ -144,7 +174,6 @@ class ArtemisAPI(object):
         :rtype: dict
         :returns: Artemis API response serialized as dictionary or ``None`` in case of failure.
         '''
-        # type: (str) -> Dict
 
         with gluetool.utils.requests() as request:
             response = request.get('{}guests/{}'.format(self.url, guest_id))
@@ -155,6 +184,7 @@ class ArtemisAPI(object):
         raise ArtemisAPIError(response)
 
     def cancel_guest(self, guest_id):
+        # type: (str) -> Any
         '''
         Requests Artemis API to cancel guest provision (or, in case a guest os already provisioned, return the guest).
 
@@ -164,7 +194,6 @@ class ArtemisAPI(object):
         :rtype: dict
         :returns: Artemis API response serialized as dictionary or ``None`` in case of failure.
         '''
-        # type: (str) -> Dict
 
         with gluetool.utils.requests() as request:
             response = request.delete('{}guests/{}'.format(self.url, guest_id))
@@ -178,15 +207,15 @@ class ArtemisAPI(object):
 class ArtemisGuest(NetworkedGuest):
 
     def __init__(self,
-                 module,  # type: gluetool.Module
+                 module,  # type: ArtemisProvisioner
                  guestname,  # type: str
                  hostname,  # type: str
                  environment,  # type: TestingEnvironment
                  port=None,  # type: Optional[int]
                  username=None,  # type: Optional[str]
                  key=None,  # type: Optional[str]
-                 options=None,
-                 **kwargs   # type: Optional[Dict]
+                 options=None,  # type: Optional[List[str]]
+                 **kwargs   # type: Optional[Dict[str, Any]]
                  ):
 
         super(ArtemisGuest, self).__init__(module,
@@ -200,12 +229,14 @@ class ArtemisGuest(NetworkedGuest):
         self.artemis_id = guestname
 
     def __str__(self):
+        # type: () -> str
         return 'ArtemisGuest({}, {})'.format(self.artemis_id, self.environment)
 
     def _check_ip_ready(self):
+        # type: () -> Result[bool, str]
 
         try:
-            guest_data = self._module.api.inspect_guest(self.artemis_id)
+            guest_data = cast(ArtemisProvisioner, self._module).api.inspect_guest(self.artemis_id)
             guest_state = guest_data['state']
             guest_address = guest_data['address']
             if guest_state == 'ready':
@@ -232,6 +263,7 @@ class ArtemisGuest(NetworkedGuest):
             raise GlueError("Guest couldn't be provisioned: {}".format(exc))
 
     def _wait_alive(self, connect_timeout, connect_tick, echo_timeout, echo_tick, boot_timeout, boot_tick):
+        # type: (int, int, int, int, int, int) -> None
         '''
         Wait till the guest is alive. That covers several checks.
         '''
@@ -372,9 +404,10 @@ class ArtemisProvisioner(gluetool.Module):
 
     required_options = ('api-url', 'key', 'priority-group', 'ssh-key',)
 
-    shared_functions = ('provision', 'provisioner_capabilities')
+    shared_functions = ['provision', 'provisioner_capabilities']
 
     def sanity(self):
+        # type: () -> None
 
         if not self.option('provision'):
             return
@@ -382,21 +415,21 @@ class ArtemisProvisioner(gluetool.Module):
         if not self.option('arch'):
             raise GlueError('Missing required option: --arch')
 
-        def get_options(options):
-            return filter(lambda x: x[0] == options, self.options)[0][1]
-
-        provisioning_opts = self.options[3][1].keys()  # provisioning options
+        # provisioning options - it is required to have one of them
+        provisioning_opts = cast(Dict[str, Any], self.options[3][1]).keys()
 
         if not any([self.option(option) for option in provisioning_opts]):
             raise GlueError('At least one of those options is required: {}'.format(', '.join(provisioning_opts)))
 
     def __init__(self, *args, **kwargs):
+        # type: (Any, Any) -> None
         super(ArtemisProvisioner, self).__init__(*args, **kwargs)
 
-        self.guests = []
-        self.api = None
+        self.guests = []  # type: List[ArtemisGuest]
+        self.api = None  # type: ArtemisAPI  # type: ignore
 
     def provisioner_capabilities(self):
+        # type: () -> ProvisionerCapabilities
         '''
         Return description of Artemis provisioner capabilities.
 
@@ -407,7 +440,15 @@ class ArtemisProvisioner(gluetool.Module):
             available_arches=['x86_64']
         )
 
-    def provision_guest(self, environment, key=None, priority=None, compose_type=None, ssh_key=None, options=None):
+    def provision_guest(self,
+                        environment,  # type: TestingEnvironment
+                        key=None,  # type: Optional[str]
+                        priority=None,  # type: Optional[str]
+                        compose_type=None,  # type: Optional[str]
+                        ssh_key=None,  # type: Optional[str]
+                        options=None  # type: Optional[List[str]]
+                       ):  # noqa
+        # type: (...) -> ArtemisGuest
         '''
         Provision Artemis guest by submitting a request to Artemis API.
 
@@ -456,15 +497,16 @@ class ArtemisProvisioner(gluetool.Module):
 
         return guest
 
-    def provision(self, environment, **kwargs):
+    def provision(self, environment, provision_count=1, **kwargs):
+        # type: (TestingEnvironment, int, Any) -> List[ArtemisGuest]
         '''
         Provision Artemis guest(s).
 
         :param tuple environment: description of the environment caller wants to provision.
             Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
 
-        :rtype: ArtemisGuest
-        :returns: ArtemisGuest instance or ``None`` if it wasn't possible to grab the guest.
+        :rtype: list
+        :returns: List of ArtemisGuest instances or ``None`` if it wasn't possible to grab the guests.
         '''
 
         key = self.option('key')
@@ -472,9 +514,8 @@ class ArtemisProvisioner(gluetool.Module):
         priority = self.option('priority-group')
         options = normalize_multistring_option(self.option('ssh-options'))
         compose_type = kwargs.pop('compose_type', None)
-        provision_count = self.option('provision') or 1
 
-        for _ in xrange(0, provision_count):
+        for _ in range(provision_count):
             guest = self.provision_guest(environment,
                                          key=key,
                                          priority=priority,
@@ -487,6 +528,7 @@ class ArtemisProvisioner(gluetool.Module):
         return self.guests
 
     def execute(self):
+        # type: () -> None
 
         self.api = ArtemisAPI(self, self.option('api-url'))
         # TODO: print Artemis API version when version endpoint is implemented
@@ -495,6 +537,7 @@ class ArtemisProvisioner(gluetool.Module):
         if not self.option('provision'):
             return
 
+        provision_count = self.option('provision')
         arch = self.option('arch')
         compose_type = None
         compose = None
@@ -515,9 +558,12 @@ class ArtemisProvisioner(gluetool.Module):
         environment = TestingEnvironment(arch=arch,
                                          compose=compose)
 
-        self.provision(environment, compose_type=compose_type)
+        self.provision(environment,
+                       provision_count=provision_count,
+                       compose_type=compose_type)
 
     def destroy(self, failure=None):
+        # type: (Optional[Any]) -> None
         if self.option('keep'):
             return
 
