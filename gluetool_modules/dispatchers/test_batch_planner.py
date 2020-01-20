@@ -1,12 +1,10 @@
 import re
 import shlex
 
-import fmf
-
 import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.log import format_dict, log_dict
-from gluetool.utils import cached_property, load_yaml, PatternMap, render_template
+from gluetool.utils import cached_property, load_yaml, PatternMap
 
 # Type annotations
 from typing import List, Tuple  # Ignore PyUnusedCodeBear
@@ -101,7 +99,7 @@ class TestBatchPlanner(gluetool.Module):
             'help': 'Comma-separated list of methods (default: none).',
             'metavar': 'METHOD',
             'action': 'append',
-            'choices': ['basic-static-config', 'ci.fmf', 'static-config', 'sti', 'sidetag'],
+            'choices': ['basic-static-config', 'tmt', 'static-config', 'sti', 'sidetag'],
             'default': []
         },
         'config': {
@@ -121,14 +119,14 @@ class TestBatchPlanner(gluetool.Module):
             'help': 'Path to a file with ``ARTIFACT_NAMESPACE`` => ``<jenkins_job_name>`` patterns.',
             'metavar': 'FILE'
         },
+        'tmt-job-map': {
+            'help': 'Path to a file with ``ARTIFACT_NAMESPACE`` => ``<jenkins_job_name>`` patterns.',
+            'metavar': 'FILE'
+        },
         'job-result-type': {
             'help': 'List of comma-separated pairs <job>:<result type> (default: none).',
             'action': 'append',
             'default': []
-        },
-        'ci-fmf-dispatch-map': {
-            'help': 'Instructions for dispatching test commands based on their ci.fmf configuration.',
-            'metavar': 'FILE'
         },
         'ignore-methods-map': {
             'help': 'Additional rules for ignoring specific methods.',
@@ -173,13 +171,6 @@ class TestBatchPlanner(gluetool.Module):
         # type: () -> List[str]
 
         return gluetool.utils.normalize_multistring_option(self.option('config'))
-
-    @cached_property
-    def _ci_fmf_dispatch_map(self):
-        if not self.option('ci-fmf-dispatch-map'):
-            return []
-
-        return load_yaml(self.option('ci-fmf-dispatch-map'), logger=self.logger)
 
     @cached_property
     def _ignore_methods_map(self):
@@ -641,6 +632,10 @@ class TestBatchPlanner(gluetool.Module):
     def sti_job_map(self):
         return PatternMap(self.option('sti-job-map'), logger=self.logger)
 
+    @cached_property
+    def tmt_job_map(self):
+        return PatternMap(self.option('tmt-job-map'), logger=self.logger)
+
     def _plan_by_sti(self):
         self.require_shared('dist_git_repository')
 
@@ -662,7 +657,7 @@ class TestBatchPlanner(gluetool.Module):
 
         return []
 
-    def _plan_by_ci_fmf(self):
+    def _plan_by_tmt(self):
         # type: () -> List[Tuple[str, List[str]]]
 
         self.require_shared('dist_git_repository')
@@ -673,66 +668,15 @@ class TestBatchPlanner(gluetool.Module):
             return []
 
         task = self.shared('primary_task')
+        job_name = self.tmt_job_map.match(task.ARTIFACT_NAMESPACE)
 
-        repo_path = distgit_repo.clone(logger=self.logger)
-
-        ci_config = fmf.Tree(repo_path)
-        ci_config_section = ci_config.find('/ci/test/{}'.format(task.ARTIFACT_NAMESPACE))
-
-        commands = []
-
-        for _, testset in ci_config_section.children.iteritems():
-            discover_config = testset.get('discover')
-            execute_config = testset.get('execute')
-            report_config = testset.get('report')
-
-            if not discover_config or not execute_config:
-                continue
-
-            dispatch_command = {
-                'options': {
-                    '--artifact-id': task.dispatch_id
-                }
-            }
-
-            def _dispatch_module(instruction, command, argument, context):
-                dispatch_command['dispatch-module'] = argument
-
-            def _add_options(instruction, command, argument, context):
-                dispatch_command['options'].update({
-                    '--{}'.format(detail): render_template(value, **context) for detail, value in argument.iteritems()
-                })
-
-            context = gluetool.utils.dict_update(
-                self.shared('eval_context'),
-                {
-                    'DISCOVER': discover_config,
-                    'EXECUTE': execute_config,
-                    'REPORT': report_config
-                }
-            )
-
-            self.shared('evaluate_instructions', self._ci_fmf_dispatch_map, {
-                'dispatch-module': _dispatch_module,
-                'add-options': _add_options
-            }, context=context)
-
-            if 'dispatch-module' not in dispatch_command:
-                self.warn(
-                    'Cannot handle {}/{}'.format(discover_config.get('how', None), execute_config.get('how', None))
-                )
-
-                continue
-
-            commands.append((
-                dispatch_command['dispatch-module'],
-                sum([
-                    ['{}={}'.format(option_name, option_value)]
-                    for option_name, option_value in dispatch_command['options'].iteritems()
-                ], [])
-            ))
-
-        return commands
+        return [(
+            'openstack-job',
+            [
+                '--artifact-id={}'.format(task.dispatch_id),
+                '--job-name', job_name
+            ]
+        )]
 
     def _get_ignored_methods(self):
         ignored_methods = []
@@ -818,7 +762,7 @@ class TestBatchPlanner(gluetool.Module):
     def sanity(self):
         self._planners = {
             'basic-static-config': self._plan_by_basic_static_config,
-            'ci.fmf': self._plan_by_ci_fmf,
+            'tmt': self._plan_by_tmt,
             'sidetag': self._plan_by_sidetag,
             'static-config': self._plan_by_static_config,
             'sti': self._plan_by_sti
@@ -853,4 +797,9 @@ class TestBatchPlanner(gluetool.Module):
             if method == 'sti' and not self.option('sti-job-map'):
                 raise gluetool.utils.IncompatibleOptionsError(
                     "--sti-job-map option is required with method 'sti'"
+                )
+
+            if method == 'tmt' and not self.option('tmt-job-map'):
+                raise gluetool.utils.IncompatibleOptionsError(
+                    "--tmt-job-map option is required with method 'tmt'"
                 )
