@@ -56,6 +56,7 @@ INSTALL_REQUIRES = [
     "requests-kerberos==0.11.0",
     "requests==2.19.1",
     "requestsexceptions==1.2.0",
+    "rpm-py-installer==0.7.1",
     "six==1.12.0",
     "stomp.py==4.1.17",
     "urlgrabber==3.10.2",
