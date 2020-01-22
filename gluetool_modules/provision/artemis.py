@@ -4,7 +4,7 @@ import gluetool
 from gluetool import GlueError, SoftGlueError
 from gluetool.log import log_dict
 from gluetool.result import Result
-from gluetool.utils import treat_url, normalize_multistring_option
+from gluetool.utils import treat_url, normalize_multistring_option, wait
 from libci.guest import NetworkedGuest
 
 from gluetool_modules.libs.testing_environment import TestingEnvironment
@@ -16,6 +16,8 @@ DEFAULT_READY_TIMEOUT = 300
 DEFAULT_READY_TICK = 3
 DEFAULT_ACTIVATION_TIMEOUT = 240
 DEFAULT_ACTIVATION_TICK = 5
+DEFAULT_API_CALL_TIMEOUT = 60
+DEFAULT_API_CALL_TICK = 1
 DEFAULT_ECHO_TIMEOUT = 240
 DEFAULT_ECHO_TICK = 10
 DEFAULT_BOOT_TIMEOUT = 240
@@ -70,12 +72,40 @@ class ArtemisAPIError(SoftGlueError):
 class ArtemisAPI(object):
     ''' Class that allows RESTful communication with Artemis API '''
 
-    def __init__(self, module, api_url):
-        # type: (gluetool.Module, str) -> None
+    def __init__(self, module, api_url, timeout, tick):
+        # type: (gluetool.Module, str, int, int) -> None
 
         self.module = module
         self.url = treat_url(api_url)
+        self.timeout = timeout
+        self.tick = tick
         self.check_if_artemis()
+
+    def api_call(self, endpoint, method='GET', expected_status_code=200, data=None):
+        # type: (str, str, int, Optional[Dict[str, Any]]) -> Any
+
+        def _api_call():
+            # type: () -> Result[Any, str]
+
+            with gluetool.utils.requests() as request:
+                _request = getattr(request, method.lower(), None)
+                if _request is None:
+                    return Result.Error('Unknown HTTP method {}'.format(method))
+
+                response = _request('{}{}'.format(self.url, endpoint), json=data)
+
+            if response.status_code == expected_status_code:
+                return Result.Ok(response)
+
+            return Result.Error('Artemis API error: {}'.format(ArtemisAPIError(response)))
+
+        try:
+            response = wait('api_call', _api_call, timeout=self.timeout, tick=self.tick)
+
+        except GlueError as exc:
+            raise GlueError('Artemis API call failed: {}'.format(exc))
+
+        return response
 
     def check_if_artemis(self):
         # type: () -> None
@@ -90,13 +120,9 @@ class ArtemisAPI(object):
             err = ArtemisAPIError(response, error=err_msg)
             return err
 
-        with gluetool.utils.requests() as request:
-            response = request.get('{}guests/'.format(self.url))
+        response = self.api_call('guests/')
 
-        try:
-            if response.status_code != 200 or not isinstance(response.json(), list):
-                raise Exception
-        except Exception:
+        if not isinstance(response.json(), list):
             raise error(response)
 
     def create_guest(self, environment, keyname=None, priority=None, compose_type=None):
@@ -155,13 +181,7 @@ class ArtemisAPI(object):
                 }
             }
 
-        with gluetool.utils.requests() as request:
-            response = request.post('{}guests/'.format(self.url), json=data)
-
-        if response.status_code == 201:
-            return response.json()
-
-        raise ArtemisAPIError(response)
+        return self.api_call('guests/', method='POST', expected_status_code=201, data=data).json()
 
     def inspect_guest(self, guest_id):
         # type: (str) -> Any
@@ -175,13 +195,7 @@ class ArtemisAPI(object):
         :returns: Artemis API response serialized as dictionary or ``None`` in case of failure.
         '''
 
-        with gluetool.utils.requests() as request:
-            response = request.get('{}guests/{}'.format(self.url, guest_id))
-
-        if response.status_code == 200:
-            return response.json()
-
-        raise ArtemisAPIError(response)
+        return self.api_call('guests/{}'.format(guest_id)).json()
 
     def cancel_guest(self, guest_id):
         # type: (str) -> Any
@@ -195,13 +209,7 @@ class ArtemisAPI(object):
         :returns: Artemis API response serialized as dictionary or ``None`` in case of failure.
         '''
 
-        with gluetool.utils.requests() as request:
-            response = request.delete('{}guests/{}'.format(self.url, guest_id))
-
-        if response.status_code == 200:
-            return response.json()
-
-        raise ArtemisAPIError(response)
+        return self.api_call('guests/{}'.format(guest_id), expected_status_code=200).json()
 
 
 class ArtemisGuest(NetworkedGuest):
@@ -251,9 +259,7 @@ class ArtemisGuest(NetworkedGuest):
         except Exception as e:
             self.warn('Exception raised: {}'.format(e))
 
-        return Result.Error("Couldn't get address for guest {} (state={}, address={})".format(self.artemis_id,
-                                                                                              guest_state,
-                                                                                              guest_address))
+        return Result.Error("Couldn't get address for guest {}".format(self.artemis_id))
 
     def _wait_ready(self, timeout, tick):
         # type: (int, int)-> None
@@ -380,6 +386,18 @@ class ArtemisProvisioner(gluetool.Module):
                 'type': int,
                 'default': DEFAULT_ACTIVATION_TICK
             },
+            'api-call-timeout': {
+                'help': 'Timeout for Artemis API calls (default: %(default)s)',
+                'metavar': 'API_CALL_TIMEOUT',
+                'type': int,
+                'default': DEFAULT_API_CALL_TIMEOUT
+            },
+            'api-call-tick': {
+                'help': 'Check every API_CALL_TICK seconds for Artemis API response (default: %(default)s)',
+                'metavar': 'API_CALL_TICK',
+                'type': int,
+                'default': DEFAULT_API_CALL_TICK
+            },
             'echo-timeout': {
                 'help': 'Timeout for guest echo (default: %(default)s)',
                 'metavar': 'ECHO_TIMEOUT',
@@ -483,22 +501,35 @@ class ArtemisProvisioner(gluetool.Module):
                                          priority=priority,
                                          compose_type=compose_type)
 
-        guest = ArtemisGuest(self, response['guestname'], response['address'], environment,
-                             port=response['ssh']['port'], username=response['ssh']['username'],
-                             key=ssh_key, options=options)
+        guestname = response.get('guestname')
+        guest = None
 
-        guest.info('Guest is being provisioned')
-        log_dict(guest.debug, 'Created guest request', response)
+        try:
+            guest = ArtemisGuest(self, guestname, response['address'], environment,
+                                 port=response['ssh']['port'], username=response['ssh']['username'],
+                                 key=ssh_key, options=options)
 
-        guest._wait_ready(timeout=self.option('ready-timeout'), tick=self.option('ready-tick'))
-        response = self.api.inspect_guest(guest.artemis_id)
-        guest.hostname = response['address']
-        guest.info('Guest is ready')
+            guest.info('Guest is being provisioned')
+            log_dict(guest.debug, 'Created guest request', response)
 
-        guest._wait_alive(self.option('activation-timeout'), self.option('activation-tick'),
-                          self.option('echo-timeout'), self.option('echo-tick'),
-                          self.option('boot-timeout'), self.option('boot-tick'))
-        guest.info('Guest has become alive')
+            guest._wait_ready(timeout=self.option('ready-timeout'), tick=self.option('ready-tick'))
+            response = self.api.inspect_guest(guest.artemis_id)
+            guest.hostname = response['address']
+            guest.info('Guest is ready')
+
+            guest._wait_alive(self.option('activation-timeout'), self.option('activation-tick'),
+                              self.option('echo-timeout'), self.option('echo-tick'),
+                              self.option('boot-timeout'), self.option('boot-tick'))
+            guest.info('Guest has become alive')
+
+        except Exception as exc:
+            self.warn("Exception while provisioning guest: {}".format(exc))
+            if not self.option('keep'):
+                if guest:
+                    self.api.cancel_guest(guest.artemis_id)
+                elif guestname:
+                    self.api.cancel_guest(guestname)
+            raise exc
 
         return guest
 
@@ -535,7 +566,11 @@ class ArtemisProvisioner(gluetool.Module):
     def execute(self):
         # type: () -> None
 
-        self.api = ArtemisAPI(self, self.option('api-url'))
+        self.api = ArtemisAPI(self,
+                              self.option('api-url'),
+                              self.option('api-call-timeout'),
+                              self.option('api-call-tick'))
+
         # TODO: print Artemis API version when version endpoint is implemented
         self.info('Using Artemis API {}'.format(self.api.url))
 
