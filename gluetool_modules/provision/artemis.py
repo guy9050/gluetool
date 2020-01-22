@@ -235,6 +235,11 @@ class ArtemisGuest(NetworkedGuest):
     def _check_ip_ready(self):
         # type: () -> Result[bool, str]
 
+        # Initialize these variables - should the exception happen inside inspect_guest, the Error()
+        # would fail because these would be left undefined due to early quit from try branch.
+        guest_state = None
+        guest_address = None
+
         try:
             guest_data = cast(ArtemisProvisioner, self._module).api.inspect_guest(self.artemis_id)
             guest_state = guest_data['state']
