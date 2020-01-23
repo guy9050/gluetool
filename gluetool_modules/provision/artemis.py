@@ -209,7 +209,7 @@ class ArtemisAPI(object):
         :returns: Artemis API response serialized as dictionary or ``None`` in case of failure.
         '''
 
-        return self.api_call('guests/{}'.format(guest_id), expected_status_code=200).json()
+        return self.api_call('guests/{}'.format(guest_id), method='DELETE', expected_status_code=200).json()
 
 
 class ArtemisGuest(NetworkedGuest):
