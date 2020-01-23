@@ -375,7 +375,7 @@ class TestScheduleTMT(Module):
         ]
 
         # run plan via tmt, note that the plan MUST be run in the artifact_dirpath
-        tmt_output = Command(command).run(cwd=schedule_entry.repodir)
+        tmt_output = Command(command).run(cwd=schedule_entry.repodir, inspect=True)
 
         # save the output to log file
         with open(tmt_log_filepath, 'w') as f:
