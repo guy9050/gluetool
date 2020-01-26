@@ -359,6 +359,10 @@ class ArtemisProvisioner(gluetool.Module):
                 'help': 'Desired AWS image',
                 'metavar': 'IMAGE',
                 'type': str
+            },
+            'setup-provisioned': {
+                'help': "Setup guests after provisioning them. See 'guest-setup' module",
+                'action': 'store_true'
             }
         }),
         ('Timeout options', {
@@ -601,6 +605,10 @@ class ArtemisProvisioner(gluetool.Module):
         self.provision(environment,
                        provision_count=provision_count,
                        compose_type=compose_type)
+
+        if self.option('setup-provisioned'):
+            for guest in self.guests:
+                guest.setup()
 
     def destroy(self, failure=None):
         # type: (Optional[Any]) -> None
