@@ -537,8 +537,8 @@ class ArtemisProvisioner(gluetool.Module):
 
         return guest
 
-    def provision(self, environment, provision_count=1, **kwargs):
-        # type: (TestingEnvironment, int, Any) -> List[ArtemisGuest]
+    def provision(self, environment, **kwargs):
+        # type: (TestingEnvironment, Any) -> List[ArtemisGuest]
         '''
         Provision Artemis guest(s).
 
@@ -555,17 +555,17 @@ class ArtemisProvisioner(gluetool.Module):
         options = normalize_multistring_option(self.option('ssh-options'))
         compose_type = kwargs.pop('compose_type', None)
 
-        for _ in range(provision_count):
-            guest = self.provision_guest(environment,
-                                         key=key,
-                                         priority=priority,
-                                         compose_type=compose_type,
-                                         ssh_key=ssh_key,
-                                         options=options)
-            guest.info('Guest provisioned')
-            self.guests.append(guest)
+        guest = self.provision_guest(environment,
+                                     key=key,
+                                     priority=priority,
+                                     compose_type=compose_type,
+                                     ssh_key=ssh_key,
+                                     options=options)
 
-        return self.guests
+        guest.info('Guest provisioned')
+        self.guests.append(guest)
+
+        return [guest]
 
     def execute(self):
         # type: () -> None
@@ -602,9 +602,12 @@ class ArtemisProvisioner(gluetool.Module):
         environment = TestingEnvironment(arch=arch,
                                          compose=compose)
 
-        self.provision(environment,
-                       provision_count=provision_count,
-                       compose_type=compose_type)
+        for num in range(provision_count):
+            self.info("Trying to provision guest #{}".format(num+1))
+            guest = self.provision(environment,
+                                   provision_count=provision_count,
+                                   compose_type=compose_type)[0]
+            guest.info("Provisioned guest #{} ({})".format(num+1, guest))
 
         if self.option('setup-provisioned'):
             for guest in self.guests:
