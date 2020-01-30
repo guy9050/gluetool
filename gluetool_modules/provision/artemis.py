@@ -238,7 +238,7 @@ class ArtemisGuest(NetworkedGuest):
 
     def __str__(self):
         # type: () -> str
-        return 'ArtemisGuest({}, {})'.format(self.artemis_id, self.environment)
+        return 'ArtemisGuest({}, {}@{}, {})'.format(self.artemis_id, self.username, self.hostname, self.environment)
 
     def _check_ip_ready(self):
         # type: () -> Result[bool, str]
@@ -607,7 +607,7 @@ class ArtemisProvisioner(gluetool.Module):
             guest = self.provision(environment,
                                    provision_count=provision_count,
                                    compose_type=compose_type)[0]
-            guest.info("Provisioned guest #{} ({})".format(num+1, guest))
+            guest.info("Provisioned guest #{} {})".format(num+1, guest))
 
         if self.option('setup-provisioned'):
             for guest in self.guests:
