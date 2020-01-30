@@ -45,6 +45,7 @@ from gluetool.utils import cached_property, normalize_bool_option, normalize_mul
 from libci.guest import NetworkedGuest
 
 import gluetool_modules.libs
+from gluetool_modules.libs import strptime
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 
 
@@ -677,7 +678,7 @@ class BeakerProvisioner(gluetool.Module):
 
         else:
             try:
-                use_by = datetime.datetime.strptime(use_by, '%Y-%m-%d %H:%M:%S.%f')
+                use_by = strptime(use_by, '%Y-%m-%d %H:%M:%S.%f')
 
             except TypeError:
                 self.warn('Guest {} has malformed use-by value, {}'.format(fqdn, use_by), sentry=True)

@@ -1,4 +1,3 @@
-import datetime
 import logging
 import pytest
 
@@ -7,6 +6,8 @@ from mock import MagicMock
 import gluetool
 import gluetool_modules.helpers.pipeline_state_reporter
 import gluetool_modules.helpers.rules_engine
+from gluetool_modules.libs import strptime
+
 from . import create_module, patch_shared
 
 CI = {
@@ -275,7 +276,7 @@ def test_execute(ci_info, evaluate, monkeypatch, module, mock_namespace, publish
     }
 
     # check if generated_at has expected format, will traceback if not
-    datetime.datetime.strptime(generated_at, "%Y-%m-%d %H:%M:%S.%f")
+    strptime(generated_at, "%Y-%m-%d %H:%M:%S.%f")
 
 
 def test_destroy_sysexit(module):

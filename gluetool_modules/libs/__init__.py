@@ -1,5 +1,9 @@
+import datetime
 import os.path
+import threading
 import traceback
+
+from typing import Any
 
 
 class _UniqObject(object):
@@ -48,3 +52,25 @@ def is_recursion(filepath, function_name):
         (f[2] == function_name and os.path.splitext(f[0])[0] == file_split)
         for f in traceback.extract_stack()[0:-2]
     ])
+
+
+_strptime_lock = threading.Lock()
+
+
+def strptime(*args, **kwargs):
+    # type: (*Any, **Any) -> Any
+    """
+    ``datetime.datetime.strptime`` in Python 2.7 is slightly broken when it comes to multithreading.
+    See [1] and [2] for details. It will not be fixed, since it's limited to Python 2 only, and it appears
+    only when multiple threads call this library function, so, this is an attempt of a thread-safe wrapper
+    that would serialize access to this library function.
+
+    It's really crude: there's a single lock guarding the access to the library function, all calls are serialized.
+    Given that ``strptime`` isn't really critical, we should be able to get away with this single contestion point.
+
+    [1] 'module' object has no attribute '_strptime'
+    [2] https://bugs.python.org/issue7980
+    """
+
+    with _strptime_lock:
+        return datetime.datetime.strptime(*args, **kwargs)

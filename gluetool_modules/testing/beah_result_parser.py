@@ -1,7 +1,7 @@
-import datetime
-
 import gluetool
 from gluetool.log import log_blob
+
+from gluetool_modules.libs import strptime
 
 
 class BeahResultParser(gluetool.Module):
@@ -77,8 +77,8 @@ class BeahResultParser(gluetool.Module):
             starttime = ' '.join(journal.starttime.string.strip().split(' ')[0:-1])
             endtime = ' '.join(journal.endtime.string.strip().split(' ')[0:-1])
 
-            started = datetime.datetime.strptime(starttime, '%Y-%m-%d %H:%M:%S')
-            ended = datetime.datetime.strptime(endtime, '%Y-%m-%d %H:%M:%S')
+            started = strptime(starttime, '%Y-%m-%d %H:%M:%S')
+            ended = strptime(endtime, '%Y-%m-%d %H:%M:%S')
 
             result['bkr_duration'] = int((ended - started).total_seconds())
 

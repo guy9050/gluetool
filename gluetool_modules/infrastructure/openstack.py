@@ -26,6 +26,7 @@ from gluetool.result import Result
 from gluetool.utils import cached_property, normalize_path, load_yaml, dict_update
 from libci.guest import NetworkedGuest
 
+from gluetool_modules.libs import strptime
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 
 
@@ -1344,7 +1345,7 @@ class CIOpenstack(gluetool.Module):
             # the instance floating will be resolved from the instance
             # we have it in the reservation file just for reference
             strtime, instance_id, _ = handle.readline().split()
-            local_timestamp = datetime.strptime(strtime, TIME_FORMAT)
+            local_timestamp = strptime(strtime, TIME_FORMAT)
         except IOError as e:
             raise GlueError('error reading file: {}'.format(e))
         except ValueError as e:
@@ -1372,7 +1373,7 @@ class CIOpenstack(gluetool.Module):
         try:
             strtime = guest.execute("cat {}".format(DEFAULT_REMOTE_RESERVE_FILE)).stdout.rstrip()
             self.debug("read timestamp '{}' from remote file '{}'".format(strtime, DEFAULT_REMOTE_RESERVE_FILE))
-            guest_timestamp = datetime.strptime(strtime, TIME_FORMAT)
+            guest_timestamp = strptime(strtime, TIME_FORMAT)
         except GlueCommandError as exc:
             # remove the guest if the file is gone
             if 'No such file' in exc.output.stderr:
