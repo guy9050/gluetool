@@ -47,7 +47,8 @@ class ComposeUrl(gluetool.Module):
 
         return render_template(name_regex_template, logger=self.logger, **self.shared('eval_context'))
 
-    def get_compose_url(self):
+    @cached_property
+    def compose_url(self):
         """
         Generates compose url from primary_task object.
 
@@ -106,3 +107,6 @@ class ComposeUrl(gluetool.Module):
         self.info('OSCI compose found: {}'.format(compose_url))
 
         return compose_url
+
+    def get_compose_url(self):
+        return self.compose_url
