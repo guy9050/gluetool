@@ -75,7 +75,7 @@ def test_invalid_response(module, monkeypatch):
 
     (_, module) = prepare_test(module, monkeypatch, 'invalid-response')
 
-    with pytest.raises(gluetool.GlueError, match=r'Post.*returned 500'):
+    with pytest.raises(gluetool.GlueError, match=r'post.*returned 500'):
         module.ancestors('dummy')
 
 

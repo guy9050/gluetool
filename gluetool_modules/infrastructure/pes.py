@@ -34,24 +34,33 @@ class PESApi(LoggerMixin, object):
         self.api_url = module.option('api-url')  # type: str
         self.module = module  # type: gluetool.Module
 
-    def _post_payload(self, location, payload):
-        # type: (str, Dict[str, Any]) -> orig_requests.Response
+    def _request_with_payload(self, method, location, payload):
+        # type: (str, str, Dict[str, Any]) -> orig_requests.Response
         url = urljoin(self.api_url, location)
 
         self.debug('[PES API]: {}'.format(url))
 
-        def _post_response():
+        def _request_response():
             # type: () -> Result[orig_requests.Response, Exception]
             try:
                 with requests() as req:
-                    response = req.post(url, json=payload, verify=False)
+                    if method == 'post':
+                        response = req.post(url, json=payload, verify=False)
+                    elif method == 'get':
+                        response = req.get(url, params=payload, verify=False)
+                    else:
+                        raise gluetool.GlueError("Unsupported method '{}'".format(method))
 
                 # 404 is expected if no events were found for a component
                 if response.status_code not in [200, 404]:
-                    raise gluetool.GlueError("Post '{}' to '{}' returned {}: {}".format(payload,
-                                                                                        url,
-                                                                                        response.status_code,
-                                                                                        response.content))
+                    raise gluetool.GlueError(
+                        "{} with payload '{}' to '{}' returned {}: {}".format(
+                            method,
+                            payload,
+                            url,
+                            response.status_code,
+                            response.content)
+                    )
 
                 # show nice parsed output
                 try:
@@ -59,7 +68,7 @@ class PESApi(LoggerMixin, object):
                              "[PES API] returned '{}' and following output".format(response.status_code),
                              response.json())
 
-                # in case json decoding fails for the reponse, something is really wrong (e.g. wrong api-url)
+                # in case json decoding fails for the response, something is really wrong (e.g. wrong api-url)
                 except simplejson.errors.JSONDecodeError:
                     raise gluetool.GlueError("Pes returned unexpected non-json output, needs investigation")
 
@@ -70,24 +79,24 @@ class PESApi(LoggerMixin, object):
 
             return Result.Error('unknown error')
 
-        # Wait until we get a valid response. For 200 or 404, we get valid result, for anything else _post_payload
+        # Wait until we get a valid response. For 200 or 404, we get valid result, for anything else _request_response
         # returns invalid result, forcing another attempt.
-        return gluetool.utils.wait('getting post response from {}'.format(url),
-                                   _post_response,
+        return gluetool.utils.wait('getting {} response from {}'.format(method, url),
+                                   _request_response,
                                    timeout=self.module.option('retry-timeout'),
                                    tick=self.module.option('retry-tick'))
 
     def get_ancestors(self, package):
         # type: (str) -> List[str]
         """
-        Get ancestors of the given package by querying Package Evolution Service. This can used
+        Get ancestors of the given package by querying Package Evolution Service. This can be used
         for testing upgrades from the ancestor package(s) to the given package.
 
         :returns: List of ancestors of the package.
         """
 
         # Note: srpm-events endpoint MUST end with /
-        response = self._post_payload('srpm-events/', {'name': package})
+        response = self._request_with_payload('post', 'srpm-events/', {'name': package})
 
         # When no entries are found empty list is returned.
         # We can assume package has not changed between releases, but rather no guessing in this step.
@@ -108,6 +117,29 @@ class PESApi(LoggerMixin, object):
 
         # remove duplicate ancestors and sort them, so their list is predictable
         return sorted(list(set(ancestors)))
+
+    def get_successors(self, package, initial_release, release):
+        # type: (str, str, str) -> List[str]
+        """
+        Get successors of the given package by querying Package Evolution Service. This can be used
+        for testing upgrades from given package to the the successor package(s).
+
+        :returns: List of ancestors of the package.
+        """
+
+        payload = {'srpm': package, 'initial_release': initial_release, 'release': release}
+        response = self._request_with_payload('get', 'successors/', payload)
+
+        # When no entries are found empty list is returned.
+        # We can assume package has not changed between releases, but rather no guessing in this step.
+        # Consumers of this function can guess the ancestor, or try to find them some other way.
+        if response.status_code == 404:
+            return []
+
+        successors = response.json().keys()
+
+        # remove duplicate ancestors and sort them, so their list is predictable
+        return sorted(list(set(successors)))
 
 
 class PES(gluetool.Module):
@@ -147,7 +179,7 @@ class PES(gluetool.Module):
 
     required_options = ('api-url',)
 
-    shared_functions = ['ancestors', 'pes_api']
+    shared_functions = ['ancestors', 'successors', 'pes_api']
 
     def __init__(self, *args, **kwargs):
         # type: (Any, Any) -> None
@@ -173,15 +205,32 @@ class PES(gluetool.Module):
         """
         Returns list of package ancestors from a previous major release.
 
-        Note that this currently expects PES only holds ancestors for on previous major release.
+        Note that this currently expects PES only holds ancestors for a previous major release.
 
         :param str package: Package to find ancestors for.
         """
-        ancestors = self._pes_api.get_ancestors(package)
+        ancestors = cast(List[str], self._pes_api.get_ancestors(package))
 
         self.info("Ancestors of '{}': {}".format(package, ', '.join(ancestors)))
 
-        return cast(List[str], ancestors)
+        return ancestors
+
+    def successors(self, package, initial_release, release):
+        # type: (str, str, str) -> List[str]
+        """
+        Returns list of package successors from a next major release.
+
+        Note that this currently expects PES only holds successors for a next major release.
+
+        :param str package: Package to find successors for.
+        :param str initial_release: Version of source system in a RHEL-X.Y format.
+        :param str release: Version of targeted system in a RHEL-X.Y format.
+        """
+        successors = cast(List[str], self._pes_api.get_successors(package, initial_release, release))
+
+        self.info("Successors ({}) of '{}' ({}): {}".format(initial_release, package, release, ', '.join(successors)))
+
+        return successors
 
     def execute(self):
         # type: () -> None
