@@ -419,6 +419,30 @@ class KojiTask(LoggerMixin, object):
 
         return '<no build target available>'
 
+    def previous_tag(self, tag=None):
+        """
+        Return previous tag according to the inheritance tag hierarchy to the current build target.
+        If tag specified, use it instead of build target.
+
+        :param str tag: Tag to use for checking. By default build target.
+        :rtype: str
+        :returns: Previous tag if found, None otherwise.
+        :raises gluetool.glue.GlueError: In case previous tag search cannot be performed.
+        """
+
+        tag = tag or self.target
+
+        # blow up loudly if requested to get previous tag with a not existing build target
+        if tag == '<no build target available>':
+            raise GlueError('Cannot check for previous tag as build target does not exist')
+
+        try:
+            previous_tag = self._call_api('getFullInheritance', tag)[0]['name']
+        except (KeyError, IndexError):
+            return None
+
+        return previous_tag
+
     @cached_property
     def source(self):
         """
