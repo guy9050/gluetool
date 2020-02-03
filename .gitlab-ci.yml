@@ -13,7 +13,7 @@ variables:
 
 
 # Use our custom image. See https://gitlab.cee.redhat.com/baseos-qe/ansible-baseos-ci/tree/master/gitlab-cicd
-image: "docker-registry.engineering.redhat.com/baseos-ci/baseosci-gitlab-cicd-centos7"
+image: "docker-registry.upshift.redhat.com/testing-farm/baseosci-gitlab-cicd-centos7"
 
 #
 # TEST steps
