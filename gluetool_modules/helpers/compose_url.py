@@ -9,22 +9,33 @@ from gluetool.log import log_dict
 
 class ComposeUrl(gluetool.Module):
     """
-    Provides a shared function get_compose_url.
-    """
-    name = 'osci-compose-url'
-    description = 'Single-purpose module to create URLs for OSCI composes.'
+    Provides compose url. Source of the url could be:
+        * Static compose url obtained from `static-compose-url` option
+        * OSCI compose url deduced from `primary-task`
 
-    options = {
-        'hostname': {
-            'help': 'address of server, where OSCI composes are stored, inlcuding protocol, eg http://'
-        },
-        'directory-path-template': {
-            'help': 'template for compose directory path'
-        },
-        'name-regex-template': {
-            'help': 'template for regex for compose directory name matching'
-        }
-    }
+    Note: Static compose url has higher priority
+    """
+    name = 'compose-url'
+    description = 'Provides compose url.'
+
+    options = [
+        ('OSCI compose options', {
+            'hostname': {
+                'help': 'address of server, where OSCI composes are stored, including protocol, eg http://'
+            },
+            'directory-path-template': {
+                'help': 'template for compose directory path'
+            },
+            'name-regex-template': {
+                'help': 'template for regex for compose directory name matching'
+            }
+        }),
+        ('Static compose options', {
+            'static-compose-url': {
+                'help': 'Url of compose, which will be provided to rest of pipeline'
+            }
+        })
+    ]
 
     required_options = ('hostname',)
     shared_functions = ['get_compose_url']
@@ -48,7 +59,7 @@ class ComposeUrl(gluetool.Module):
         return render_template(name_regex_template, logger=self.logger, **self.shared('eval_context'))
 
     @cached_property
-    def compose_url(self):
+    def osci_compose_url(self):
         """
         Generates compose url from primary_task object.
 
@@ -109,4 +120,10 @@ class ComposeUrl(gluetool.Module):
         return compose_url
 
     def get_compose_url(self):
-        return self.compose_url
+        static_compose_url = self.option('static-compose-url')
+
+        if static_compose_url:
+            self.info('Using static compose url: {}'.format(static_compose_url))
+            return static_compose_url
+
+        return self.osci_compose_url
