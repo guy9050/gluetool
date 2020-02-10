@@ -1,9 +1,12 @@
+import sys
+import six
 import re
 from libci.results import TestResult, publish_result
 import gluetool
 from gluetool.utils import Command, normalize_multistring_option
 import gluetool_modules.libs
 from gluetool_modules.libs.brew_build_fail import run_command
+from gluetool.log import log_blob
 
 
 class BrewBuildTestResult(TestResult):
@@ -54,7 +57,11 @@ class BrewBuilder(gluetool.Module):
         if arches:
             command += ['--arches', ' '.join(arches)]
 
-        output = Command(command).run()
+        try:
+            output = Command(command).run()
+        except gluetool.glue.GlueCommandError as error:
+            log_blob(self.error, "command '{}' failed with following error".format(command), error.output.stderr)
+            six.reraise(*sys.exc_info())
 
         # detect brew task id
         match = re.search(r'^Created task: (\d+)$', output.stdout, re.M)
