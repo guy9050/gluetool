@@ -521,6 +521,12 @@ class PipelineStateReporter(gluetool.Module):
         if failure is not None and isinstance(failure.exc_info[1], SystemExit):
             return
 
+        # if evaluate_instructions failed, it means we failed super early, just bail out silently
+        # and let the user get the real error
+        if not self.has_shared('evaluate_instructions'):
+            self.warn('Skipping reporting as the pipeline failed too early')
+            return
+
         self.info('reporting pipeline final state')
 
         test_results = self.shared('results')
