@@ -47,6 +47,7 @@ BOOT_TICK = 10
 DEFAULT_START_AFTER_SNAPSHOT_ATTEMPTS = 3
 DEFAULT_RESTORE_SNAPSHOT_ATTEMPTS = 3
 DEFAULT_SHUTDOWN_TIMEOUT = 60
+DEFAULT_DELETE_TIMEOUT = 60
 
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
@@ -479,11 +480,13 @@ class OpenstackGuest(NetworkedGuest):
             self.debug('deleting...')
 
             self._call_api('instance.delete', self._os_instance.delete)
-
-            self.debug('deleted')
+            self._wait_deleted()
 
         except NotFound:
             self.warn('Instance already deleted', sentry=True)
+
+        else:
+            self.debug('deleted')
 
         finally:
             self._os_instance = None
@@ -556,6 +559,14 @@ class OpenstackGuest(NetworkedGuest):
         self._wait_for_resource_status('instance reports ACTIVE', 'servers', self._os_instance.id, u'ACTIVE',
                                        timeout=self._module.option('activation-timeout'), tick=1)
 
+    def _wait_deleted(self):
+        """
+        Wait till OpenStack reports the instance is ``DELETED``.
+        """
+
+        self._wait_for_resource_deleted('instance is DELETED', 'servers', self._os_instance.id,
+                                        timeout=self._module.option('delete-timeout'), tick=1)
+
     def _wait_shutoff(self):
         """
         Wait till OpenStack reports the instance is ``SHUTOFF``.
@@ -585,12 +596,35 @@ class OpenstackGuest(NetworkedGuest):
 
         return self._get_resource_status(resource, rid) == status
 
+    def _check_resource_deleted(self, resource, rid):
+        """
+        Check whether the resource with given ID is already deleted.
+
+        param: str resource: Resource type (``images``, ``servers``, etc.)
+        param: unicode rid: ID of the resource to check.
+        """
+
+        try:
+            self._get_resource_status(resource, rid)
+            return False
+        except Exception:
+            return True
+
     def _wait_for_resource_status(self, label, resource, rid, status, timeout, tick):
         def _check():
             if self._check_resource_status(resource, rid, status):
                 return Result.Ok(True)
 
             return Result.Error('resource {} {} not in state {}'.format(resource, rid, status))
+
+        self.wait(label, _check, timeout=timeout, tick=tick)
+
+    def _wait_for_resource_deleted(self, label, resource, rid, timeout, tick):
+        def _check():
+            if self._check_resource_deleted(resource, rid):
+                return Result.Ok(True)
+            else:
+                return Result.Error('resource {} {} not deleted yet'.format(resource, rid))
 
         self.wait(label, _check, timeout=timeout, tick=tick)
 
@@ -1157,6 +1191,12 @@ class CIOpenstack(gluetool.Module):
                 'help': 'Wait SECONDS for a guest to finish its shutdown process (default: %(default)s)',
                 'type': int,
                 'default': DEFAULT_SHUTDOWN_TIMEOUT,
+                'metavar': 'SECONDS'
+            },
+            'delete-timeout': {
+                'help': 'Wait SECONDS for a guest to be deleted (default: %(default)s)',
+                'type': int,
+                'default': DEFAULT_DELETE_TIMEOUT,
                 'metavar': 'SECONDS'
             }
         }),
