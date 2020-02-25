@@ -170,6 +170,10 @@ class Notify((gluetool.Module)):
             'error-message-template': {
                 'help': 'Path to a template for errors without custom templates, relative to ``template-root``.',
                 'metavar': 'FILE'
+            },
+            'reservation-template': {
+                'help': 'Path to a template for machine reservations, relative to ``template-root``.',
+                'metavar': 'FILE'
             }
         })
     )
@@ -177,7 +181,8 @@ class Notify((gluetool.Module)):
     required_options = ('email-map',
                         'template-root',
                         'subject-template', 'body-footer-template', 'body-header-template',
-                        'custom-error-message-template', 'error-message-template')
+                        'custom-error-message-template', 'error-message-template',
+                        'reservation-template')
 
     _formatters = None
 
@@ -291,7 +296,7 @@ class Notify((gluetool.Module)):
           feature.
 
         :rtype: set
-        :returns: a set with uniqe connectable guests
+        :returns: a set with unique connectable guests
         """
 
         guests = set()
@@ -461,12 +466,21 @@ class Notify((gluetool.Module)):
             body_template = 'error-message-template'
             failure_subject, failure_body = '', ''
 
+        reservation_body = ''
+        if self.option('add-reservation') and self.has_shared('test_schedule'):
+            schedule = self.shared('test_schedule')
+            guests = {entry.guest.hostname for entry in schedule if entry.guest}
+            reservation_body = self.render_template(self.option('reservation-template'), **{
+                'GUESTS': guests
+            })
+
         subject = _render_template(self.option('subject-template'), **{
             'FAILURE_SUBJECT': failure_subject
         })
 
         body = _render_template(self.option(body_template), **{
-            'FAILURE_BODY': failure_body
+            'FAILURE_BODY': failure_body,
+            'RESERVATION': reservation_body
         })
 
         return Message(subject=subject,
