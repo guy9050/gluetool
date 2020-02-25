@@ -6,13 +6,12 @@ import shutil
 import stat
 import tempfile
 
-from argparse import Namespace
-
 import gluetool
 from gluetool.action import Action
-from gluetool.log import log_xml, ContextAdapter
+from gluetool.log import log_xml
 from gluetool.result import Result
 from gluetool.utils import Command
+from gluetool_modules.libs import create_inspect_callback
 
 
 DEFAULT_RESTRAINTD_PORT = 8081
@@ -27,11 +26,6 @@ DEFAULT_RESTRAINTD_START_TIMEOUT_TICK = 10
 #:     as returned by :py:meth:`gluetool.utils.Command.run`.
 #: :ivar str directory: path to a directory with ``restraint`` files.
 RestraintOutput = collections.namedtuple('RestraintOutput', ('execution_output', 'directory'))
-
-
-class StdStreamAdapter(ContextAdapter):
-    def __init__(self, logger, name):
-        super(StdStreamAdapter, self).__init__(logger, {'ctx_stream': (100, name)})
 
 
 class Restraint(gluetool.Module):
@@ -157,39 +151,6 @@ class Restraint(gluetool.Module):
             f.write(job.prettify(encoding='utf-8'))
             f.flush()
 
-            stdout_logger = StdStreamAdapter(guest.logger, 'stdout')
-            stderr_logger = StdStreamAdapter(guest.logger, 'stderr')
-
-            class StreamHandler(Namespace):
-                def write(self):
-                    self.logger(''.join(self.buff))
-                    self.buff = []
-
-            streams = {
-                '<stdout>': StreamHandler(buff=[], logger=stdout_logger.info),
-                '<stderr>': StreamHandler(buff=[], logger=stderr_logger.warn)
-            }
-
-            def output_streamer(stream, data, flush=False):
-                stream_handler = streams[stream.name]
-
-                if flush and stream_handler.buff:
-                    stream_handler.write()
-                    return
-
-                if data is None:
-                    return
-
-                for c in data:
-                    if c == '\n':
-                        stream_handler.write()
-
-                    elif c == '\r':
-                        continue
-
-                    else:
-                        stream_handler.buff.append(c)
-
             try:
                 remote = '1={}@{}'.format(guest.username, self._guest_restraint_address(guest, port))
 
@@ -210,7 +171,10 @@ class Restraint(gluetool.Module):
                         'options': restraint_command.options
                     }
                 ):
-                    output = restraint_command.run(inspect=True, inspect_callback=output_streamer)
+                    output = restraint_command.run(
+                        inspect=True,
+                        inspect_callback=create_inspect_callback(guest.logger)
+                    )
 
             except gluetool.GlueCommandError as exc:
                 output = exc.output

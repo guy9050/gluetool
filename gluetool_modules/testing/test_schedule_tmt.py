@@ -11,6 +11,7 @@ from gluetool.log import Logging, format_blob, log_blob, log_dict
 from gluetool.log import ContextAdapter, LoggingFunctionType  # Ignore PyUnusedCodeBear
 from gluetool.utils import Command, load_yaml, new_xml_element
 
+from gluetool_modules.libs import create_inspect_callback
 from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 from gluetool_modules.libs.test_schedule import TestSchedule, TestScheduleResult
@@ -375,7 +376,11 @@ class TestScheduleTMT(Module):
         ]
 
         # run plan via tmt, note that the plan MUST be run in the artifact_dirpath
-        tmt_output = Command(command).run(cwd=schedule_entry.repodir, inspect=True)
+        tmt_output = Command(command).run(
+            cwd=schedule_entry.repodir,
+            inspect=True,
+            inspect_callback=create_inspect_callback(schedule_entry.logger)
+        )
 
         # save the output to log file
         with open(tmt_log_filepath, 'w') as f:
