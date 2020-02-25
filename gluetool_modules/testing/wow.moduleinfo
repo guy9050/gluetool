@@ -6,11 +6,11 @@ dependencies:
   repo:
     - name: beaker-client
       description: Beaker client repository
-      baseurl: http://download-node-02.eng.bos.redhat.com/beakerrepos/client/RedHatEnterpriseLinux7
+      baseurl: http://download-node-02.eng.bos.redhat.com/beakerrepos/client/Fedora29
       exclude: kobo kobo-rpmlib kobo-client
     - name: beaker-harness
       description: Beaker harness repository
-      baseurl: http://beaker.engineering.redhat.com/harness/RedHatEnterpriseLinux7
+      baseurl: http://beaker.engineering.redhat.com/harness/Fedora29
       exclude: "rhts-* restraint-rhts"
 
     # for qa-tools-workstation
