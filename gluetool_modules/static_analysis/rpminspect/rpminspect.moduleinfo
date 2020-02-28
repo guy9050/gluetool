@@ -5,9 +5,9 @@ description: RPMInspect analysis and comparison
 dependencies:
   repo:
     - name: rpminspect
-      baseurl: https://copr-be.cloud.fedoraproject.org/results/dcantrel/rpminspect/fedora-$releasever-$basearch/
+      baseurl: https://copr-be.cloud.fedoraproject.org/results/dcantrell/rpminspect/fedora-$releasever-$basearch/
       enabled: 1
-      gpgkey: https://copr-be.cloud.fedoraproject.org/results/dcantrel/rpminspect/pubkey.gpg
+      gpgkey: https://copr-be.cloud.fedoraproject.org/results/dcantrell/rpminspect/pubkey.gpg
       gpgcheck: 0
     - name: rpminspect-data-redhat
       baseurl: http://coprbe.devel.redhat.com/results/dcantrel/rpmdiff/fedora-$releasever-$basearch/
