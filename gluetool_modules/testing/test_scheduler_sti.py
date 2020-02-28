@@ -76,7 +76,7 @@ class TestSchedulerSTI(gluetool.Module):
             'action': 'append'
         },
         'playbook-variables': {
-            'help': 'List of comma-separated pairs <variable name>=<variable value> (default: none).',
+            'help': 'List of hash-separated pairs <variable name>=<variable value> (default: none).',
             'metavar': 'KEY=VALUE',
             'action': 'append',
             'default': []
@@ -143,7 +143,9 @@ class TestSchedulerSTI(gluetool.Module):
 
         gluetool.log.log_dict(self.info, 'creating schedule for {} playbooks'.format(len(playbooks)), playbooks)
 
-        playbook_variables = utils.normalize_multistring_option(self.option('playbook-variables'), separator=' ')
+        # Playbook variables are separated by hash. We cannot use comma, because value of the variable
+        # can be list. Also we cannot use space, because space separates module options.
+        playbook_variables = utils.normalize_multistring_option(self.option('playbook-variables'), separator='#')
 
         variables = {}
         context = self.shared('eval_context')
