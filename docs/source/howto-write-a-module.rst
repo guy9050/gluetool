@@ -558,7 +558,7 @@ The basic test which will test loadability of the module consists of a `fixture 
     import pytest # main testing framework
 
     import gluetool_modules.cat_facts_api # importing of a module that will be tested
-    from . import create_module # helper function to easy creating of a module
+    from . import check_loadable, create_module # helper function to easy creating of a module
 
 
     # The fixture provides a created module, the main access to a module for testing.
@@ -569,12 +569,10 @@ The basic test which will test loadability of the module consists of a `fixture 
 
 
     def test_loadable(module):
-        ci = module.glue
-        python_mod = ci._load_python_module('cat_facts_api', # group name
-                                            'pytest_cat_facts_api', # name assigned to the imported module
-                                            'gluetool_modules/cat_facts_api.py') # path to the module
+        check_loadable(module.glue, 'gluetool_modules/cat_facts_api.py', 'CatFactsAPI')
 
-        assert hasattr(python_mod, 'CatFactsApi') # check if module was loaded
+.. warning::
+    If you put your module in a subdirectory in `gluetool_modules` the import will change. For example if you put it into subdirectory `testing` the module import would be `import gluetool_modules.testing.cat_facts_api`
 
 After that, you can call ``tox`` from the ``gluetool-modules`` folder to run all types of tests for all modules. If you want to reduce waiting of the end of testing, you can call ``tox -e py27-unit-tests -- gluetool_modules/tests/test_cat_facts_api.py`` to unit test the module.
 
