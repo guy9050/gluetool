@@ -6,11 +6,11 @@ dependencies:
   repo:
     - name: beaker-client
       description: Beaker client repository
-      baseurl: http://download-node-02.eng.bos.redhat.com/beakerrepos/client/Fedora29
+      baseurl: http://download-node-02.eng.bos.redhat.com/beakerrepos/client/Fedora$releasever
       exclude: kobo kobo-rpmlib kobo-client
     - name: beaker-harness
       description: Beaker harness repository
-      baseurl: http://beaker.engineering.redhat.com/harness/Fedora29
+      baseurl: http://beaker.engineering.redhat.com/harness/Fedora$releasever
       exclude: "rhts-* restraint-rhts"
 
     # for qa-tools-workstation
@@ -29,14 +29,14 @@ dependencies:
     - python-dateutil==2.6.1
 
   ansible_tasks:
-    - name: "Requires: pykickstart because of qa-tools-workstation"
-      lineinfile:
-        dest: "{{ SPECFILE }}"
-        regexp: "^Requires: /usr/lib/python2.7/site-packages/pykickstart"
-        line: "# added by 'beaker' module\nRequires: /usr/lib/python2.7/site-packages/pykickstart\n"
-        state: present
-        insertbefore: "^# TASK: GLOBAL-BEFORE-DESCRIPTION"
-      when: BUILDING_SPECFILE is defined
+#    - name: "Requires: pykickstart because of qa-tools-workstation"
+#      lineinfile:
+#        dest: "{{ SPECFILE }}"
+#        regexp: "^Requires: /usr/lib/python2.7/site-packages/pykickstart"
+#        line: "# added by 'beaker' module\nRequires: /usr/lib/python2.7/site-packages/pykickstart\n"
+#        state: present
+#        insertbefore: "^# TASK: GLOBAL-BEFORE-DESCRIPTION"
+#      when: BUILDING_SPECFILE is defined
 
     - name: "Requires: krb5-devel because of krb5.h"
       lineinfile:

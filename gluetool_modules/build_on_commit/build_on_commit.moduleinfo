@@ -6,7 +6,7 @@ dependencies:
   repo:
     - name: rel-eng
       description: RCMTOOLS repository
-      baseurl: http://download-ipv4.eng.brq.redhat.com/rel-eng/RCMTOOLS/latest-RCMTOOLS-2-RHEL-7/compose/Server/$basearch/os
+      baseurl: http://download-ipv4.eng.brq.redhat.com/rel-eng/RCMTOOLS/latest-RCMTOOLS-2-F-$releasever/compose/Everything/$basearch/os
       exclude: kobo kobo-rpmlib kobo-client
     - name: qa-tools
       description: qa-tools repository

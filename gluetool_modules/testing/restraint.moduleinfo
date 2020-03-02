@@ -6,7 +6,7 @@ dependencies:
   repo:
     - name: beaker-harness
       description: Beaker harness repository
-      baseurl: http://beaker.engineering.redhat.com/harness/Fedora29
+      baseurl: http://beaker.engineering.redhat.com/harness/Fedora$releasever
       exclude: "rhts-* restraint-rhts"
   yum:
     - restraint-client

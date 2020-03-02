@@ -6,7 +6,7 @@ dependencies:
   repo:
     - name: beaker-client
       description: Beaker client repository
-      baseurl: http://download-node-02.eng.bos.redhat.com/beakerrepos/client/Fedora29
+      baseurl: http://download-node-02.eng.bos.redhat.com/beakerrepos/client/Fedora$releasever
       exclude: kobo kobo-rpmlib kobo-client
 
   yum:
