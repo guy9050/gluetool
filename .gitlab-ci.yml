@@ -105,7 +105,7 @@ build-docker-images:
   only:
     - master@baseos-qe/gluetool-modules
   script:
-    - tower-cli workflow_job launch --monitor -W "[BaseOS CI] [build] [docker] Production chain - Fedora 29" | tee tower_output.log
+    - tower-cli workflow_job launch --monitor -W "[BaseOS CI] [build] [docker] Production chain" | tee tower_output.log
     - grep 'failed' tower_output.log && { echo 'At least one of subtasks failed!'; exit 1; } || exit 0
   tags:
     - shared
@@ -115,7 +115,7 @@ build-docker-images-devel:
   only:
     - devel@baseos-qe/gluetool-modules
   script:
-    - tower-cli workflow_job launch --monitor -W "[BaseOS CI] [build] [docker] Devel chain - Fedora 29" | tee tower_output.log
+    - tower-cli workflow_job launch --monitor -W "[BaseOS CI] [build] [docker] Devel chain" | tee tower_output.log
     - grep 'failed' tower_output.log && { echo 'At least one of subtasks failed!'; exit 1; } || exit 0
   tags:
     - shared
