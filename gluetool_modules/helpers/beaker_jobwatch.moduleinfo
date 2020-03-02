@@ -11,4 +11,5 @@ dependencies:
       baseurl: http://liver.brq.redhat.com/repo-testing/
 
   yum:
+    - python2-nitrate
     - qa-tools-workstation

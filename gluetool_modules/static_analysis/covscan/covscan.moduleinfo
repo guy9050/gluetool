@@ -16,6 +16,10 @@ dependencies:
   yum:
     - covscan-client
     - libcurl-devel
+    - python2-kerberos
+    - python2-dateutil
+    - python2-lxml
+    - python2-requests
   pip:
     - urlgrabber==3.10.2
     - requests==2.19.1
