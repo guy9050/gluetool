@@ -10,9 +10,9 @@ dependencies:
       gpgkey: https://copr-be.cloud.fedoraproject.org/results/dcantrell/rpminspect/pubkey.gpg
       gpgcheck: 0
     - name: rpminspect-data-redhat
-      baseurl: http://coprbe.devel.redhat.com/results/dcantrel/rpmdiff/fedora-$releasever-$basearch/
+      baseurl: http://coprbe.devel.redhat.com/results/dcantrell/rpminspect-data-redhat/fedora-$releasever-$basearch/
       enabled: 1
-      gpgkey: http://coprbe.devel.redhat.com/results/dcantrel/rpmdiff/pubkey.gpg
+      gpgkey: http://coprbe.devel.redhat.com/results/dcantrell/rpminspect-data-redhat/pubkey.gpg
       gpgcheck: 0
 
   yum:
