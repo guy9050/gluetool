@@ -14,6 +14,7 @@ from gluetool.action import Action
 from gluetool.log import Logging, LoggerMixin, log_dict
 from gluetool.result import Result
 from gluetool.utils import cached_property, dict_update, wait, normalize_multistring_option, render_template
+from gluetool.utils import IncompatibleOptionsError
 
 
 DEFAULT_COMMIT_FETCH_TIMEOUT = 300
@@ -553,6 +554,45 @@ class KojiTask(LoggerMixin, object):
         latest_released = self.latest_released()
 
         return latest_released.nvr if latest_released else None
+
+    @cached_property
+    def baseline_task(self):
+        """
+        Return baseline task. For documentation of the baseline methods see the module's help.
+
+        :rtype: KojiTask
+        :returns: Initialized task for the baseline build or None if not baseline found.
+        :raises gluetool.glue.GlueError: if specific build does not exist or no baseline-method specified.
+        """
+        method = self._module.option('baseline-method')
+
+        if not method:
+            raise GlueError("Cannot get baseline because no 'baseline-method' specified")
+
+        if method == 'previous-released-build':
+            previous_tag = self.previous_tag()
+            if not previous_tag:
+                return None
+
+            baseline_task = self.latest_released(tags=[previous_tag])
+
+        elif method == 'previous-build':
+            baseline_task = self.latest_released()
+
+        elif method == 'specific-build':
+            nvr = self._module.option('baseline-nvr')
+            task_initializers = self._module._find_task_initializers(nvrs=[nvr])
+            if not task_initializers:
+                raise GlueError("Specific build with nvr '{}' not found".format(nvr))
+            # we know we have just one initializer ...
+            baseline_task = self._module.task_factory(task_initializers[0])
+
+        else:
+            # this really should not happen ...
+            self.warn("Unknown baseline method '{}'".format(method), sentry=True)
+            return None
+
+        return baseline_task
 
     @cached_property
     def branch(self):
@@ -1489,6 +1529,15 @@ class Koji(gluetool.Module):
 
     The task can be specified also by using the ``task`` shared function. The shared function
     supports only initialization from task ID.
+
+    If option ``--baseline-method`` is specified, the module finds a baseline build according
+    to given method and exposes it under ``baseline_task`` attribute of the primary task. The following
+    baseline methods are supported:
+
+    * `previous-build` - finds the previously built package on the same tag
+    * `previous-released-build` - finds the previously released build, i.e. build tagged to the previous
+                                  tag according to the tag inheritance
+    * `specific-build` - finds the build specified with ``--baseline-nvr`` option
     """
 
     name = 'koji'
@@ -1547,6 +1596,16 @@ class Koji(gluetool.Module):
                 'help': 'Wait timeout for task to become non-waiting and closed (default: %(default)s)',
                 'type': int,
                 'default': 60,
+            },
+        }),
+        ('Baseline options', {
+            'baseline-method': {
+                'help': 'Method for choosing the baseline package.',
+                'choices': ['previous-build', 'specific-build', 'previous-released-build'],
+                'metavar': 'METHOD',
+            },
+            'baseline-nvr': {
+                'help': "NVR of the build to use with 'specific-build' baseline method",
             }
         }),
         ('Workarounds', {
@@ -1818,11 +1877,15 @@ class Koji(gluetool.Module):
 
         # name option requires tag
         if self.option('name') and not self.option('tag'):
-            raise GlueError("You need to specify 'tag' with package name")
+            raise IncompatibleOptionsError("You need to specify 'tag' with package name")
 
         # name option requires tag
         if self.option('tag') and not self.option('name'):
-            raise GlueError("You need to specify package name with '--name' option")
+            raise IncompatibleOptionsError("You need to specify package name with '--name' option")
+
+        method = self.option('baseline-method')
+        if method and method == 'specific-build' and not self.option('baseline-nvr'):
+            raise IncompatibleOptionsError("You need to specify build NVR with '--baseline-nvr' option")
 
     def execute(self):
         url = self.option('url')
@@ -1844,6 +1907,10 @@ class Koji(gluetool.Module):
 
         for task in self._tasks:
             self.info('Initialized with {}: {} ({})'.format(task.id, task.full_name, task.url))
+
+            # init baseline build if requested
+            if self.option('baseline-method'):
+                self.info('Baseline build: {} ({})'.format(task.baseline_task.nvr, task.baseline_task.url))
 
 
 class Brew(Koji, (gluetool.Module)):

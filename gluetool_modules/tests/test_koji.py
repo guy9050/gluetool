@@ -328,3 +328,25 @@ def test_invalid_tag_latest(koji_session, koji_module, log):
         levelno=logging.WARN,
         message="ignoring error while listing latest builds tagged to 'f25-candidate': koji error"
     )
+
+
+@pytest.mark.parametrize('koji_session', [
+    (15869828, 'previous-released-build', 'bash-4.2.43-4.fc24'),
+    (15869828, 'previous-build', 'bash-4.3.43-3.fc25'),
+    (15869828, 'specific-build', 'bash-1.1.1-1.fc1'),
+
+], indirect=True)
+def test_baseline(koji_session, koji_module, log):
+    """
+    Test if baseline builds are correctly resolved
+    """
+
+    task_id, method, nvr = koji_session
+
+    koji_module._config['baseline-method'] = method
+    koji_module._config['task-id'] = [task_id]
+    koji_module._config['baseline-nvr'] = nvr
+
+    koji_module.execute()
+
+    assert koji_module._tasks[0].baseline_task.nvr == nvr

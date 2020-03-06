@@ -33,6 +33,31 @@ getTaskInfo:
         - git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde
         - f25-candidate
         - {}
+  15869827:
+      weight: 0.2
+      parent:
+      completion_time: '2016-09-30 08:35:21.640601'
+      start_time: '2016-09-30 08:20:42.560345'
+      start_ts: 1475223642.56034
+      state: 2
+      awaited:
+      label:
+      priority: 20
+      channel_id: 1
+      waiting: false
+      create_time: '2016-09-30 08:20:37.164862'
+      id: 15869827
+      create_ts: 1475223637.16486
+      owner: 3543
+      host_id: 149
+      completion_ts: 1475224521.6406
+      arch: noarch
+      method: build
+      request:
+        - git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbdf
+        - f24-candidate
+        - {}
+
   15736657:
     id: 15736657
     waiting: false
@@ -68,6 +93,30 @@ listBuilds:
       task_id: 15869828
       volume_name: DEFAULT
       release: 4.fc25
+  15869827:
+    - package_name: bash
+      extra:
+      creation_time: '2016-09-30 08:22:42.639802'
+      completion_time: '2016-09-30 08:34:58.935735'
+      package_id: 1088
+      build_id: 805706
+      state: 1
+      source: 'git://pkgs.fedoraproject.org/rpms/bash?#b1104ec130056866f3bdce51a3f77685b702fbde'
+      epoch:
+      version: 4.2.43
+      completion_ts: 1475224498.93573
+      owner_id: 3543
+      owner_name: svashisht
+      nvr: bash-4.2.43-4.fc24
+      start_time: '2016-09-30 08:22:42.639802'
+      creation_event_id: 18507215
+      start_ts: 1475223762.6398
+      volume_id: 0
+      creation_ts: 1475223762.6398
+      name: bash
+      task_id: 15869828
+      volume_name: DEFAULT
+      release: 4.fc24
 
   15736657:
     - package_name: bash
@@ -233,6 +282,10 @@ getUser:
     name: svashisht
     krb_principal:
 
+getFullInheritance:
+  f25-candidate:
+    - name: f24-candidate
+
 listTagged:
   f25:
     - build_id: 805705
@@ -323,6 +376,29 @@ listTagged:
       owner_id: 3543
       id: 774971
       nvr: bash-4.3.43-1.fc25
+  f24-candidate:
+    - build_id: 805704
+      tag_name: f24
+      owner_name: svashisht
+      package_name: bash
+      task_id: 15869827
+      volume_name: DEFAULT
+      start_time: '2016-09-30 08:22:42.639802'
+      creation_event_id: 18507215
+      creation_time: '2016-09-30 08:22:42.639802'
+      epoch:
+      tag_id: 335
+      name: bash
+      completion_time: '2016-09-30 08:34:58.935735'
+      state: 1
+      version: 4.2.43
+      volume_id: 0
+      release: 4.fc25
+      package_id: 1088
+      owner_id: 3543
+      id: 805705
+      nvr: bash-4.2.43-4.fc24
+
 
 getBuild:
   805705:
@@ -375,6 +451,58 @@ getBuild:
     task_id: 15869828
     volume_name: DEFAULT
     release: 4.fc25
+  805701:
+    package_name: bash
+    extra:
+    creation_time: '2016-09-30 08:22:42.639802'
+    completion_time: '2016-09-30 08:34:58.935735'
+    package_id: 1088
+    id: 805701
+    build_id: 805701
+    state: 1
+    source:
+    epoch:
+    version: 1.1.1
+    completion_ts: 1475224498.93573
+    owner_id: 3543
+    owner_name: svashisht
+    nvr: bash-1.1.1-1.fc1
+    start_time: '2016-09-30 08:22:42.639802'
+    creation_event_id: 18507215
+    start_ts: 1475223762.6398
+    volume_id: 0
+    creation_ts: 1475223762.6398
+    name: bash
+    task_id: 15869828
+    volume_name: DEFAULT
+    release: 1.fc1
+  bash-1.1.1-1.fc1:
+    package_name: bash
+    extra:
+    creation_time: '2016-09-30 08:22:42.639802'
+    completion_time: '2016-09-30 08:34:58.935735'
+    package_id: 1088
+    id: 805701
+    build_id: 805701
+    state: 1
+    source:
+    epoch:
+    version: 1.1.1
+    completion_ts: 1475224498.93573
+    owner_id: 3543
+    owner_name: svashisht
+    nvr: bash-1.1.1-1.fc1
+    start_time: '2016-09-30 08:22:42.639802'
+    creation_event_id: 18507215
+    start_ts: 1475223762.6398
+    volume_id: 0
+    creation_ts: 1475223762.6398
+    name: bash
+    task_id: 15869828
+    volume_name: DEFAULT
+    release: 1.fc1
+
+
 
 listBuildRPMs:
   805705:
