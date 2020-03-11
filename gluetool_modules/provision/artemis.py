@@ -1,4 +1,5 @@
 import collections
+import re
 import gluetool
 
 from gluetool import GlueError, SoftGlueError
@@ -286,6 +287,30 @@ class ArtemisGuest(NetworkedGuest):
 
         except GlueError as exc:
             raise GlueError('Guest failed to become alive: {}'.format(exc))
+
+    def setup(self, variables=None, **kwargs):
+        # type: (Optional[Dict[str, Any]], **Any) -> Any
+        """
+        Custom setup for Artemis guests. Add a hostname in case there is none.
+
+        :param dict variables: dictionary with GUEST_HOSTNAME and/or GUEST_DOMAINNAME keys
+        """
+        variables = variables or {}
+
+        # Our playbooks require hostname and domainname.
+        # If not set, create them - some tests may depend on resolvable hostname.
+        if 'GUEST_HOSTNAME' not in variables:
+            assert self.hostname
+            variables['GUEST_HOSTNAME'] = re.sub(r'10\.(\d+)\.(\d+)\.(\d+)', r'host-\1-\2-\3', self.hostname)
+
+        if 'GUEST_DOMAINNAME' not in variables:
+            variables['GUEST_DOMAINNAME'] = 'host.centralci.eng.rdu2.redhat.com'
+
+        if 'IMAGE_NAME' not in variables:
+            assert self.environment
+            variables['IMAGE_NAME'] = self.environment.compose
+
+        return super(ArtemisGuest, self).setup(variables=variables, **kwargs)
 
 
 class ArtemisProvisioner(gluetool.Module):
