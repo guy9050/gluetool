@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 # possible python interpreters
-ANSIBLE_PYTHON_INTERPRETERS = ["/usr/bin/python3", "/usr/bin/python2", "/usr/libexec/platform-python"]
+DEFAULT_ANSIBLE_PYTHON_INTERPRETERS = ["/usr/bin/python3", "/usr/bin/python2", "/usr/libexec/platform-python"]
 
 
 # Default name of log file with Ansible output
@@ -56,6 +56,7 @@ class Ansible(gluetool.Module):
     name = 'ansible'
     description = 'Run an Ansible playbook on a given guest.'
 
+    # pylint: disable=gluetool-option-hard-default
     options = {
         'ansible-playbook-options': {
             'help': "Additional ansible-playbook options, for example '-vvv'. (default: none)",
@@ -65,6 +66,14 @@ class Ansible(gluetool.Module):
         'use-pipelining': {
             'help': 'If set, Ansible pipelining would be enabled for playbooks (default: %(default)s).',
             'default': 'no'
+        },
+        'interpreter-detection-order': {
+            'help': 'Comma-separated Python binaries in the order autodetection should try them (default: {}).'.format(
+                ','.join(DEFAULT_ANSIBLE_PYTHON_INTERPRETERS)
+            ),
+            'metavar': 'PATH,',
+            'default': [],
+            'action': 'append'
         }
     }
 
@@ -90,12 +99,20 @@ class Ansible(gluetool.Module):
         assert guest.hostname is not None
         assert guest.key is not None
 
+        if self.option('interpreter-detection-order'):
+            ansible_python_interpreters = gluetool.utils.normalize_multistring_option(
+                self.option('interpreter-detection-order')
+            )
+
+        else:
+            ansible_python_interpreters = DEFAULT_ANSIBLE_PYTHON_INTERPRETERS
+
         cmd = [
             'ansible',
             '--inventory', '{},'.format(guest.hostname),
             '--private-key', guest.key,
             '--module-name', 'raw',
-            '--args', 'command -v ' + ' '.join(ANSIBLE_PYTHON_INTERPRETERS),
+            '--args', 'command -v ' + ' '.join(ansible_python_interpreters),
             '--ssh-common-args',
             ' '.join(['-o ' + option for option in guest.options]),
             guest.hostname
@@ -117,7 +134,7 @@ class Ansible(gluetool.Module):
             raise gluetool.GlueError('Ansible did not produce usable output')
 
         available_interpreters = [
-            intrp for intrp in ansible_call.stdout.splitlines() if intrp in ANSIBLE_PYTHON_INTERPRETERS
+            intrp for intrp in ansible_call.stdout.splitlines() if intrp in ansible_python_interpreters
         ]
 
         log_dict(guest.debug, 'available interpreters', available_interpreters)
