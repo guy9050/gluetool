@@ -1,6 +1,7 @@
 import collections
 import logging
 
+import git
 import pytest
 
 from mock import MagicMock
@@ -8,7 +9,7 @@ from mock import MagicMock
 import gluetool
 import gluetool_modules.infrastructure.distgit
 from gluetool_modules.infrastructure.distgit import DistGitRepository
-from . import assert_shared, create_module, patch_shared
+from . import assert_shared, create_module, patch_shared, testing_asset
 
 Response = collections.namedtuple('Response', ['status_code', 'content', 'text'])
 
@@ -21,6 +22,49 @@ def fixture_module():
 @pytest.fixture(name='dummy_repository')
 def fixture_dummy_repository(module):
     return DistGitRepository(module, 'some-package', clone_url='some-clone-url', web_url='some-web-url', branch='some-branch')
+
+
+@pytest.fixture(name='git_log', params=[
+    ('systemd', {
+        '1777110', '1702565'
+    }),
+    ('selinux-policy',  {
+        '1782925', '1782925', '1779098', '1791557', '1790795', '1787298', '1778126', '1777761', '1777042'
+    })
+])
+def fixture_git_log(request, module, monkeypatch, dummy_repository):
+    with open(testing_asset('distgit', request.param[0]), 'r') as logfile:
+        log = logfile.read()
+
+    # could not use MagicMock because `log_blob` checks if log returns a string and we are using MagicMock
+    class gitMock:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def log(self, *args, **kwargs):
+            return log
+
+    monkeypatch.setattr(git, 'Git', gitMock)
+
+    # we set the expected bugs to an instance variable, so we can consume it in the test
+    module._expected_bugs = request.param[1]
+
+    # set the required regex options for searching for dist-git bugs
+    module._config['regex-resolves'] = '^\s*-?\s*Resolves?:'
+    module._config['regex-bugzilla'] = '(?:(?:bug|bz|rhbz)\s*#?|#)\s*(\d+)'
+
+    # required for sanity only, not used in tests really ...
+    module._config['branch'] = 'some-branch'
+    module._config['clone-url'] = 'some-clone-url'
+    module._config['web-url'] = 'some-web-url'
+
+    # initialize repository from path
+    dummy_repository.initialize_from_path('fake/path')
+
+    # sanity is required to run (it compiles regexes)
+    module.sanity()
+
+    return request.param
 
 
 def test_sanity_shared(module):
@@ -199,3 +243,36 @@ def test_no_gating_recipients(module, dummy_repository, monkeypatch):
     monkeypatch.setattr(MockRequests, 'content', 'data')
 
     assert dummy_repository.gating_recipients == []
+
+
+@pytest.mark.parametrize('method', [
+    'previous-tag-build',
+    'previous-build',
+    'specific-build'
+])
+def test_bugs(module, dummy_repository, git_log, monkeypatch, method):
+    module._config['baseline-method'] = method
+    module._config['git-repo-path'] = 'fake/path'
+    module._repository = dummy_repository
+
+    mock_previous_task = MagicMock(
+        nvr='previous-nvr',
+        url='previous-url',
+        distgit_ref='123456'
+    )
+
+    mock_primary_task = MagicMock(
+        nvr='primary-nvr',
+        url='primary-url',
+        latest_released=MagicMock(return_value=mock_previous_task),
+        distgit_ref='789123'
+    )
+
+    patch_shared(monkeypatch, module, {
+        'primary_task': mock_primary_task,
+        'tasks': mock_previous_task
+    })
+
+    monkeypatch.setattr(dummy_repository, 'clone', MagicMock())
+
+    assert module.dist_git_bugs() == module._expected_bugs

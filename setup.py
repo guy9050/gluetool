@@ -36,6 +36,8 @@ INSTALL_REQUIRES = [
     "enum34==1.1.6",
     "fmf==0.6.1",  # test-batch-planner
     'futures==3.2.0; python_version == "2.7"',  # restraint-scheduler
+    "GitPython==2.1.15",  # dist-git
+    "gitdb2==2.0.6",  # dist-git
     "inotify==0.2.10",  # sti
     "jenkins-job-builder==1.6.2",
     "jenkinsapi==0.3.8",

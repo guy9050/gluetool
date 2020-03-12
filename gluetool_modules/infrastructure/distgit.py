@@ -2,24 +2,22 @@ import re
 
 import gluetool
 
-from gluetool.log import LoggerMixin
-from gluetool.utils import cached_property, IncompatibleOptionsError, log_blob, PatternMap, render_template
+from gluetool.utils import cached_property, IncompatibleOptionsError, normalize_path, PatternMap, render_template
+from gluetool.log import log_blob, log_dict
 
 import gluetool_modules.libs
 import gluetool_modules.libs.git
 
 
-class DistGitRepository(LoggerMixin, gluetool_modules.libs.git.RemoteGitRepository):
+class DistGitRepository(gluetool_modules.libs.git.RemoteGitRepository):
     """
     Provides a dist-git repository.
     """
 
-    def __init__(self, module, package, clone_url=None, branch=None, ref=None, web_url=None):
-        super(DistGitRepository, self).__init__(module.logger, clone_url, branch=branch, ref=ref, web_url=web_url)
-
-        self._module = module
-
+    def __init__(self, logger, package, **kwargs):
         self.package = package
+
+        super(DistGitRepository, self).__init__(logger, **kwargs)
 
     def __repr__(self):
         return '<DistGitRepository(package="{}", branch="{}")>'.format(self.package, self.branch)
@@ -166,12 +164,23 @@ class DistGitRepository(LoggerMixin, gluetool_modules.libs.git.RemoteGitReposito
 class DistGit(gluetool.Module):
     """
     Module provides details of a dist-git repository. The repository is made available via the shared
-    function ```dist_git_repository```, which returns an instance of py:class:`DistGitRepository` class.
+    function ``dist_git_repository``, which returns an instance of py:class:`DistGitRepository` class.
 
     The module supports currently one method for resolving the dist-git repository details:
 
     * ``artifact``: Resolve dist-git repository for the primary artifact in the pipeline. If some of the options
                     ``branch``, ``ref``, ``web-url`` or ``clone-url`` are specified they override the resolved values.
+
+    The shared function ``dist_git_bugs`` finds all the bugs mentioned in commit logs from a previous version
+    of the package. The previous version of the package is provided via primary task's ``baseline`` property. See
+    help of the module which provides ``primary_task`` shared function in the pipeline for more information.
+
+    When ``dist_git_bugs`` shared function is used the module clones the dist-git repository, so it can look
+    at the commit logs.
+
+    For testing purposes the option ``list-bugs`` is provided which calls shared function ``dist_git_bugs`` and prints
+    a list of found bugs in the commit log. You can also use the option ``git-repo-path`` to skip cloning and use
+    the repository under given path.
     """
 
     name = 'dist-git'
@@ -184,6 +193,16 @@ class DistGit(gluetool.Module):
                 'help': 'What method to use for resolving dist-git repository (default: %(default)s).',
                 'choices': ('artifact',),
                 'default': 'artifact'
+            },
+        }),
+        ('Testing options', {
+            'git-repo-path': {
+                'help': 'Use given git repository path. Skips cloning of new repository.',
+                'metavar': 'PATH'
+            },
+            'list-bugs': {
+                'help': 'List bugs gathered from dist-git commit logs.',
+                'action': 'store_true'
             },
         }),
         ("Options for method 'artifact'", {
@@ -208,16 +227,27 @@ class DistGit(gluetool.Module):
             'web-url': {
                 'help': 'Force dist-git repository web URL'
             }
+        }),
+        ("Options related to discovering bugs from commit logs", {
+            'regex-bugzilla': {
+                'help': 'Regular expression for matching bugzilla in commit logs'
+            },
+            'regex-resolves': {
+                'help': 'Regular expression for matching resolves keyword in commit logs'
+            }
         })
     ]
 
     required_options = ('method',)
-    shared_functions = ['dist_git_repository']
+    shared_functions = ['dist_git_repository', 'dist_git_bugs']
 
     def __init__(self, *args, **kwargs):
         super(DistGit, self).__init__(*args, **kwargs)
 
         self._repository = None
+
+        self._regex_resolves = None
+        self._regex_bugzilla = None
 
     @property
     def eval_context(self):
@@ -295,6 +325,16 @@ class DistGit(gluetool.Module):
         if self.option('ref') and self.option('branch'):
             raise IncompatibleOptionsError("You can use only one of 'ref' or 'branch'")
 
+        try:
+            self._regex_resolves = re.compile(self.option('regex-resolves'), re.IGNORECASE)
+        except re.error as error:
+            raise gluetool.GlueError("Failed to compile regular expression in 'regex-resolves': {}".format(error))
+
+        try:
+            self._regex_bugzilla = re.compile(self.option('regex-bugzilla'), re.IGNORECASE)
+        except re.error as error:
+            raise gluetool.GlueError("Failed to compile regular expression in 'regex-bugzilla': {}".format(error))
+
     def dist_git_repository(self):
         """
         Returns a dist-git repository for the primary_task in the pipeline in the form of an instance
@@ -302,7 +342,7 @@ class DistGit(gluetool.Module):
         with the same name.
 
         The module currently holds only one dist-git repository and it caches it after the first retrieval
-        in the execute funtion.
+        in the execute function.
 
         :returns: instance of the :py:class:`DistGitRepository`
         """
@@ -333,9 +373,54 @@ class DistGit(gluetool.Module):
 
         return render_template(value, **context)
 
+    def dist_git_bugs(self):
+        """
+        Finds and returns bugs referenced in commit logs between primary artifact and a baseline package version.
+        See module help for more information about baseline package version.
+
+        :returns set(int): Set of Bugzilla IDs found in commit log.
+        """
+        artifact = self.shared('primary_task')
+        baseline = self.shared('primary_task').baseline_task
+
+        if not baseline:
+            raise gluetool.GlueError('No baseline package available')
+
+        if not self._regex_resolves or not self._regex_bugzilla:
+            raise gluetool.GlueError("Required options 'regex-resolves' or 'regex-bugzilla' were not set")
+
+        head = artifact.distgit_ref
+        tail = baseline.distgit_ref
+
+        repository = self._repository
+
+        # clone repository if needed
+        if not repository.is_cloned:
+            repository.clone(prefix='dist-git-{}-{}'.format(repository.package, repository.branch))
+
+        tail_head = '{}..{}'.format(tail, head)
+        log = repository.gitlog('--pretty=%B', tail_head)
+
+        # Extracts bug IDs from dist git log, bugs are unique, thus use a set
+        bugs = set()
+
+        # Extracts bug IDs from dist git log, bugs are unique, thus use a set
+        for line in log.split('\n'):
+            if self._regex_resolves.search(line):
+                for bug in self._regex_bugzilla.findall(line):
+                    bugs.add(bug.encode('utf-8'))
+
+        log_dict(self.info, 'Found bugs in dist-git log', {
+            'tail..head': tail_head,
+            'bugs': ['BZ#{}'.format(bug) for bug in bugs] if bugs else '<no bugs found>'
+        })
+
+        return bugs
+
     def execute(self):
         self.require_shared('primary_task')
         task = self.shared('primary_task')
+        path = normalize_path(self.option('git-repo-path')) if self.option('git-repo-path') else None
 
         if not task:
             raise gluetool.GlueError('No task available, cannot continue')
@@ -347,13 +432,18 @@ class DistGit(gluetool.Module):
             'clone_url': self._acquire_param('clone_url', error_message='Could not acquire dist-git clone URL'),
             'web_url': self._acquire_param('web_url', error_message='Could not acquire dist-git web URL'),
             'branch': self._acquire_param('branch'),
-            'ref': self._acquire_param('ref')
+            'ref': self._acquire_param('ref'),
+            'path': path
+
         }
 
-        self._repository = DistGitRepository(self, task.component, **kwargs)
+        self._repository = DistGitRepository(self.logger, task.component, **kwargs)
 
         self.info("dist-git repository {}, branch {}, ref {}".format(
             self._repository.web_url,
             self._repository.branch if self._repository.branch else 'not specified',
             self._repository.ref if self._repository.ref else 'not specified'
         ))
+
+        if self.option('list-bugs'):
+            self.dist_git_bugs()
