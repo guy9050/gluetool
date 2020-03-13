@@ -1,3 +1,4 @@
+import json
 import os
 import re
 
@@ -201,6 +202,16 @@ class Ansible(gluetool.Module):
                 '--extra-vars',
                 ' '.join(['{}="{}"'.format(k, v) for k, v in variables.iteritems()])
             ]
+
+        cmd += [
+            '--extra-vars',
+            json.dumps({
+                'GUEST': {
+                    'hostname': guest.hostname,
+                    'environment': guest.environment.serialize_to_json() if guest.environment else None
+                }
+            })
+        ]
 
         cmd += self.additional_options
 
