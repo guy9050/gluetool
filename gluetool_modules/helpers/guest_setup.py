@@ -255,8 +255,8 @@ class GuestSetup(gluetool.Module):
             )
         )
 
-    def _get_details_from_map(self, stage):
-        # type: (GuestSetupStage) -> Tuple[List[str], Dict[str, str]]
+    def _get_details_from_map(self, guest, stage):
+        # type: (libci.guest.NetworkedGuest, GuestSetupStage) -> Tuple[List[str], Dict[str, str]]
         """
         Returns a tuple with list of playbooks and extra vars from the processed mapping file
         """
@@ -264,10 +264,17 @@ class GuestSetup(gluetool.Module):
         playbooks = []  # type: List[str]
         extra_vars = {}  # type: Dict[str, Any]
 
+        context = gluetool.utils.dict_update(
+            self.shared('eval_context'),
+            {
+                'GUEST': guest
+            }
+        )
+
         def render_context(playbook):
             # type: (str) -> str
 
-            return render_template(playbook, logger=self.logger, **self.shared('eval_context'))
+            return render_template(playbook, logger=self.logger, **context)
 
         playbooks_map = self._playbooks_map.get(stage.value, [])
 
@@ -276,8 +283,7 @@ class GuestSetup(gluetool.Module):
 
             if not self.shared('evaluate_rules',
                                playbooks_set.get('rule', 'False'),
-                               context=self.shared('eval_context')):
-
+                               context=context):
                 self.debug('rule does not match, moving on')
                 continue
 
@@ -331,7 +337,7 @@ class GuestSetup(gluetool.Module):
         logger.info('guest setup log is in {}'.format(log_location))
 
         # Detect playbooks and extra vars from the playbook map...
-        playbooks_from_map, variables_from_map = self._get_details_from_map(stage)
+        playbooks_from_map, variables_from_map = self._get_details_from_map(guest, stage)
 
         # ... and command-line/config file options.
         playbooks_from_config = self._playbooks.get(stage.value, [])
@@ -360,6 +366,8 @@ class GuestSetup(gluetool.Module):
 
         variables['GUEST_SETUP_STAGE'] = stage.value
 
+        log_dict(logger.debug, 'playbook variables', variables)
+
         # Detect Python interpreter for Ansible - this depends on the guest, it cannot be based
         # just on the artifact properties (some artifacts may need to be tested on a mixture
         # of different composes with different Python interpreters), therefore detect - unless,
@@ -367,6 +375,8 @@ class GuestSetup(gluetool.Module):
         #
         # Also if user is specifying it's own playbooks, always autodetect ansible_python_interpreter
         if 'ansible_python_interpreter' not in variables:
+            logger.debug('ansible interpreter not specified, trying to autodetect one')
+
             guest_interpreters = self.shared('detect_ansible_interpreter', guest)
 
             log_dict(logger.debug, 'detected interpreters', guest_interpreters)
@@ -376,6 +386,8 @@ class GuestSetup(gluetool.Module):
 
             else:
                 variables['ansible_python_interpreter'] = guest_interpreters[0]
+
+        log_dict(logger.debug, 'final playbook variables', variables)
 
         log_dict(logger.info, 'setting up with playbooks', playbooks)
 

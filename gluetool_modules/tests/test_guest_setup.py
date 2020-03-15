@@ -154,7 +154,7 @@ def test_playbook_map_guest_setup(module, monkeypatch):
         'detect_ansible_interpreter': []
     })
 
-    monkeypatch.setattr(module, "_get_details_from_map", lambda stage: ([], {}))
+    monkeypatch.setattr(module, "_get_details_from_map", lambda guest, stage: ([], {}))
 
     module.shared('setup_guest', MagicMock())
 
@@ -194,5 +194,7 @@ def test_playbook_map(module, monkeypatch):
 
     monkeypatch.setattr(gluetool.utils, "load_yaml", load_yaml)
 
-    assert module._get_details_from_map(gluetool_modules.libs.guest_setup.GuestSetupStage.PRE_ARTIFACT_INSTALLATION) \
-        == ([os.path.join(os.getcwd(), 'default.yaml')], {'key': 'value'})
+    assert module._get_details_from_map(
+        None,
+        gluetool_modules.libs.guest_setup.GuestSetupStage.PRE_ARTIFACT_INSTALLATION
+    ) == ([os.path.join(os.getcwd(), 'default.yaml')], {'key': 'value'})
