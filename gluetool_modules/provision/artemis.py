@@ -206,11 +206,11 @@ class ArtemisAPI(object):
         :param str guest_id: Artemis guestname (or guest id).
             See Artemis API docs for more.
 
-        :rtype: dict
-        :returns: Artemis API response serialized as dictionary or ``None`` in case of failure.
+        :rtype: Response
+        :returns: Artemis API response or ``None`` in case of failure.
         '''
 
-        return self.api_call('guests/{}'.format(guest_id), method='DELETE', expected_status_code=200).json()
+        return self.api_call('guests/{}'.format(guest_id), method='DELETE', expected_status_code=200)
 
 
 class ArtemisGuest(NetworkedGuest):
