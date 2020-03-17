@@ -327,7 +327,7 @@ def fixture_module(monkeypatch, tmpdir):
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
-    mock_primary_task.latest = 'dummy-latest'
+    mock_primary_task.baseline_task = 'dummy-latest'
     mock_primary_task.scratch = False
     mock_primary_task.id = 111111
     module.task = mock_primary_task
@@ -357,7 +357,7 @@ def test_run_rpminspect(module, monkeypatch):
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
-    mock_primary_task.latest = 'dummy-latest'
+    mock_primary_task.baseline_task = 'dummy-latest'
     mock_primary_task.scratch = False
     mock_primary_task.id = 111111
 
@@ -389,7 +389,7 @@ def test_run_rpminspect_profile(module, monkeypatch):
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
-    mock_primary_task.latest = 'dummy-latest'
+    mock_primary_task.baseline_task = 'dummy-latest'
     mock_primary_task.scratch = False
     mock_primary_task.id = 111111
 
@@ -413,7 +413,7 @@ def test_run_rpminspect_no_baseline(module, monkeypatch):
     monkeypatch.setattr(gluetool_modules.static_analysis.rpminspect.rpminspect, 'Command', mock_command)
 
     mock_primary_task = MagicMock()
-    mock_primary_task.latest = None
+    mock_primary_task.baseline_task = None
 
     monkeypatch.setattr(__builtin__, 'open', MagicMock())
 
@@ -459,7 +459,7 @@ def test_parse_comparison_runinfo(module):
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
-    mock_primary_task.latest = 'dummy-latest'
+    mock_primary_task.baseline_task = 'dummy-latest'
     mock_primary_task.scratch = False
     mock_primary_task.id = 111111
 
@@ -472,7 +472,7 @@ def test_parse_analysis_runinfo(module):
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
-    mock_primary_task.latest = 'dummy-latest'
+    mock_primary_task.baseline_task = 'dummy-latest'
     mock_primary_task.scratch = False
     mock_primary_task.id = 111111
 
@@ -499,7 +499,7 @@ def test_execute(module, monkeypatch, log):
 
 
 def test_execute_no_latest(module, monkeypatch, log):
-    module.task.latest = None
+    module.task.baseline_task = None
 
     monkeypatch.setattr(__builtin__, 'open', MagicMock())
 
@@ -534,7 +534,7 @@ def test_execute_no_latest(module, monkeypatch, log):
 
 
 def test_execute_nvr_is_latest(module, monkeypatch, log):
-    module.task.latest = module.task.nvr
+    module.task.baseline_task = module.task.nvr
 
     monkeypatch.setattr(__builtin__, 'open', MagicMock())
 
