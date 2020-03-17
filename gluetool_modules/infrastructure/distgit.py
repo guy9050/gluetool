@@ -325,15 +325,19 @@ class DistGit(gluetool.Module):
         if self.option('ref') and self.option('branch'):
             raise IncompatibleOptionsError("You can use only one of 'ref' or 'branch'")
 
-        try:
-            self._regex_resolves = re.compile(self.option('regex-resolves'), re.IGNORECASE)
-        except re.error as error:
-            raise gluetool.GlueError("Failed to compile regular expression in 'regex-resolves': {}".format(error))
+        regex_resolves = self.option('regex-resolves')
+        if regex_resolves:
+            try:
+                self._regex_resolves = re.compile(regex_resolves, re.IGNORECASE)
+            except re.error as error:
+                raise gluetool.GlueError("Failed to compile regular expression in 'regex-resolves': {}".format(error))
 
-        try:
-            self._regex_bugzilla = re.compile(self.option('regex-bugzilla'), re.IGNORECASE)
-        except re.error as error:
-            raise gluetool.GlueError("Failed to compile regular expression in 'regex-bugzilla': {}".format(error))
+        regex_bugzilla = self.option('regex-bugzilla')
+        if regex_bugzilla:
+            try:
+                self._regex_bugzilla = re.compile(regex_bugzilla, re.IGNORECASE)
+            except re.error as error:
+                raise gluetool.GlueError("Failed to compile regular expression in 'regex-bugzilla': {}".format(error))
 
     def dist_git_repository(self):
         """
