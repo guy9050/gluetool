@@ -51,7 +51,7 @@ class TestSchedulerUpgrades(gluetool.Module):
         for repo_name in metadate_rpms_json['payload']['rpms']:
             for srpm_name in metadate_rpms_json['payload']['rpms'][repo_name]['x86_64']:
                 if primary_task_nevr_regex.match(srpm_name):
-                    binary_rpms_list = metadate_rpms_json['payload']['rpms'][repo_name]['x86_64'][srpm_name].keys()
+                    binary_rpms_list += metadate_rpms_json['payload']['rpms'][repo_name]['x86_64'][srpm_name].keys()
 
         binary_rpms_list = [package.encode('utf-8') for package in binary_rpms_list if not package.endswith('.src')]
         log_dict(self.debug, 'binary rpm nevrs', binary_rpms_list)
