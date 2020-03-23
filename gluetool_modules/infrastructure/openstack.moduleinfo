@@ -6,6 +6,7 @@ dependencies:
   pip:
     - python-dateutil==2.6.1
     - python-glanceclient==2.8.0
+    - python-neutronclient==7.1.0
     - python-novaclient==7.1.0
     - python-openstackclient==3.9.0
     - pytz==2017.3

@@ -15,15 +15,17 @@ from keystoneclient.auth.identity import v3 as keystone_identity
 from keystoneauth1 import session as keystone_session
 
 import novaclient.exceptions
-from novaclient import client
+from novaclient import client as nova_client
 from novaclient.exceptions import BadRequest, NotFound, Unauthorized, NoUniqueMatch
+
+from neutronclient.v2_0 import client as neutron_client
 
 import gluetool
 from gluetool import GlueError, GlueCommandError
 from gluetool.action import Action
 from gluetool.log import LoggerMixin, format_dict, log_dict
 from gluetool.result import Result
-from gluetool.utils import cached_property, normalize_path, load_yaml, dict_update
+from gluetool.utils import cached_property, normalize_path, load_yaml, dict_update, normalize_multistring_option
 from libci.guest import NetworkedGuest
 
 from gluetool_modules.libs import strptime
@@ -79,6 +81,8 @@ class OpenStackImage(LoggerMixin, object):
         self.module = module
         self.name = name
         self._resource = resource
+
+        self.network_regexes = None
 
         glance_options = {}
         for option in ['auth-url', 'project-name', 'username', 'password']:
@@ -1098,7 +1102,12 @@ class CIOpenstack(gluetool.Module):
                 'default': DEFAULT_NAME_TEMPLATE
             },
             'network': {
-                'help': 'Label of network to attach instance to',
+                'help': """
+                        Label of network to attach instance to. More networks can be specified and regular
+                        expressions can be used, matching the whole label. The network with most free
+                        IP addresses is chosen.
+                        """,
+                'action': 'append'
             },
             'provision': {
                 'help': 'Provision given number of guests',
@@ -1485,24 +1494,71 @@ class CIOpenstack(gluetool.Module):
         return OpenStackImage.factory(self, image)
 
     def _get_network_ref(self):
-        # get network reference
-        networks = self.option('network')
-        if networks is not None:
+        # no networks specified
+        if not self.network_regexes:
+            self.warn('No networks specified, this is not expected at all.', sentry=True)
+            return None
 
-            def _get_network_ref(network):
-                # get network reference label
+        # use neutron client to get list of IPs availabilities
+        # note: the api call returns a dictionary where all availabilities are under 'network_ip_availabilities' key
+        network_ip_availabilities = self._call_api(
+            'network.list_network_ip_availabilities', self.neutron.list_network_ip_availabilities
+        )['network_ip_availabilities']
+        log_dict(self.debug, 'network_ip_availabilities', network_ip_availabilities)
+
+        def _check_ipv4_subnet(network):
+            # filter only networks we care about
+            if not any(re.match(network_regex, network['network_name']) for network_regex in self.network_regexes):
+                # this is not interesting for reporting really
+                return False
+
+            # filter only networks which have IPv4 subnets, inform if we filtered this network out
+            if not any(subnet['ip_version'] == 4 for subnet in network['subnet_ip_availability']):
+                self.debug("Network '{}' has no IPv4 subnets, ignoring".format(network['network_name']))
+                return False
+
+            return True
+
+        # filter only networks we are interested only in, choose only IPv4 subnets
+        networks_ipv4_subnets = [
+            {
+                'name': network['network_name'],
+                # select only IPv4 subnet here, IPv6 has very large ranges, so we do not need to care
+                # note that _check_ipv4_subnet helper function makes sure the filtered list is not empty
+                'subnets': filter(lambda subnet: subnet['ip_version'] == 4, network['subnet_ip_availability'])[0]
+            }
+            for network in network_ip_availabilities
+            if _check_ipv4_subnet(network)
+        ]
+
+        if not networks_ipv4_subnets:
+            raise GlueError('No networks found according to the specification, cannot continue.')
+
+        # sort the networks by free IPv4 addresses
+        networks_ipv4_subnets.sort(
+                key=lambda network: network['subnets']['total_ips'] - network['subnets']['used_ips'],
+                reverse=True
+        )
+
+        log_dict(self.debug, 'networks sorted by free IPv4 addresses', networks_ipv4_subnets)
+
+        log_dict(self.info, "chosen network '{}'".format(networks_ipv4_subnets[0]['name']), {
+            'Total IPs': networks_ipv4_subnets[0]['subnets']['total_ips'],
+            'Used IPs': networks_ipv4_subnets[0]['subnets']['used_ips']
+        })
+
+        def _network_ref(network):
+            # get network reference label
+            try:
+                return self._call_api('networks.find', self.nova.networks.find, label=network)
+            except (NotFound, BadRequest):
                 try:
-                    return self._call_api('networks.find', self.nova.networks.find, label=network)
-                except (NotFound, BadRequest):
-                    try:
-                        return self._call_api('networks.find', self.nova.networks.find, id=network)
-                    except NotFound:
-                        # get network reference by id
-                        self._resource_not_found('networks', network, name_attr='label')
+                    return self._call_api('networks.find', self.nova.networks.find, id=network)
+                except NotFound:
+                    # get network reference by id
+                    self._resource_not_found('networks', network, name_attr='label')
 
-            return [_get_network_ref(network) for network in networks.split(',')]
-
-        return None
+        return [_network_ref(networks_ipv4_subnets[0]['name'])]
 
     def provision(self, environment, count=1, name=None, image=None, flavor=None, **kwargs):
         assert count >= 1, 'count needs to >= 1'
@@ -1645,6 +1701,9 @@ class CIOpenstack(gluetool.Module):
         cleanup = self.option('cleanup')
         cleanup_force = self.option('cleanup-force')
 
+        # precompile network regular expressions
+        self.network_regexes = [re.compile(regex) for regex in normalize_multistring_option(self.option('network'))]
+
         # If domain name is specified, we use for authentication keystone client, which supports v3 Client API.
         # This was required for newer Openstack versions.
         #
@@ -1657,18 +1716,23 @@ class CIOpenstack(gluetool.Module):
                 password=password,
                 project_domain_name=project_domain_name,
                 project_name=project_name,
-                user_domain_name=user_domain_name)
+                user_domain_name=user_domain_name
+            )
 
-            self.nova = client.Client(api_version, session=keystone_session.Session(auth=auth))
+            session = keystone_session.Session(auth=auth)
+            self.nova = nova_client.Client(api_version, session=session)
+            self.neutron = neutron_client.Client(session=session)
 
         # Use v2 Client API for authentication
         else:
             # connect to openstack instance
-            self.nova = client.Client(api_version,
-                                      auth_url=auth_url,
-                                      username=username,
-                                      password=password,
-                                      project_name=project_name)
+            self.nova = nova_client.Client(
+                api_version,
+                auth_url=auth_url,
+                username=username,
+                password=password,
+                project_name=project_name
+            )
 
         # test connection
         try:

@@ -52,6 +52,7 @@ INSTALL_REQUIRES = [
     "pycurl==7.43.0",
     "pymemcache==2.0.0",  # memcache
     "python-glanceclient==2.8.0",
+    "python-neutronclient==7.1.0",
     "python-novaclient==7.1.0",
     "python-openstackclient==3.9.0",
     "python-qpid-proton==0.18.1",
