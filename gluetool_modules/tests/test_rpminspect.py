@@ -327,7 +327,8 @@ def fixture_module(monkeypatch, tmpdir):
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
-    mock_primary_task.baseline_task = 'dummy-latest'
+    mock_primary_task.baseline_task = MagicMock()
+    mock_primary_task.baseline_task.nvr = 'dummy-latest'
     mock_primary_task.scratch = False
     mock_primary_task.id = 111111
     module.task = mock_primary_task
@@ -357,7 +358,8 @@ def test_run_rpminspect(module, monkeypatch):
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
-    mock_primary_task.baseline_task = 'dummy-latest'
+    mock_primary_task.baseline_task = MagicMock()
+    mock_primary_task.baseline_task.nvr = 'dummy-latest'
     mock_primary_task.scratch = False
     mock_primary_task.id = 111111
 
@@ -389,7 +391,8 @@ def test_run_rpminspect_profile(module, monkeypatch):
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
-    mock_primary_task.baseline_task = 'dummy-latest'
+    mock_primary_task.baseline_task = MagicMock()
+    mock_primary_task.baseline_task.nvr = 'dummy-latest'
     mock_primary_task.scratch = False
     mock_primary_task.id = 111111
 
@@ -459,7 +462,8 @@ def test_parse_comparison_runinfo(module):
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
-    mock_primary_task.baseline_task = 'dummy-latest'
+    mock_primary_task.baseline_task = MagicMock()
+    mock_primary_task.baseline_task.nvr = 'dummy-latest'
     mock_primary_task.scratch = False
     mock_primary_task.id = 111111
 
@@ -472,7 +476,8 @@ def test_parse_analysis_runinfo(module):
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
-    mock_primary_task.baseline_task = 'dummy-latest'
+    mock_primary_task.baseline_task = MagicMock()
+    mock_primary_task.baseline_task.nvr = 'dummy-latest'
     mock_primary_task.scratch = False
     mock_primary_task.id = 111111
 
@@ -534,7 +539,7 @@ def test_execute_no_latest(module, monkeypatch, log):
 
 
 def test_execute_nvr_is_latest(module, monkeypatch, log):
-    module.task.baseline_task = module.task.nvr
+    module.task.baseline_task.nvr = module.task.nvr
 
     monkeypatch.setattr(__builtin__, 'open', MagicMock())
 

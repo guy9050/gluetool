@@ -197,7 +197,7 @@ class CIRpminspect(gluetool.Module):
         if self.option('type') == 'comparison':
             if task.baseline_task is None:
                 raise GlueError('Not provided baseline for comparison')
-            command.append(task.baseline_task)
+            command.append(task.baseline_task.nvr)
 
         command.append(task.nvr)
 
@@ -272,7 +272,7 @@ class CIRpminspect(gluetool.Module):
 
         if test_type == 'comparison':
             result_type = 'brew_build_pair'
-            item = '{} {}'.format(task.nvr, task.baseline_task)
+            item = '{} {}'.format(task.nvr, task.baseline_task.nvr)
         else:
             result_type = 'brew_build'
             item = task.nvr
@@ -293,7 +293,7 @@ class CIRpminspect(gluetool.Module):
                 'item': item,
                 'type': result_type,
                 'newnvr': task.nvr,
-                'oldnvr': task.baseline_task,
+                'oldnvr': task.baseline_task.nvr,
                 'scratch': task.scratch,
                 'taskid': task.id
             },
@@ -349,7 +349,7 @@ class CIRpminspect(gluetool.Module):
                         'item': item,
                         'type': result_type,
                         'newnvr': task.nvr,
-                        'oldnvr': task.baseline_task,
+                        'oldnvr': task.baseline_task.nvr,
                         'scratch': task.scratch,
                         'taskid': task.id
                     },
@@ -457,12 +457,12 @@ class CIRpminspect(gluetool.Module):
                     self.warn('no baseline found, refusing to continue testing')
                     self._publish_skipped_result(task)
                     return
-                if task.baseline_task == task.nvr:
+                if task.baseline_task.nvr == task.nvr:
                     self.warn('cowardly refusing to compare same packages')
                     return
 
             msg = ["running {} for task '{}'".format(test_type, task.id)]
-            msg += ['compared to {}'.format(task.baseline_task)] if test_type == 'comparison' else []
+            msg += ['compared to {}'.format(task.baseline_task.nvr)] if test_type == 'comparison' else []
             self.info(' '.join(msg))
 
             self._run_rpminspect(task, tests, workdir)
