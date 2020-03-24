@@ -1910,7 +1910,10 @@ class Koji(gluetool.Module):
 
             # init baseline build if requested
             if self.option('baseline-method'):
-                self.info('Baseline build: {} ({})'.format(task.baseline_task.nvr, task.baseline_task.url))
+                if task.baseline_task:
+                    self.info('Baseline build: {} ({})'.format(task.baseline_task.nvr, task.baseline_task.url))
+                else:
+                    self.warn('Baseline build was not found')
 
 
 class Brew(Koji, (gluetool.Module)):
