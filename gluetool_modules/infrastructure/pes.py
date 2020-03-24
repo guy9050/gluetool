@@ -44,7 +44,7 @@ class PESApi(LoggerMixin, object):
             # type: () -> Result[orig_requests.Response, Exception]
             try:
                 with requests() as req:
-                    response = req.post(url, json=payload)
+                    response = req.post(url, json=payload, verify=False)
 
                 # 404 is expected if no events were found for a component
                 if response.status_code not in [200, 404]:
