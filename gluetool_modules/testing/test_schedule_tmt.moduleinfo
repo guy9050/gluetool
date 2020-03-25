@@ -12,4 +12,4 @@ dependencies:
       gpgcheck: 0
 
   yum:
-    - tmt
+    - tmt-all
