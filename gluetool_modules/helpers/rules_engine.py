@@ -1,6 +1,7 @@
 import functools
 import imp
 import re
+import sys
 import ast
 
 import jinja2
@@ -42,6 +43,25 @@ class AttrDict(Dict[str, Any]):
         super(AttrDict, self).__init__(*args, **kwargs)
 
         self.__dict__ = self
+
+
+class RulesExecutionError(GlueError):
+    def __init__(
+        self,
+        message,  # type: str
+        rules,  # type: str
+        rule_locals,  # type: ContextType
+        rule_globals,  # type: ContextType
+        exc_info=None  # type: Optional[gluetool.log.ExceptionInfoType]
+    ):
+        # type: (...) -> None
+
+        super(RulesExecutionError, self).__init__(message)
+
+        self.rules = rules
+        self.rule_locals = rule_locals
+        self.rule_globals = rule_globals
+        self.exc_info = exc_info
 
 
 class RulesError(SoftGlueError):
@@ -208,7 +228,22 @@ class Rules(object):
             return eval(self._code, our_globals, our_locals)
 
         except NameError as exc:
-            raise gluetool.GlueError('Unknown variable used in rule: {}'.format(exc.message))
+            raise RulesExecutionError(
+                'Unknown variable used in rule: {}'.format(exc.message),
+                self._rules,
+                our_locals,
+                our_globals,
+                exc_info=sys.exc_info()
+            )
+
+        except Exception as exc:
+            raise RulesExecutionError(
+                'Cannot execute the rule: `{}` => {}'.format(self._rules, exc.message),
+                self._rules,
+                our_locals,
+                our_globals,
+                exc_info=sys.exc_info()
+            )
 
 
 class RulesEngine(gluetool.Module):
