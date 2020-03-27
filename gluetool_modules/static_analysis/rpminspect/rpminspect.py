@@ -293,7 +293,7 @@ class CIRpminspect(gluetool.Module):
                 'item': item,
                 'type': result_type,
                 'newnvr': task.nvr,
-                'oldnvr': task.baseline_task.nvr,
+                'oldnvr': task.baseline_task.nvr if self.option('type') == 'comparison' else '',
                 'scratch': task.scratch,
                 'taskid': task.id
             },
@@ -349,7 +349,7 @@ class CIRpminspect(gluetool.Module):
                         'item': item,
                         'type': result_type,
                         'newnvr': task.nvr,
-                        'oldnvr': task.baseline_task.nvr,
+                        'oldnvr': task.baseline_task.nvr if self.option('type') == 'comparison' else '',
                         'scratch': task.scratch,
                         'taskid': task.id
                     },
@@ -462,7 +462,10 @@ class CIRpminspect(gluetool.Module):
                     return
 
             msg = ["running {} for task '{}'".format(test_type, task.id)]
-            msg += ['compared to {}'.format(task.baseline_task.nvr)] if test_type == 'comparison' else []
+
+            if test_type == 'comparison' and task.baseline_task:
+                msg += ['compared to {}'.format(task.baseline_task.nvr)]
+
             self.info(' '.join(msg))
 
             self._run_rpminspect(task, tests, workdir)

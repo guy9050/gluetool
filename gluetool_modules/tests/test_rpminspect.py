@@ -74,7 +74,7 @@ ANALYSIS_PARSED_STDOUT = [
         "data": {
             "item": "dummy-nvr",
             "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
+            "oldnvr": "",
             "scratch": False,
             "taskid": 111111,
             "type": "brew_build"
@@ -90,7 +90,7 @@ ANALYSIS_PARSED_STDOUT = [
         "data": {
             "item": "dummy-nvr",
             "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
+            "oldnvr": "",
             "scratch": False,
             "taskid": 111111,
             "type": "brew_build"
@@ -129,7 +129,7 @@ ANALYSIS_PARSED_STDOUT = [
         "data": {
             "item": "dummy-nvr",
             "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
+            "oldnvr": "",
             "scratch": False,
             "taskid": 111111,
             "type": "brew_build"
@@ -168,7 +168,7 @@ ANALYSIS_PARSED_STDOUT = [
         "data": {
             "item": "dummy-nvr",
             "newnvr": "dummy-nvr",
-            "oldnvr": "dummy-latest",
+            "oldnvr": "",
             "scratch": False,
             "taskid": 111111,
             "type": "brew_build"
@@ -476,8 +476,6 @@ def test_parse_analysis_runinfo(module):
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
-    mock_primary_task.baseline_task = MagicMock()
-    mock_primary_task.baseline_task.nvr = 'dummy-latest'
     mock_primary_task.scratch = False
     mock_primary_task.id = 111111
 
