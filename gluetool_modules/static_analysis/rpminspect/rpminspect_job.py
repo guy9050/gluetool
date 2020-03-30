@@ -30,6 +30,12 @@ class RpminspectJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module)
         },
         'profile': {
             'help': 'RPMinspect profile to use',
+        },
+        'baseline-method': {
+            'help': 'Brew baseline method',
+        },
+        'baseline-nvr': {
+            'help': 'Baseline NVR for specific-build baseline method'
         }
     })
 
@@ -37,8 +43,16 @@ class RpminspectJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module)
 
     def execute(self):
         if self.option('profile'):
-            gluetool.utils.dict_update(self.build_params, {
+            self.build_params.update({
                 'rpminspect_profile': self.option('profile')
+            })
+        if self.option('baseline-method'):
+            self.build_params.update({
+                'brew_with_baseline_method': self.option('baseline-method')
+            })
+        if self.option('baseline-nvr'):
+            self.build_params.update({
+                'brew_with_baseline_nvr': self.option('baseline-nvr')
             })
 
         self.shared('jenkins').invoke_job('ci-test-brew-rpminspect_{}'.format(self.option('type')), self.build_params)
