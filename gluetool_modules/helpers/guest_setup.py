@@ -4,10 +4,11 @@ import re
 import gluetool
 from gluetool.action import Action
 from gluetool.log import log_dict
+from gluetool.result import Ok
 from gluetool.utils import normalize_path_option, render_template
 from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput, GuestSetupStage, \
-    GuestSetupStageAdapter
+    GuestSetupStageAdapter, SetupGuestReturnType
 
 # Type annotations
 from typing import cast, TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union  # noqa
@@ -308,7 +309,7 @@ class GuestSetup(gluetool.Module):
                     log_dirpath=None,  # type: Optional[str]
                     **kwargs  # type: Any
                    ):  # noqa
-        # type: (...) -> List[GuestSetupOutput]
+        # type: (...) -> SetupGuestReturnType
         """
         Setup provided guest using predefined list of Ansible playbooks.
 
@@ -349,7 +350,7 @@ class GuestSetup(gluetool.Module):
         if not playbooks:
             logger.info('no setup playbooks')
 
-            return []
+            return Ok([])
 
         # The same applies to extra variables - those specified by command-line/configuration override all other
         # variables.
@@ -414,14 +415,14 @@ class GuestSetup(gluetool.Module):
                 **kwargs
             )
 
-        return [
+        return Ok([
             GuestSetupOutput(
                 stage=stage,
                 label='guest setup',
                 log_path=log_filepath,
                 additional_data=ansible_output
             )
-        ]
+        ])
 
     def execute(self):
         # type: () -> None

@@ -3,15 +3,53 @@ import gluetool
 import gluetool.log
 from gluetool.log import LoggerMixin, log_table
 import libci.sentry
+import gluetool_modules.libs.guest_setup
+from gluetool_modules.libs.artifacts import artifacts_location
 
 # Type annotations
-from typing import TYPE_CHECKING, cast, Any, List, Optional  # noqa
+from typing import TYPE_CHECKING, cast, Any, Dict, List, Optional  # noqa
 
 if TYPE_CHECKING:
     from gluetool.log import LoggingFunctionType  # noqa
     import libci.guest  # noqa
     import gluetool_modules.libs.guest_setup  # noqa
     import gluetool_modules.libs.testing_environment  # noqa
+
+
+# A mapping between guest setup stage and a list of guest setup outputs.
+GuestSetupOutputsContainerType = Dict[
+    gluetool_modules.libs.guest_setup.GuestSetupStage,
+    List[gluetool_modules.libs.guest_setup.GuestSetupOutput]
+]
+
+
+# Helper - convert testing environment to a nice human-readable string.
+# `serialize_to_string is not that nice, it adds field names and no spaces between fields,
+# it is for machines mostly, and output of this function is supposed to be easily
+# readable by humans.
+def _env_to_str(testing_environment):
+    # type: (Optional[gluetool_modules.libs.testing_environment.TestingEnvironment]) -> str
+
+    if not testing_environment:
+        return ''
+
+    # Use serialized form for quick access to fields and their values, omit keys
+    # and show values only - readable so far.
+    serialized = testing_environment.serialize_to_json()
+
+    return ', '.join([
+        str(serialized[field]) for field in sorted(serialized.iterkeys())
+    ])
+
+
+# The same but for guests.
+def _guest_to_str(guest):
+    # type: (Optional[libci.guest.NetworkedGuest]) -> str
+
+    if guest:
+        return '{}\n{}'.format(_env_to_str(guest.environment), guest.name)
+
+    return ''
 
 
 class EmptyTestScheduleError(libci.sentry.PrimaryTaskFingerprintsMixin, gluetool.SoftGlueError):
@@ -134,7 +172,7 @@ class TestScheduleEntry(LoggerMixin, object):
         self.guest = None  # type: Optional[libci.guest.NetworkedGuest]
 
         # List of outputs produced by different guest setup actions
-        self.guest_setup_outputs = []  # type: List[gluetool_modules.libs.guest_setup.GuestSetupOutput]
+        self.guest_setup_outputs = {}  # type: GuestSetupOutputsContainerType
 
         self.action = None  # type: Optional[gluetool.action.Action]
 
@@ -145,6 +183,32 @@ class TestScheduleEntry(LoggerMixin, object):
 
         log_fn('testing environment: {}'.format(self.testing_environment))
         log_fn('guest: {}'.format(self.guest))
+
+    def log_guest_setup_outputs(self, module, log_fn=None):
+        # type: (gluetool.Module, Optional[LoggingFunctionType]) -> None
+
+        log_fn = log_fn or self.debug
+
+        table = [
+            ['Stage', 'Log', 'Location']
+        ]
+
+        for stage in gluetool_modules.libs.guest_setup.STAGES_ORDERED:
+            outputs = self.guest_setup_outputs.get(stage, [])
+
+            for output in outputs:
+                table.append([
+                    stage.value,
+                    output.label,
+                    artifacts_location(module, output.log_path, logger=self.logger)
+                ])
+
+        log_table(
+            log_fn,
+            'Guest setup logs',
+            table,
+            headers='firstrow', tablefmt='psql'
+        )
 
 
 class TestSchedule(List[TestScheduleEntry]):
@@ -184,36 +248,12 @@ class TestSchedule(List[TestScheduleEntry]):
 
         rows = []
 
-        # Helper - convert testing environment to a nice human-readable string.
-        # `serialize_to_string is not that nice, id adds field names and no spaces between fields,
-        # it is for machines mostly, and output of this function is supposed to be easily
-        # readable by humans.
-        def _env_to_str(testing_environment):
-            # type: (Optional[gluetool_modules.libs.testing_environment.TestingEnvironment]) -> str
-
-            if not testing_environment:
-                return ''
-
-            # Use serialized form for quick access to fields and their values, omit keys
-            # and show values only - readable so far.
-            serialized = testing_environment.serialize_to_json()
-
-            return ', '.join([
-                str(serialized[field]) for field in sorted(serialized.iterkeys())
-            ])
-
         for se in self:
             se_environment = _env_to_str(se.testing_environment)
-
-            # if we have a guest, add provisioned environment and guest's name
-            if se.guest:
-                guest_info = '{}\n{}'.format(_env_to_str(se.guest.environment), se.guest.name)
-
-            else:
-                guest_info = ''
+            se_guest = _guest_to_str(se.guest)
 
             rows.append([
-                se.id, se.stage.name, se.state.name, se.result.name, se_environment, guest_info, se.runner_capability
+                se.id, se.stage.name, se.state.name, se.result.name, se_environment, se_guest, se.runner_capability
             ])
 
         log_table(log_fn, label, [headers] + rows,

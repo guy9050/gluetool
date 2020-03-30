@@ -1,6 +1,7 @@
 import os
 import gluetool
 from gluetool import GlueError
+from gluetool.result import Ok, Error
 from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput, GuestSetupStage
 from gluetool_modules.libs.sut_installation import SUTInstallationFailedError
@@ -23,18 +24,24 @@ class InstallKojiDockerImage(gluetool.Module):
 
         log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
 
-        guest_setup_output = self.overloaded_shared(
+        r_overloaded_guest_setup_output = self.overloaded_shared(
             'setup_guest',
             guest,
             stage=stage,
             log_dirpath=log_dirpath,
             **kwargs
-        ) or []
+        )
+
+        if r_overloaded_guest_setup_output is None:
+            r_overloaded_guest_setup_output = Ok([])
+
+        if r_overloaded_guest_setup_output.is_error:
+            return r_overloaded_guest_setup_output
 
         if stage != GuestSetupStage.ARTIFACT_INSTALLATION:
-            return guest_setup_output
+            return r_overloaded_guest_setup_output
 
-        guest.info('installing the Docker image')
+        guest_setup_output = r_overloaded_guest_setup_output.unwrap() or []
 
         installation_log_dirpath = os.path.join(
             log_dirpath,
@@ -119,29 +126,10 @@ class InstallKojiDockerImage(gluetool.Module):
         output = self.shared('restraint', guest, job_xml,
                              rename_dir_to=installation_log_dirpath)
 
-        # If the installation fails, we won't return GuestSetupOutput instance(s) to the caller,
-        # therefore the caller won't have any access to logs, hence nobody would find out where
-        # installation logs live. This will be solved one day, when we would be able to propagate
-        # output anyway, despite errors. Until that, each guest-setup-like module is responsible
-        # for logging location of relevant logs.
         index_filepath = os.path.join(installation_log_dirpath, 'index.html')
         index_location = artifacts_location(self, index_filepath, logger=guest.logger)
 
-        guest.info('Brew/Koji Docker image installation logs are in {}'.format(index_location))
-
-        if output.execution_output.exit_code != 0:
-            self.debug('restraint exited with invalid exit code {}'.format(output.execution_output.exit_code))
-
-            raise SUTInstallationFailedError(
-                self.shared('primary_task'),
-                guest,
-                installation_logs=index_filepath,
-                installation_logs_location=index_location
-            )
-
-        guest.info('All packages have been successfully installed')
-
-        return guest_setup_output + [
+        guest_setup_output += [
             GuestSetupOutput(
                 stage=stage,
                 label='Brew/Koji Docker image installation',
@@ -149,3 +137,18 @@ class InstallKojiDockerImage(gluetool.Module):
                 additional_data=output
             )
         ]
+
+        if output.execution_output.exit_code != 0:
+            self.debug('restraint exited with invalid exit code {}'.format(output.execution_output.exit_code))
+
+            return Error((
+                guest_setup_output,
+                SUTInstallationFailedError(
+                    self.shared('primary_task'),
+                    guest,
+                    installation_logs=index_filepath,
+                    installation_logs_location=index_location
+                )
+            ))
+
+        return Ok(guest_setup_output)

@@ -4,6 +4,7 @@ import os
 import shutil
 from mock import MagicMock
 from mock import call
+import gluetool_modules.libs.sut_installation
 from gluetool_modules.helpers.install_copr_build import InstallCoprBuild
 from gluetool_modules.libs.sut_installation import SUTInstallationFailedError
 from gluetool_modules.libs.guest_setup import GuestSetupStage
@@ -130,8 +131,20 @@ def test_nvr_check_fails(module_shared_patched, tmpdir):
 
     guest = mock_guest(execute_mock)
 
-    with pytest.raises(SUTInstallationFailedError):
-        module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
+    ret = module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
+
+    assert ret.is_error
+
+    outputs, exc = ret.value
+
+    assert len(outputs) == 1
+    assert outputs[0].stage == GuestSetupStage.ARTIFACT_INSTALLATION
+    assert outputs[0].label == 'Copr build installation'
+    assert outputs[0].log_path == '{}/artifact-installation-guest0'.format(str(tmpdir))
+    assert isinstance(outputs[0].additional_data, gluetool_modules.libs.sut_installation.SUTInstallation)
+
+    assert isinstance(exc, SUTInstallationFailedError)
+    assert exc.message == 'SUT installation failed'
 
     assert_log_files(guest, str(tmpdir))
 
@@ -146,7 +159,19 @@ def test_repo_download_fails(module_shared_patched, tmpdir):
 
     guest = mock_guest(execute_mock)
 
-    with pytest.raises(SUTInstallationFailedError):
-        module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
+    ret = module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
+
+    assert ret.is_error
+
+    outputs, exc = ret.value
+
+    assert len(outputs) == 1
+    assert outputs[0].stage == GuestSetupStage.ARTIFACT_INSTALLATION
+    assert outputs[0].label == 'Copr build installation'
+    assert outputs[0].log_path == '{}/artifact-installation-guest0'.format(str(tmpdir))
+    assert isinstance(outputs[0].additional_data, gluetool_modules.libs.sut_installation.SUTInstallation)
+
+    assert isinstance(exc, SUTInstallationFailedError)
+    assert exc.message == 'SUT installation failed'
 
     assert_log_files(guest, str(tmpdir), file_names=['0-Download-copr-repository.txt'])

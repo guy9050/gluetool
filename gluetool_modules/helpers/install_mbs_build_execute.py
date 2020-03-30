@@ -4,10 +4,10 @@ import re
 import gluetool
 from gluetool.action import Action
 from gluetool.log import log_dict
+from gluetool.result import Ok, Error
 from gluetool.utils import Command, normalize_shell_option, render_template
 from gluetool import GlueError
 
-from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupOutput, GuestSetupStage
 from gluetool_modules.libs.sut_installation import SUTInstallation
 
@@ -113,18 +113,24 @@ class InstallMBSBuild(gluetool.Module):
 
         log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
 
-        guest_setup_output = self.overloaded_shared(
+        r_overloaded_guest_setup_output = self.overloaded_shared(
             'setup_guest',
             guest,
             stage=stage,
             log_dirpath=log_dirpath,
             **kwargs
-        ) or []
+        )
+
+        if r_overloaded_guest_setup_output is None:
+            r_overloaded_guest_setup_output = Ok([])
+
+        if r_overloaded_guest_setup_output.is_error:
+            return r_overloaded_guest_setup_output
 
         if stage != GuestSetupStage.ARTIFACT_INSTALLATION:
-            return guest_setup_output
+            return r_overloaded_guest_setup_output
 
-        guest.info('installing the artifact')
+        guest_setup_output = r_overloaded_guest_setup_output.unwrap() or []
 
         installation_log_dirpath = os.path.join(
             log_dirpath,
@@ -258,15 +264,6 @@ class InstallMBSBuild(gluetool.Module):
             sut_installation.add_step('Verify module installed', 'yum module info {}',
                                       items=nsvc, callback=_check_installed)
 
-        # If the installation fails, we won't return GuestSetupOutput instance(s) to the caller,
-        # therefore the caller won't have any access to logs, hence nobody would find out where
-        # installation logs live. This will be solved one day, when we would be able to propagate
-        # output anyway, despite errors. Until that, each guest-setup-like module is responsible
-        # for logging location of relevant logs.
-        guest.info('module installation logs are in {}'.format(
-            artifacts_location(self, installation_log_dirpath, logger=guest.logger)
-        ))
-
         with Action(
             'installing module',
             parent=Action.current_action(),
@@ -280,9 +277,9 @@ class InstallMBSBuild(gluetool.Module):
                 'artifact-type': primary_task.ARTIFACT_NAMESPACE
             }
         ):
-            sut_installation.run(guest)
+            sut_result = sut_installation.run(guest)
 
-        return guest_setup_output + [
+        guest_setup_output += [
             GuestSetupOutput(
                 stage=stage,
                 label='module installation',
@@ -290,3 +287,13 @@ class InstallMBSBuild(gluetool.Module):
                 additional_data=sut_installation
             )
         ]
+
+        if sut_result.is_error:
+            assert sut_result.error is not None
+
+            return Error((
+                guest_setup_output,
+                sut_result.error
+            ))
+
+        return Ok(guest_setup_output)

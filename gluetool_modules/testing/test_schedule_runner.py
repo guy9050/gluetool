@@ -2,7 +2,7 @@ import libci.guest
 import gluetool
 from gluetool.action import Action
 from gluetool.utils import normalize_bool_option
-from gluetool_modules.libs.guest_setup import GuestSetupOutput, GuestSetupStage
+from gluetool_modules.libs.guest_setup import GuestSetupStage, SetupGuestReturnType
 from gluetool_modules.libs.jobs import JobEngine, Job, handle_job_errors
 from gluetool_modules.libs.test_schedule import TestScheduleEntryStage, TestScheduleEntryState
 
@@ -74,48 +74,73 @@ class TestScheduleRunner(gluetool.Module):
     def _setup_guest(self, schedule_entry):
         # type: (TestScheduleEntry) -> Any
 
-        assert schedule_entry.guest is not None
-
         schedule_entry.info('starting guest setup')
 
-        results = []  # type: List[GuestSetupOutput]
+        def _run_setup(stage):
+            # type: (GuestSetupStage) -> None
+
+            assert schedule_entry.guest is not None
+
+            r_result = cast(
+                SetupGuestReturnType,
+                schedule_entry.guest.setup(stage=stage)
+            )
+
+            if r_result.is_ok:
+                results, exc = r_result.unwrap(), None
+
+            else:
+                assert r_result.error is not None
+
+                results, exc = r_result.error
+
+            schedule_entry.guest_setup_outputs[stage] = results
+
+            schedule_entry.log_guest_setup_outputs(self, log_fn=schedule_entry.info)
+
+            if not exc:
+                return
+
+            raise exc
 
         with Action(
             'pre-artifact-installation guest setup',
             parent=schedule_entry.action,
             logger=schedule_entry.logger
         ):
-            results += schedule_entry.guest.setup(stage=GuestSetupStage.PRE_ARTIFACT_INSTALLATION)
+            _run_setup(GuestSetupStage.PRE_ARTIFACT_INSTALLATION)
 
         with Action(
             'pre-artifact-installation-workarounds guest setup',
             parent=schedule_entry.action,
             logger=schedule_entry.logger
         ):
-            results += schedule_entry.guest.setup(stage=GuestSetupStage.PRE_ARTIFACT_INSTALLATION_WORKAROUNDS)
+            _run_setup(GuestSetupStage.PRE_ARTIFACT_INSTALLATION_WORKAROUNDS)
 
         with Action(
             'artifact-installation guest setup',
             parent=schedule_entry.action,
             logger=schedule_entry.logger
         ):
-            results += schedule_entry.guest.setup(stage=GuestSetupStage.ARTIFACT_INSTALLATION)
+            schedule_entry.info('installing the artifact')
+
+            _run_setup(GuestSetupStage.ARTIFACT_INSTALLATION)
+
+            schedule_entry.info('artifact installed')
 
         with Action(
             'post-artifact-installation-workarounds guest setup',
             parent=schedule_entry.action,
             logger=schedule_entry.logger
         ):
-            results += schedule_entry.guest.setup(stage=GuestSetupStage.POST_ARTIFACT_INSTALLATION_WORKAROUNDS)
+            _run_setup(GuestSetupStage.POST_ARTIFACT_INSTALLATION_WORKAROUNDS)
 
         with Action(
             'post-artifact-installation guest setup',
             parent=schedule_entry.action,
             logger=schedule_entry.logger
         ):
-            results += schedule_entry.guest.setup(stage=GuestSetupStage.POST_ARTIFACT_INSTALLATION)
-
-        return results
+            _run_setup(GuestSetupStage.POST_ARTIFACT_INSTALLATION)
 
     def _run_tests(self, schedule_entry):
         # type: (TestScheduleEntry) -> None
@@ -198,24 +223,7 @@ class TestScheduleRunner(gluetool.Module):
             elif schedule_entry.stage == TestScheduleEntryStage.GUEST_SETUP:
                 schedule_entry.info('guest setup finished')
 
-                gluetool.log.log_dict(schedule_entry.debug, 'guest setup outputs', result)
-
-                schedule_entry.guest_setup_outputs = cast(
-                    List[GuestSetupOutput],
-                    result
-                )
-
-                # In a perfect world, we should log each log location here, to provide this functionality
-                # to all involved guest-setup-like modules. But their `setup-guest` methods can raise
-                # exceptions, that means no `result` for us, and especially in that case we need to know
-                # where logs live, therefore at this moment, each module must log the location on its own.
-                # When we get access to their output - and errors as well - we re-enable the code below.
-
-                # for output in schedule_entry.guest_setup_outputs:
-                #    schedule_entry.info('{} logs are in {}'.format(
-                #        output.label,
-                #        artifacts_location(self, output.log_path, logger=schedule_entry.logger)
-                #    ))
+                schedule_entry.log_guest_setup_outputs(self, log_fn=schedule_entry.info)
 
                 _shift(schedule_entry, TestScheduleEntryStage.PREPARED)
 
@@ -242,6 +250,8 @@ class TestScheduleRunner(gluetool.Module):
 
             elif schedule_entry.stage == TestScheduleEntryStage.GUEST_SETUP:
                 schedule_entry.error('guest setup failed: {}'.format(exc), exc_info=exc_info)
+
+                schedule_entry.log_guest_setup_outputs(self, log_fn=schedule_entry.info)
 
             elif schedule_entry.stage == TestScheduleEntryStage.RUNNING:
                 schedule_entry.error('test execution failed: {}'.format(exc), exc_info=exc_info)

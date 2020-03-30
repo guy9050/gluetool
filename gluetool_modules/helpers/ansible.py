@@ -29,7 +29,7 @@ ANSIBLE_OUTPUT = "ansible-output.txt"
 #:     as returned by :py:meth:`gluetool.utils.Command.run`.
 #: :ivar str json_output: if set, a Python data structure representing Ansible output.
 #: :ivar str log_filepath: local path to a file with Ansible output.
-AnsibleOutput = NamedTuple('RestraintOutput', (
+AnsibleOutput = NamedTuple('AnsibleOutput', (
     ('execution_output', gluetool.utils.ProcessOutput),
     ('json_output', Optional[Any]),
     ('log_filepath', str)

@@ -3,6 +3,7 @@ import os
 import gluetool
 from gluetool import SoftGlueError
 from gluetool.log import log_dict, log_blob, LoggingFunctionType
+from gluetool.result import Ok, Error
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 from jq import jq
@@ -13,6 +14,7 @@ from .artifacts import artifacts_location
 from typing import TYPE_CHECKING, cast, Any, Dict, List, Tuple, Union, Optional, Callable  # noqa
 
 if TYPE_CHECKING:
+    from gluetool.result import Result  # noqa
     import libci.guest # noqa
 
 #: Step callback type
@@ -65,7 +67,7 @@ class SUTInstallation(object):
         self.steps.append(SUTStep(label, command, items, ignore_exception, callback))
 
     def run(self, guest):
-        # type: (libci.guest.NetworkedGuest) -> None
+        # type: (libci.guest.NetworkedGuest) -> Result[None, Exception]
 
         def _run_and_log(command,  # type: str
                          log_filepath,  # type: str
@@ -114,8 +116,6 @@ class SUTInstallation(object):
 
         logs_location = artifacts_location(self.module, self.log_dirpath, logger=guest.logger)
 
-        guest.info('artifact installation logs are in {}'.format(logs_location))
-
         for i, step in enumerate(self.steps):
             guest.info(step.label)
 
@@ -131,12 +131,14 @@ class SUTInstallation(object):
                 command_failed, error_message = _run_and_log(command, log_filepath, step.callback)
 
                 if command_failed and not step.ignore_exception:
-                    raise SUTInstallationFailedError(
-                        self.primary_task,
-                        guest,
-                        reason=error_message,
-                        installation_logs=self.log_dirpath,
-                        installation_logs_location=logs_location
+                    return Error(
+                        SUTInstallationFailedError(
+                            self.primary_task,
+                            guest,
+                            reason=error_message,
+                            installation_logs=self.log_dirpath,
+                            installation_logs_location=logs_location
+                        )
                     )
 
             for item in step.items:
@@ -154,24 +156,29 @@ class SUTInstallation(object):
 
                 if error_message:
                     self.logger.error(error_message)
-                    raise SUTInstallationFailedError(
+
+                    return Error(
+                        SUTInstallationFailedError(
+                            self.primary_task,
+                            guest,
+                            items=item,
+                            reason=error_message,
+                            installation_logs=self.log_dirpath,
+                            installation_logs_location=logs_location
+                        )
+                    )
+
+                return Error(
+                    SUTInstallationFailedError(
                         self.primary_task,
                         guest,
                         items=item,
-                        reason=error_message,
                         installation_logs=self.log_dirpath,
                         installation_logs_location=logs_location
                     )
-
-                raise SUTInstallationFailedError(
-                    self.primary_task,
-                    guest,
-                    items=item,
-                    installation_logs=self.log_dirpath,
-                    installation_logs_location=logs_location
                 )
 
-        guest.info('All packages have been successfully installed')
+        return Ok(None)
 
 
 def check_ansible_sut_installation(ansible_output,  # type: Dict[str, Any]

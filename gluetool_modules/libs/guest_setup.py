@@ -17,10 +17,13 @@ structure all ``setup_guest`` functions should return, and states few basic rule
 import os
 
 import enum
+import gluetool
 import gluetool.log
+from gluetool.result import Result
 
 # Type annotations
-from typing import TYPE_CHECKING, Any, NamedTuple, Optional  # noqa
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, NamedTuple, Tuple  # noqa
+from typing_extensions import Protocol
 
 if TYPE_CHECKING:
     import libci.guest  # noqa
@@ -59,6 +62,15 @@ class GuestSetupStage(enum.Enum):
     POST_ARTIFACT_INSTALLATION = 'post-artifact-installation'
 
 
+STAGES_ORDERED = [
+    GuestSetupStage.PRE_ARTIFACT_INSTALLATION,
+    GuestSetupStage.PRE_ARTIFACT_INSTALLATION_WORKAROUNDS,
+    GuestSetupStage.ARTIFACT_INSTALLATION,
+    GuestSetupStage.POST_ARTIFACT_INSTALLATION_WORKAROUNDS,
+    GuestSetupStage.POST_ARTIFACT_INSTALLATION
+]
+
+
 class GuestSetupStageAdapter(gluetool.log.ContextAdapter):
     def __init__(self, logger, stage):
         # type: (gluetool.log.ContextAdapter, GuestSetupStage) -> None
@@ -79,6 +91,23 @@ GuestSetupOutput = NamedTuple('GuestSetupOutput', (
     ('log_path', str),
     ('additional_data', Any)
 ))
+
+
+SetupGuestReturnType = Result[List[GuestSetupOutput], Tuple[List[GuestSetupOutput], Exception]]
+
+
+class SetupGuestType(Protocol):
+    def __call__(
+        self,
+        guest,  # type: libci.guest.NetworkedGuest
+        stage=GuestSetupStage.PRE_ARTIFACT_INSTALLATION,  # type: GuestSetupStage
+        variables=None,  # type: Optional[Dict[str, str]]
+        log_dirpath=None,  # type: Optional[str]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> SetupGuestReturnType
+
+        pass
 
 
 def guest_setup_log_dirpath(guest, log_dirpath):

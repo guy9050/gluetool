@@ -3,6 +3,7 @@ import os
 import shutil
 import gluetool
 from mock import MagicMock, call
+import gluetool_modules.libs.sut_installation
 from gluetool_modules.helpers.install_mbs_build_execute import InstallMBSBuild
 from gluetool_modules.libs.guest_setup import GuestSetupStage
 from gluetool_modules.libs.sut_installation import SUTInstallationFailedError
@@ -470,8 +471,20 @@ def test_execute_command_fail(module, monkeypatch, tmpdir):
 
     guest = mock_guest(execute_mock)
 
-    with pytest.raises(SUTInstallationFailedError):
-        module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
+    ret = module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
+
+    assert ret.is_error
+
+    outputs, exc = ret.value
+
+    assert len(outputs) == 1
+    assert outputs[0].stage == GuestSetupStage.ARTIFACT_INSTALLATION
+    assert outputs[0].label == 'module installation'
+    assert outputs[0].log_path == '{}/artifact-installation-guest0'.format(str(tmpdir))
+    assert isinstance(outputs[0].additional_data, gluetool_modules.libs.sut_installation.SUTInstallation)
+
+    assert isinstance(exc, SUTInstallationFailedError)
+    assert exc.message == 'SUT installation failed'
 
 
 @pytest.mark.parametrize('info_output', [
@@ -503,5 +516,17 @@ def test_sut_installation_fail(module, monkeypatch, info_output, tmpdir):
 
     guest = mock_guest(execute_mock)
 
-    with pytest.raises(SUTInstallationFailedError):
-        module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
+    ret = module.setup_guest(guest, stage=GuestSetupStage.ARTIFACT_INSTALLATION, log_dirpath=str(tmpdir))
+
+    assert ret.is_error
+
+    outputs, exc = ret.value
+
+    assert len(outputs) == 1
+    assert outputs[0].stage == GuestSetupStage.ARTIFACT_INSTALLATION
+    assert outputs[0].label == 'module installation'
+    assert outputs[0].log_path == '{}/artifact-installation-guest0'.format(str(tmpdir))
+    assert isinstance(outputs[0].additional_data, gluetool_modules.libs.sut_installation.SUTInstallation)
+
+    assert isinstance(exc, SUTInstallationFailedError)
+    assert exc.message == 'SUT installation failed'

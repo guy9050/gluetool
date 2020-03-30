@@ -1,6 +1,5 @@
-import six
-
 import gluetool
+from gluetool.result import Ok, Error
 from gluetool.utils import normalize_shell_option
 from gluetool.log import log_dict
 from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupStage
@@ -97,25 +96,55 @@ class PipelineInstallAncestors(gluetool.Module):
         # Make sure previous setup_guest methods are called. This is out of decency only - we don't expect there
         # to be any other `setup_guest` in the pipeline. If there were, it would be operate within the context
         # of the initial primary artifact while we're trying to do our job within context of the ancestor.
-        guest_setup_output = self.overloaded_shared(
+        r_overloaded_guest_setup_output = self.overloaded_shared(
             'setup_guest',
             guest,
             stage=stage,
             log_dirpath=log_dirpath,
             **kwargs
-        ) or []
+        )
 
-        # callback to initiate setup guest in separate pipeline
+        if r_overloaded_guest_setup_output is None:
+            r_overloaded_guest_setup_output = Ok([])
+
+        if r_overloaded_guest_setup_output.is_error:
+            return r_overloaded_guest_setup_output
+
+        # Containers for guest setup outputs and result from the child pipeline.
+        guest_setup_output = r_overloaded_guest_setup_output.unwrap() or []
+        guest_setup_output_result = [Ok(guest_setup_output)]
+
+        # Callback to initiate setup guest in child pipeline - will add its outputs to our container,
+        # and it should propagate any failure - or at least the first one - by updating the result.
         def do_setup_guest(self):
-            guest_setup_output.extend(
-                self.shared(
-                    'setup_guest',
-                    guest,
-                    stage=stage,
-                    log_dirpath=log_dirpath,
-                    **kwargs
-                )
+            r_guest_setup = self.shared(
+                'setup_guest',
+                guest,
+                stage=stage,
+                log_dirpath=log_dirpath,
+                **kwargs
             )
+
+            if r_guest_setup is None:
+                r_guest_setup = Ok([])
+
+            if r_guest_setup.is_error:
+                # Just like the successfull result, the failed one also carries list of outputs
+                # we need to propagate to our parent pipeline.
+                outputs, exc = r_guest_setup.value
+
+                guest_setup_output.extend(outputs)
+
+                # If the current global outcome of guest-setup is still set to "success", change that to failed.
+                # If it's already an error, we don't care, just propagate the outputs.
+                if guest_setup_output_result[0].is_ok:
+                    guest_setup_output_result[0] = Error((
+                        guest_setup_output,
+                        exc
+                    ))
+
+            else:
+                guest_setup_output.extend(r_guest_setup.unwrap() or [])
 
         #
         # Run the installation of the ancestors in a separate pipeline. We are using a separate pipeline
@@ -165,13 +194,40 @@ class PipelineInstallAncestors(gluetool.Module):
 
         failure_execute, failure_destroy = self.glue.run_modules(modules)
 
+        # Finalize the response. We must return Result, either Ok or Error, with a list of guest setup
+        # outputs and possible the exception.
+        #
+        # Note that we can return just a single exception, so the first one wins. If there were more
+        # exceptions raised somewhere later, then we at least log them.
+        result = guest_setup_output_result[0]
+
         if failure_execute:
-            six.reraise(*failure_execute.exc_info)
+            if result.is_ok:
+                result = Error((
+                    guest_setup_output,
+                    failure_execute.exception
+                ))
+
+            else:
+                guest.error(
+                    'Exception raised: {}'.format(failure_execute.exception),
+                    exc_info=failure_execute.exc_info
+                )
 
         if failure_destroy:
-            six.reraise(*failure_destroy.exc_info)
+            if result.is_ok:
+                result = Error((
+                    guest_setup_output,
+                    failure_destroy.exception
+                ))
 
-        return guest_setup_output
+            else:
+                guest.error(
+                    'Exception raised: {}'.format(failure_destroy.exception),
+                    exc_info=failure_destroy.exc_info
+                )
+
+        return result
 
     @property
     def eval_context(self):
