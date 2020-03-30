@@ -76,6 +76,9 @@ class TestScheduleEntryStage(enum.Enum):
     #: Freshly created entry, nothing has happened yet to fulfil its goal.
     CREATED = 'created'
 
+    #: An entry is ready for next stages of testing.
+    READY = 'ready'
+
     #: A provisioning process started, to acquire a guest for the entry.
     GUEST_PROVISIONING = 'guest-provisioning'
 

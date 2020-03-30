@@ -1,14 +1,22 @@
 import libci.guest
 import gluetool
 from gluetool.action import Action
-from gluetool.utils import normalize_bool_option
+from gluetool.utils import normalize_bool_option, load_yaml, dict_update, GlueError
+from gluetool.log import log_blob
 from gluetool_modules.libs.guest_setup import GuestSetupStage, SetupGuestReturnType
 from gluetool_modules.libs.jobs import JobEngine, Job, handle_job_errors
-from gluetool_modules.libs.test_schedule import TestScheduleEntryStage, TestScheduleEntryState
+from gluetool_modules.libs.test_schedule import TestScheduleEntryStage, TestScheduleEntryState, TestScheduleResult
 
 # Type annotations
 from typing import TYPE_CHECKING, cast, Any, Callable, Dict, List, Optional  # noqa
 from gluetool_modules.libs.test_schedule import TestSchedule, TestScheduleEntry  # noqa
+
+# Make sure all enums listed here use lower case values only, they will not work correctly with config file otherwise.
+STRING_TO_ENUM = {
+    'stage': TestScheduleEntryStage,
+    'state': TestScheduleEntryState,
+    'result': TestScheduleResult
+}
 
 
 class TestScheduleRunner(gluetool.Module):
@@ -22,6 +30,23 @@ class TestScheduleRunner(gluetool.Module):
 
     Runner plugins are expected to provide the shared function which accepts single `SE` and returns nothing.
     Plugin is responsible for updating ``SE.result`` attribute.
+
+    SE execution is divided into several `stages`. Each stage is executed, when the previous one successfully finished.
+    In special cases attributes of `SE` can be changed between stage transitions. Even `SE.stage` can be changed.
+    Rules for such changes are held in config file specified by `--schedule-entry-attribute-map` option.
+
+    The config file (in YAML format) is set of dictionaries. Each dictionary has to have rule stored under `rule` key.
+    The rule is evaluated by `evaluate_filter` shared function, `eval_context` extend by the SE object is passed as a
+    context for evaluation.
+
+    Rest of the items is used as attributes of current SE, when the rule was met.
+
+    Example of such config file:
+
+    - rule: 'leapp-upgrade' in JENKINS_JOB_NAME and BUILD_TARGET.match(RHEL_8_0_0.ZStream.build_target.brew)
+      stage: complete
+      result: not_applicable
+      results: []
     """
 
     name = 'test-schedule-runner'
@@ -32,6 +57,13 @@ class TestScheduleRunner(gluetool.Module):
             'help': 'Enable or disable parallelization of test schedule entries (default: %(default)s)',
             'default': 'no',
             'metavar': 'yes|no'
+        },
+        'schedule-entry-attribute-map': {
+            'help': """Path to file with schedule entry attributes and rules, when to use them. See modules's
+                    docstring for more details. (default: %(default)s)""",
+            'metavar': 'FILE',
+            'type': str,
+            'default': ''
         }
     }
 
@@ -41,6 +73,15 @@ class TestScheduleRunner(gluetool.Module):
 
         return normalize_bool_option(self.option('parallelize'))
 
+    @gluetool.utils.cached_property
+    def schedule_entry_attribute_map(self):
+        # type: () -> Any
+
+        if not self.option('schedule-entry-attribute-map'):
+            return []
+
+        return load_yaml(self.option('schedule-entry-attribute-map'), logger=self.logger)
+
     def sanity(self):
         # type: () -> None
 
@@ -49,6 +90,11 @@ class TestScheduleRunner(gluetool.Module):
 
         else:
             self.info('Will run schedule entries serially')
+
+    def _get_entry_ready(self, schedule_entry):
+        # type: (TestScheduleEntry) -> None
+
+        pass
 
     def _provision_guest(self, schedule_entry):
         # type: (TestScheduleEntry) -> List[libci.guest.NetworkedGuest]
@@ -194,7 +240,51 @@ class TestScheduleRunner(gluetool.Module):
         def _on_job_start(schedule_entry):
             # type: (TestScheduleEntry) -> None
 
-            if schedule_entry.stage == TestScheduleEntryStage.CREATED:
+            self.require_shared('evaluate_filter')
+
+            filtered_items = self.shared(
+                'evaluate_filter',
+                self.schedule_entry_attribute_map,
+                context=dict_update(
+                    self.shared('eval_context'),
+                    {'SCHEDULE_ENTRY': schedule_entry}
+                )
+            )
+
+            if filtered_items:
+                schedule_entry.warn('Schedule entry will be changed by config file')
+
+            for item in filtered_items:
+                for attribute, value in item.items():
+                    if attribute == 'rule':
+                        log_blob(self.debug, 'applied rule', value)
+                        continue
+
+                    if not hasattr(schedule_entry, attribute):
+                        raise GlueError("Schedule entry has no attribute '{}'".format(attribute))
+
+                    if attribute in STRING_TO_ENUM:
+                        log_old_value = getattr(schedule_entry, attribute, None).name
+
+                        try:
+                            new_value = STRING_TO_ENUM[attribute](value.lower())
+                        except ValueError:
+                            raise GlueError("Cannot set schedule entry {} to '{}'".format(attribute, value))
+
+                        log_new_value = new_value.name
+                    else:
+                        log_old_value = getattr(schedule_entry, attribute, None)
+
+                        new_value = value
+                        log_new_value = value
+
+                    setattr(schedule_entry, attribute, new_value)
+
+                    schedule_entry.info(
+                        '{} changed: {} => {}'.format(attribute, log_old_value, log_new_value)
+                    )
+
+            if schedule_entry.stage == TestScheduleEntryStage.READY:
                 schedule_entry.debug('planning guest provisioning')
 
                 _shift(schedule_entry, TestScheduleEntryStage.GUEST_PROVISIONING)
@@ -212,7 +302,14 @@ class TestScheduleRunner(gluetool.Module):
         def _on_job_complete(result, schedule_entry):
             # type: (Any, TestScheduleEntry) -> None
 
-            if schedule_entry.stage == TestScheduleEntryStage.GUEST_PROVISIONING:
+            if schedule_entry.stage == TestScheduleEntryStage.CREATED:
+                schedule_entry.info('Entry is ready')
+
+                _shift(schedule_entry, TestScheduleEntryStage.READY)
+
+                engine.enqueue_jobs(_job(schedule_entry, 'provisioning', self._provision_guest))
+
+            elif schedule_entry.stage == TestScheduleEntryStage.GUEST_PROVISIONING:
                 schedule_entry.info('guest provisioning finished')
 
                 schedule_entry.guest = result[0]
@@ -264,7 +361,7 @@ class TestScheduleRunner(gluetool.Module):
             # type: (int, TestScheduleEntry) -> None
 
             # `remaining_count` is number of remaining jobs, but we're more interested in a number of remaining
-            # schedule entries (one entry spawns multiple jobs, hence jobs are not usefull to us).
+            # schedule entries (one entry spawns multiple jobs, hence jobs are not useful to us).
 
             remaining_count = len([
                 se for se in schedule if se.stage != TestScheduleEntryStage.COMPLETE
@@ -304,7 +401,7 @@ class TestScheduleRunner(gluetool.Module):
                 }
             )
 
-            engine.enqueue_jobs(_job(schedule_entry, 'provisioning', self._provision_guest))
+            engine.enqueue_jobs(_job(schedule_entry, 'get entry ready', self._get_entry_ready))
 
         engine.run()
 
