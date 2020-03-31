@@ -285,6 +285,8 @@ getUser:
 getFullInheritance:
   f25-candidate:
     - name: f24-candidate
+  f25-updates-candidate:
+    - name: f24-candidate
 
 listTagged:
   f25:

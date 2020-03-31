@@ -431,7 +431,7 @@ class KojiTask(LoggerMixin, object):
         :raises gluetool.glue.GlueError: In case previous tag search cannot be performed.
         """
 
-        tag = tag or self.target
+        tag = tag or self.destination_tag or self.target
 
         # blow up loudly if requested to get previous tag with a not existing build target
         if tag == '<no build target available>':
@@ -439,7 +439,7 @@ class KojiTask(LoggerMixin, object):
 
         try:
             previous_tag = self._call_api('getFullInheritance', tag)[0]['name']
-        except (KeyError, IndexError):
+        except (KeyError, IndexError, koji.GenericError):
             return None
 
         return previous_tag
