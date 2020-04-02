@@ -2,10 +2,11 @@ import collections
 import os
 import gluetool
 from gluetool import SoftGlueError
-from gluetool.log import log_dict, log_blob, LoggingFunctionType
+from gluetool.log import log_dict
 from gluetool.result import Ok, Error
 from gluetool.utils import Result
 from gluetool_modules.libs.sentry import PrimaryTaskFingerprintsMixin
+from gluetool_modules.libs import run_and_log
 
 from jq import jq
 
@@ -69,42 +70,6 @@ class SUTInstallation(object):
     def run(self, guest):
         # type: (gluetool_modules.libs.guest.NetworkedGuest) -> Result[None, SUTInstallationFailedError]
 
-        def _run_and_log(command,  # type: str
-                         log_filepath,  # type: str
-                         callback  # type: Optional[Callable[[str, gluetool.utils.ProcessOutput], str]]
-                        ):  # noqa
-            # type: (...) -> Tuple[bool, Optional[str]]
-
-            # Set to `True` when the exception was raised by a command - we cannot immediately
-            # raise `SUTInstallationFailedError` because we want to log output of the command,
-            # and we cannot use `exc` and check whether it's not `None` because Python will
-            # unset `exc` when leaving `except` branch.
-            execute_failed = False
-            error_message = None
-
-            try:
-                output = guest.execute(command)
-
-            except gluetool.glue.GlueCommandError as exc:
-                execute_failed = True
-                output = exc.output
-
-            if callback:
-                error_message = callback(command, output)
-
-            with open(log_filepath, 'a') as log_file:
-                def write_cover(text, **kwargs):
-                    # type: (str, **Any) -> None
-
-                    assert log_file is not None
-                    log_file.write('{}\n\n'.format(text))
-
-                log_blob(cast(LoggingFunctionType, write_cover), 'Command', command)
-                log_blob(cast(LoggingFunctionType, write_cover), 'Stdout', output.stdout or '')
-                log_blob(cast(LoggingFunctionType, write_cover), 'Stderr', output.stderr or '')
-
-            return bool(execute_failed or error_message), error_message
-
         try:
             guest.execute('command -v yum')
             yum_present = True
@@ -128,7 +93,14 @@ class SUTInstallation(object):
                 command = '{}{}'.format('dnf', command[3:])
 
             if not step.items:
-                command_failed, error_message = _run_and_log(command, log_filepath, step.callback)
+                command_failed, error_message, output = run_and_log(
+                    [command],  # `command` is a string, we need to send it as List[str]
+                    log_filepath,
+                    # our `command` is assigned to this `cmd`, and here we convert it
+                    # to string to work with guest.execute
+                    lambda cmd: guest.execute(cmd[0]),
+                    callback=step.callback
+                )
 
                 if command_failed and not step.ignore_exception:
                     return Error(
@@ -146,7 +118,14 @@ class SUTInstallation(object):
                 # e.g 'yum install -y {}'.format('ksh')
                 final_command = command.format(item)
 
-                command_failed, error_message = _run_and_log(final_command, log_filepath, step.callback)
+                command_failed, error_message, output = run_and_log(
+                    [final_command],  # `final_command` is a string, we need to send it as List[str]
+                    log_filepath,
+                    # our `final_command` is assigned to this `cmd`, and here we convert it
+                    # to string to work with guest.execute
+                    lambda cmd: guest.execute(cmd[0]),
+                    callback=step.callback
+                )
 
                 if not command_failed:
                     continue

@@ -12,9 +12,7 @@ from . import create_module, patch_shared, check_loadable
 
 @pytest.fixture(name='module')
 def fixture_module():
-    module = create_module(pagure_srpm.PagureSRPM)[1]
-
-    return module
+    return create_module(pagure_srpm.PagureSRPM)[1]
 
 
 def test_loadable(module):
@@ -40,10 +38,9 @@ def run_src_rpm(module, monkeypatch, command_calls):
 
     run_return_value_mock = MagicMock()
     run_return_value_mock.stdout = 'dummy_directory/dummy_src_rpm.srpm'
-    init_mock = MagicMock(return_value=None)
+
     run_mock = MagicMock(return_value=run_return_value_mock)
-    monkeypatch.setattr(pagure_srpm.Command, '__init__', init_mock)
-    monkeypatch.setattr(pagure_srpm.Command, 'run', run_mock)
+    monkeypatch.setattr(pagure_srpm, 'run_command', run_mock)
 
     chdir_mock = MagicMock()
     monkeypatch.setattr(os, 'chdir', chdir_mock)
@@ -57,21 +54,47 @@ def run_src_rpm(module, monkeypatch, command_calls):
     chdir_mock.assert_called_once_with('dummy_project_name')
     rename_mock.assert_called_once_with('dummy_project_name.spec', 'dummy_project_name.spec.backup')
 
-    init_mock.assert_has_calls(command_calls, any_order=True)
+    run_mock.assert_has_calls(command_calls, any_order=True)
 
 
-def test_src_rpm(module, monkeypatch):
+def test_src_rpm(tmp_path, module, monkeypatch):
+    path = tmp_path / "pagure.log"
+    path_mock = MagicMock(return_value=path)
+    monkeypatch.setattr(pagure_srpm, 'normalize_path', path_mock)
+    monkeypatch.setattr(os.path, 'relpath', path_mock)
+
     calls = []
 
-    calls.append(call(['git', 'clone', '-b', 'dummy_destination_branch', 'dummy_clone_url'], logger=module.logger))
-    calls.append(call(['git', 'fetch', 'origin', 'refs/pull/8/head'], logger=module.logger))
-    calls.append(call(['git', 'merge', 'FETCH_HEAD', '-m', 'ci pr merge'], logger=module.logger))
-    calls.append(call(['rhpkg', 'srpm'], logger=module.logger))
+    calls.append(call(
+        ['git', 'clone', '-b', 'dummy_destination_branch', 'dummy_clone_url'],
+        path,
+        'Clone git repository'
+    ))
+    calls.append(call(
+        ['git', 'fetch', 'origin', 'refs/pull/8/head'],
+        path,
+        'Fetch pull request changes'
+    ))
+    calls.append(call(
+        ['git', 'merge', 'FETCH_HEAD', '-m', 'ci pr merge'],
+        path,
+        'Merge pull request changes'
+    ))
+    calls.append(call(
+        ['rhpkg', 'srpm'],
+        path,
+        'Make srpm'
+    ))
 
     run_src_rpm(module, monkeypatch, calls)
 
 
-def test_src_rpm_additional_options(module, monkeypatch):
+def test_src_rpm_additional_options(tmp_path, module, monkeypatch):
+    path = tmp_path / "pagure.log"
+    path_mock = MagicMock(return_value=path)
+    monkeypatch.setattr(pagure_srpm, 'normalize_path', path_mock)
+    monkeypatch.setattr(os.path, 'relpath', path_mock)
+
     calls = []
 
     module._config['git-clone-options'] = '--depth 1'
@@ -80,17 +103,24 @@ def test_src_rpm_additional_options(module, monkeypatch):
 
     calls.append(call(
         ['git', 'clone', '-b', 'dummy_destination_branch', 'dummy_clone_url', '--depth', '1'],
-        logger=module.logger
+        path,
+        'Clone git repository'
     ))
     calls.append(call(
         ['git', 'fetch', 'origin', 'refs/pull/8/head', '--multiple'],
-        logger=module.logger
+        path,
+        'Fetch pull request changes'
     ))
     calls.append(call(
         ['git', 'merge', 'FETCH_HEAD', '-m', 'ci pr merge', '--allow-unrelated-histories'],
-        logger=module.logger
+        path,
+        'Merge pull request changes'
     ))
-    calls.append(call(['rhpkg', 'srpm'], logger=module.logger))
+    calls.append(call(
+        ['rhpkg', 'srpm'],
+        path,
+        'Make srpm'
+    ))
 
     run_src_rpm(module, monkeypatch, calls)
 

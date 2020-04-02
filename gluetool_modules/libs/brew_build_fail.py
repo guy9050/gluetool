@@ -1,7 +1,9 @@
-from gluetool import GlueCommandError, SoftGlueError
+from gluetool import SoftGlueError
+from gluetool.utils import Command
+from gluetool_modules.libs import run_and_log
 
 # Type annotations
-from typing import TYPE_CHECKING  # noqa
+from typing import TYPE_CHECKING, List  # noqa
 
 if TYPE_CHECKING:
     import gluetool # noqa
@@ -16,10 +18,17 @@ class BrewBuildFailedError(SoftGlueError):
         self.output = output
 
 
-def run_command(module, command, comment):
-    # type: (gluetool.Module, gluetool.utils.Command, str) -> gluetool.utils.ProcessOutput
-    try:
-        module.info(comment)
-        return command.run(inspect=True)
-    except GlueCommandError as exc:
-        raise BrewBuildFailedError('{} failed'.format(comment), exc.output)
+def executor(command):
+    # type: (List[str]) -> gluetool.utils.ProcessOutput
+    return Command(command).run()
+
+
+def run_command(command, log_path, comment):
+    # type: (List[str], str, str) -> gluetool.utils.ProcessOutput
+    command_failed, err_msg, output = run_and_log(command,
+                                                  log_path,
+                                                  executor)
+
+    if command_failed:
+        raise BrewBuildFailedError('{} failed.'.format(comment), output)
+    return output

@@ -1,8 +1,9 @@
 import os
 import shlex
 import gluetool
-from gluetool.utils import Command
+from gluetool.utils import normalize_path
 from gluetool_modules.libs.brew_build_fail import run_command
+from gluetool_modules.libs.artifacts import artifacts_location
 
 
 class PagureSRPM(gluetool.Module):
@@ -23,6 +24,10 @@ class PagureSRPM(gluetool.Module):
             'help': 'Additional options for `git merge` command (default: %(default)s).',
             'default': ''
         },
+        'log-path': {
+            'help': 'Path to log file (default: %(default)s).',
+            'default': 'pagure_srpm.log'
+        }
     }
 
     shared_functions = ['src_rpm']
@@ -35,6 +40,10 @@ class PagureSRPM(gluetool.Module):
         if pull_request.ARTIFACT_NAMESPACE not in ['dist-git-pr']:
             raise gluetool.GlueError('Incompatible artifact namespace: {}'.format(pull_request.ARTIFACT_NAMESPACE))
 
+        log_path = normalize_path(self.option('log-path'))
+        display_log_path = os.path.relpath(log_path, os.getcwd())
+        self.info('build logs are in {}'.format(artifacts_location(self, display_log_path, logger=self.logger)))
+
         clone_cmd = [
             'git', 'clone',
             '-b', pull_request.destination_branch,
@@ -43,9 +52,10 @@ class PagureSRPM(gluetool.Module):
 
         if self.option('git-clone-options'):
             clone_cmd.extend(shlex.split(self.option('git-clone-options')))
+
         run_command(
-            self,
-            Command(clone_cmd, logger=self.logger),
+            clone_cmd,
+            log_path,
             'Clone git repository'
         )
 
@@ -59,8 +69,8 @@ class PagureSRPM(gluetool.Module):
             fetch_cmd.extend(shlex.split(self.option('git-fetch-options')))
 
         run_command(
-            self,
-            Command(fetch_cmd, logger=self.logger),
+            fetch_cmd,
+            log_path,
             'Fetch pull request changes'
         )
 
@@ -70,9 +80,9 @@ class PagureSRPM(gluetool.Module):
             merge_cmd.extend(shlex.split(self.option('git-merge-options')))
 
         run_command(
-            self,
-            Command(merge_cmd, logger=self.logger),
-            'merge pull request changes'
+            merge_cmd,
+            log_path,
+            'Merge pull request changes'
         )
 
         last_comment_id = pull_request.comments[-1]['id'] if pull_request.comments else 0
@@ -89,8 +99,8 @@ class PagureSRPM(gluetool.Module):
 
         rhpkg_cmd = ['rhpkg', 'srpm']
         output = run_command(
-            self,
-            Command(rhpkg_cmd, logger=self.logger),
+            rhpkg_cmd,
+            log_path,
             'Make srpm'
         )
 

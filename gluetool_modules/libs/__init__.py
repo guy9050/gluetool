@@ -8,7 +8,9 @@ import enum
 import gluetool.log
 import gluetool.utils
 
-from typing import Any, Callable, List, Optional  # noqa
+from gluetool.log import LoggingFunctionType, log_blob
+
+from typing import cast, Any, Callable, List, Optional, Tuple, Union  # noqa
 
 
 class _UniqObject(object):
@@ -153,3 +155,41 @@ def create_inspect_callback(logger):
                 stream_handler.buff.append(c)
 
     return _callback
+
+
+def run_and_log(command,  # type: List[str]
+                log_filepath,  # type: str
+                executor,  # type: Callable[[List[str]], gluetool.utils.ProcessOutput]
+                callback=None,  # type: Optional[Callable[[List[str], gluetool.utils.ProcessOutput], str]]
+                full_output=False  # type: bool
+                ):  # noqa
+    # type: (...) -> Tuple[bool, Optional[str], gluetool.utils.ProcessOutput]
+
+    # Set to `True` when the exception was raised by a command - we cannot immediately
+    # raise `SUTInstallationFailedError` because we want to log output of the command,
+    # and we cannot use `exc` and check whether it's not `None` because Python will
+    # unset `exc` when leaving `except` branch.
+    execute_failed = False
+    error_message = None
+
+    try:
+        output = executor(command)
+    except gluetool.glue.GlueCommandError as exc:
+        execute_failed = True
+        output = exc.output
+
+    if callback:
+        error_message = callback(command, output)
+
+    with open(log_filepath, 'a') as log_file:
+        def write_cover(text, **kwargs):
+            # type: (str, **Any) -> None
+
+            assert log_file is not None
+            log_file.write('{}\n\n'.format(text))
+
+        log_blob(cast(LoggingFunctionType, write_cover), 'Command', ' '.join(command))
+        log_blob(cast(LoggingFunctionType, write_cover), 'Stdout', output.stdout or '')
+        log_blob(cast(LoggingFunctionType, write_cover), 'Stderr', output.stderr or '')
+
+    return bool(execute_failed or error_message), error_message, output

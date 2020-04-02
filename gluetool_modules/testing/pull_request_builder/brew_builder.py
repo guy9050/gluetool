@@ -1,12 +1,13 @@
+import os
 import sys
 import six
 import re
 import gluetool
-from gluetool.utils import Command, normalize_multistring_option
-import gluetool_modules.libs
-from gluetool_modules.libs.brew_build_fail import run_command
+from gluetool.utils import normalize_multistring_option, normalize_path
+from gluetool_modules.libs import run_and_log
+from gluetool_modules.libs.brew_build_fail import BrewBuildFailedError, executor, run_command
 from gluetool_modules.libs.results import TestResult, publish_result
-from gluetool.log import log_blob
+from gluetool_modules.libs.artifacts import artifacts_location
 
 
 class BrewBuildTestResult(TestResult):
@@ -29,6 +30,10 @@ class BrewBuilder(gluetool.Module):
             'action': 'append',
             'default': []
         },
+        'log-path': {
+            'help': 'Path to log file (default: %(default)s).',
+            'default': 'brew_builder.log'
+        }
     }
 
     def report_result(self, result, build_url=None, exception=None):
@@ -52,15 +57,19 @@ class BrewBuilder(gluetool.Module):
             '--nowait'
         ]
 
+        log_path = normalize_path(self.option('log-path'))
+        display_log_path = os.path.relpath(log_path, os.getcwd())
+        self.info('build logs are in {}'.format(artifacts_location(self, display_log_path, logger=self.logger)))
+
         arches = normalize_multistring_option(self.option('arches'))
 
         if arches:
             command += ['--arches', ' '.join(arches)]
 
-        try:
-            output = Command(command).run()
-        except gluetool.glue.GlueCommandError as error:
-            log_blob(self.error, "command '{}' failed with following error".format(command), error.output.stderr)
+        command_failed, err_msg, output = run_and_log(command,
+                                                      log_path,
+                                                      executor)
+        if command_failed:
             six.reraise(*sys.exc_info())
 
         # detect brew task id
@@ -79,18 +88,17 @@ class BrewBuilder(gluetool.Module):
         # wait until brew task finish
         brew_watch_cmd = ['brew', 'watch-task', task_id]
 
-        run_command(
-            self,
-            Command(brew_watch_cmd),
-            'Wait for brew build finish'
-        )
+        run_command(brew_watch_cmd,
+                    log_path,
+                    'Wait for brew build finish'
+                    )
 
         return task_url
 
     def execute(self):
         try:
             brew_task_url = self._make_brew_build()
-        except gluetool_modules.libs.brew_build_fail.BrewBuildFailedError as exc:
+        except BrewBuildFailedError as exc:
             self.report_result('FAIL', exception=exc)
             return
 

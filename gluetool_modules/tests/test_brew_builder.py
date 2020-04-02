@@ -1,14 +1,19 @@
+import os
 import pytest
 import gluetool_modules.libs
+from gluetool_modules.libs.brew_build_fail import BrewBuildFailedError
 from mock import MagicMock
 from gluetool_modules.testing.pull_request_builder import brew_builder
 from gluetool import GlueCommandError
 from . import create_module, patch_shared, check_loadable
 
+
 RHPKG_OUTPUT = """
 Created task: 123
 Task info: dummy_brew_url
 """
+
+LOG_PATH = './brew_builder.log'
 
 
 @pytest.fixture(name='module')
@@ -20,11 +25,15 @@ def test_loadable(module):
     check_loadable(module.glue, 'gluetool_modules/testing/pull_request_builder/brew_builder.py', 'BrewBuilder')
 
 
-def test_pass(module, monkeypatch):
-    init_mock = MagicMock(return_value=None)
-    run_mock = MagicMock(return_value=MagicMock(stdout=RHPKG_OUTPUT))
-    monkeypatch.setattr(brew_builder.Command, '__init__', init_mock)
-    monkeypatch.setattr(brew_builder.Command, 'run', run_mock)
+def test_pass(tmp_path, module, monkeypatch):
+    run_mock = MagicMock(return_value=(False, None, MagicMock(stdout=RHPKG_OUTPUT)))
+    run_command = MagicMock()
+    path_mock = MagicMock(return_value=tmp_path)
+
+    monkeypatch.setattr(brew_builder, 'normalize_path', path_mock)
+    monkeypatch.setattr(os.path, 'relpath', path_mock)
+    monkeypatch.setattr(brew_builder, 'run_and_log', run_mock)
+    monkeypatch.setattr(brew_builder, 'run_command', run_command)
 
     patch_shared(monkeypatch, module, {
         'src_rpm': MagicMock()
@@ -39,22 +48,17 @@ def test_pass(module, monkeypatch):
                                                 'PASS', 'dummy_brew_url', None, None)
 
 
-def test_fail(module, monkeypatch):
+def test_fail(tmp_path, module, monkeypatch):
     process_output_mock = MagicMock(exit_code=1)
 
-    class MockedCommand(object):
-        def __init__(self, command, *args, **kwargs):
-            self.cmd = command
+    run_log = MagicMock(return_value=(False, None, MagicMock(stdout=RHPKG_OUTPUT)))
+    run_command = MagicMock(side_effect=BrewBuildFailedError('Wait for brew build finish failed', process_output_mock))
+    path_mock = MagicMock(return_value=tmp_path)
 
-        def run(self, *args, **kwargs):
-            if self.cmd[0] == 'rhpkg':
-                return MagicMock(stdout=RHPKG_OUTPUT)
-            elif self.cmd[0] == 'brew':
-                raise GlueCommandError(self.cmd, process_output_mock)
-            else:
-                return MagicMock()
-
-    monkeypatch.setattr(brew_builder, 'Command', MockedCommand)
+    monkeypatch.setattr(brew_builder, 'normalize_path', path_mock)
+    monkeypatch.setattr(os.path, 'relpath', path_mock)
+    monkeypatch.setattr(brew_builder, 'run_and_log', run_log)
+    monkeypatch.setattr(brew_builder, 'run_command', run_command)
 
     patch_shared(monkeypatch, module, {
         'src_rpm': MagicMock()
@@ -69,13 +73,14 @@ def test_fail(module, monkeypatch):
                                                 'FAIL', None, 'Wait for brew build finish failed', process_output_mock)
 
 
-def test_fail_src_rpm(module, monkeypatch):
+def test_fail_src_rpm(tmp_path, module, monkeypatch):
     process_output_mock = MagicMock(exit_code=1)
+    run_mock = MagicMock(return_value=(False, None, MagicMock(stdout=RHPKG_OUTPUT)))
+    path_mock = MagicMock(return_value=tmp_path)
 
-    init_mock = MagicMock(return_value=None)
-    run_mock = MagicMock(return_value=MagicMock(stdout=RHPKG_OUTPUT))
-    monkeypatch.setattr(brew_builder.Command, '__init__', init_mock)
-    monkeypatch.setattr(brew_builder.Command, 'run', run_mock)
+    monkeypatch.setattr(brew_builder, 'normalize_path', path_mock)
+    monkeypatch.setattr(os.path, 'relpath', path_mock)
+    monkeypatch.setattr(brew_builder, 'run_and_log', run_mock)
 
     src_rpm_mock = MagicMock(
         side_effect=gluetool_modules.libs.brew_build_fail.BrewBuildFailedError(
