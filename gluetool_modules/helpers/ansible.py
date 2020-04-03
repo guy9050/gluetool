@@ -1,6 +1,7 @@
-import json
 import os
 import re
+import stat
+import tempfile
 
 import gluetool
 from gluetool.action import Action
@@ -21,6 +22,9 @@ DEFAULT_ANSIBLE_PYTHON_INTERPRETERS = ["/usr/bin/python3", "/usr/bin/python2", "
 
 # Default name of log file with Ansible output
 ANSIBLE_OUTPUT = "ansible-output.txt"
+
+EXTRA_VARS_FILENAME_PREFIX = 'extra-vars-'
+EXTRA_VARS_FILENAME_SUFFIX = '.yaml'
 
 
 #: Represents bundle of information we know about Ansible output.
@@ -64,6 +68,14 @@ class Ansible(gluetool.Module):
             'action': 'append',
             'default': []
         },
+        'extra-variables-template-file': {
+            'help': """
+                    If specified, the templates in files are rendered into a YAML file which is then passed to every
+                    playbook via ``--extra-vars="@foo.yaml`` option. (default: none)
+                    """,
+            'action': 'append',
+            'default': []
+        },
         'use-pipelining': {
             'help': 'If set, Ansible pipelining would be enabled for playbooks (default: %(default)s).',
             'default': 'no'
@@ -87,6 +99,76 @@ class Ansible(gluetool.Module):
         # type: () -> List[str]
 
         return gluetool.utils.normalize_multistring_option(self.option('ansible-playbook-options'))
+
+    @gluetool.utils.cached_property
+    def extra_variables_template_files(self):
+        # type: () -> List[str]
+
+        return gluetool.utils.normalize_path_option(self.option('extra-variables-template-file'))
+
+    def _extra_variables_templates(self, filepaths):
+        # type: (List[str]) -> List[str]
+
+        templates = []
+
+        for filepath in filepaths:
+            try:
+                with open(filepath, 'r') as f:
+                    templates.append(f.read())
+
+            except IOError as exc:
+                raise gluetool.GlueError('Cannot open template file {}: {}'.format(filepath, exc))
+
+        return templates
+
+    def render_extra_variables_templates(
+        self,
+        logger,  # type: gluetool.log.ContextAdapter
+        context,  # type: Dict[str, Any]
+        template_filepaths=None,  # type: Optional[List[str]]
+        filepath_dir=None,  # type: Optional[str]
+        filename_prefix=EXTRA_VARS_FILENAME_PREFIX,  # type: str
+        filename_suffix=EXTRA_VARS_FILENAME_SUFFIX  # type: str
+    ):
+        # type: (...) -> List[str]
+        """
+        Render template files. For each template file, a file with rendered content is created.
+
+        :param logger: logger to use for logging.
+        :param dict context: context to use for rendering.
+        :param str template_filepaths: list of paths to template files. If not set, paths set via
+            ``--extra-variables-template-file`` option are used.
+        :param str filepath_dir: all files are created in this directory. If not set, current working directory
+            is used.
+        :param str filename_prefix: all file names begin with this prefix.
+        :param str filename_suffix: all file names end with this suffix.
+        :returns: list of paths to rendered files, one for each template.
+        """
+
+        template_filepaths = template_filepaths or self.extra_variables_template_files
+        filepath_dir = filepath_dir or os.getcwd()
+
+        filepaths = []
+
+        for template in self._extra_variables_templates(template_filepaths):
+            with tempfile.NamedTemporaryFile(
+                prefix=filename_prefix,
+                suffix=filename_suffix,
+                dir=filepath_dir,
+                delete=False
+            ) as f:
+                f.write(
+                    gluetool.utils.render_template(template, logger=logger, **context)
+                )
+
+                f.flush()
+
+            # Make the "temporary" file readable for investigation when pipeline's done.
+            os.chmod(f.name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+
+            filepaths.append(f.name)
+
+        return filepaths
 
     def detect_ansible_interpreter(self, guest):
         # type: (libci.guest.NetworkedGuest) -> List[str]
@@ -151,7 +233,9 @@ class Ansible(gluetool.Module):
                      env=None,  # type: Optional[Dict[str, Any]]
                      json_output=False,  # type: bool
                      logger=None,  # type: Optional[gluetool.log.ContextAdapter]
-                     log_filepath=None  # type: Optional[str]
+                     log_filepath=None,  # type: Optional[str]
+                     extra_vars_filename_prefix=EXTRA_VARS_FILENAME_PREFIX,  # type: str
+                     extra_vars_filename_suffix=EXTRA_VARS_FILENAME_SUFFIX  # type: str
                     ):  # noqa
         # type: (...) -> AnsibleOutput
         """
@@ -169,6 +253,8 @@ class Ansible(gluetool.Module):
         :param logger: Optional logger to use for logging. If no set, guest's logger is used by default.
         :param str log_filepath: Path to a file to store Ansible output in. If not set, ``ansible-output.txt``
             is created in the current directory.
+        :param str extra_vars_filename_prefix: prefix used to name files generated from extra vars template files.
+        :param str extra_vars_filename_suffix: suffix used to name files generated from extra vars template files.
         :returns: Instance of :py:class:`AnsibleOutput`.
         """
 
@@ -185,6 +271,8 @@ class Ansible(gluetool.Module):
         inventory = inventory or '{},'.format(guest.hostname)  # note the comma
 
         env = env or os.environ.copy()
+
+        log_filepath = log_filepath or os.path.join(os.getcwd(), ANSIBLE_OUTPUT)
 
         cmd = [
             'ansible-playbook',
@@ -203,15 +291,25 @@ class Ansible(gluetool.Module):
                 ' '.join(['{}="{}"'.format(k, v) for k, v in variables.iteritems()])
             ]
 
-        cmd += [
-            '--extra-vars',
-            json.dumps({
-                'GUEST': {
-                    'hostname': guest.hostname,
-                    'environment': guest.environment.serialize_to_json() if guest.environment else None
-                }
-            })
-        ]
+        # Export common context variables
+        context = gluetool.utils.dict_update(
+            self.shared('eval_context'),
+            {
+                'GUEST': guest
+            }
+        )
+
+        for filepath in self.render_extra_variables_templates(
+            logger,
+            context,
+            filename_prefix=extra_vars_filename_prefix,
+            filename_suffix=extra_vars_filename_suffix,
+            filepath_dir=os.path.dirname(log_filepath)
+        ):
+            cmd += [
+                '--extra-vars',
+                '@{}'.format(filepath)
+            ]
 
         cmd += self.additional_options
 
@@ -302,10 +400,6 @@ class Ansible(gluetool.Module):
 
             except gluetool.GlueCommandError as exc:
                 ansible_call = exc.output
-
-        # As path of logs, use the given file, with fallback to current directory & default name.
-        if not log_filepath:
-            log_filepath = os.path.join(os.getcwd(), ANSIBLE_OUTPUT)
 
         with open(log_filepath, 'w') as f:
             def _write(label, s):

@@ -130,7 +130,8 @@ def test_setup(log, module, local_guest, monkeypatch):
             'dummy_option': 17,
             'json_output': False,
             'logger': mock.ANY,
-            'log_filepath': 'guest-setup-{}/guest-setup-output-pre-artifact-installation.txt'.format(local_guest.name)
+            'log_filepath': 'guest-setup-{}/guest-setup-output-pre-artifact-installation.txt'.format(local_guest.name),
+            'extra_vars_filename_prefix': 'extra-vars-pre-artifact-installation-'
         }
 
         return None

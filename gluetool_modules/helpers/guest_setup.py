@@ -412,6 +412,7 @@ class GuestSetup(gluetool.Module):
                 json_output=False,
                 logger=logger,
                 log_filepath=log_filepath,
+                extra_vars_filename_prefix='extra-vars-{}-'.format(stage.value),
                 **kwargs
             )
 

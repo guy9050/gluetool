@@ -72,8 +72,6 @@ def test_run_playbook_json(module, local_guest, monkeypatch, assert_output):
         'ansible-playbook',
         '-i', '127.0.0.1,',
         '--private-key', local_guest.key,
-        '--extra-vars',
-        mock.ANY,
         os.path.abspath('dummy playbook file')
     ], logger=local_guest.logger)
 
@@ -101,8 +99,6 @@ def test_run_playbook_plaintext(module, local_guest, monkeypatch, assert_output)
         'ansible-playbook',
         '-i', '127.0.0.1,',
         '--private-key', local_guest.key,
-        '--extra-vars',
-        mock.ANY,
         '-v',
         os.path.abspath('dummy playbook file'),
     ], logger=local_guest.logger)
@@ -131,8 +127,6 @@ def test_run_playbooks(module, local_guest, monkeypatch, assert_output):
         'ansible-playbook',
         '-i', '127.0.0.1,',
         '--private-key', local_guest.key,
-        '--extra-vars',
-        mock.ANY,
         '-v',
         os.path.abspath('playbook1'),
         os.path.abspath('playbook2')
@@ -184,8 +178,6 @@ def test_extra_vars(module, local_guest, monkeypatch, assert_output):
         '-i', '127.0.0.1,',
         '--private-key', local_guest.key,
         '--extra-vars', 'FOO="bar"',
-        '--extra-vars',
-        mock.ANY,
         '-v',
         os.path.abspath('dummy playbook file')
     ], logger=local_guest.logger)
@@ -213,8 +205,6 @@ def test_dryrun(module, local_guest, monkeypatch, assert_output):
         'ansible-playbook',
         '-i', '127.0.0.1,',
         '--private-key', local_guest.key,
-        '--extra-vars',
-        mock.ANY,
         '-C',
         '-v',
         os.path.abspath('dummy playbook path')
@@ -243,8 +233,6 @@ def test_additonal_options(module, local_guest, monkeypatch, assert_output):
     mock_command_init.assert_called_once_with([
         'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key,
         '--extra-vars', 'FOO="bar"',
-        '--extra-vars',
-        mock.ANY,
         '-vvv',
         '-d',
         '-v',
