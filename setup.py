@@ -51,6 +51,7 @@ INSTALL_REQUIRES = [
     "pyOpenSSL==17.0.0",
     "pycurl==7.43.0",
     "pymemcache==2.0.0",  # memcache
+    "python-bugzilla==2.3.0",  # bugzilla
     "python-glanceclient==2.8.0",
     "python-neutronclient==7.1.0",
     "python-novaclient==7.1.0",
