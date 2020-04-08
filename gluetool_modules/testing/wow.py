@@ -344,9 +344,9 @@ class WorkflowTomorrow(gluetool.Module):
                 component = primary_task.component
 
                 try:
-                    plan_id = qe.GeneralPlan(component).id
+                    plan_id = qe.Find.general_test_plan(component).id
 
-                except qe.GeneralPlanError:
+                except qe.nitrate.NitrateError:
                     raise NoGeneralTestPlanError(primary_task)
 
                 for wow_options in actual_body_options:
