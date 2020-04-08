@@ -13,4 +13,6 @@ dependencies:
 
   yum:
     - python2-nitrate
-    - qa-tools-workstation
+    # - qa-tools-workstation
+    - qa-tools-workstation-qa-tools
+    - qa-tools-workstation-integration_scripts

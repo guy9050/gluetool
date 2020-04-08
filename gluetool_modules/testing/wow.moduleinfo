@@ -27,7 +27,9 @@ dependencies:
     # because the module uses qe.py to discover test plans from TCMS
     - beaker-client
     - beaker-redhat
-    - qa-tools-workstation
+    # - qa-tools-workstation
+    - qa-tools-workstation-qa-tools
+    - qa-tools-workstation-integration_scripts
 
   ansible_tasks:
     - name: "Requires: krb5-devel because of krb5.h"
@@ -51,8 +53,8 @@ dependencies:
     - name: "%post: inject system qe.py package into virtualenv"
       lineinfile:
         dest: "{{ SPECFILE }}"
-        regexp: "^ln -s /usr/share/qa-tools/python-modules/qe\\.py %GLUETOOL_BASE/lib/python2\\.7/site-packages/qe\\.py"
-        line: "# added by 'wow' module\nln -s /usr/share/qa-tools/python-modules/qe.py %GLUETOOL_BASE/lib/python2.7/site-packages/qe.py\n"
+        regexp: "^ln -s /usr/lib/python3.7/site-packages/qe\\.py %GLUETOOL_BASE/lib/python2\\.7/site-packages/qe\\.py"
+        line: "# added by 'wow' module\nln -s /usr/lib/python3.7/site-packages/qe.py %GLUETOOL_BASE/lib/python2.7/site-packages/qe.py\n"
         state: present
         insertafter: "^# TASK: POST-START"
       when: BUILDING_SPECFILE is defined
