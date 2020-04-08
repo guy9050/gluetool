@@ -16,8 +16,7 @@ structure all ``setup_guest`` functions should return, and states few basic rule
 
 import os
 
-import enum
-import gluetool
+from gluetool_modules.libs import GlueEnum
 import gluetool.log
 from gluetool.result import Result
 
@@ -29,7 +28,7 @@ if TYPE_CHECKING:
     import libci.guest  # noqa
 
 
-class GuestSetupStage(enum.Enum):
+class GuestSetupStage(GlueEnum):
     """
     Different stages supported by guest setup workflow.
     """

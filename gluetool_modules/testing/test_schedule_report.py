@@ -167,10 +167,10 @@ class TestScheduleReport(gluetool.Module):
         # type: (TestSchedule) -> TestScheduleResult
 
         self._overall_result_base(schedule)
-        self.debug('base overall result: {}'.format(schedule.result.name))
+        self.debug('base overall result: {}'.format(schedule.result))
 
         self._overall_result_custom(schedule)
-        self.debug('custom overall result: {}'.format(schedule.result.name))
+        self.debug('custom overall result: {}'.format(schedule.result))
 
         return schedule.result
 
@@ -186,7 +186,7 @@ class TestScheduleReport(gluetool.Module):
             self.error('Result of testing: FAILED')
 
         else:
-            self.warn('Result of testing: {}'.format(result.name))
+            self.warn('Result of testing: {}'.format(result))
 
     def _serialize_results(self, schedule):
         # type: (TestSchedule) -> None

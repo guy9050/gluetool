@@ -1,10 +1,10 @@
-import enum
 import gluetool
 import gluetool.log
 from gluetool.log import LoggerMixin, log_table
 import libci.sentry
 import gluetool_modules.libs.guest_setup
 from gluetool_modules.libs.artifacts import artifacts_location
+from gluetool_modules.libs import GlueEnum
 
 # Type annotations
 from typing import TYPE_CHECKING, cast, Any, Dict, List, Optional  # noqa
@@ -65,7 +65,7 @@ class EmptyTestScheduleError(libci.sentry.PrimaryTaskFingerprintsMixin, gluetool
         return False
 
 
-class TestScheduleEntryStage(enum.Enum):
+class TestScheduleEntryStage(GlueEnum):
     """
     Enumerates different stages of a test schedule entry.
 
@@ -98,7 +98,7 @@ class TestScheduleEntryStage(enum.Enum):
     COMPLETE = 'complete'
 
 
-class TestScheduleEntryState(enum.Enum):
+class TestScheduleEntryState(GlueEnum):
     """
     Enumerates different possible (final) states of a test schedule entry.
 
@@ -113,7 +113,7 @@ class TestScheduleEntryState(enum.Enum):
     ERROR = 'error'
 
 
-class TestScheduleResult(enum.Enum):
+class TestScheduleResult(GlueEnum):
     """
     Enumerates different possible results of both the tests performed by the entry and the schedule as whole.
     """

@@ -3,6 +3,7 @@ import datetime
 import os.path
 import threading
 import traceback
+import enum
 
 import gluetool.log
 import gluetool.utils
@@ -41,6 +42,19 @@ class StreamAdapter(gluetool.log.ContextAdapter):
         # type: (gluetool.log.ContextAdapter, str) -> None
 
         super(StreamAdapter, self).__init__(logger, {'ctx_stream': (100, name)})
+
+
+class GlueEnum(enum.Enum):
+
+    def __str__(self):
+        # type: () -> str
+
+        return self.name
+
+    def __repr__(self):
+        # type: () -> str
+
+        return self.name
 
 
 class StreamHandler(argparse.Namespace):

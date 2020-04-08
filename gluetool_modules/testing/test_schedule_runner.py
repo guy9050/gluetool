@@ -221,7 +221,7 @@ class TestScheduleRunner(gluetool.Module):
             schedule_entry.stage, schedule_entry.state = new_stage, new_state
 
             schedule_entry.debug('shifted: {} => {}, {} => {}'.format(
-                old_stage.name, new_stage.name, old_state.name, new_state.name
+                old_stage, new_stage, old_state, new_state
             ))
 
         def _finish_action(schedule_entry):
@@ -263,25 +263,20 @@ class TestScheduleRunner(gluetool.Module):
                     if not hasattr(schedule_entry, attribute):
                         raise GlueError("Schedule entry has no attribute '{}'".format(attribute))
 
-                    if attribute in STRING_TO_ENUM:
-                        log_old_value = getattr(schedule_entry, attribute, None).name
+                    old_value = getattr(schedule_entry, attribute, None)
 
+                    if attribute in STRING_TO_ENUM:
                         try:
                             new_value = STRING_TO_ENUM[attribute](value.lower())
                         except ValueError:
                             raise GlueError("Cannot set schedule entry {} to '{}'".format(attribute, value))
-
-                        log_new_value = new_value.name
                     else:
-                        log_old_value = getattr(schedule_entry, attribute, None)
-
                         new_value = value
-                        log_new_value = value
 
                     setattr(schedule_entry, attribute, new_value)
 
                     schedule_entry.info(
-                        '{} changed: {} => {}'.format(attribute, log_old_value, log_new_value)
+                        '{} changed: {} => {}'.format(attribute, old_value, new_value)
                     )
 
             if schedule_entry.stage == TestScheduleEntryStage.READY:
