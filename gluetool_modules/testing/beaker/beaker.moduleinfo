@@ -16,7 +16,8 @@ dependencies:
     # for qa-tools-workstation
     - name: qa-tools
       description: qa-tools repository
-      baseurl: http://liver.brq.redhat.com/repo-testing/
+      #baseurl: http://liver.brq.redhat.com/repo-testing/
+      baseurl: http://coprbe.devel.redhat.com/results/lpol/qa-tools/fedora-$releasever-$basearch/
 
   yum:
     - beaker-client

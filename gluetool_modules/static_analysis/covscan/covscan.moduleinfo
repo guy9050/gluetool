@@ -12,7 +12,8 @@ dependencies:
       baseurl: http://coprbe.devel.redhat.com/repos/kdudka/covscan/fedora-$releasever-$basearch/
     - name: rel-eng
       description: RCMTOOLS repository
-      baseurl: http://download-ipv4.eng.brq.redhat.com/rel-eng/RCMTOOLS/latest-RCMTOOLS-2-F-$releasever/compose/Everything/$basearch/os
+      #baseurl: http://download-ipv4.eng.brq.redhat.com/rel-eng/RCMTOOLS/latest-RCMTOOLS-2-F-$releasever/compose/Everything/$basearch/os
+      baseurl: http://download-node-02.eng.bos.redhat.com/rel-eng/RCMTOOLS/latest-RCMTOOLS-2-F-$releasever/compose/Everything/$basearch/os
   yum:
     - covscan-client
     - libcurl-devel

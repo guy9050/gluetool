@@ -16,7 +16,8 @@ dependencies:
     # for qa-tools-workstation
     - name: qa-tools
       description: qa-tools repository
-      baseurl: http://liver.brq.redhat.com/repo-testing/
+      #baseurl: http://liver.brq.redhat.com/repo-testing/
+      baseurl: http://coprbe.devel.redhat.com/results/lpol/qa-tools/fedora-$releasever-$basearch/
   pip:
     # both required by qe.py
     - git+https://github.com/psss/python-nitrate.git@1.3-2#egg=nitrate
