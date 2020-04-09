@@ -37,10 +37,13 @@ class TeDuDeJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     })
 
     def execute(self):
+        options = []
         if self.option('tedude-instructions'):
-            self.build_params['tedude_options'] = '--instructions={}'.format(self.option('tedude-instructions'))
+            options.append('--instructions={}'.format(self.option('tedude-instructions')))
 
         if self.option('bug-attributes'):
-            self.build_params['tedude_options'] = '--bugzilla-attributes={}'.format(self.option('bug-attributes'))
+            options.append('--bugzilla-attributes={}'.format(self.option('bug-attributes')))
+
+        self.build_params['tedude_options'] = ' '.join(options)
 
         self.shared('jenkins').invoke_job('ci-test-brew-tedude', self.build_params)
