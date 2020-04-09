@@ -41,6 +41,6 @@ class TeDuDeJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
             self.build_params['tedude_options'] = '--instructions={}'.format(self.option('tedude-instructions'))
 
         if self.option('bug-attributes'):
-            self.build_params['bugzilla_options'] = '--attributes={}'.format(self.option('bug-attributes'))
+            self.build_params['tedude_options'] = '--bugzilla-attributes={}'.format(self.option('bug-attributes'))
 
         self.shared('jenkins').invoke_job('ci-test-brew-tedude', self.build_params)
