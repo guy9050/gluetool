@@ -42,6 +42,15 @@ class Restraint(gluetool.Module):
             'help': 'Additional restraint options (default: %(default)s).',
             'default': None
         },
+        'start-restraintd': {
+            'help': """
+                    If set, start ``restraintd`` service and wait for it to become available before running tests
+                    (default: %(default)s).
+                    """,
+            'metavar': 'yes|no',
+            'type': str,
+            'default': 'yes'
+        },
         'restraintd-start-timeout': {
             'help': 'Wait SECONDS for restraintd to start and listen (default: %(default)s)',
             'type': int,
@@ -55,7 +64,7 @@ class Restraint(gluetool.Module):
             'metavar': 'SECONDS'
         },
         'restraintd-port': {
-            'help': 'Port on which ``restraind`` is waiting for the tests (default: %(default)s).',
+            'help': 'Port on which ``restraintd`` is waiting for the tests (default: %(default)s).',
             'type': int,
             'default': DEFAULT_RESTRAINTD_PORT,
             'metavar': 'PORT'
@@ -67,33 +76,18 @@ class Restraint(gluetool.Module):
     def sanity(self):
         gluetool.utils.check_for_commands(['restraint'])
 
-    def _guest_restraint_address(self, guest, restraintd_port):
-        return '{}:{}/{}'.format(guest.hostname, restraintd_port, guest.port)
+    def _guest_restraint_address(self, guest):
+        if gluetool.utils.normalize_bool_option(self.option('start-restraintd')):
+            return '{}:{}/{}'.format(guest.hostname, self.option('restraintd-port'), guest.port)
 
-    def restraint(self, guest, job, port=None, rename_dir_to=None):
-        """
-        Run a job on the guest.
+        return guest.hostname
 
-        :param libci.guest.Guest guest: guest to use for running tests.
-        :param job: <job /> element describing the test job.
-        :param int port: port on which ``restraind`` is waiting for the tests. The default value is set
-            by ``--restraintd-port`` option.
-        :param str rename_dir_to: if set, when ``restraint`` finishes, its output directory
-            would be renamed to this value.
-        :rtype: RestraintOutput(gluetool.utils.ProcessOutput, str, str)
-        :returns: output of ``restraint`` command, a path to ``restraint`` directory, and
-            and location of ``index.html`` report, suitabel for reporting.
-        """
-
-        log_xml(guest.debug, 'Job', job)
-
-        port = port or self.option('restraintd-port')
-
+    def _spawn_restraintd(self, guest, parent_action):
         # Make sure restraintd is running and listens for connections
         try:
             with Action(
                 'starting restraintd',
-                parent=Action.current_action(),
+                parent=parent_action,
                 logger=guest.logger,
                 tags={
                     'guest': {
@@ -116,16 +110,19 @@ class Restraint(gluetool.Module):
                 return Result.Error('ss check failed, ignoring error')
 
             # ss' output looks like this:
-            # LISTEN     0      5      127.0.0.1:\d+      *:*       users:(("restraind",pid=\d+,fd=\d+))
-            # just match the important bits, address and name. If the output matches, it's good, restraind
+            # LISTEN     0      5      127.0.0.1:\d+      *:*       users:(("restraintd",pid=\d+,fd=\d+))
+            # just match the important bits, address and name. If the output matches, it's good, restraintd
             # is somewhere in the output (using search - match matches from the first character).
-            match = re.search(r'.*?\s+127\.0\.0\.1:{}.*?"restraintd".*?'.format(port), output.stdout.strip())
+            match = re.search(
+                r'.*?\s+127\.0\.0\.1:{}.*?"restraintd".*?'.format(self.option('restraintd-port')),
+                output.stdout.strip()
+            )
 
             return Result.Ok(True) if match is not None else Result.Error('no restraintd running')
 
         with Action(
             'waiting for restraintd running',
-            parent=Action.current_action(),
+            parent=parent_action,
             logger=guest.logger,
             tags={
                 'guest': {
@@ -141,6 +138,26 @@ class Restraint(gluetool.Module):
                 tick=self.option('restraintd-start-timeout-tick')
             )
 
+    def restraint(self, guest, job, rename_dir_to=None):
+        """
+        Run a job on the guest.
+
+        :param libci.guest.Guest guest: guest to use for running tests.
+        :param job: <job /> element describing the test job.
+        :param str rename_dir_to: if set, when ``restraint`` finishes, its output directory
+            would be renamed to this value.
+        :rtype: RestraintOutput(gluetool.utils.ProcessOutput, str, str)
+        :returns: output of ``restraint`` command, a path to ``restraint`` directory, and
+            and location of ``index.html`` report, suitable for reporting.
+        """
+
+        log_xml(guest.debug, 'Job', job)
+
+        parent_action = Action.current_action()
+
+        if gluetool.utils.normalize_bool_option('start-restraintd'):
+            self._spawn_restraintd(guest, parent_action)
+
         restraint_command = Command(['restraint'], options=['-v'], logger=guest.logger)
 
         if self.option('restraint-options'):
@@ -152,7 +169,7 @@ class Restraint(gluetool.Module):
             f.flush()
 
             try:
-                remote = '1={}@{}'.format(guest.username, self._guest_restraint_address(guest, port))
+                remote = '1={}@{}'.format(guest.username, self._guest_restraint_address(guest))
 
                 restraint_command.options += [
                     '--host', remote,
@@ -161,7 +178,7 @@ class Restraint(gluetool.Module):
 
                 with Action(
                     'running restraint',
-                    parent=Action.current_action(),
+                    parent=parent_action,
                     logger=guest.logger,
                     tags={
                         'guest': {

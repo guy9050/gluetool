@@ -51,10 +51,12 @@ from gluetool_modules.libs.testing_environment import TestingEnvironment
 
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
 
-#: A port on which ``restraintd`` listens for connections to run tests. Since we're using ``restraint``
+#: A port on which **legacy** ``restraintd`` listens for connections to run tests. Since we're using ``restraint``
 #: to run the pseudo-tests that provision the machine - and this ``restraintd`` instance keeps running
 #: since there's still and unfinished test, ``reservesys``, we need an extra ``restraintd`` instance
 #: to run the actual tests. And this is its port.
+#:
+#: Since 0.2.0, we don't need to start yet another ``restraintd`` instance, client does that for us transparently.
 DEFAULT_RESTRAINTD_PORT = 8082
 
 DEFAULT_ACTIVATION_TIMEOUT = 240
@@ -392,6 +394,15 @@ class BeakerProvisioner(gluetool.Module):
                 'metavar': 'PORT',
                 'type': int,
                 'default': DEFAULT_RESTRAINTD_PORT
+            },
+            'start-restraintd': {
+                'help': """
+                        If set, provisioner will spawn a ``restraintd`` listening on a given port
+                        (see ``--restraintd-port``) (default: %(default)s).
+                        """,
+                'metavar': 'yes|no',
+                'type': str,
+                'default': 'yes'
             }
         }),
         ('Provisioning options', {
@@ -532,33 +543,53 @@ class BeakerProvisioner(gluetool.Module):
         ssh_key = normalize_path(self.option('ssh-key'))
         ssh_options = normalize_multistring_option(self.option('ssh-options'))
 
+        # Tell ``reservesys`` task to start *another* ``restraintd`` instance: when ``RSTRNT_PORT`` variable
+        # is set, ``reservesys`` starts new instance of ``restraintd``, listening on this port, aside from
+        # the "original" ``restraintd`` (which is running the ``reservesys`` task :). Should anyone wanted
+        # to use this guest to run tests via ``restraint`` (which is quite common...) they would need
+        # a ``restraintd`` which is not occupied by running our provisioning pseudo-tests, and that's the
+        # new ``restraintd`` listening on ``RSTRNT_PORT``.
+        #
+        # Since Restraint 0.2.0, it is no longer necessary to spawn another instance of restraintd, client
+        # is capable of doing so when started, over SSH. Therefore there's an option controlling this
+        # behavior.
+        body_options = [
+            '--no-reserve',
+            '--task=/distribution/utils/dummy'
+        ]
+
+        if gluetool.utils.normalize_bool_option('start-restraintd'):
+            body_options += [
+                '--last-task=RESERVETIME=86400 RSTRNT_PORT={} /distribution/reservesys'.format(
+                    self.option('restraintd-port')
+                )
+            ]
+
+        else:
+            body_options += [
+                '--last-task=RESERVETIME=86400 /distribution/reservesys'
+            ]
+
         # Override whatever value ``wow`` might think is a suitable distro for this request - we don't care!
         # We want *exactly* the compose specified in the environment, on the exact architecture specified
         # by that environment, and nothing else. ``wow`` is smart and can guess a lot of things, with
         # the help of other modules (shared ``distro`` function) but by this time, given the most common
         # usage pattern, someone else already used ``wow`` to prepare the whole set of jobs, giving its
         # smart ass a chance to show off, now we are not interested in that anymore - give us what we want!
-        #
-        # Also, tell ``reservesys`` to start *another* ``restraintd`` instance: when ``RSTRNT_PORT`` variable
-        # is set, ``reservesys`` starts new instance of ``restraintd``, listening on this port, aside from
-        # the "original" ``restraintd`` (which is running the ``reservesys`` task :). Should anyone wanted
-        # to use this guest to run tests via ``restraint`` (which is quite common...) they would need
-        # a ``restraintd`` which is not occupied by running our provisioning pseudo-tests, and that's the
-        # new ``restraintd`` listening on ``RSTRNT_PORT``.
-        jobs = self.shared('beaker_job_xml', body_options=[
-            '--no-reserve',
-            '--task=/distribution/utils/dummy',
-            '--last-task=RESERVETIME=86400 RSTRNT_PORT={} /distribution/reservesys'.format(
-                self.option('restraintd-port')
-            )
-        ], options=[
-            '--arch', environment.arch
-        ], distros=[
-            environment.compose
-        ], extra_context={
-            'PHASE': 'guest-provisioning',
-            'ENVIRONMENT': environment
-        })
+        jobs = self.shared(
+            'beaker_job_xml',
+            body_options=body_options,
+            options=[
+                '--arch', environment.arch
+            ],
+            distros=[
+                environment.compose
+            ],
+            extra_context={
+                'PHASE': 'guest-provisioning',
+                'ENVIRONMENT': environment
+            }
+        )
 
         if len(jobs) != 1:
             raise GlueError('For an environment a single guest is needed, multiple jobs were returned instead')
