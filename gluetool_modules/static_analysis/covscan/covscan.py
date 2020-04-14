@@ -239,6 +239,10 @@ class CICovscan(gluetool.Module):
                                     overall_result=result.overall_result, result_class=result.result_class,
                                     test_type=result.test_type)
 
+        # note we have only one result for covscan
+        if result.overall_result == 'FAILED':
+            new_xml_element('failure', _parent=test_case, message="Test failed - see added.html for details")
+
         logs = new_xml_element('logs', _parent=test_case)
 
         def _log_url(log_name):
