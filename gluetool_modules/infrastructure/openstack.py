@@ -579,15 +579,22 @@ class OpenstackGuest(NetworkedGuest):
         self._wait_for_resource_status('instance reports SHUTOFF', 'servers', self._os_instance.id, u'SHUTOFF',
                                        timeout=self._module.option('shutdown-timeout'), tick=1)
 
-    def _get_resource_status(self, resource, rid):
-        status = self._call_api('{}.find'.format(resource), getattr(self._nova, resource).find, id=rid).status
+    def _get_resource_status(self, resource_type, rid):
+        resource = self._call_api('{}.find'.format(resource_type), getattr(self._nova, resource_type).find, id=rid)
 
-        self.debug("status of resource '{}' within '{}' is '{}'".format(rid, resource, status))
+        self.debug("status of resource '{}' within '{}' is '{}'".format(rid, resource_type, resource.status))
 
-        if status == u'ERROR':
-            raise GlueError("resource {} {} is in ERROR state".format(resource, rid))
+        if resource.status == u'ERROR':
+            message = ["resource {} {} is in ERROR state".format(resource_type, rid)]
 
-        return status
+            resource_dict = resource.to_dict()
+
+            if 'fault' in resource_dict and 'message' in resource_dict['fault']:
+                message.append(resource_dict['fault']['message'])
+
+            raise GlueError(': '.join(message))
+
+        return resource.status
 
     def _check_resource_status(self, resource, rid, status):
         """
