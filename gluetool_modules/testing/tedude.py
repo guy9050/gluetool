@@ -89,7 +89,10 @@ class TeDuDe(gluetool.Module):
         bug_ids = map(int, self.shared('dist_git_bugs'))
 
         # read bug attributes from bugzilla
-        attributes = self.shared('bugzilla_attributes', bug_ids, self._bugzilla_attributes)
+        if bug_ids:
+            attributes = self.shared('bugzilla_attributes', bug_ids, self._bugzilla_attributes)
+        else:
+            self.info("No bug IDs have been parsed from the changelog")
 
         # method stores the instruction's 'result' and 'message' to a global dictionary with overall results
         def add_result(instruction, command, argument, context):
@@ -105,6 +108,9 @@ class TeDuDe(gluetool.Module):
                 'result': instruction['result'],
                 'message': instruction['message']
             }
+
+        # FIXME: Currently we would pass in case no bugs have been parsed. Maybe we would like
+        # to represent such state somehow so it could be tested against in instructions
 
         # do the evaluation for each parsed bug
         for bug_id in bug_ids:
