@@ -69,6 +69,19 @@ RUN_MAP = [{
     }
 }]
 
+TEST_DOCS_MAP = [
+    {
+        'rules': '1 != 1'
+    },
+    {
+        'rules': 'PRIMARY_TASK'
+    },
+    {
+       'rules': 'PRIMARY_TASK',
+       'docs': 'some-docs'
+    }
+]
+
 RUN = {
     'debug': 'http://example.com/debug',
     'url': 'http://example.com/url'
@@ -118,7 +131,8 @@ def fixture_maps(module, monkeypatch):
     module._config.update({
         'artifact-map': ARTIFACT_MAP,
         'run-map': RUN_MAP,
-        'final-state-map': FINAL_STATE_MAP
+        'final-state-map': FINAL_STATE_MAP,
+        'test-docs-map': TEST_DOCS_MAP
     })
 
     # fake load yaml to directly return our maps
@@ -216,19 +230,21 @@ def test_eval_context(module, namespace):
         'test-type': 'fake-test-type',
         'test-category': 'fake-test-category',
         'test-namespace': '{{ PRIMARY_TASK.id }}',
+        'test-docs': 'fake-test-docs',
         'label': 'fake-label'
     })
 
     assert module.eval_context == {
         'PIPELINE_TEST_TYPE': 'fake-test-type',
         'PIPELINE_TEST_CATEGORY': 'fake-test-category',
+        'PIPELINE_TEST_DOCS': 'fake-test-docs',
         'PIPELINE_TEST_NAMESPACE': '123456',
         'PIPELINE_LABEL': 'fake-label'
     }
 
 
 def test_init_message_thread_id(module, evaluate):
-    _, body = module._init_message('category', 'namespace', 'type', 'thread_id')
+    _, body = module._init_message('category', 'docs', 'namespace', 'type', 'thread_id')
 
     assert body['thread_id'] == 'thread_id'
 
@@ -240,7 +256,7 @@ def test_init_message_shared_thread_id(ci_info, evaluate, monkeypatch, module):
         'evaluate_rules': 'something'
     })
 
-    _, body = module._init_message('category', 'namespace', 'type', None)
+    _, body = module._init_message('category', 'docs', 'namespace', 'type', None)
 
     assert body['thread_id'] == 'shared-thread-id'
 
@@ -269,6 +285,7 @@ def test_execute(ci_info, evaluate, monkeypatch, module, mock_namespace, publish
         'label': 'some-label',
         'issue_url': None,
         'namespace': 'namespace',
+        'docs': 'some-docs',
         'note': 'some-note',
         'reason': None,
         'type': 'some-type',

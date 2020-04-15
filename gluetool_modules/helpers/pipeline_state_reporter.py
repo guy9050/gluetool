@@ -124,6 +124,13 @@ class PipelineStateReporter(gluetool.Module):
                         """,
                 'choices': ['static-analysis', 'functional', 'integration', 'validation']
             },
+            'test-docs': {
+                'help': """
+                        URL to the test documentation. By default the this field is set via mapping file
+                        specified by `--test-docs-map`` option. By specifying this option you override
+                        the mapping file value.
+                        """,
+            },
             'test-namespace': {
                 'help':
                     """
@@ -140,6 +147,14 @@ class PipelineStateReporter(gluetool.Module):
         ('Mapping options', {
             'artifact-map': {
                 'help': 'File with description of items provided as artifact info.'
+            },
+            'test-docs-map': {
+                'help':
+                    """
+                    Rules file to decide the link to the documentation of the test, i.e. content of
+                    link:https://pagure.io/fedora-ci/messages/blob/master/f/schemas/test-common.yaml[test.docs]
+                    field.
+                    """
             },
             'run-map': {
                 'help': 'File with description of items provided as run info.'
@@ -195,6 +210,10 @@ class PipelineStateReporter(gluetool.Module):
             'PIPELINE_TEST_CATEGORY': """
                                       Category of tests performed in this pipeline. See ``test-category`` option.
                                       """,
+            'PIPELINE_TEST_DOCS': """
+                                  Link to the documentation of the test. See ``test-docs`` and ``test-docs-map``
+                                  options.
+                                  """,
             'PIPELINE_TEST_NAMESPACE': """
                                        Test namespace (i.e. prefix) used when constructing ResultsDB testcase name.
                                        See ``test-namespace`` option.
@@ -209,6 +228,7 @@ class PipelineStateReporter(gluetool.Module):
             # common for all artifact providers
             'PIPELINE_TEST_TYPE': self.option('test-type'),
             'PIPELINE_TEST_CATEGORY': self.option('test-category'),
+            'PIPELINE_TEST_DOCS': self._get_test_docs(),
             'PIPELINE_TEST_NAMESPACE': self._get_test_namespace(),
             'PIPELINE_LABEL': self.option('label')
         }
@@ -219,6 +239,13 @@ class PipelineStateReporter(gluetool.Module):
             return []
 
         return gluetool.utils.load_yaml(self.option('artifact-map'), logger=self.logger)
+
+    @gluetool.utils.cached_property
+    def test_docs_map(self):
+        if not self.option('test-docs-map'):
+            return []
+
+        return gluetool.utils.load_yaml(self.option('test-docs-map'), logger=self.logger)
 
     @gluetool.utils.cached_property
     def run_map(self):
@@ -288,7 +315,7 @@ class PipelineStateReporter(gluetool.Module):
     def _run_info(self):
         return self._subject_info('run', self.run_map)
 
-    def _init_message(self, test_category, test_namespace, test_type, thread_id):
+    def _init_message(self, test_category, test_docs, test_namespace, test_type, thread_id):
         headers = {}
         body = {}
 
@@ -307,6 +334,7 @@ class PipelineStateReporter(gluetool.Module):
         body['label'] = self.option('label')
         body['note'] = self.option('note')
         body['namespace'] = test_namespace or self._get_test_namespace()
+        body['docs'] = test_docs or self._get_test_docs()
 
         body['generated_at'] = datetime.datetime.utcnow().isoformat(' ')
         body['version'] = self.option('version')
@@ -320,7 +348,7 @@ class PipelineStateReporter(gluetool.Module):
         return headers, body
 
     def report_pipeline_state(self, state, thread_id=None, topic=None,
-                              test_category=None, test_namespace=None, test_type=None,
+                              test_category=None, test_docs=None, test_namespace=None, test_type=None,
                               test_overall_result=None, test_results=None,
                               distros=None,
                               error_message=None, error_url=None):
@@ -333,6 +361,7 @@ class PipelineStateReporter(gluetool.Module):
         :param str state: State of the pipeline.
         :param str topic: Message bus topic to report to. If not set, ``bus-topic`` option is used.
         :param str test_category: Pipeline category - ``functional``, ``static-analysis``, etc.
+        :param str test_docs: Link to test documentation, etc.
         :param str test_namespace: Test namespace, used to construct test case name in ResultsDB.
         :param str test_type: Pipeline type - ``tier1``, ``rpmdiff-analysis``, etc.
         :param str thread_id: The thread ID of the pipeline. If not set, shared function ``thread_id``
@@ -354,7 +383,7 @@ class PipelineStateReporter(gluetool.Module):
         distros = distros or []
         topic = topic or self.option('bus-topic')
 
-        headers, body = self._init_message(test_category, test_namespace, test_type, thread_id)
+        headers, body = self._init_message(test_category, test_docs, test_namespace, test_type, thread_id)
 
         if state == STATE_COMPLETE:
             body['system'] = [
@@ -516,6 +545,34 @@ class PipelineStateReporter(gluetool.Module):
             return instr['state']
 
         return STATE_ERROR if failure else STATE_COMPLETE
+
+    def _get_test_docs(self):
+        """
+        Read instructions from a file and find the documentation by evaluating the given rules.
+        """
+
+        # force test docs if specified
+        if self.option('test-docs'):
+            return self.option('test-docs')
+
+        context = self.shared('eval_context')
+
+        for instr in self.test_docs_map:
+            log_dict(self.debug, 'test docs instruction', instr)
+
+            if not self.shared('evaluate_rules', instr.get('rules', 'True'), context=context):
+                self.debug('denied by rules')
+                continue
+
+            if 'docs' not in instr:
+                self.warn('Docs rules matched but did not yield any documentation link', sentry=True)
+                continue
+
+            self.debug("test docs set to '{}'".format(instr['docs']))
+
+            return instr['docs']
+
+        return None
 
     def destroy(self, failure=None):
         if failure is not None and isinstance(failure.exc_info[1], SystemExit):
