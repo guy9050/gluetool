@@ -12,18 +12,14 @@ dependencies:
       description: Beaker harness repository
       baseurl: http://beaker.engineering.redhat.com/harness/Fedora$releasever
       exclude: "rhts-* restraint-rhts"
-
     # for qa-tools-workstation
     - name: qa-tools
       description: qa-tools repository
-      #baseurl: http://liver.brq.redhat.com/repo-testing/
       baseurl: http://coprbe.devel.redhat.com/results/lpol/qa-tools/fedora-$releasever-$basearch/
 
   yum:
     - beaker-client
     - beaker-redhat
-    # - qa-tools-workstation
-    - qa-tools-workstation-qa-tools
     - qa-tools-workstation-integration_scripts
 
   pip:
@@ -63,8 +59,17 @@ dependencies:
     - name: "%post: inject system qe.py package into virtualenv"
       lineinfile:
         dest: "{{ SPECFILE }}"
-        regexp: "^ln -s /usr/lib/python3.7/site-packages/qe\\.py %GLUETOOL_BASE/lib/python2\\.7/site-packages/qe\\.py"
-        line: "# added by 'wow' module\nln -s /usr/lib/python3.7/site-packages/qe.py %GLUETOOL_BASE/lib/python2.7/site-packages/qe.py\n"
+        regexp: "^ln -s /usr/lib/python3\\.7/site-packages/qe\\.py %GLUETOOL_BASE/lib/python2\\.7/site-packages/qe\\.py"
+        line: "# added by 'beaker' module\nln -s /usr/lib/python3.7/site-packages/qe.py %GLUETOOL_BASE/lib/python2.7/site-packages/qe.py\n"
         state: present
         insertafter: "^# TASK: POST-START"
+      when: BUILDING_SPECFILE is defined
+
+    - name: "%post: inject python3 system qe.py into python2 system paths"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^ln -s /usr/lib/python3\\.7/site-packages/qe\\.py /usr/lib/python2\\.7/site-packages/qe\\.py"
+        line: "# added by 'beaker' module\nln -s /usr/lib/python3.7/site-packages/qe.py /usr/lib/python2.7/site-packages/qe.py\n"
+        state: present
+        insertafter: "^ln -s /usr/lib/python3\\.7/site-packages/qe\\.py %GLUETOOL_BASE/lib/python2\\.7/site-packages/qe\\.py"
       when: BUILDING_SPECFILE is defined

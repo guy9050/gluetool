@@ -8,11 +8,45 @@ dependencies:
     # for qa-tools-workstation
     - name: qa-tools
       description: qa-tools repository
-      #baseurl: http://liver.brq.redhat.com/repo-testing/
       baseurl: http://coprbe.devel.redhat.com/results/lpol/qa-tools/fedora-$releasever-$basearch/
 
   yum:
     - python2-nitrate
-    # - qa-tools-workstation
-    - qa-tools-workstation-qa-tools
     - qa-tools-workstation-integration_scripts
+
+  ansible_tasks:
+    - name: "%post: inject python3 system qe.py package into virtualenv"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^ln -s /usr/lib/python3\\.7/site-packages/qe\\.py %GLUETOOL_BASE/lib/python2\\.7/site-packages/qe\\.py"
+        line: "# added by 'beaker-jobwatch' module\nln -s /usr/lib/python3.7/site-packages/qe.py %GLUETOOL_BASE/lib/python2.7/site-packages/qe.py\n"
+        state: present
+        insertafter: "^# TASK: POST-START"
+      when: BUILDING_SPECFILE is defined
+
+    - name: "%post: inject python3 system qe.py into python2 system paths"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^ln -s /usr/lib/python3\\.7/site-packages/qe\\.py /usr/lib/python2\\.7/site-packages/qe\\.py"
+        line: "# added by 'beaker-jobwatch' module\nln -s /usr/lib/python3.7/site-packages/qe.py /usr/lib/python2.7/site-packages/qe.py\n"
+        state: present
+        insertafter: "^ln -s /usr/lib/python3\\.7/site-packages/qe\\.py %GLUETOOL_BASE/lib/python2\\.7/site-packages/qe\\.py"
+      when: BUILDING_SPECFILE is defined
+
+    - name: "%post: inject beaker-jobwatch"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^curl -Lk.*beaker-jobwatch"
+        line: "# added by 'beaker-jobwatch' module\ncurl -Lk https://gitlab.cee.redhat.com/baseos-qe/beaker-jobwatch/raw/master/beaker-jobwatch | sed 's|usr/bin/python|usr/bin/python2|' > /usr/bin/beaker-jobwatch\n"
+        state: present
+        insertafter: "^ln -s /usr/lib/python3.7/site-packages/qe\\.py /usr/lib/python2\\.7/site-packages/qe\\.py"
+      when: BUILDING_SPECFILE is defined
+
+    - name: "%post: make beaker-jobwatch executable"
+      lineinfile:
+        dest: "{{ SPECFILE }}"
+        regexp: "^chmod +x /usr/bin/beaker-jobwatch"
+        line: "# added by 'beaker-jobwatch' module\nchmod +x /usr/bin/beaker-jobwatch\n"
+        state: present
+        insertafter: "^curl -Lk.*beaker-jobwatch"
+      when: BUILDING_SPECFILE is defined
