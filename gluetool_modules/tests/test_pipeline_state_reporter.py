@@ -208,16 +208,6 @@ def fixture_publish_messages(module):
     return published
 
 
-def test_get_test_exception(global_eval_context, module, monkeypatch, namespace):
-    def mock_shared(name):
-        raise gluetool.GlueError('something')
-
-    monkeypatch.setattr(module, 'shared', mock_shared)
-
-    with pytest.raises(gluetool.GlueError, match="Cannot render template: 'PRIMARY_TASK' is undefined"):
-        module._get_test_namespace()
-
-
 def test_get_final_state_error(module, evaluate, monkeypatch):
     # fake load yaml to directly return our maps
     monkeypatch.setattr(gluetool.utils, 'load_yaml', lambda option, logger: [])
@@ -225,7 +215,7 @@ def test_get_final_state_error(module, evaluate, monkeypatch):
     assert module._get_final_state(AttributeError) == gluetool_modules.helpers.pipeline_state_reporter.STATE_ERROR
 
 
-def test_eval_context(module, namespace):
+def test_eval_context(module, namespace, global_eval_context):
     module._config.update({
         'test-type': 'fake-test-type',
         'test-category': 'fake-test-category',

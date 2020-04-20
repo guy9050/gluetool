@@ -13,6 +13,7 @@ import bs4
 import gluetool
 from gluetool.log import log_dict
 from gluetool.utils import render_template, normalize_bool_option
+import gluetool_modules.libs
 
 
 STATE_QUEUED = 'queued'
@@ -224,14 +225,22 @@ class PipelineStateReporter(gluetool.Module):
                               """
         }
 
-        return {
+        context = {
             # common for all artifact providers
             'PIPELINE_TEST_TYPE': self.option('test-type'),
             'PIPELINE_TEST_CATEGORY': self.option('test-category'),
-            'PIPELINE_TEST_DOCS': self._get_test_docs(),
-            'PIPELINE_TEST_NAMESPACE': self._get_test_namespace(),
+            'PIPELINE_TEST_DOCS': None,
+            'PIPELINE_TEST_NAMESPACE': None,
             'PIPELINE_LABEL': self.option('label')
         }
+
+        if not gluetool_modules.libs.is_recursion(__file__, 'eval_context'):
+            context.update({
+                'PIPELINE_TEST_DOCS': self._get_test_docs(),
+                'PIPELINE_TEST_NAMESPACE': self._get_test_namespace()
+            })
+
+        return context
 
     @gluetool.utils.cached_property
     def artifact_map(self):
@@ -442,23 +451,14 @@ class PipelineStateReporter(gluetool.Module):
         """
         Return a rendered test namespace.
 
-        Note that we cannot use the whole shared context here, as we would endup in a recursion, because this module
-        provides the test namespace in the shared evaluation context as ``PIPELINE_TEST_NAMESPACE``.
-
         :returns: a rendered test namespace with one variable available in context.
         """
-        try:
-            context = {
-                'PRIMARY_TASK': self.shared('primary_task')
-            }
 
-        except gluetool.glue.GlueError:
-            # if no primary task available yet, render and empty dictionary
-            context = {}
-
-        return gluetool.utils.render_template(self.option('test-namespace'),
-                                              logger=self.logger,
-                                              **context)
+        return gluetool.utils.render_template(
+            self.option('test-namespace'),
+            logger=self.logger,
+            **self.shared('eval_context')
+        )
 
     def _get_overall_result_xunit(self, test_results):
         """
