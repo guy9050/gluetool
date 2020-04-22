@@ -5,11 +5,13 @@ import koji
 import functools
 
 import gluetool
+import gluetool_modules.helpers.rules_engine
 import gluetool_modules.libs.artifacts
 import gluetool_modules.infrastructure.koji_fedora
 
+
 from mock import MagicMock
-from . import create_module, testing_asset
+from . import create_module, patch_shared, testing_asset
 
 
 class MockClientSession(object):
@@ -58,8 +60,13 @@ def fixture_koji_session(request, monkeypatch):
     return request.param
 
 
+@pytest.fixture(name='rules_engine')
+def fixture_rules_engine():
+    return create_module(gluetool_modules.helpers.rules_engine.RulesEngine)[1]
+
+
 @pytest.fixture(name='koji_module')
-def fixture_koji_module(monkeypatch):
+def fixture_koji_module(monkeypatch, rules_engine):
     ci, mod = create_module(gluetool_modules.infrastructure.koji_fedora.Koji)
 
     # make sure task has required share function
@@ -70,7 +77,13 @@ def fixture_koji_module(monkeypatch):
         'url': 'https://koji.fedoraproject.org/kojihub',
         'pkgs-url': 'https://kojipkgs.fedoraproject.org',
         'web-url': 'https://koji.fedoraproject.org/koji',
+        'baseline-tag-map': testing_asset('koji', 'baseline-tag-map.yaml')
     }
+
+    patch_shared(monkeypatch, mod, {}, callables={
+        'evaluate_instructions': rules_engine.evaluate_instructions,
+        'evaluate_rules': rules_engine.evaluate_rules
+    })
 
     #  make sure the module is loaded without a task specified
     mod.execute()
@@ -79,7 +92,7 @@ def fixture_koji_module(monkeypatch):
 
 
 @pytest.fixture(name='brew_module')
-def fixture_brew_module(monkeypatch):
+def fixture_brew_module(monkeypatch, rules_engine):
     ci, mod = create_module(gluetool_modules.infrastructure.koji_fedora.Brew)
 
     # make sure task has required share function
@@ -92,8 +105,14 @@ def fixture_brew_module(monkeypatch):
         'web-url': 'https://brewweb.engineering.redhat.com/brew',
         'automation-user-ids': '2863',
         'dist-git-commit-urls': 'http://pkgs.devel.redhat.com/cgit/rpms/{component}/commit/?id={commit},http://pkgs.devel.redhat.com/cgit/rpms/{component}.git/commit/?id={commit}',
-        'docker-image-url-template': "{{ MODULE.option('pkgs-url') }}/packages/{{ TASK.component }}/{{ TASK.version }}/{{ TASK.release }}/images/{{ ARCHIVE['filename'] }}"
+        'docker-image-url-template': "{{ MODULE.option('pkgs-url') }}/packages/{{ TASK.component }}/{{ TASK.version }}/{{ TASK.release }}/images/{{ ARCHIVE['filename'] }}",
+        'baseline-tag-map': testing_asset('koji', 'baseline-tag-map.yaml')
     }
+
+    patch_shared(monkeypatch, mod, {}, callables={
+        'evaluate_instructions': rules_engine.evaluate_instructions,
+        'evaluate_rules': rules_engine.evaluate_rules
+    })
 
     #  make sure the module is loaded without a task specified
     mod.execute()

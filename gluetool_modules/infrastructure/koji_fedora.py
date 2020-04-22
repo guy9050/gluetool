@@ -420,29 +420,28 @@ class KojiTask(LoggerMixin, object):
 
         return '<no build target available>'
 
-    def previous_tag(self, tag=None):
+    def previous_tags(self, tags):
         """
-        Return previous tag according to the inheritance tag hierarchy to the current build target.
-        If tag specified, use it instead of build target.
+        Return previous tags according to the inheritance tag hierarchy to the given tags.
 
-        :param str tag: Tag to use for checking. By default build target.
-        :rtype: str
-        :returns: Previous tag if found, None otherwise.
+        :param str tags: Tags used for checking.
+        :rtype: list(str)
+        :returns: List of previous tags, empty list if not previous tags found.
         :raises gluetool.glue.GlueError: In case previous tag search cannot be performed.
         """
 
-        tag = tag or self.destination_tag or self.target
+        previous_tags = []
 
-        # blow up loudly if requested to get previous tag with a not existing build target
-        if tag == '<no build target available>':
-            raise GlueError('Cannot check for previous tag as build target does not exist')
+        for tag in tags:
+            if tag == '<no build target available>':
+                raise GlueError('Cannot check for previous tag as build target does not exist')
 
-        try:
-            previous_tag = self._call_api('getFullInheritance', tag)[0]['name']
-        except (KeyError, IndexError, koji.GenericError):
-            return None
+            try:
+                previous_tags.append(self._call_api('getFullInheritance', tag)[0]['name'])
+            except (KeyError, IndexError, koji.GenericError):
+                self.warn("Failed to find inheritance tree for tag '{}'".format(tag), sentry=True)
 
-        return previous_tag
+        return previous_tags
 
     @cached_property
     def source(self):
@@ -556,6 +555,52 @@ class KojiTask(LoggerMixin, object):
         return latest_released.nvr if latest_released else None
 
     @cached_property
+    def _tags_from_map(self):
+        """
+        Unfortunately tags used for looking up baseline builds need to be resolved
+        from a rules file due to contradicting use cases.
+
+        Nice examples for this are:
+
+        * rhel-8 builds, which have ``destination_tag`` set to rhel-8.x.y-gate, but that
+          is incorrrect for the lookup, we need to use the ``build_target``, which
+          in this case is the final destination of the builds after gating
+
+        * for some non-rhel products we have to use ``destination_tag`` only, because
+          ``build_target`` is not a tag to which builds get tagged
+        """
+
+        self._module.require_shared('evaluate_instructions', 'evaluate_rules')
+
+        # use dictionary which can be altered in _tags_callback
+        map = {
+            'tags': []
+        }
+
+        def _tags_callback(instruction, command, argument, context):
+            map['tags'] = []
+
+            for arg in argument:
+                map['tags'].append(self._module.shared('evaluate_rules', arg, context=context))
+
+        context = dict_update(self._module.shared('eval_context'), {
+            'TASK': self
+        })
+
+        commands = {
+            'tags': _tags_callback,
+        }
+
+        self._module.shared(
+            'evaluate_instructions', self._module.baseline_tag_map,
+            commands=commands, context=context
+        )
+
+        log_dict(self.debug, 'Tags from baseline tag map', map['tags'])
+
+        return map['tags']
+
+    @cached_property
     def baseline_task(self):
         """
         Return baseline task. For documentation of the baseline methods see the module's help.
@@ -570,14 +615,14 @@ class KojiTask(LoggerMixin, object):
             raise GlueError("Cannot get baseline because no 'baseline-method' specified")
 
         if method == 'previous-released-build':
-            previous_tag = self.previous_tag()
-            if not previous_tag:
+            previous_tags = self.previous_tags(tags=self._tags_from_map)
+            if not previous_tags:
                 return None
 
-            baseline_task = self.latest_released(tags=[previous_tag])
+            baseline_task = self.latest_released(tags=previous_tags)
 
         elif method == 'previous-build':
-            baseline_task = self.latest_released()
+            baseline_task = self.latest_released(tags=self._tags_from_map)
 
         elif method == 'specific-build':
             nvr = self._module.option('baseline-nvr')
@@ -1534,10 +1579,25 @@ class Koji(gluetool.Module):
     to given method and exposes it under ``baseline_task`` attribute of the primary task. The following
     baseline methods are supported:
 
-    * `previous-build` - finds the previously built package on the same tag
-    * `previous-released-build` - finds the previously released build, i.e. build tagged to the previous
+    * ``previous-build`` - finds the previously built package on the same tag
+    * ``previous-released-build`` - finds the previously released build, i.e. build tagged to the previous
                                   tag according to the tag inheritance
-    * `specific-build` - finds the build specified with ``--baseline-nvr`` option
+    * ``specific-build`` - finds the build specified with ``--baseline-nvr`` option
+
+    For the baseline methods it is expected to provide a rules file via the ``--baseline-tag-map`` option
+    which provides a list of tags which will be used to lookup. Each rule needs to provide `tags` attribute
+    with list of possible values. Each list item is interpreted as a rule. All rules are evaluated and the
+    last matching wins. Below is an example we use now:
+
+    .. code-block:: yaml
+
+        - tags:
+            - TASK.destination_tag
+            - TASK.target
+
+        - rule: MATCH('.*-gate$', TASK.destination_tag)
+          tags:
+            - SUB(r'([^-]*)-([^-]*)-.*', r'\1-\2-candidate', TASK.target)
     """
 
     name = 'koji'
@@ -1606,6 +1666,9 @@ class Koji(gluetool.Module):
             },
             'baseline-nvr': {
                 'help': "NVR of the build to use with 'specific-build' baseline method",
+            },
+            'baseline-tag-map': {
+                'help': 'Optional rules providing tags which are used for finding baseline package'
             }
         }),
         ('Workarounds', {
@@ -1654,6 +1717,13 @@ class Koji(gluetool.Module):
     @cached_property
     def _valid_methods(self):
         return gluetool.utils.normalize_multistring_option(self.option('valid-methods'))
+
+    @cached_property
+    def baseline_tag_map(self):
+        if not self.option('baseline-tag-map'):
+            return []
+
+        return gluetool.utils.load_yaml(self.option('baseline-tag-map'))
 
     def task_factory(self, task_initializer, wait_timeout=None, details=None, task_class=None):
         task_class = task_class or KojiTask
@@ -1925,6 +1995,33 @@ class Brew(Koji, (gluetool.Module)):
         - options ``--name`` and ``--tag`` with the latest build from the given tag
         - option ``--nvr`` with a string with an NVR of a build
         - option ``--task-id`` with a build task ID
+
+    The task can be specified also by using the ``task`` shared function. The shared function
+    supports only initialization from task ID.
+
+    If option ``--baseline-method`` is specified, the module finds a baseline build according
+    to given method and exposes it under ``baseline_task`` attribute of the primary task. The following
+    baseline methods are supported:
+
+    * ``previous-build`` - finds the previously built package on the same tag
+    * ``previous-released-build`` - finds the previously released build, i.e. build tagged to the previous
+                                  tag according to the tag inheritance
+    * ``specific-build`` - finds the build specified with ``--baseline-nvr`` option
+
+    For the baseline methods it is expected to provide a rules file via the ``--baseline-tag-map`` option
+    which provides a list of tags which will be used to lookup. Each rule needs to provide `tags` attribute
+    with list of possible values. Each list item is interpreted as a rule. All rules are evaluated and the
+    last matching wins. Below is an example we use now:
+
+    .. code-block:: yaml
+
+        - tags:
+            - TASK.destination_tag
+            - TASK.target
+
+        - rule: MATCH('.*-gate$', TASK.destination_tag)
+          tags:
+            - SUB(r'([^-]*)-([^-]*)-.*', r'\1-\2-candidate', TASK.target)
     """
     name = 'brew'
     description = 'Provide Brew task details to other modules'
