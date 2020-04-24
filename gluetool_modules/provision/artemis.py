@@ -6,7 +6,7 @@ from gluetool import GlueError, SoftGlueError
 from gluetool.log import log_dict
 from gluetool.result import Result
 from gluetool.utils import treat_url, normalize_multistring_option, wait
-from libci.guest import NetworkedGuest
+from gluetool_modules.libs.guest import NetworkedGuest
 
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 

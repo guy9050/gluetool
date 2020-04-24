@@ -3,7 +3,7 @@ from gluetool import utils, GlueError, SoftGlueError
 from gluetool.action import Action
 from gluetool.log import log_dict
 
-import libci.guest
+import gluetool_modules.libs.guest
 import libci.sentry
 
 import gluetool_modules.libs.artifacts

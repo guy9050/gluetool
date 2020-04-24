@@ -142,7 +142,7 @@ class Restraint(gluetool.Module):
         """
         Run a job on the guest.
 
-        :param libci.guest.Guest guest: guest to use for running tests.
+        :param gluetool_modules.libs.guest.Guest guest: guest to use for running tests.
         :param job: <job /> element describing the test job.
         :param str rename_dir_to: if set, when ``restraint`` finishes, its output directory
             would be renamed to this value.

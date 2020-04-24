@@ -4,6 +4,7 @@ import gluetool
 from gluetool import SoftGlueError
 from gluetool.log import log_dict, log_blob, LoggingFunctionType
 from gluetool.result import Ok, Error
+from gluetool.utils import Result
 from libci.sentry import PrimaryTaskFingerprintsMixin
 
 from jq import jq
@@ -14,8 +15,7 @@ from .artifacts import artifacts_location
 from typing import TYPE_CHECKING, cast, Any, Dict, List, Tuple, Union, Optional, Callable  # noqa
 
 if TYPE_CHECKING:
-    from gluetool.result import Result  # noqa
-    import libci.guest # noqa
+    import gluetool_modules.libs.guest # noqa
 
 #: Step callback type
 StepCallbackType = Callable[[str, gluetool.utils.ProcessOutput], None]
@@ -33,7 +33,7 @@ SUTStep = collections.namedtuple('SUTStep', ['label', 'command', 'items', 'ignor
 
 class SUTInstallationFailedError(PrimaryTaskFingerprintsMixin, SoftGlueError):
     def __init__(self, task, guest, items=None, reason=None, installation_logs=None, installation_logs_location=None):
-        # type: (Any, libci.guest.Guest, Any, Optional[str], Optional[str], Optional[str]) -> None
+        # type: (Any, gluetool_modules.libs.guest.Guest, Any, Optional[str], Optional[str], Optional[str]) -> None
 
         super(SUTInstallationFailedError, self).__init__(task, 'SUT installation failed')
 
@@ -67,7 +67,7 @@ class SUTInstallation(object):
         self.steps.append(SUTStep(label, command, items, ignore_exception, callback))
 
     def run(self, guest):
-        # type: (libci.guest.NetworkedGuest) -> Result[None, Exception]
+        # type: (gluetool_modules.libs.guest.NetworkedGuest) -> Result[None, SUTInstallationFailedError]
 
         def _run_and_log(command,  # type: str
                          log_filepath,  # type: str
@@ -182,7 +182,7 @@ class SUTInstallation(object):
 
 
 def check_ansible_sut_installation(ansible_output,  # type: Dict[str, Any]
-                                   guest,  # type: libci.guest.NetworkedGuest
+                                   guest,  # type: gluetool_modules.libs.guest.NetworkedGuest
                                    primary_task,  # type: Any
                                    logger=None  # type: Optional[gluetool.log.ContextAdapter]
                                   ):  # noqa

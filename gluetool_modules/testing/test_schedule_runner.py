@@ -1,4 +1,4 @@
-import libci.guest
+import gluetool_modules.libs.guest
 import gluetool
 from gluetool.action import Action
 from gluetool.utils import normalize_bool_option, load_yaml, dict_update, GlueError
@@ -97,7 +97,7 @@ class TestScheduleRunner(gluetool.Module):
         pass
 
     def _provision_guest(self, schedule_entry):
-        # type: (TestScheduleEntry) -> List[libci.guest.NetworkedGuest]
+        # type: (TestScheduleEntry) -> List[gluetool_modules.libs.guest.NetworkedGuest]
 
         # This is necessary - the output would tie the thread and the schedule entry in
         # the output. Modules used to actually provision the guest use their own module
@@ -113,7 +113,7 @@ class TestScheduleRunner(gluetool.Module):
 
         with Action('provisioning guest', parent=schedule_entry.action, logger=schedule_entry.logger):
             return cast(
-                List[libci.guest.NetworkedGuest],
+                List[gluetool_modules.libs.guest.NetworkedGuest],
                 self.shared('provision', schedule_entry.testing_environment)
             )
 

@@ -26,7 +26,7 @@ from gluetool.action import Action
 from gluetool.log import LoggerMixin, format_dict, log_dict
 from gluetool.result import Result
 from gluetool.utils import cached_property, normalize_path, load_yaml, dict_update, normalize_multistring_option
-from libci.guest import NetworkedGuest
+from gluetool_modules.libs.guest import NetworkedGuest
 
 from gluetool_modules.libs import strptime
 from gluetool_modules.libs.testing_environment import TestingEnvironment

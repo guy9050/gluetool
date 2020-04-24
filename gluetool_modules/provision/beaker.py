@@ -42,7 +42,7 @@ from gluetool.log import log_dict, log_table
 from gluetool.result import Result
 from gluetool.utils import cached_property, normalize_bool_option, normalize_multistring_option, normalize_path, \
     load_yaml, dict_update
-from libci.guest import NetworkedGuest
+from gluetool_modules.libs.guest import NetworkedGuest
 
 import gluetool_modules.libs
 from gluetool_modules.libs import strptime

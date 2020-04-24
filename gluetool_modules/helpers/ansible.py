@@ -13,7 +13,7 @@ from libci.sentry import PrimaryTaskFingerprintsMixin
 from typing import cast, TYPE_CHECKING, Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union  # noqa
 
 if TYPE_CHECKING:
-    import libci.guest  # noqa
+    import gluetool_modules.libs.guest  # noqa
 
 
 # possible python interpreters
@@ -171,11 +171,11 @@ class Ansible(gluetool.Module):
         return filepaths
 
     def detect_ansible_interpreter(self, guest):
-        # type: (libci.guest.NetworkedGuest) -> List[str]
+        # type: (gluetool_modules.libs.guest.NetworkedGuest) -> List[str]
         """
         Detect Ansible's python interpreter on the given guest and return it.
 
-        :param libci.guest.NetworkedGuest guest: Guest for auto-detection
+        :param gluetool_modules.libs.guest.NetworkedGuest guest: Guest for auto-detection
         :returns: List of paths to the auto-detected python interpreters. Empty list if auto-detection failed.
         """
 
@@ -226,7 +226,7 @@ class Ansible(gluetool.Module):
 
     def run_playbook(self,
                      playbook_paths,  # type: Union[str, List[str]]
-                     guest,  # type: libci.guest.NetworkedGuest
+                     guest,  # type: gluetool_modules.libs.guest.NetworkedGuest
                      variables=None,  # type: Optional[Dict[str, Any]]
                      inventory=None,  # type: Optional[str]
                      cwd=None,  # type: Optional[str]
@@ -242,7 +242,7 @@ class Ansible(gluetool.Module):
         Run Ansible playbook on a given guest.
 
         :param str or list playbook_paths: Path to the playbook or a list of playbook paths.
-        :param libci.guest.NetworkedGuest guest: Guest to run playbooks on.
+        :param gluetool_modules.libs.guest.NetworkedGuest guest: Guest to run playbooks on.
         :param dict variables: If set, represents additional variables that will
             be passed to ``ansible-playbook`` using ``--extra-vars`` option.
         :param str inventory: A path to the inventory file. You can use it if you

@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 
 import gluetool
 from gluetool import GlueError
-from libci.guest import NetworkedGuest
+from gluetool_modules.libs.guest import NetworkedGuest
 
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 
@@ -25,7 +25,7 @@ ProvisionerCapabilities = collections.namedtuple('ProvisionerCapabilities', ['av
 
 class StaticGuest(NetworkedGuest):
     """
-    StaticGuest is like py:class:`libci.guests.NetworkedGuest`, just it does allow degraded services.
+    StaticGuest is like py:class:`gluetool_modules.libs.guests.NetworkedGuest`, just it does allow degraded services.
     """
 
     def _is_allowed_degraded(self, service):

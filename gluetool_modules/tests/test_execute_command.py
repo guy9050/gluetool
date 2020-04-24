@@ -6,7 +6,6 @@ import pytest
 
 import gluetool
 import gluetool_modules.helpers.execute_command
-import libci.guest
 
 from mock import MagicMock
 

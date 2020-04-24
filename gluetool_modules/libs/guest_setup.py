@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, NamedTu
 from typing_extensions import Protocol
 
 if TYPE_CHECKING:
-    import libci.guest  # noqa
+    import gluetool_modules.libs.guest  # noqa
 
 
 class GuestSetupStage(GlueEnum):
@@ -98,7 +98,7 @@ SetupGuestReturnType = Result[List[GuestSetupOutput], Tuple[List[GuestSetupOutpu
 class SetupGuestType(Protocol):
     def __call__(
         self,
-        guest,  # type: libci.guest.NetworkedGuest
+        guest,  # type: gluetool_modules.libs.guest.NetworkedGuest
         stage=GuestSetupStage.PRE_ARTIFACT_INSTALLATION,  # type: GuestSetupStage
         variables=None,  # type: Optional[Dict[str, str]]
         log_dirpath=None,  # type: Optional[str]
@@ -110,7 +110,7 @@ class SetupGuestType(Protocol):
 
 
 def guest_setup_log_dirpath(guest, log_dirpath):
-    # type: (libci.guest.NetworkedGuest, Optional[str]) -> str
+    # type: (gluetool_modules.libs.guest.NetworkedGuest, Optional[str]) -> str
 
     if not log_dirpath:
         log_dirpath = 'guest-setup-{}'.format(guest.name)

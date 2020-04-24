@@ -5,7 +5,7 @@ import mock
 from mock import MagicMock
 
 import gluetool
-import libci.guest
+import gluetool_modules.libs.guest as guest_module
 import gluetool_modules.libs.guest_setup
 import gluetool_modules.libs.testing_environment
 import gluetool_modules.helpers.guest_setup
@@ -21,7 +21,7 @@ def fixture_module():
 
 @pytest.fixture(name='local_guest')
 def fixture_local_guest(module):
-    guest = libci.guest.NetworkedGuest(module, '127.0.0.1', key=MagicMock())
+    guest = guest_module.NetworkedGuest(module, '127.0.0.1', key=MagicMock())
     guest.environment = gluetool_modules.libs.testing_environment.TestingEnvironment(
         arch='x86_64',
         compose='dummy-compose'

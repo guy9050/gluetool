@@ -38,8 +38,7 @@ import gluetool
 from gluetool import GlueError
 from gluetool.log import log_blob, log_dict, format_xml
 from gluetool.utils import new_xml_element, normalize_bool_option, render_template
-import libci.guest
-import libci.results
+import gluetool_modules.libs.guest
 
 from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.test_schedule import TestScheduleResult
@@ -314,7 +313,7 @@ class RestraintRunner(gluetool.Module):
                       task_set,  # type: List[Any]
                       recipe_attrs,  # type: Dict[str, str]
                       recipe_set_attrs,  # type: Dict[str, str]
-                      actual_guest=None  # type: Optional[libci.guest.NetworkedGuest]
+                      actual_guest=None  # type: Optional[gluetool_modules.libs.guest.NetworkedGuest]
                      ):  # noqa
         # type: (...) -> TaskSetResults
         """
@@ -523,7 +522,7 @@ class RestraintRunner(gluetool.Module):
 
             guest.debug("restoring snapshot '{}' before running next task".format(base_snapshot.name))
             actual_guest = cast(
-                libci.guest.NetworkedGuest,
+                gluetool_modules.libs.guest.NetworkedGuest,
                 guest.restore_snapshot(base_snapshot)
             )
 

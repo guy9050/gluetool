@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, cast, Any, Dict, List, Optional  # noqa
 
 if TYPE_CHECKING:
     from gluetool.log import LoggingFunctionType  # noqa
-    import libci.guest  # noqa
+    import gluetool_modules.libs.guest  # noqa
     import gluetool_modules.libs.guest_setup  # noqa
     import gluetool_modules.libs.testing_environment  # noqa
 
@@ -44,7 +44,7 @@ def _env_to_str(testing_environment):
 
 # The same but for guests.
 def _guest_to_str(guest):
-    # type: (Optional[libci.guest.NetworkedGuest]) -> str
+    # type: (Optional[gluetool_modules.libs.guest.NetworkedGuest]) -> str
 
     if guest:
         return '{}\n{}'.format(_env_to_str(guest.environment), guest.name)
@@ -172,7 +172,7 @@ class TestScheduleEntry(LoggerMixin, object):
         self.result = TestScheduleResult.UNDEFINED
 
         self.testing_environment = None  # type: Optional[gluetool_modules.libs.testing_environment.TestingEnvironment]
-        self.guest = None  # type: Optional[libci.guest.NetworkedGuest]
+        self.guest = None  # type: Optional[gluetool_modules.libs.guest.NetworkedGuest]
 
         # List of outputs produced by different guest setup actions
         self.guest_setup_outputs = {}  # type: GuestSetupOutputsContainerType

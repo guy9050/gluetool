@@ -4,7 +4,7 @@ import time
 import gluetool
 from gluetool import GlueError, GlueCommandError
 from gluetool.result import Result
-import libci.guest
+import gluetool_modules.libs.guest
 
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 
@@ -68,7 +68,7 @@ class Image(object):
         return self._image.attrs
 
 
-class DockerGuest(libci.guest.Guest):
+class DockerGuest(gluetool_modules.libs.guest.Guest):
     """
     Guest backed by Docker containers and images.
 

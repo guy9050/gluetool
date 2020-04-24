@@ -8,7 +8,7 @@ from gluetool_modules.libs.sut_installation import SUTInstallation
 
 # Type annotations
 from typing import Any, List, Optional  # noqa
-from libci.guest import Guest
+from gluetool_modules.libs.guest import Guest
 
 
 class InstallCoprBuild(gluetool.Module):

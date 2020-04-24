@@ -14,7 +14,7 @@ from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetu
 from typing import cast, TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union  # noqa
 
 if TYPE_CHECKING:
-    import libci.guest  # noqa
+    import gluetool_modules.libs.guest  # noqa
     import gluetool_modules.helpers.ansible  # noqa
 
 
@@ -257,7 +257,7 @@ class GuestSetup(gluetool.Module):
         )
 
     def _get_details_from_map(self, guest, stage):
-        # type: (libci.guest.NetworkedGuest, GuestSetupStage) -> Tuple[List[str], Dict[str, str]]
+        # type: (gluetool_modules.libs.guest.NetworkedGuest, GuestSetupStage) -> Tuple[List[str], Dict[str, str]]
         """
         Returns a tuple with list of playbooks and extra vars from the processed mapping file
         """
@@ -303,7 +303,7 @@ class GuestSetup(gluetool.Module):
         return (playbooks, extra_vars)
 
     def setup_guest(self,
-                    guest,  # type: libci.guest.NetworkedGuest
+                    guest,  # type: gluetool_modules.libs.guest.NetworkedGuest
                     stage=GuestSetupStage.PRE_ARTIFACT_INSTALLATION,  # type: GuestSetupStage
                     variables=None,  # type: Optional[Dict[str, str]]
                     log_dirpath=None,  # type: Optional[str]
@@ -315,7 +315,7 @@ class GuestSetup(gluetool.Module):
 
         Only networked guests, accessible over SSH, are supported.
 
-        :param libci.guest.NetworkedGuest guest: Guest to setup.
+        :param gluetool_modules.libs.guest.NetworkedGuest guest: Guest to setup.
         :param str stage: pipeline stage in which we're running the playbooks. It is exported to playbooks
             as ``GUEST_SETUP_STAGE`` variable.
         :param dict(str, str) variables: additional variables to pass to each playbook.
