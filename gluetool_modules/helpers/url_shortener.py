@@ -2,6 +2,9 @@ import requests
 
 import gluetool
 
+# Type annotations
+from typing import Optional  # noqa
+
 
 class URLShortener(gluetool.Module):
     """
@@ -34,14 +37,16 @@ class URLShortener(gluetool.Module):
 
     shared_functions = ['get_shortened_url']
 
-    def get_shortened_url(self, url):
-        # type: (str) -> str
+    def get_shortened_url(self, url, raise_on_error=True, logger=None):
+        # type: (str, bool, Optional[gluetool.log.ContextAdapter]) -> str
         """
         Retun the shortened url.
 
         :param url: The url to be shortened.
         :type url: str
         """
+
+        logger = logger or self.logger
 
         shortener = '{}?{}'.format(self.option('shortener-url'), url)
 
@@ -50,8 +55,14 @@ class URLShortener(gluetool.Module):
         if response.status_code < 200 or response.status_code > 299:
             try:
                 response.raise_for_status()
+
             except requests.exceptions.HTTPError as e:
-                raise gluetool.GlueError(str(e))
+                if raise_on_error:
+                    raise gluetool.GlueError(str(e))
+
+                logger.warning('Failed to shorten URL: {}'.format(e), sentry=True)
+
+            return url
 
         return response.text
 
