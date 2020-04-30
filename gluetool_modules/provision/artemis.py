@@ -2,10 +2,10 @@ import collections
 import re
 import gluetool
 
-from gluetool import GlueError, SoftGlueError
+from gluetool import GlueError, GlueCommandError, SoftGlueError
 from gluetool.log import log_dict, LoggerMixin
 from gluetool.result import Result
-from gluetool.utils import treat_url, normalize_multistring_option, wait
+from gluetool.utils import Command, dump_yaml, treat_url, normalize_multistring_option, wait
 from gluetool_modules.libs.guest import NetworkedGuest
 
 from gluetool_modules.libs.testing_environment import TestingEnvironment
@@ -204,6 +204,20 @@ class ArtemisAPI(object):
 
         return self.api_call('guests/{}'.format(guest_id)).json()
 
+    def inspect_guest_events(self, guest_id):
+        # type: (str) -> Any
+        '''
+        Requests Artemis API for data about a specific guest's events.
+
+        :param str guest_id: Artemis guestname (or guest id).
+            See Artemis API docs for more.
+
+        :rtype: list
+        :returns: Artemis API response serialized as list or ``None`` in case of failure.
+        '''
+
+        return self.api_call('guests/{}/events'.format(guest_id)).json()
+
     def cancel_guest(self, guest_id):
         # type: (str) -> Any
         '''
@@ -372,18 +386,35 @@ class ArtemisGuest(NetworkedGuest):
     def _check_ip_ready(self):
         # type: () -> Result[bool, str]
 
-        # Initialize these variables - should the exception happen inside inspect_guest, the Error()
-        # would fail because these would be left undefined due to early quit from try branch.
-        guest_state = None
-        guest_address = None
+        def dump_events(events, filename):
+            # type: (List[Any], str) -> None
+            dump_yaml(events, '{}.tmp'.format(filename))
+            command = ['mv', '{}.tmp'.format(filename), filename]
+            try:
+                Command(command).run()
+            except GlueCommandError:
+                pass
 
         try:
             guest_data = cast(ArtemisProvisioner, self._module).api.inspect_guest(self.artemis_id)
             guest_state = guest_data['state']
             guest_address = guest_data['address']
+
             if guest_state == 'ready':
                 if guest_address:
                     return Result.Ok(True)
+
+            guest_events_list = cast(ArtemisProvisioner, self._module).api.inspect_guest_events(self.artemis_id)
+            dump_events(guest_events_list, '{}-artemis-guest-log.yaml'.format(self.artemis_id))
+
+            error_guest_events_list = [event for event in guest_events_list if event['eventname'] == 'error']
+            if error_guest_events_list:
+                # There was/were error(s) while provisioning
+                last_error = sorted(error_guest_events_list, key=lambda event: event['updated'], reverse=True)[0]
+                err_msg = "Guest provisioning error(s) from Artemis, newest error: {}".format(
+                    last_error['details']['error']
+                )
+                self.debug(err_msg)
 
         except Exception as e:
             self.warn('Exception raised: {}'.format(e))
