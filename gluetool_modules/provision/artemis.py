@@ -3,7 +3,7 @@ import re
 import gluetool
 
 from gluetool import GlueError, SoftGlueError
-from gluetool.log import log_dict
+from gluetool.log import log_dict, LoggerMixin
 from gluetool.result import Result
 from gluetool.utils import treat_url, normalize_multistring_option, wait
 from gluetool_modules.libs.guest import NetworkedGuest
@@ -24,6 +24,8 @@ DEFAULT_ECHO_TICK = 10
 DEFAULT_BOOT_TIMEOUT = 240
 DEFAULT_BOOT_TICK = 10
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
+DEFAULT_SNAPSHOT_READY_TIMEOUT = 300
+DEFAULT_SNAPSHOT_READY_TICK = 10
 
 #: Artemis provisioner capabilities.
 #: Follows :doc:`Provisioner Capabilities Protocol </protocols/provisioner-capabilities>`.
@@ -187,7 +189,7 @@ class ArtemisAPI(object):
     def inspect_guest(self, guest_id):
         # type: (str) -> Any
         '''
-        Requests Artemis API for data abput a specific guest.
+        Requests Artemis API for data about a specific guest.
 
         :param str guest_id: Artemis guestname (or guest id).
             See Artemis API docs for more.
@@ -211,6 +213,119 @@ class ArtemisAPI(object):
         '''
 
         return self.api_call('guests/{}'.format(guest_id), method='DELETE', expected_status_code=200)
+
+    def create_snapshot(self, guest_id):
+        # type: (str) -> Any
+        '''
+        Requests Aremis API to create a snapshot of a guest.
+
+        :param str guest_id: Artemis guestname (or guest_id).
+            See Artemis API docs for more.
+
+        :rtype: dict
+        :returns: Artemis API response serialized as dictionary or ``None`` in case of failure.
+        '''
+
+        return self.api_call('guests/{}/snapshots'.format(guest_id), method='POST', expected_status_code=201).json()
+
+    def inspect_snapshot(self, guest_id, snapshot_id):
+        # type: (str, str) -> Any
+        '''
+        Requests Artemis API for data about a specific snapshot.
+
+        :param str guest_id: Artemis guestname (or guest id).
+        :param str snaphsot_id: Artemis snapshotname (or snapshot id).
+            See Artemis API docs for more.
+
+        :rtype: dict
+        :returns: Artemis API response serialized as dictionary or ``None`` in case of failure.
+        '''
+
+        return self.api_call('guests/{}/snapshots/{}'.format(guest_id, snapshot_id)).json()
+
+    def restore_snapshot(self, guest_id, snapshot_id):
+        # type: (str, str) -> Any
+        '''
+        Requests Artemis API to restore a guest to a snapshot.
+
+        :param str guest_id: Artemis guestname (or guest id).
+        :param str snaphsot_id: Artemis snapshotname (or snapshot id).
+            See Artemis API docs for more.
+
+        :rtype: dict
+        :returns: Artemis API response serialized as dictionary or ``None`` in case of failure.
+        '''
+
+        return self.api_call('guests/{}/snapshots/{}/restore'.format(guest_id, snapshot_id),
+                             method='POST',
+                             expected_status_code=201
+                             ).json()
+
+    def cancel_snapshot(self, guest_id, snapshot_id):
+        # type: (str, str) -> Any
+        '''
+        Requests Artemis API to cancel snapshot creating
+        (or, in case a snapshot is already provisioned, delete the snapshot).
+
+        :param str guest_id: Artemis guestname (or guest id).
+        :param str snaphsot_id: Artemis snapshotname (or snapshot id).
+            See Artemis API docs for more.
+
+        :rtype: Response
+        :returns: Artemis API response or ``None`` in case of failure.
+        '''
+
+        return self.api_call('guests/{}/snapshots/{}'.format(guest_id, snapshot_id),
+                             method='DELETE',
+                             expected_status_code=200)
+
+
+class ArtemisSnapshot(LoggerMixin):
+    def __init__(self,
+                 module,  # type: ArtemisProvisioner
+                 name,  # type: str
+                 guest  # type: ArtemisGuest
+                 ):
+        # type: (...) -> None
+        super(ArtemisSnapshot, self).__init__(module.logger)
+
+        self._module = module
+        self.name = name
+        self.guest = guest
+
+    def __repr__(self):
+        # type: () -> str
+        return '<ArtemisSnapshot(name="{}")>'.format(self.name)
+
+    def wait_snapshot_ready(self, timeout, tick):
+        # type: (int, int) -> None
+
+        try:
+            wait('snapshot_ready', self._check_snapshot_ready, timeout=timeout, tick=tick)
+
+        except GlueError as exc:
+            raise GlueError("Snapshot couldn't be ready: {}".format(exc))
+
+    def _check_snapshot_ready(self):
+        # type: () -> Result[bool, str]
+
+        snapshot_state = None
+
+        try:
+            snapshot_data = self._module.api.inspect_snapshot(self.guest.artemis_id, self.name)
+
+            snapshot_state = snapshot_data['state']
+            if snapshot_state == 'ready':
+                return Result.Ok(True)
+
+        except Exception as e:
+            self.warn('Exception raised: {}'.format(e))
+
+        return Result.Error("Couldn't get snapshot {}".format(self.name))
+
+    def release(self):
+        # type: () -> None
+        self._module.api.cancel_snapshot(self.guest.artemis_id, self.name)
 
 
 class ArtemisGuest(NetworkedGuest):
@@ -236,6 +351,7 @@ class ArtemisGuest(NetworkedGuest):
                                            key=key,
                                            options=options)
         self.artemis_id = guestname
+        self._snapshots = []  # type: List[ArtemisSnapshot]
 
     def __str__(self):
         # type: () -> str
@@ -311,6 +427,64 @@ class ArtemisGuest(NetworkedGuest):
             variables['IMAGE_NAME'] = self.environment.compose
 
         return super(ArtemisGuest, self).setup(variables=variables, **kwargs)
+
+    def create_snapshot(self, start_again=True):
+        # type: (Optional[bool]) -> ArtemisSnapshot
+        """
+        Creates a snapshot from the current running image of the guest.
+
+        All created snapshots are deleted automatically during destruction.
+
+        :rtype: ArtemisSnapshot
+        :returns: newly created snapshot.
+        """
+        if not start_again:
+            raise GlueError("Disabling of guest starting is not implemented yet. Can't do it.")
+
+        response = cast(ArtemisProvisioner, self._module).api.create_snapshot(self.artemis_id)
+
+        snapshot = ArtemisSnapshot(cast(ArtemisProvisioner, self._module), response.get('snapshotname'), self)
+
+        snapshot.wait_snapshot_ready(self._module.option('snapshot-ready-timeout'),
+                                     self._module.option('snapshot-ready-tick'))
+
+        self._snapshots.append(snapshot)
+
+        return snapshot
+
+    def restore_snapshot(self, snapshot):
+        # type: (ArtemisSnapshot) -> ArtemisGuest
+        """
+        Rebuilds server with the given snapshot.
+
+        :param snapshot: :py:class:`ArtemisSnapshot` instance.
+        :rtype: ArtemisGuest
+        :returns: server instance rebuilt from given snapshot.
+        """
+        cast(ArtemisProvisioner, self._module).api.restore_snapshot(self.artemis_id, snapshot.name)
+        snapshot.wait_snapshot_ready(self._module.option('snapshot-ready-timeout'),
+                                     self._module.option('snapshot-ready-tick'))
+
+        return self
+
+    def _release_snapshots(self):
+        # type: () -> None
+        for snapshot in self._snapshots:
+            snapshot.release()
+
+        if self._snapshots:
+            self.info('Successfully released all {} snapshots'.format(len(self._snapshots)))
+
+        self._snapshots = []
+
+    def _release_instance(self):
+        # type: () -> None
+        cast(ArtemisProvisioner, self._module).api.cancel_guest(self.artemis_id)
+
+    def destroy(self):
+        # type: () -> None
+        self._release_snapshots()
+        self._release_instance()
 
 
 class ArtemisProvisioner(gluetool.Module):
@@ -450,6 +624,18 @@ class ArtemisProvisioner(gluetool.Module):
                 'metavar': 'BOOT_TICK',
                 'type': int,
                 'default': DEFAULT_BOOT_TICK
+            },
+            'snapshot-ready-timeout': {
+                'help': 'Timeout for snapshot to become ready (default: %(default)s)',
+                'metavar': 'SNAPSHOT_READY_TIMEOUT',
+                'type': int,
+                'default': DEFAULT_SNAPSHOT_READY_TIMEOUT
+            },
+            'snapshot-ready-tick': {
+                'help': 'Check every SNAPSHOT_READY_TICK seconds if a snapshot has become ready (default: %(default)s)',
+                'metavar': 'SNAPSHOT_READY_TICK',
+                'type': int,
+                'default': DEFAULT_SNAPSHOT_READY_TICK
             }
         })
     ]
@@ -645,5 +831,5 @@ class ArtemisProvisioner(gluetool.Module):
 
         for guest in self.guests:
             guest.info('Canceling guest')
-            self.api.cancel_guest(guest.artemis_id)
+            guest.destroy()
             guest.info('Successfully removed guest')
