@@ -1,6 +1,6 @@
 import gluetool
 from gluetool.result import Ok, Error
-from gluetool.utils import normalize_shell_option
+from gluetool.utils import normalize_shell_option, normalize_multistring_option
 from gluetool.log import log_dict
 from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetupStage
 
@@ -11,8 +11,9 @@ class PipelineInstallAncestors(gluetool.Module):
 
     The ancestor package to install can specified by ``brew-options``, which is passed directly
     to the ``brew`` module. If ``ancestors`` shared function exists, the ancestors package(s) are resolved
-    from ``primary_task`` component name. Then these component names are used to resolve specific brew
-    builds on the given tag specifed by the option ``tag``.
+    from ``primary_task`` component name. This shared function can be ommited by using ``ancestors``
+    option. Then these component names are used to resolve specific brew builds on the given tag
+    specifed by the option ``tag``.
 
     Guest is setup by `guest-setup` module.
     """
@@ -31,6 +32,13 @@ class PipelineInstallAncestors(gluetool.Module):
                 """,
             'type': str,
             'default': ''
+        },
+        'ancestors': {
+            'help': """
+                Comma separated list of packages to be install on the guest (default: none).
+                """,
+            'default': [],
+            'action': 'append'
         },
     }
 
@@ -56,14 +64,20 @@ class PipelineInstallAncestors(gluetool.Module):
             return brew_options
 
         if not self.option('tag'):
-            raise gluetool.glue.GlueError("Option 'tag' is required if used with 'ancestors' shared function.")
+            raise gluetool.glue.GlueError("Option 'tag' is required")
 
         tag = self.option('tag')
 
         self.require_shared('primary_task')
 
         component = self.shared('primary_task').component
-        ancestors = self.shared('ancestors', component)
+
+        if self.option('ancestors'):
+            self.info('Ancestors passed by option.')
+            ancestors = normalize_multistring_option(self.option('ancestors'))
+
+        else:
+            ancestors = self.shared('ancestors', component)
 
         if ancestors:
             log_dict(self.info, "Ancestors of '{}'".format(component), ancestors)
