@@ -262,7 +262,12 @@ class MBSTask(LoggerMixin, object):
         if 'modulemd' not in self._build_info:
             raise gluetool.GlueError('Artifact build info does not include modulemd document')
 
-        modulemd = gluetool.utils.from_yaml(self._build_info['modulemd'])
+        # Use "base" loader, to overcome MBS representing some string-like values as numbers,
+        # for example "5.30" may be expressed as a number `5.30` which the default parser yields
+        # as a number, `5.3`, which is just misleading. "base" parser yields "5.30", that's
+        # better. But, it probably treats *all* fields this way, so some fields we're expected
+        # to be numbers are suddenly strings...
+        modulemd = gluetool.utils.from_yaml(self._build_info['modulemd'], loader_type='base')
 
         log_dict(self.debug, 'modulemd', modulemd)
 
