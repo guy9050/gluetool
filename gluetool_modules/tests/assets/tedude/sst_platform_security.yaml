@@ -1,4 +1,8 @@
 ---
+- rule: NO_BUGS_FOUND
+  result: passed
+  message: 'No bugs have been found in the changelog. This is acceptable.'
+
 - rule: BUG_NOT_FOUND
   result: failed
   message: 'Could not get bugzilla data. Hint: private/embargoed bug?'

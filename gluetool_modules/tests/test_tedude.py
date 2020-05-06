@@ -36,30 +36,40 @@ BZ_QUERY_RESULTS = {
     }
 }
 
+GATING_TEST_STATUSES_NO_BUGS = [
+    "passed",
+    {
+        'NO_BUGS_FOUND': {
+            "message": "No bugs have been found in the changelog. This is acceptable.",
+            "result": "passed"
+        }
+    }
+]
+
 GATING_TEST_STATUSES = [
     "failed",
     {
-        111111: {
+        'BZ#111111': {
             "message": "ci_tests_implemented: CI Gating tests are implemented.",
             "result": "passed"
         },
-        222222: {
+        'BZ#222222': {
             "message": "requires_ci_gating+: CI Gating tests are required but not implemented.",
             "result": "failed"
         },
-        333333: {
+        'BZ#333333': {
             "message": "ci_tests_implemented: CI Gating tests are implemented.",
             "result": "passed"
         },
-        444444: {
+        'BZ#444444': {
             "message": "requires_ci_gating-: CI Gating tests are not required.",
             "result": "passed"
         },
-        555555: {
+        'BZ#555555': {
             "message": "CI Gating tests decission is missing.",
             "result": "failed"
         },
-        666666: {
+        'BZ#666666': {
             "message": "Could not access required attribute, wrong attribute or insufficent bugzilla permissions?",
             "result": "failed"
         }
@@ -103,7 +113,22 @@ def test_sanity_shared(module):
     assert module.glue.has_shared('tedude_xunit_serialize') is True
 
 
-def test_gating_test_statuses(module, monkeypatch, rules_engine):
+def test_tedude_test_statuses_no_bugs(module, monkeypatch, rules_engine):
+    module._config['instructions'] = testing_asset('tedude', 'sst_platform_security.yaml')
+    module._config['bugzilla-attributes'] = 'cf_devel_whiteboard'
+
+    patch_shared(monkeypatch, module, {
+        'bugzilla_attributes': {},
+        'dist_git_bugs': []
+    }, callables={
+        'evaluate_instructions': rules_engine.evaluate_instructions
+    })
+    result, statuses = module._tedude_test_statuses
+    assert result == GATING_TEST_STATUSES_NO_BUGS[0]
+    assert statuses == GATING_TEST_STATUSES_NO_BUGS[1]
+
+
+def test_tedude_test_statuses(module, monkeypatch, rules_engine):
     module._config['instructions'] = testing_asset('tedude', 'sst_platform_security.yaml')
     module._config['bugzilla-attributes'] = 'cf_devel_whiteboard'
 
@@ -113,7 +138,7 @@ def test_gating_test_statuses(module, monkeypatch, rules_engine):
     }, callables={
         'evaluate_instructions': rules_engine.evaluate_instructions
     })
-    result, statuses = module._gating_test_statuses
+    result, statuses = module._tedude_test_statuses
     assert result == GATING_TEST_STATUSES[0]
     assert statuses == GATING_TEST_STATUSES[1]
 
@@ -133,27 +158,27 @@ def test_execute(module_with_results, monkeypatch, rules_engine, log):
     "ids": {},
     "overall_result": "failed",
     "payload": {
-        "111111": {
+        "BZ#111111": {
             "message": "ci_tests_implemented: CI Gating tests are implemented.",
             "result": "passed"
         },
-        "222222": {
+        "BZ#222222": {
             "message": "requires_ci_gating+: CI Gating tests are required but not implemented.",
             "result": "failed"
         },
-        "333333": {
+        "BZ#333333": {
             "message": "ci_tests_implemented: CI Gating tests are implemented.",
             "result": "passed"
         },
-        "444444": {
+        "BZ#444444": {
             "message": "requires_ci_gating-: CI Gating tests are not required.",
             "result": "passed"
         },
-        "555555": {
+        "BZ#555555": {
             "message": "CI Gating tests decission is missing.",
             "result": "failed"
         },
-        "666666": {
+        "BZ#666666": {
             "message": "Could not access required attribute, wrong attribute or insufficent bugzilla permissions?",
             "result": "failed"
         }

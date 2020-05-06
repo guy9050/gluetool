@@ -69,7 +69,7 @@ class TeDuDe(gluetool.Module):
         return gluetool.utils.normalize_multistring_option(self.option('bugzilla-attributes'))
 
     @cached_property
-    def _gating_test_statuses(self):
+    def _tedude_test_statuses(self):
         # type: () -> Tuple[str, Dict[int, Dict[str,str]]]
         """
         Evaluates each bug using the provided instructions.
@@ -104,49 +104,69 @@ class TeDuDe(gluetool.Module):
                 'argument': argument,
                 'context': context
             })
+
             results[context['BUG_ID']] = {
                 'result': instruction['result'],
                 'message': instruction['message']
             }
 
-        # FIXME: Currently we would pass in case no bugs have been parsed. Maybe we would like
-        # to represent such state somehow so it could be tested against in instructions
-
-        # do the evaluation for each parsed bug
-        for bug_id in bug_ids:
-            # handle a situation when bugzilla xmlrpc did not provide details for a bug
-            bug_attributes = attributes[bug_id] if bug_id in attributes else {}
-
-            # prepare context for insturctions evaluation
-            context = gluetool.utils.dict_update(
-                self.shared('eval_context'),
-                {
-                    'BUG_ID': bug_id,
-                    'BUG_NOT_FOUND': bug_id not in attributes,
-                    'ATTRIBUTES': bug_attributes,
-                    'ATTRIBUTE_NAMES': bug_attributes.keys()
-                }
-            )
+        # evaluates instructions using a given context, returns result of a test ('passed' or 'failed'),
+        # or raise exception when no rule has matched
+        def check_instructions(instructions, context, current_key):
+            # type: (Dict[str, Any], Dict[str, Any], str) -> Any
 
             # need to evaluate instructions one by one as we want to skip remaining on the first match
-            for instruction in self._instructions:
+            for instruction in instructions:
                 self.shared('evaluate_instructions', [instruction], {
                     'result': add_result,
                 }, context=context, stop_at_first_hit=True, ignore_unhandled_commands=True)
                 # skip remaining instructions
-                if bug_id in results:
-                    break
+                if current_key in results:
+                    return results[current_key]['result']
 
-            try:
-                # overall_results is 'failed' if at least one bug has results 'failed'
-                if results[bug_id]['result'] == 'failed':
-                    overall_result = 'failed'
-            except KeyError:
-                # Q: Is is really appropriate here to raise and exception?
-                #    We could eventually make the test fail eventually
-                raise gluetool.GlueError("Bug '{}' did not match any rule in instructions.".format(bug_id))
+            # Q: Is is really appropriate here to raise and exception?
+            #    We could make the test fail eventually
+            raise gluetool.GlueError("'{}' did not match any rule in instructions.".format(current_key))
 
-        log_dict(self.debug, 'Found CI Gating test statuses in bugzilla', results)
+        # do the evaluation for each parsed bug
+        if bug_ids:
+            for bug_id in bug_ids:
+                # handle a situation when bugzilla xmlrpc did not provide details for a bug
+                bug_attributes = attributes[bug_id] if bug_id in attributes else {}
+
+                # prepare context for insturctions evaluation
+                context = gluetool.utils.dict_update(
+                    self.shared('eval_context'),
+                    {
+                        'NO_BUGS_FOUND': False,
+                        'BUG_ID': 'BZ#{}'.format(bug_id),
+                        'BUG_NOT_FOUND': bug_id not in attributes,
+                        'ATTRIBUTES': bug_attributes,
+                        'ATTRIBUTE_NAMES': bug_attributes.keys()
+                    }
+                )
+
+                result = check_instructions(self._instructions, context, 'BZ#{}'.format(bug_id))
+                if result == 'failed':
+                    overall_result = result
+
+        # when no bugs have been parsed
+        else:
+            # prepare context for instruction evaluation
+            context = gluetool.utils.dict_update(
+                self.shared('eval_context'),
+                {
+                    'NO_BUGS_FOUND': True,
+                    'BUG_ID': 'NO_BUGS_FOUND',  # to ease reuse of add_result() function
+                    'BUG_NOT_FOUND': False,
+                    'ATTRIBUTES': [],
+                    'ATTRIBUTE_NAMES': []
+                }
+            )
+
+            overall_result = check_instructions(self._instructions, context, 'NO_BUGS_FOUND')
+
+        log_dict(self.debug, 'Detailed TeDuDe test results', results)
         self.info("Result of testing: {}".format(overall_result.upper()))
         return overall_result, results
 
@@ -154,7 +174,7 @@ class TeDuDe(gluetool.Module):
         # type: () -> None
         self.require_shared('dist_git_bugs', 'bugzilla_attributes', 'evaluate_instructions')
 
-        overall_result, statuses = self._gating_test_statuses
+        overall_result, statuses = self._tedude_test_statuses
         publish_result(self, TeDuDeTestResult, overall_result, payload=statuses)
 
     def tedude_xunit_serialize(self, test_suite, result):
@@ -163,14 +183,14 @@ class TeDuDe(gluetool.Module):
         if not result.payload:
             return test_suite
 
-        for bug_id, data in result.payload.items():
+        for key, data in result.payload.items():
 
             outcome = data["result"]
 
             test_case = new_xml_element(
                 'testcase',
                 _parent=test_suite,
-                name='BZ#{}'.format(bug_id)
+                name=key
             )
 
             # properties = new_xml_element('properties', _parent=test_case)
@@ -179,7 +199,7 @@ class TeDuDe(gluetool.Module):
                 new_xml_element('failure', _parent=test_case, message=data["message"])
 
             elif outcome != 'passed':
-                self.warn('Unknown outcome {} in test {}'.format(outcome, bug_id), sentry=True)
+                self.warn('Unknown outcome {} in test {}'.format(outcome, key), sentry=True)
 
             test_outputs = new_xml_element(
                 'test-outputs',
