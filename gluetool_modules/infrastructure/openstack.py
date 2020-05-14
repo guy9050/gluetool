@@ -5,6 +5,8 @@ import os
 import re
 import threading
 from time import gmtime, strftime
+import time
+import difflib
 from datetime import datetime, timedelta
 
 import dateutil.parser
@@ -53,6 +55,9 @@ DEFAULT_DELETE_TIMEOUT = 60
 
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
+
+DEFAULT_CONSOLE_COLLECT_START_DELAY = 60
+DEFAULT_CONSOLE_COLLECT_TICK = 20
 
 
 #: OpenStack provisioner capabilities.
@@ -426,6 +431,24 @@ class OpenstackGuest(NetworkedGuest):
             _find_ip
         )
 
+    def _get_console_output(self):
+        # try to get console output
+        try:
+
+            console = self._call_api('instance.get_console_output', self._os_instance.get_console_output)
+
+            if console:
+                console = console.encode('utf-8', 'replace')
+                return console
+
+            # Some servers may return empty console output. Observed with rhel-7.1-server-x86_64-released image
+            self.warn('empty console output')
+            return None
+
+        except Exception as exc:
+            self.warn('Failed to get console output: {}'.format(str(exc)), sentry=True)
+            return None
+
     def _release_snapshots(self):
         """
         Removes all created snapshots.
@@ -465,20 +488,12 @@ class OpenstackGuest(NetworkedGuest):
 
             self.debug("storing console output in '{}'".format(filename))
 
-            console = self._call_api('instance.get_console_output', self._os_instance.get_console_output)
+            console = self._get_console_output()
 
-            if console:
-                console = console.encode('utf-8', 'replace')
-
-            else:
-                # Some servers may return empty console output. Observed with rhel-7.1-server-x86_64-released image
-                self.warn('empty console output')
-
-                console = '<Server returned empty console output>'
-
-            with gzip.open(filename, 'wb') as f:
-                f.write(console)
-                f.flush()
+            if console is not None:
+                with gzip.open(filename, 'wb') as f:
+                    f.write(console)
+                    f.flush()
 
         except Exception as exc:
             self.warn('Failed to store console output in the file: {}'.format(str(exc)), sentry=True)
@@ -675,6 +690,55 @@ class OpenstackGuest(NetworkedGuest):
             _assign
         )
 
+    def _collect_console(self, action):
+        """
+        Gather console outputs during the time instance is alive and save it in file. Method is intended to be called
+        inside separated thread. Does not end automatically by itself.
+        """
+        Action.set_thread_root(action)
+
+        try:
+
+            filename = 'full-console-{}-{}.log.gz'.format(self.name, self.instance_id)
+
+        except AttributeError as error:
+
+            self.warn('Failed to create console output filename: {}'.format(str(error)), sentry=True)
+
+            return
+
+        last_console = []
+
+        while True:
+
+            console = self._get_console_output()
+            if console:
+                console = console.splitlines()
+
+                # We use difflib to compare lists of strings (last console output with the
+                # new one) to see the lines that were added to the new console log. Those lines are
+                # put into the output file.
+                diff = difflib.unified_diff(last_console,
+                                            console,
+                                            fromfile=last_console,
+                                            tofile=console,
+                                            lineterm='',
+                                            n=0)
+
+                lines = list(diff)[2:]
+                added = [line[1:] for line in lines if line[0] == '+']
+                removed = [line[1:] for line in lines if line[0] == '-']
+
+                with gzip.open(filename, 'ab') as f:
+                    for line in added:
+                        if line not in removed:
+                            f.write(line + "\n")
+
+                    f.flush()
+                    last_console = console
+
+            time.sleep(DEFAULT_CONSOLE_COLLECT_TICK)
+
     def __init__(self, module, details=None, instance_id=None, **kwargs):
         self._snapshots = []
 
@@ -823,6 +887,15 @@ class OpenstackGuest(NetworkedGuest):
             # to check anything else - our network-based checks *may* succeed even during
             # an instance shutdown process, leading to false positives.
             self._wait_active()
+
+            current_action = Action.current_action()
+
+            console_thread = threading.Timer(DEFAULT_CONSOLE_COLLECT_START_DELAY,
+                                             self._collect_console,
+                                             args=(current_action,))
+            # we do not know how long will the instance be active so we use daemon thread
+            console_thread.setDaemon(True)
+            console_thread.start()
 
             # If the instance is in ACTIVE state, proceed with other checks
             return self.wait_alive(connect_timeout=self._module.option('activation-timeout'), connect_tick=1,
@@ -1217,6 +1290,12 @@ class CIOpenstack(gluetool.Module):
                 'type': int,
                 'default': DEFAULT_DELETE_TIMEOUT,
                 'metavar': 'SECONDS'
+            },
+            'console-collect-tick': {
+                'help': 'Every SECONDS download and collect console output (default: %(default)s)',
+                'type': int,
+                'default': DEFAULT_CONSOLE_COLLECT_TICK,
+                'metavar': 'SECONDS'
             }
         }),
         ('Workarounds', {
@@ -1238,6 +1317,12 @@ class CIOpenstack(gluetool.Module):
                         """,
                 'type': int,
                 'default': DEFAULT_RESTORE_SNAPSHOT_ATTEMPTS
+            },
+            'console-collect-start-delay': {
+                'help': 'Wait SECONDS before first attempt to collect console output (default: %(default)s)',
+                'type': int,
+                'default': DEFAULT_CONSOLE_COLLECT_START_DELAY,
+                'metavar': 'SECONDS'
             }
         })
     ]
