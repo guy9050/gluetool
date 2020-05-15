@@ -84,7 +84,7 @@ class PagureSRPM(gluetool.Module):
 
         with open(spec_backup_name, 'r') as infile, open(spec_origin_name, 'w') as outfile:
             for line in infile.readlines():
-                line = line.replace('%{?dist}', '%{{?dist}}.pr.{}.c.{}'.format(pull_request.uid, last_comment_id))
+                line = line.replace('%{?dist}', '.0.pr.{}.c.{}%{{?dist}}'.format(pull_request.uid, last_comment_id))
                 outfile.writelines(line)
 
         rhpkg_cmd = ['rhpkg', 'srpm']
