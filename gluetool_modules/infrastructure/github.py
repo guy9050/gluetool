@@ -207,6 +207,7 @@ class GitHubPullRequest(object):
         pull_request = github_api.get_pull_request(self.owner, self.repo, self.pull_number)
 
         self.clone_url = pull_request['base']['repo']['clone_url']
+        self.source_clone_url = pull_request['head']['repo']['clone_url']
 
         links = pull_request['_links']
         self.api_url = links['self']['href']
