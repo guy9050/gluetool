@@ -194,7 +194,7 @@ class GitHubPullRequest(object):
         # type: (GitHub, PullRequestID) -> None
 
         self.pull_request_id = pull_request_id
-        self.id = str(pull_request_id)
+        self.id = self.dispatch_id = str(pull_request_id)
 
         self.owner = self.pull_request_id.owner  # type: str
         self.repo = self.pull_request_id.repo  # type: str
@@ -262,7 +262,7 @@ class PullRequestID(object):
 
     The representation consists of the repository owner, repository name, pull
     request number, commit SHA and optionally comment id available as a string
-    with the following format: 'owner:repo:pull_number:commit_sha[:comment_id]'.
+    with the following format: 'owner:repo:pull_number:[commit_sha|:comment_id]'.
     """
 
     def __init__(self, owner, repo, pull_number, commit_sha, comment_id=None):
@@ -321,7 +321,7 @@ class GitHub(gluetool.Module):
         ('Pull request initialization options', {
             'pull-request': {
                 'help': 'Unique identifier of a pull request.',
-                'metavar': 'owner:repo:pull_number:commit_sha[:comment_id]'
+                'metavar': 'owner:repo:pull_number:[commit_sha|:comment_id]'
             },
         }),
         ('Test options', {
@@ -451,7 +451,7 @@ class GitHub(gluetool.Module):
         # type: () -> None
 
         if self.option('pull-request'):
-            # pull-request = 'owner:repo:pull_number:commit_sha[:comment_id]'
+            # pull-request = 'owner:repo:pull_number:[commit_sha|:comment_id]'
             pr_option = self.option('pull-request').split(':')
             if len(pr_option) < 4 or len(pr_option) > 5:
                 raise gluetool.GlueError('Check pull-request option, invalid value provided.')
