@@ -9,8 +9,7 @@ class PipelineInstallAncestors(gluetool.Module):
     """
     Installs package ancestors in a separate pipeline.
 
-    The ancestor package to install can specified by ``brew-options``, which is passed directly
-    to the ``brew`` module. If ``ancestors`` shared function exists, the ancestors package(s) are resolved
+    If ``ancestors`` shared function exists, the ancestors package(s) are resolved
     from ``primary_task`` component name. This shared function can be ommited by using ``ancestors``
     option. Then these component names are used to resolve specific brew builds on the given tag
     specifed by the option ``tag``.
@@ -20,9 +19,6 @@ class PipelineInstallAncestors(gluetool.Module):
     name = 'pipeline-install-ancestors'
 
     options = {
-        'brew-options': {
-            'help': 'Options to pass to brew module.',
-        },
         'tag': {
             'help': 'Tag to use when looking up ancestors.'
         },
@@ -58,10 +54,9 @@ class PipelineInstallAncestors(gluetool.Module):
 
     @gluetool.utils.cached_property
     def _brew_options(self):
-        brew_options = normalize_shell_option(self.option('brew-options')) or ''
-
-        if not self.has_shared('ancestors'):
-            return brew_options
+        if not self.has_shared('ancestors') and not self.option('ancestors'):
+            self.warn("No way how to obrtain ancestors, assume ancestor's list is empty.")
+            return ''
 
         if not self.option('tag'):
             raise gluetool.glue.GlueError("Option 'tag' is required")
@@ -93,9 +88,6 @@ class PipelineInstallAncestors(gluetool.Module):
 
         if ancestors:
             log_dict(self.info, "Ancestors of '{}' with builds tagged '{}'".format(component, tag), ancestors)
-
-            if brew_options:
-                self.warn('Replacing `brew_options` from ancestors shared function.')
 
             brew_options = '--tag {} --name {}'.format(tag, ','.join(ancestors))
 
