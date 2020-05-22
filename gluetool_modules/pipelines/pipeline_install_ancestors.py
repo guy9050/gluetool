@@ -9,10 +9,14 @@ class PipelineInstallAncestors(gluetool.Module):
     """
     Installs package ancestors in a separate pipeline.
 
-    If ``ancestors`` shared function exists, the ancestors package(s) are resolved
-    from ``primary_task`` component name. This shared function can be ommited by using ``ancestors``
-    option. Then these component names are used to resolve specific brew builds on the given tag
-    specifed by the option ``tag``.
+    The ancestors names are resolved from ``primary_task`` component name using ``ancestors``
+    shared function. When ``ancestors`` shared function is not available or if it returns empty list,
+    we suppose ancestor name is the same as the component name.
+
+    If option ``ancestors`` is set, its value is used.
+
+    Then these ancestors names are used to resolve specific brew builds on the given tag
+    specified by the option ``tag``.
 
     Guest is setup by `guest-setup` module.
     """
@@ -38,6 +42,7 @@ class PipelineInstallAncestors(gluetool.Module):
         },
     }
 
+    required_options = ('tag',)
     shared_functions = ('setup_guest',)
 
     def __init__(self, *args, **kwargs):
@@ -54,24 +59,17 @@ class PipelineInstallAncestors(gluetool.Module):
 
     @gluetool.utils.cached_property
     def _brew_options(self):
-        if not self.has_shared('ancestors') and not self.option('ancestors'):
-            self.warn("No way how to obrtain ancestors, assume ancestor's list is empty.")
-            return ''
-
-        if not self.option('tag'):
-            raise gluetool.glue.GlueError("Option 'tag' is required")
-
-        tag = self.option('tag')
+        ancestors = []
 
         self.require_shared('primary_task')
-
         component = self.shared('primary_task').component
 
         if self.option('ancestors'):
-            self.info('Ancestors passed by option.')
+            self.info('Ancestors set by option')
             ancestors = normalize_multistring_option(self.option('ancestors'))
 
-        else:
+        elif self.has_shared('ancestors'):
+            self.info('Ancestors set by shared function')
             ancestors = self.shared('ancestors', component)
 
         if ancestors:
@@ -79,22 +77,19 @@ class PipelineInstallAncestors(gluetool.Module):
 
         else:
             self.info("No ancestors of '{}' found, assume ancestor's name is the same.".format(component))
-
             ancestors = [component]
 
-        self.info("Filter out ancestors without builds tagged '{}'".format(tag))
+        tag = self.option('tag')
 
+        self.info("Filter out ancestors without builds tagged '{}'".format(tag))
         ancestors = [ancestor for ancestor in ancestors if self._build_exists(ancestor, tag)]
 
         if ancestors:
             log_dict(self.info, "Ancestors of '{}' with builds tagged '{}'".format(component, tag), ancestors)
+            return '--tag {} --name {}'.format(tag, ','.join(ancestors))
 
-            brew_options = '--tag {} --name {}'.format(tag, ','.join(ancestors))
-
-        else:
-            self.info('No ancestors left, nothing will be installed on SUT.')
-
-        return brew_options
+        self.info('No ancestors left, nothing will be installed on SUT.')
+        return None
 
     def setup_guest(self, guest, stage=GuestSetupStage.PRE_ARTIFACT_INSTALLATION, log_dirpath=None, **kwargs):
         log_dirpath = guest_setup_log_dirpath(guest, log_dirpath)
@@ -135,7 +130,7 @@ class PipelineInstallAncestors(gluetool.Module):
                 r_guest_setup = Ok([])
 
             if r_guest_setup.is_error:
-                # Just like the successfull result, the failed one also carries list of outputs
+                # Just like the successful result, the failed one also carries list of outputs
                 # we need to propagate to our parent pipeline.
                 outputs, exc = r_guest_setup.value
 
