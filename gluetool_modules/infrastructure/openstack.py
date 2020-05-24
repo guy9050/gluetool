@@ -224,7 +224,10 @@ class OpenstackGuest(NetworkedGuest):
         return _call_api(self.logger, method_label, method, *args, **kwargs)
 
     def _is_allowed_degraded(self, service):
-        self._module.require_shared('evaluate_instructions')
+
+        # if evaluate instructions is not around, skip this check
+        if not self._module.has_shared('evaluate_instructions'):
+            return True
 
         self.debug("service '{}' is degraded, check whether it's allowed".format(service))
 
