@@ -601,6 +601,18 @@ class KojiTask(LoggerMixin, object):
         return map['tags']
 
     @cached_property
+    def baseline(self):
+        """
+        Return baseline task NVR if `baseline-method` specified, otherwise return None.
+
+        :rtype: str
+        """
+        if not self._module.option('baseline-method'):
+            return None
+
+        return self.baseline_task.nvr
+
+    @cached_property
     def baseline_task(self):
         """
         Return baseline task. For documentation of the baseline methods see the module's help.

@@ -322,7 +322,7 @@ class MBSTask(LoggerMixin, object):
             for stream in module_streams:
                 dependencies.append('{}:{}'.format(module_name, stream))
 
-        return dependencies
+        return sorted(dependencies)
 
     @cached_property
     def url(self):

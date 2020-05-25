@@ -1,5 +1,6 @@
 ---
 
+baseline: None
 build_id: 805705
 component: 'bash'
 dist_git_repository_name: 'bash'

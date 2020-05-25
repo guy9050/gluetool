@@ -132,6 +132,11 @@ def assert_task_attributes(module, task_id):
 
     for name, expected in expected_attributes.iteritems():
         actual = getattr(primary_task, name)
+
+        # correctly interpret 'None' value
+        if expected == 'None':
+            expected = None
+
         assert actual == expected, "Field '{}' mismatch: {} expected, {} found".format(name, expected, actual)
 
 
@@ -369,3 +374,4 @@ def test_baseline(koji_session, koji_module, log):
     koji_module.execute()
 
     assert koji_module._tasks[0].baseline_task.nvr == nvr
+    assert koji_module._tasks[0].baseline == nvr
