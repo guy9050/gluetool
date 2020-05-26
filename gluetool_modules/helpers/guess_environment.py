@@ -803,8 +803,14 @@ class GuessEnvironment(gluetool.Module):
         else:
             primary_task = self.shared('primary_task')
 
+            result = None
+
             # by default we match with destination_tag
-            result = self._guess_autodetect(source, 'destination_tag', primary_task.destination_tag, *args)
+            if primary_task.destination_tag:
+                result = self._guess_autodetect(source, 'destination_tag', primary_task.destination_tag, *args)
+
+            else:
+                self.warn('primary task does not have destination tag')
 
             # we fallback to build target for legacy reasons
             if not result:
