@@ -279,8 +279,31 @@ class RulesEngine(gluetool.Module):
     context. These functions can be called, and they are given eval context as their first
     argument implicitly.
 
-    Custom variables are supported via ``--variables`` option. Listed YAML files are loaded
-    and become part of ``rules-engine`` eval context.
+    Custom variables are supported via ``--variables`` and ``--user-variables`` options.
+    Listed YAML files are expected to contain key:value mappings which are then loaded and:
+
+        * ``variables``: key:value pairs will be exported into ``rules-engine`` eval context.
+        Values can be complex objects and lists, they are exported as-is, with no additional
+        processing.
+        * ``user-variables``: key:value pairs will be available via ``user_variables`` shared
+        function. On every call, the values - which support templates - are re-rendered.
+
+    .. code-block:: yaml
+
+       # variables
+       NAMES:
+         - foo
+         - bar
+         - baz: 79
+
+       # user-variables
+
+       NAME: |
+         {% JENKINS_JOB_NAME == 'foo' %}
+           some-value
+         {% else %}
+           some-other-value
+         {% endif %}
 
     Users of this module would simply specify what objects are available to rules in their
     domain, and then provides these objects when asking ``rules-engine`` (via the shared
@@ -309,13 +332,37 @@ class RulesEngine(gluetool.Module):
         'variables': {
             'help': 'File(s) with additional context objects (default: none).',
             'action': 'append',
-            'default': []
+            'default': [],
+            'metavar': 'FILE'
+        },
+        'user-variables': {
+            'help': 'File(s) with additional variables that are rendered on demand (default: none).',
+            'action': 'append',
+            'default': [],
+            'metavar': 'FILE'
         }
     }
 
-    shared_functions = ['evaluate_rules', 'evaluate_filter', 'evaluate_instructions']
+    shared_functions = ['evaluate_rules', 'evaluate_filter', 'evaluate_instructions', 'user_variables']
 
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
+
+    @gluetool.utils.cached_property
+    def _user_variable_files(self):
+        # type: () -> List[str]
+
+        return gluetool.utils.normalize_path_option(self.option('user-variables'))
+
+    @gluetool.utils.cached_property
+    def _user_variable_templates(self):
+        # type: () -> Dict[str, str]
+
+        templates = {}  # type: Dict[str, str]
+
+        for filepath in self._user_variable_files:
+            templates.update(gluetool.utils.load_yaml(filepath, logger=self.logger))
+
+        return templates
 
     @property
     def eval_context(self):
@@ -455,6 +502,20 @@ class RulesEngine(gluetool.Module):
 
         return functions
 
+    def _render_user_variables(self, logger=None, context=None):
+        # type: (Optional[gluetool.log.ContextAdapter], Optional[Dict[str, Any]]) -> Dict[str, Any]
+        """
+        Returns mapping of variables, with values fully rendered.
+        """
+
+        logger = logger or self.logger
+        context = context or self.shared('eval_context')
+
+        return {
+            name: gluetool.utils.render_template(template, logger=self.logger, **context)
+            for name, template in self._user_variable_templates.iteritems()
+        }
+
     @cached_property
     def variables(self):
         # type: () -> Any
@@ -529,6 +590,11 @@ class RulesEngine(gluetool.Module):
             variables.update(new_variables)
 
         return variables
+
+    def user_variables(self, logger=None, context=None):
+        # type: (Optional[gluetool.log.ContextAdapter], Optional[Dict[str, Any]]) -> Dict[str, Any]
+
+        return self._render_user_variables(logger=logger, context=context)
 
     def evaluate_rules(self, rules, context=None):
         # type: (str, Optional[ContextType]) -> Any

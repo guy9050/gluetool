@@ -217,6 +217,13 @@ sut     ansible_host={} ansible_user=root {}
 
             Action.set_thread_root(current_action)
 
+            context = dict_update(
+                self.shared('eval_context'),
+                {
+                    'GUEST': schedule_entry.guest
+                }
+            )
+
             variables = dict_update(
                 {},
                 {
@@ -225,6 +232,7 @@ sut     ansible_host={} ansible_user=root {}
                     'artifacts': os.path.abspath(artifact_dirpath),
                     'ansible_ssh_common_args': ' '.join(['-o ' + option for option in schedule_entry.guest.options])
                 },
+                self.shared('user_variables', logger=schedule_entry.logger, context=context) or {},
                 schedule_entry.variables
             )
 

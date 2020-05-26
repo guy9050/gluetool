@@ -9,7 +9,7 @@ from gluetool import GlueError, GlueCommandError, Module
 from gluetool.action import Action
 from gluetool.log import Logging, format_blob, log_blob, log_dict
 from gluetool.log import ContextAdapter, LoggingFunctionType  # Ignore PyUnusedCodeBear
-from gluetool.utils import Command, load_yaml, new_xml_element
+from gluetool.utils import Command, load_yaml, new_xml_element, dict_update
 
 from gluetool_modules.libs import create_inspect_callback
 from gluetool_modules.libs.artifacts import artifacts_location
@@ -362,17 +362,44 @@ class TestScheduleTMT(Module):
 
         Action.set_thread_root(current_action)
 
+        context = dict_update(
+            self.shared('eval_context'),
+            {
+                'GUEST': schedule_entry.guest
+            }
+        )
+
+        variables = self.shared('user_variables', logger=schedule_entry.logger, context=context) or {}
+
         self.info('running in {}'.format(schedule_entry.repodir))
 
         # work_dirpath is relative to the current directory, but tmt expects it to be a absolute path
         # so it recognizes it as a path instead of run directory name
         command = [
-            self.option('command'),
-            'run', '--all', '--id={}'.format(os.path.abspath(work_dirpath)),
-            'provision', '--how=connect',
-                         '--guest={}'.format(schedule_entry.guest.hostname),
-                         '--key={}'.format(schedule_entry.guest.key),
-            'plan', '--name={}'.format(schedule_entry.plan)
+            self.option('command')
+        ]
+
+        command += [
+            'run',
+            '--all',
+            '--id', os.path.abspath(work_dirpath)
+        ]
+
+        for name, value in variables.iteritems():
+            command += [
+                '-e', '{}={}'.format(name, value)
+            ]
+
+        command += [
+            # `provision` step
+            'provision',
+            '--how', 'connect',
+            '--guest', schedule_entry.guest.hostname,
+            '--key', schedule_entry.guest.key,
+
+            # `plan` step
+            'plan',
+            '--name', schedule_entry.plan
         ]
 
         # run plan via tmt, note that the plan MUST be run in the artifact_dirpath
