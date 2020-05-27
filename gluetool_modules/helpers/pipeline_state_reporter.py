@@ -153,7 +153,7 @@ class PipelineStateReporter(gluetool.Module):
                 'help':
                     """
                     Rules file to decide the link to the documentation of the test, i.e. content of
-                    link:https://pagure.io/fedora-ci/messages/blob/master/f/schemas/test-common.yaml[test.docs]
+                    `test.docs <https://pagure.io/fedora-ci/messages/blob/master/f/schemas/test-common.yaml>`_
                     field.
                     """
             },
