@@ -25,12 +25,12 @@ class TestSchedulerUpgrades(gluetool.Module):
         and require special variables for successful run. Namely url of composes, made by OSCI guys based on tested
         artifact and list of binary package names, which belongs to the artifact.
         """
-        self.require_shared('primary_task')
+        self.require_shared('primary_task', 'get_compose_url', 'product')
         primary_task = self.shared('primary_task')
 
         primary_task_compose_url = self.shared('get_compose_url')
 
-        # List of binary package names is obtained from componse metadata (metadata/rpms.json).
+        # List of binary package names is obtained from compose metadata (metadata/rpms.json).
 
         metadate_rpms_json_path = '{}/metadata/rpms.json'.format(primary_task_compose_url)
 
@@ -62,9 +62,18 @@ class TestSchedulerUpgrades(gluetool.Module):
         if not binary_rpms_list:
             self.warn('No binary rpm names found for package: "{}"'.format(primary_task_nevr_pattern))
 
+        product = self.shared('product')
+        matched_product = re.match(r'(?i).*rhel-(\d.\d{1,2})', product)
+
+        if not matched_product:
+            raise gluetool.GlueError('Unexpected product format: {}'.format(product))
+
+        target_release = matched_product.group(1)
+
         new_variables = {
             'compose_url': primary_task_compose_url,
-            'binary_rpms_list': binary_rpms_list
+            'binary_rpms_list': binary_rpms_list,
+            'target_release': target_release
         }
 
         schedule = self.overloaded_shared(
