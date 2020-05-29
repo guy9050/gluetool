@@ -1,0 +1,21 @@
+description: |
+  Test gluetool-moduoles installation on rhel8.
+
+provision+:
+  image: registry.access.redhat.com/ubi8/ubi
+
+prepare:
+  how: shell
+  script:
+    - yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+    - yum install -y autoconf automake gcc git krb5-devel libcurl-devel libtool
+    - yum install -y libxml2-devel make openssl-devel postgresql-devel python2-devel
+    # popt devel is only available in Centos8 :(
+    - yum install -y http://mirror.centos.org/centos/8/BaseOS/x86_64/os/Packages/popt-devel-1.16-14.el8.x86_64.rpm
+    # unfortunately installing Ansible on RHEL8 from EPEL does not work :(
+    - yum install -y python2-pip
+    - pip2 install ansible
+    # workaround poetry requiring python instead
+    - alternatives --set python /usr/bin/python2
+    # python2-virtualenv is required
+    - yum install -y python2-virtualenv

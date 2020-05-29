@@ -6,196 +6,159 @@ Environment
 
 Before moving on to the actual setup, there are few important notes:
 
-- **The only supported and (sort of tested) way of using and developing these modules is a separate virtual
-  environment!**
+- **The only supported and (sort of tested) way of using and developing these modules is using Poetry!**
 
-  It is possible to install ``citool`` and these modules directly into your system but we don't recommend that. We
-  definitely recommend either:
-
-  - creating a virtual environment for your development, or
-  - installing ``citool`` from RPM, and adding this collection into the virtual environment created by the installation.
-
--  The tested distributions (as in "we're using these") are the recent released of Fedora - 26, 27 and 28. You could
-   try other distributions but we didn't - please, let us know, and it'd be awesome if your first merge request could
+-  The tested distributions (as in "we're using these") are the recent releases of Fedora, CentOS 8 and RHEL8. You could try
+   other distributions but we didn't - please, let us know, and it'd be awesome if your first merge request could
    update this file :)
-
-We will focus on creating a separate virtual environment for your development efforts.
 
 
 Requirements
 ------------
 
-To begin digging into sources, there are few requirements:
+To begin digging into sources, there are few requirements to mention:
 
--  ``virtualenv`` utility
+- ``poetry``, with version < 1.2, installed as described on the `installation page <https://python-poetry.org/docs/#installation>`__
 
--  ``ansible-playbook``
+- ``ansible-playbook`` installed on your localhost
 
--  system packages - it is either impossible or impractical to use their Python counterpart, or they are required to
-  build a Python package. In some cases, on recent Fedora (26+) for example, it's been shown for some packages
+- system packages - it is either impossible or impractical to use their Python counterpart, or they are required to
+  build a Python package. In some cases, on recent Fedora for example, it's been shown for some packages
   their ``compat-*`` variant might be needed. See the optional ``Bootstrap system environment`` step bellow.
+
+Do not worry, the next sections will guide you through the whole installation process.
 
 
 Installation
 ------------
 
-0. (optional) Bootstrap system environment
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+0. Bootstrap system environment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Following steps are necessary to install requirements for different distributions:
 
-**RHEL 7.4**
+**CentOS 8**
 
-.. code-block:: bash
+Run all commands listed in the TMT test plan's ``prepare`` section. Test plan is located in the file `plans/centos8.fmf`.
 
-    yum install -y krb5-devel libcurl-devel libxml2-devel openssl-devel python-devel
-    curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py" && python get-pip.py && rm -f get-pip.py
-    pip install -U setuptools
-    pip install ansible virtualenv
+**Fedora**
 
-**Fedora 29+**
+Run all commands listed in the TMT test plan's ``prepare`` section. Test plan is located in the file `plans/fedora.fmf`.
 
-.. code-block:: bash
+.. warning::
 
-    dnf install -y ansible krb5-devel libselinux-python python2-virtualenv /usr/lib/rpm/redhat/redhat-hardened-cc1 /usr/bin/virtualenv \
-                   python2-setuptools libtool gcc automake postgresql-devel openssl-devel libcurl-devel
-    dnf install -y --allowerasing compat-openssl10-devel
+    Due to the fact we still run with Python2, you will need to install ``virtualenv`` module manually to python2.
 
-**Fedora 31+**
+.. warning::
 
-.. code-block:: bash
+    `rpm-py-installer` installation will fail on Fedora 33 and there is no workaround for it. Use Fedora 32 please.
 
-    dnf install -y ansible krb5-devel python3-libselinux python3-virtualenv /usr/lib/rpm/redhat/redhat-hardened-cc1 /usr/bin/virtualenv \
-                   python2-setuptools libtool gcc automake postgresql-devel libpq-devel
-    dnf install -y --allowerasing compat-openssl10-devel
+**RHEL 8**
 
-1. Create a virtual environment
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: bash
-
-    virtualenv -p /usr/bin/python2.7 <virtualenv-dir>
-    . <virtualenv-dir>/bin/activate
+Run all commands listed in the TMT test plan's ``prepare`` section. Test plan is located in the file `plans/rhel8.fmf`.
 
 
-2. Install ``gluetool``
-~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: bash
-
-   git clone https://github.com/gluetool/gluetool.git gluetool
-   pushd gluetool && python setup.py develop && popd
-
-
-3. Install ``citool``
+1. Install ``poetry``
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-    git clone git@gitlab.cee.redhat.com:baseos-qe/citool.git citool
-    pushd citool && python setup.py develop && popd
+    curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python
+    poetry self update 1.0.9
 
-4. Clone ``gluetool-modules``
+.. note::
+    You might need to open a new shell to have ``poetry`` command available.
+
+
+2. Clone ``gluetool-modules``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
    git clone git@gitlab.cee.redhat.com:baseos-qe/gluetool-modules.git gluetool-modules
+   cd gluetool-modules
 
-5. Install requirements
-~~~~~~~~~~~~~~~~~~~~~~~
+
+3. Install ``gluetool-modules``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-   pushd gluetool-modules && /usr/bin/ansible-playbook ./inject-extra-requirements.yml && popd
+   poetry install
+
+
+4. Install extra requirements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+
+   poetry run /usr/bin/ansible-playbook inject-extra-requirements.yml
 
 **Be warned:** read the messages reported by this step - ``inject-extra-requirements.yml`` playbook checks for
 necessary system packages, and reports any missing pieces. **It does not install them!** - we don't want to
 mess up your system setup, as we try to stay inside our little own virtualenv, but the playbook will try to
 provide hints on what packages might solve the issue. Hopefully, you already have all required system packages.
 
-6. Install ``gluetool-modules``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _step_config:
 
-.. code-block:: bash
-
-   pushd gluetool-modules && python setup.py develop && popd
-
-
-7. Re-activate virtualenv
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Since step #1 your virtualenv is active, but installation made some changes to the ``activate`` script, therefore
-it's necessary to re-activate the virtualenv before actually doing stuff:
-
-.. code-block:: bash
-
-    deactivate
-    . <virtualenv-dir>/bin/activate
-
-8. Add configuration
-~~~~~~~~~~~~~~~~~~~~~~
+5. Add configuration
+~~~~~~~~~~~~~~~~~~~~
 
 ``citool`` looks for its configuration in ``~/.citool.d``. Add configuration for the modules according to your
-preference:
+preference by cloning the repository with your citool configuration. Note that this expects you know where
+the repository is, if unsure, ask the maintainers of this project:
 
 .. code-block:: bash
 
-   git clone -b production https://gitlab.cee.redhat.com/baseos-qe/citool-config ~/.citool.d
+   git clone -b staging https://YOUR_CITOOL_CONFIG_REPOSITORY ~/.citool.d
 
-9. Add local configuration (optional)
+
+6. Add local configuration (optional)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A configuration you cloned from remote repository in step #8 is often tailored for other task (e.g. CI) while
+A configuration you cloned from remote repository in step :ref:`step_config` is often tailored for other task (e.g. CI) while
 providing reasonable functionality when used locally. To tweak things for you, you can create a local configuration
 ``citool`` looks for configuration files in its working directory as well, i.e. when running from your
 ``gluetool-modules`` clone, it looks for ``.gluetool.d`` (or ``.citool.d`` directory).
 
 .. code-block:: bash
 
-   pushd gluetool-modules
-   mkdir .gluetool.d
-   cat << EOF > .gluetool.d/gluetool
+   mkdir .citool.d
+   cat << EOF > .citool.d/citool
    [default]
    output = citool-debug.txt
    colors = yes
-   module-path = <location of your gluetool clone>/gluetool_modules, ./gluetool_modules
    EOF
-   popd
 
 
-9. Test ``citool``
+7. Test ``citool``
 ~~~~~~~~~~~~~~~~~~
 
-Now every time you activate your new virtualenv, you should be able to
-run ``citool``:
+To run ``citool`` you can use the ``poetry run`` command, which executes the given command in the virtualenv.
 
 .. code-block:: bash
 
-    citool -h
-    usage: citool [opts] module1 [opts] [args] module2 ...
+    poetry run citool -l
+    ... pile of modules ...
 
-    optional arguments:
-    ...
-
+You can also enter a shell with activated virtualenv by running the command:
 
 .. code-block:: bash
 
-   citool -l
-   ... pile of modules ...
+   poetry shell
 
+If you are in an poetry shell, you can run citool directly:
+
+.. code-block:: bash
+
+    citool -l
+    ... pile of modules ...
 
 
 Test suites
 -----------
 
-The test suite is governed by ``tox`` and ``py.test``. Before running the test suite, you have to install ``tox``:
-
-.. code-block:: bash
-
-    pip install tox
-
-Tox can be easily executed by:
+The test suite is governed by ``tox`` and ``py.test``. Tox can be easily executed by:
 
 .. code-block:: bash
 
@@ -210,6 +173,11 @@ Tox also accepts additional options which are then passed to ``py.test``:
 Tox creates (and caches) virtualenv for its test runs, and uses them for running the tests. It integrates multiple
 different types of test (you can see them by running ``tox -l``).
 
+
+Installation tests
+~~~~~~~~~~~~~~~~~~
+
+A collection of installation tests written with the help of `Test Management Tool (tmt) <https://tmt.readthedocs.io/>` can be found at `plans/README.rst`.
 
 Documentation
 -------------
@@ -226,30 +194,4 @@ Then you can read generated docs by opening ``docs/build/html/index.html``.
 Troubleshooting
 ---------------
 
-Issues with pycurl
-~~~~~~~~~~~~~~~~~~
-
-In case you encounter tracebacks when importing pycurl, similar to this one:
-
-.. note::
-
-    ImportError: pycurl: libcurl link-time ssl backend (openssl) is different from compile-time ssl backend (nss)
-
-This is caused by mismatch of the SSL library which libcurl package is compiled against and pycurl module's compile time library. To resolve, make sure that your PYCURL_SSL_LIBRARY environment variable is correctly set. In case if your libcurl package requires "libnss*.so" library, the value should be "nss". In case it requires "libssl*.so" library, the value should be "openssl":
-
-.. code-block:: bash
-
-    rpm -qR libcurl
-    env | grep PYCURL_SSL_LIBRARY
-
-Note that this environment variable is added to the virtualenv activate script in step 5. of this guide. To reinstall pycurl use these commands:
-
-.. code-block:: bash
-
-    pip uninstall pycurl; pip install --no-cache-dir pycurl
-
-To verify that your pycurl works, use this command:
-
-.. code-block:: bash
-
-    python -c "import pycurl"
+No known issues currently, if you run into issues please contact the maintainers.

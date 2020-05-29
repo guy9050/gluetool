@@ -4,14 +4,18 @@ import shlex
 
 import bs4
 
+# this is an optional, downstream only requirement
+try:
+    import qe
+except ImportError:
+    qe = None
+
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError
 from gluetool.action import Action
 from gluetool.log import log_dict, log_blob
 from gluetool.utils import Command, render_template, dict_update
 from gluetool_modules.libs.sentry import PrimaryTaskFingerprintsMixin
-
-import qe
 
 import gluetool_modules.libs.test_schedule
 
@@ -238,6 +242,10 @@ class WorkflowTomorrow(gluetool.Module):
         #   '--plan=foo --baz'
         # ]
 
+        # refuse to run if 'qe' module is not around
+        if not qe:
+            raise GlueError('qe.py is not available, please install internal qa-tools-workstation')
+
         fixed_wow_options = []
 
         for instance in self.option('wow-options'):
@@ -332,6 +340,7 @@ class WorkflowTomorrow(gluetool.Module):
             ]
 
         else:
+
             # For each --wow-options instance, add one set of options to the list, and sprinkle
             # with general test plan if needed.
 

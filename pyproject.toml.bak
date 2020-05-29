@@ -1,6 +1,0 @@
-# Renamed to avoid its usage by tools. The goal was to install gluetool to actually extract Python
-# requirements from modules' moduleinfo files, instead of having them hardcoded in setup.py. When we
-# get time to finish this work, we'd put pyproject.toml back in the game.
-
-[build-system]
-# requires = ["http://liver3.brq.redhat.com/gluetool/packages/testing/gluetool-1.0-py2-none-any.whl"]

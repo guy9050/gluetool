@@ -6,28 +6,36 @@ stages:
   - build-docker
   - deploy
 
-variables:
-  # This one keeps popping up again and again and again... It works locally while tox is not
-  # psssing this variable to its command... That should not work at all :/
-  PYCURL_SSL_LIBRARY: nss
-
-  # See https://click.palletsprojects.com/en/7.x/python3/#python-3-surrogate-handling
-  # Export these for Python 3.6 - from 3.7 forward, Python is smarter when picking
-  # default locales.
-  LC_ALL: "en_US.utf8"
-  LANG: "en_US.utf8"
-
 # Use our custom image. See https://gitlab.cee.redhat.com/baseos-qe/ansible-baseos-ci/tree/master/gitlab-cicd
 image: "docker-registry.upshift.redhat.com/testing-farm/baseosci-gitlab-cicd-centos7"
 
 #
+# Some of the jobs require locale to be set, some fail with is. Those which need it can inherit this section.
+#
+.locale:
+  variables:
+    # See https://click.palletsprojects.com/en/7.x/python3/#python-3-surrogate-handling
+    # Export these for Python 3.6 - from 3.7 forward, Python is smarter when picking
+    # default locales.
+    LC_ALL: "en_US.utf8"
+    LANG: "en_US.utf8"
+
+#
 # TEST steps
 #
+.tests:
+  extends: .locale
+  before_script:
+    - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python
+    - source ~/.poetry/env
+    # https://github.com/python-poetry/poetry/issues/3010
+    - poetry config experimental.new-installer false
 
 # Run unit tests
 #
 # Note: this step also generates coverage report (HTML).
 unit-tests:
+  extends: .tests
   stage: test
   script:
     - tox -v -e py27-unit-tests -- --cov=gluetool_modules --cov-report=html:coverage-report
@@ -39,6 +47,7 @@ unit-tests:
 
 # Static analysis - pylint, flake8
 static-analysis:
+  extends: .tests
   stage: test
   script:
     - tox -v -e py27-static-analysis
@@ -64,6 +73,41 @@ type-check:
   tags:
     - shared
 
+# Installation Fedora
+installation-fedora:
+  stage: test
+  image: fedora:32
+  script:
+    - dnf -y install python3-pip git
+    - pip3 install git+https://github.com/psss/tmt.git
+    - tmt run -adddvvv provision -h local plan --name /plans/fedora
+  tags:
+    - shared
+
+# Installation Centos8
+installation-centos8:
+  stage: test
+  image: centos:8
+  script:
+    - dnf -y install python3-pip git
+    - pip3 install git+https://github.com/psss/tmt.git
+    - tmt run -adddvvv provision -h local plan --name /plans/centos8
+  tags:
+    - shared
+
+# Installation RHEL8
+installation-rhel8:
+  stage: test
+  # using universal base images for RHEL8
+  # https://access.redhat.com/articles/4238681
+  image: registry.access.redhat.com/ubi8/ubi
+  script:
+    - dnf -y install python3-pip git
+    - pip3 install git+https://github.com/psss/tmt.git
+    - tmt run -adddvvv provision -h local plan --name /plans/rhel8
+  tags:
+    - shared
+
 # Generate documentation from the sources
 #
 # Note: executed for all commits in all branches to make sure it is actually possible
@@ -71,6 +115,7 @@ type-check:
 # uses docstrings to generate command-line help, it is useful to check whether these
 # docstrings are readable and sane.
 generate-docs:
+  extends: .tests
   stage: test
   script:
     - tox -v -e py27-doctest -- ./docs
@@ -80,7 +125,6 @@ generate-docs:
   tags:
     - shared
 
-
 #
 # BUILD steps
 #
@@ -88,6 +132,7 @@ generate-docs:
 # Trigger RPM build
 build-rpm-packages:
   stage: build-rpm
+  extends: .locale
   only:
     - master@baseos-qe/gluetool-modules
   script:
@@ -97,6 +142,7 @@ build-rpm-packages:
 
 build-rpm-packages-devel:
   stage: build-rpm
+  extends: .locale
   only:
     - devel@baseos-qe/gluetool-modules
   script:
@@ -107,6 +153,7 @@ build-rpm-packages-devel:
 # Trigger Docker build
 build-docker-images:
   stage: build-docker
+  extends: .locale
   only:
     - master@baseos-qe/gluetool-modules
   script:
@@ -117,6 +164,7 @@ build-docker-images:
 
 build-docker-images-devel:
   stage: build-docker
+  extends: .locale
   only:
     - devel@baseos-qe/gluetool-modules
   script:
@@ -128,11 +176,11 @@ build-docker-images-devel:
 # Trigger staging deployment
 deploy-to-staging:
   stage: deploy
+  extends: .locale
   only:
     - devel@baseos-qe/gluetool-modules
   script:
     - tower-cli workflow_job launch --monitor -W "[BaseOS CI] [deploy] [staging] Image" | tee tower_output.log
     - grep 'failed' tower_output.log && { echo 'At least one of subtasks failed!'; exit 1; } || exit 0
-
   tags:
     - shared

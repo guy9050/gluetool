@@ -104,14 +104,16 @@
       when: qepy_present.stat.isreg is defined and qepy_present.stat.isreg
 
     - fail:
-        msg: "Install package providing qe.py (usually provided qa-tools-workstation)"
+        msg: "WARNING: qe.py from qa-tools-workstation was not found, some modules will not work"
       when: qepy_path is not defined
+      ignore_errors: yes
 
     #
     # Modify `activate` script to set additional variables
     #
     - name: "Detect libcurl dependecies library"
-      command: rpm -qR libcurl
+      # not that on RHEL8/Centos8 package installed is libcurl-minimal
+      command: rpm -qaR libcurl*
       args:
         warn: false
       register: libcurl_deps
@@ -119,7 +121,7 @@
     - name: "Set pycurl_ssl_library to openssl if libcurl compiled against libssl.so"
       set_fact:
         pycurl_ssl_library: "openssl"
-      when: libcurl_deps.stdout.find("libssl.so")
+      when: libcurl_deps.stdout.find("OPENSSL_") != -1
 
     - name: "Force PycURL to use chosen library: '{{ pycurl_ssl_library }}'"
       lineinfile:
@@ -128,6 +130,12 @@
         insertafter: EOF
         regexp: '^export PYCURL_SSL_LIBRARY=.*$'
         line: 'export PYCURL_SSL_LIBRARY={{ pycurl_ssl_library }}'
+
+    - name: "Reinstall pycurl with correct backend"
+      shell: |
+        pycurl=$(pip freeze | grep pycurl)
+        pip uninstall -y pycurl
+        PYCURL_SSL_LIBRARY={{ pycurl_ssl_library }} pip install --no-cache-dir $pycurl
 
     - name: "Force requests to use system CA bundle"
       lineinfile:
@@ -140,9 +148,9 @@
     #
     # Inject system packages into the virtualenv
     #
-
     - name: "Inject qe.py into virtualenv"
       file:
         path: "{{ virtualenv_path }}/lib64/python2.7/site-packages/qe.py"
         state: link
         src: '{{ qepy_path }}'
+      when: qepy_path is defined

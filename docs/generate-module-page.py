@@ -109,7 +109,7 @@ def gather_module_data():
             'klass': klass,
             'filepath': filepath,
             'modclass': properties.klass,
-            'modpath': 'gluetool_modules.{}'.format(modpath),
+            'modpath': modpath,
             'filepath_mtime': stat.st_mtime if stat else sys.maxint
         })
 
