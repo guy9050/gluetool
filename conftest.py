@@ -3,7 +3,8 @@ import pytest
 
 from gluetool.action import Action
 from gluetool.tests.conftest import fixture_enable_logger, fixture_enable_logger_propagate, fixture_log  # noqa
-from libci.tests.conftest import fixture_module_with_primary_task  # noqa
+
+from gluetool_modules.tests import patch_shared
 
 
 def pytest_addoption(parser):
@@ -44,6 +45,18 @@ def fixture_mock_command(monkeypatch):
     monkeypatch.setattr(gluetool.utils, 'Command', mock_command_init)
 
     return mock_command_init, mock_command, mock_run, mock_output
+
+
+@pytest.fixture(name='module_with_primary_task')
+def fixture_module_with_primary_task(module, monkeypatch):
+    _, module = module
+
+    # make sure primary_task exists to get to check for jenkins module
+    patch_shared(monkeypatch, module, {
+        'primary_task': mock.MagicMock(id=17, dispatch_id=17),
+    })
+
+    return module
 
 
 @pytest.fixture(scope='function', name='root_action', autouse=True)

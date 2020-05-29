@@ -7,9 +7,6 @@
     clean: false
     static_rst:
       - source/framework.rst
-      - source/howto-tests.rst
-      - source/howto-docs.rst
-      - source/howto-modules.rst
       - source/howto-write-a-module.rst
       - source/index.rst
       - source/protocols/cache.rst

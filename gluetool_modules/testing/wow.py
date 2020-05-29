@@ -9,7 +9,7 @@ from gluetool import GlueError, SoftGlueError, GlueCommandError
 from gluetool.action import Action
 from gluetool.log import log_dict, log_blob
 from gluetool.utils import Command, render_template, dict_update
-from libci.sentry import PrimaryTaskFingerprintsMixin
+from gluetool_modules.libs.sentry import PrimaryTaskFingerprintsMixin
 
 import qe
 

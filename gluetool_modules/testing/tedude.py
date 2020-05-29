@@ -1,7 +1,7 @@
 import gluetool
 from gluetool.log import log_dict
 from gluetool.utils import cached_property, new_xml_element
-from libci.results import TestResult, publish_result
+from gluetool_modules.libs.results import TestResult, publish_result
 
 # Type annotations
 from typing import Any, Dict, List, Optional, Tuple  # noqa

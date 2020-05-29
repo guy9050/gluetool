@@ -1,12 +1,12 @@
 import gluetool
 from gluetool.utils import cached_property, dict_update
-import libci.dispatch_job
+import gluetool_modules.libs.dispatch_job
 
 
 DEFAULT_WOW_OPTIONS_SEPARATOR = '#-#-#-#-#'
 
 
-class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
+class BeakerJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     """
     Jenkins job module dispatching Beaker-based testing pipeline, as defined in ``ci-beaker.yaml`` file.
 
@@ -27,7 +27,7 @@ class BeakerJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     job_name = 'ci-beaker'
 
     # pylint: disable=gluetool-option-no-default-in-help,gluetool-option-hard-default
-    options = dict_update({}, libci.dispatch_job.DispatchJenkinsJobMixin.options, {
+    options = dict_update({}, gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin.options, {
         'build-dependencies-options': {
             'help': 'Additional options for ``build-dependencies-options`` module.'
         },

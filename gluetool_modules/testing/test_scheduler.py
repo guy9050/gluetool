@@ -4,7 +4,7 @@ from gluetool.action import Action
 from gluetool.log import log_dict
 
 import gluetool_modules.libs.guest
-import libci.sentry
+import gluetool_modules.libs.sentry
 
 import gluetool_modules.libs.artifacts
 from gluetool_modules.libs import ANY
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from gluetool_modules.testing.test_scheduler_beaker_xml import TestScheduleEntry  # noqa
 
 
-class NoTestableArtifactsError(libci.sentry.PrimaryTaskFingerprintsMixin, SoftGlueError):
+class NoTestableArtifactsError(gluetool_modules.libs.sentry.PrimaryTaskFingerprintsMixin, SoftGlueError):
     """
     Raised when the artifact we're given to test contains no usable RPMS we could actually test.
     E.g. when the artifact was build for arch A only, while our backend can handle just arches

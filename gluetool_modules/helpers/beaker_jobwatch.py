@@ -2,7 +2,7 @@ import shlex
 
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError
-from libci.sentry import PrimaryTaskFingerprintsMixin
+from gluetool_modules.libs.sentry import PrimaryTaskFingerprintsMixin
 
 
 class BeakerJobwatchError(PrimaryTaskFingerprintsMixin, GlueError):

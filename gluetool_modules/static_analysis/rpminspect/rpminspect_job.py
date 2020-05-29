@@ -1,8 +1,8 @@
 import gluetool
-import libci.dispatch_job
+import gluetool_modules.libs.dispatch_job
 
 
-class RpminspectJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
+class RpminspectJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     """
     Jenkins job module dispatching RPMinspect analysis and comparison testing, as defined in
     ``ci-test-brew-rpminspect_analysis.yaml`` and ``ci-test-brew-rpminspect_comparison.yaml`` files.
@@ -23,7 +23,7 @@ class RpminspectJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module)
 
     # DispatchJenkinsJobMixin.options contain hard defaults
     # pylint: disable=gluetool-option-no-default-in-help,gluetool-option-hard-default
-    options = gluetool.utils.dict_update({}, libci.dispatch_job.DispatchJenkinsJobMixin.options, {
+    options = gluetool.utils.dict_update({}, gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin.options, {
         'type': {
             'help': 'Test type: analysis or comparison',
             'choices': ('analysis', 'comparison')

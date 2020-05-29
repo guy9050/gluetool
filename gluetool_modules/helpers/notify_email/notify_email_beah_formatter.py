@@ -41,7 +41,7 @@ class NotifyEmailBeahFormatter(gluetool.Module):
         Gather short summary for each failed test instance. The summary will then be used
         to provide user with more information in the notification e-mails.
 
-        :param libci.result.Result result: result to inspect. So far, only ``workflow-tomorrow`
+        :param gluetool_modules.libs.results.TestResult result: result to inspect. So far, only ``workflow-tomorrow`
           and ``restraint`` provide the summaries, other result types do not support this
           feature.
 

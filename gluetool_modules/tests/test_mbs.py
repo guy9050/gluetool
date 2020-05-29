@@ -192,12 +192,14 @@ def test_execute(module, tags, get):
     assert primary_task.devel_nvr == 'rust-toolset-devel-rhel8-820181105234334.b09eea91'
     assert primary_task.component_id == 'rust-toolset:rhel8'
     assert primary_task.has_artifacts is True
-    assert primary_task.dependencies == ['llvm-toolset:rhel8', 'platform:el8']
     assert primary_task.platform_stream == 'el8'
     assert primary_task.distgit_ref == '7981ffe74ef8badda5dfcc5407fb2d9a84af0d62'
 
     assert primary_task.tags == ['tag1', 'tag2']
     assert primary_task.task_arches == TaskArches(['aarch64', 'i686', 'ppc64le', 's390x', 'x86_64'])
+
+    # hmm, seems it is better to sort this, happend the items were in different order when run via gitlab CI
+    assert sorted(primary_task.dependencies) == ['llvm-toolset:rhel8', 'platform:el8']
 
 
 def test_scratch_build(module, get, tags):

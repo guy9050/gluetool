@@ -1,16 +1,12 @@
-citool - Continuous Integration Swiss Army Knife
-------------------------------------------------
-
-``citool`` is a command line centric CI framework used to implement (not only) BaseOS CI
+Collection of gluetool modules used by Testing Farm Team
+---------------------------------------------------------
 
 Documentation
 -------------
 
-For more information see generated citool's documetation
+For more information see the generated documentation
 
-http://liver3.lab.eng.brq.redhat.com/~citool-doc/
-
-For more on pipelines, see libci/data/README.md.
+https://gluetool-modules.readthedocs.io
 
 Testing
 -------

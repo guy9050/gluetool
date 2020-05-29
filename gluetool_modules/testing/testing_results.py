@@ -2,14 +2,14 @@ import json
 import sys
 
 import gluetool
-import libci
+import gluetool_modules.libs.results
 
 
 class TestingResults(gluetool.Module):
     """
     Provides support for gathering and exporting testing results.
 
-    Keeps internal ``list`` of produced results (instances of :py:class:`libci.results.TestResult`),
+    Keeps internal ``list`` of produced results (instances of :py:class:`gluetool_modules.libs.results.TestResult`),
     and provides it to callers via its shared function :py:meth:`results`. Users can then modify the
     list and results it carries.
 
@@ -47,7 +47,7 @@ class TestingResults(gluetool.Module):
         Return list of gathered results.
 
         :rtype: list
-        :returns: list of gathered results (instances of :py:class:`libci.results.TestResult`).
+        :returns: list of gathered results (instances of :py:class:`gluetool_modules.libs.results.TestResult`).
         """
 
         return self._results
@@ -122,7 +122,7 @@ class TestingResults(gluetool.Module):
         self.info("loading results from '{}', in format '{}'".format(input_file, input_format))
 
         def _default_unserialize(result):
-            return libci.results.TestResult.unserialize(self.glue, 'json', result)
+            return gluetool_modules.libs.results.TestResult.unserialize(self.glue, 'json', result)
 
         # load results from init file
         try:

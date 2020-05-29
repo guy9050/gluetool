@@ -1,11 +1,11 @@
 import sys
 import six
 import re
-from libci.results import TestResult, publish_result
 import gluetool
 from gluetool.utils import Command, normalize_multistring_option
 import gluetool_modules.libs
 from gluetool_modules.libs.brew_build_fail import run_command
+from gluetool_modules.libs.results import TestResult, publish_result
 from gluetool.log import log_blob
 
 

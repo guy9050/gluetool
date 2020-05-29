@@ -11,8 +11,8 @@ from gluetool import GlueError, SoftGlueError, GlueCommandError, utils
 from gluetool.log import BlobLogger
 from gluetool.result import Result
 from gluetool.utils import load_yaml, fetch_url, Command
-from libci.results import TestResult, publish_result
-from libci.sentry import PrimaryTaskFingerprintsMixin
+from gluetool_modules.libs.results import TestResult, publish_result
+from gluetool_modules.libs.sentry import PrimaryTaskFingerprintsMixin
 
 import gluetool_modules.libs.artifacts
 import gluetool_modules.libs.test_schedule

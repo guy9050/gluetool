@@ -5,7 +5,7 @@ import time
 import gluetool
 from gluetool import GlueError, SoftGlueError, GlueCommandError, utils
 from gluetool.log import format_dict, log_blob
-from libci.results import TestResult, publish_result
+from gluetool_modules.libs.results import TestResult, publish_result
 
 # map RPMdiff overal score to resultsdb 2.0 API outcome states
 # http://docs.resultsdb20.apiary.io/

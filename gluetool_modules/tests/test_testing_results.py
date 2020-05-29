@@ -2,7 +2,7 @@ import json
 import pytest
 
 import gluetool
-import libci
+import gluetool_modules.libs.results
 
 import gluetool_modules.testing.testing_results
 
@@ -16,7 +16,7 @@ def fixture_module():
 
 @pytest.fixture(name='result')
 def fixture_result(module):
-    return libci.results.TestResult(module.glue, 'dummy', 'PASS')
+    return gluetool_modules.libs.results.TestResult(module.glue, 'dummy', 'PASS')
 
 
 def assert_results(results, length=0, model=None):

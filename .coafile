@@ -9,5 +9,5 @@ use_spaces = True
 
 bears = PyUnusedCodeBear,PEP8Bear
 
-[all.libci]
+[all.code]
 files = gluetool_modules/**/*.py

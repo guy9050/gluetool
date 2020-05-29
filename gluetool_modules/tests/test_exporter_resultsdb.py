@@ -3,10 +3,10 @@ import pytest
 from mock import MagicMock
 
 from gluetool_modules.helpers.exporter_resultsdb import CIExporterResultsDB
+from gluetool_modules.libs.results import TestResult
 from gluetool_modules.static_analysis.covscan.covscan import CovscanTestResult
 from gluetool_modules.static_analysis.rpmdiff.rpmdiff import RpmdiffTestResult
 from gluetool_modules.testing.beaker.beaker import BeakerTestResult
-from libci.results import TestResult
 from . import create_module, patch_shared, assert_shared, check_loadable
 
 

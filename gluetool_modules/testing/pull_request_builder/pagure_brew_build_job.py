@@ -1,9 +1,9 @@
 import gluetool
-import libci.dispatch_job
+import gluetool_modules.libs.dispatch_job
 from gluetool.utils import cached_property, dict_update
 
 
-class BrewBuildJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
+class BrewBuildJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     """
     Jenkins job module dispatching brew build, as defined in ``ci-test-pagure-brew_build.yaml`` file.
 
@@ -20,7 +20,7 @@ class BrewBuildJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
 
     # DispatchJenkinsJobMixin.options contain hard defaults
     # pylint: disable=gluetool-option-no-default-in-help,gluetool-option-hard-default
-    options = dict_update({}, libci.dispatch_job.DispatchJenkinsJobMixin.options, {
+    options = dict_update({}, gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin.options, {
         'brew-builder-options': {
             'help': 'Additional options for ``brew-builder`` module.'
         }

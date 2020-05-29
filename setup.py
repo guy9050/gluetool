@@ -139,7 +139,6 @@ if __name__ == '__main__':
           data_files=DATA_FILES,
           install_requires=[
               'gluetool',
-              'citool @ git+https://gitlab.cee.redhat.com/baseos-qe/citool.git#egg=citool',
               'sphinx-argparse==0.2.0',
               'sphinxcontrib-programoutput==0.11'
           ] + INSTALL_REQUIRES,

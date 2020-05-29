@@ -1,8 +1,8 @@
 import gluetool
-import libci.dispatch_job
+import gluetool_modules.libs.dispatch_job
 
 
-class TeDuDeJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
+class TeDuDeJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     """
     Jenkins job module dispatching TeDuDe validation testing, as defined in
     ``ci-test-brew-tedude.yaml`` file
@@ -23,7 +23,7 @@ class TeDuDeJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
 
     # DispatchJenkinsJobMixin.options contain hard defaults
     # pylint: disable=gluetool-option-no-default-in-help,gluetool-option-hard-default
-    options = gluetool.utils.dict_update({}, libci.dispatch_job.DispatchJenkinsJobMixin.options, {
+    options = gluetool.utils.dict_update({}, gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin.options, {
         'bug-attributes': {
             'help': 'Comma separated list of bug attribute names. (default: %(default)s)',
             'type': str,

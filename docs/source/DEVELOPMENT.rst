@@ -205,7 +205,7 @@ Tox also accepts additional options which are then passed to ``py.test``:
 
 .. code-block:: bash
 
-    tox -- --cov=libci --cov-report=html:coverage-report
+    tox -- --cov=gluetool_modules --cov-report=html:coverage-report
 
 Tox creates (and caches) virtualenv for its test runs, and uses them for running the tests. It integrates multiple
 different types of test (you can see them by running ``tox -l``).

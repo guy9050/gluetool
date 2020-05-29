@@ -1,7 +1,7 @@
 import pytest
 
 import gluetool_modules.static_analysis.covscan.covscan_job
-from libci.tests.test_dispatch_job import create_build_params
+from gluetool_modules.tests.test_dispatch_job import create_build_params
 from . import create_module, check_loadable
 
 

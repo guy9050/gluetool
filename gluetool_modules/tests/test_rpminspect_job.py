@@ -2,7 +2,7 @@ import pytest
 
 import gluetool_modules.static_analysis.rpminspect.rpminspect_job
 
-from libci.tests.test_dispatch_job import test_dispatch as basic_test_dispatch
+from gluetool_modules.tests.test_dispatch_job import test_dispatch as basic_test_dispatch
 from . import create_module, check_loadable
 
 

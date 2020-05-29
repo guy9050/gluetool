@@ -7,7 +7,7 @@ import gluetool
 from gluetool.action import Action
 from gluetool.utils import Command, from_json
 from gluetool.log import format_blob, log_blob, log_dict
-from libci.sentry import PrimaryTaskFingerprintsMixin
+from gluetool_modules.libs.sentry import PrimaryTaskFingerprintsMixin
 
 # Type annotations
 from typing import cast, TYPE_CHECKING, Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union  # noqa

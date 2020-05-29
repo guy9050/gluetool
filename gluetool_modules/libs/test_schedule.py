@@ -1,8 +1,8 @@
 import gluetool
 import gluetool.log
 from gluetool.log import LoggerMixin, log_table
-import libci.sentry
 import gluetool_modules.libs.guest_setup
+import gluetool_modules.libs.sentry
 from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs import GlueEnum
 
@@ -52,7 +52,7 @@ def _guest_to_str(guest):
     return ''
 
 
-class EmptyTestScheduleError(libci.sentry.PrimaryTaskFingerprintsMixin, gluetool.SoftGlueError):
+class EmptyTestScheduleError(gluetool_modules.libs.sentry.PrimaryTaskFingerprintsMixin, gluetool.SoftGlueError):
     def __init__(self, task):
         # type: (Any) -> None
 

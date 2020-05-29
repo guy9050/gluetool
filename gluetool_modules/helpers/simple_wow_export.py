@@ -111,7 +111,7 @@ class SimpleWowExport(gluetool.Module):
 
         self.info('Logging wow results into a log file {}'.format(self.option('log')))
 
-        from libci.results import TestResult
+        from gluetool_modules.libs.results import TestResult
         result = TestResult(self.glue, 'dummy', 'ERROR')
 
         self._flush_records([self._format_record(task, result)])

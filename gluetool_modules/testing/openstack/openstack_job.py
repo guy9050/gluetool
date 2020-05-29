@@ -1,12 +1,12 @@
 import gluetool
 from gluetool.utils import cached_property, dict_update
-import libci.dispatch_job
+import gluetool_modules.libs.dispatch_job
 
 
 DEFAULT_WOW_OPTIONS_SEPARATOR = '#-#-#-#-#'
 
 
-class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
+class OpenStackJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     """
     Jenkins job module dispatching OpenStack-based testing pipeline, as defined in ``ci-openstack.yaml`` file.
 
@@ -28,7 +28,7 @@ class OpenStackJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
 
     # DispatchJenkinsJobMixin.options contain hard defaults
     # pylint: disable=gluetool-option-no-default-in-help,gluetool-option-hard-default
-    options = dict_update({}, libci.dispatch_job.DispatchJenkinsJobMixin.options, {
+    options = dict_update({}, gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin.options, {
         'build-dependencies-options': {
             'help': 'Additional options for ``build-dependencies-options`` module.'
         },

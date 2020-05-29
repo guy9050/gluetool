@@ -1,8 +1,8 @@
 import gluetool
-import libci.dispatch_job
+import gluetool_modules.libs.dispatch_job
 
 
-class CovscanJob(libci.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
+class CovscanJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     """
     Jenkins job module dispatching Covscan testing, as defined in ``ci-covscan.yaml`` file.
 

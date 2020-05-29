@@ -11,7 +11,7 @@ from gluetool.glue import DryRunLevels
 from gluetool.log import log_dict, format_dict
 from gluetool.utils import cached_property, Command, check_for_commands, new_xml_element, GlueCommandError, \
     dict_update, Bunch, PatternMap
-from libci.results import TestResult, publish_result
+from gluetool_modules.libs.results import TestResult, publish_result
 
 REQUIRED_CMDS = ['covscan']
 

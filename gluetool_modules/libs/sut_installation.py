@@ -5,7 +5,7 @@ from gluetool import SoftGlueError
 from gluetool.log import log_dict, log_blob, LoggingFunctionType
 from gluetool.result import Ok, Error
 from gluetool.utils import Result
-from libci.sentry import PrimaryTaskFingerprintsMixin
+from gluetool_modules.libs.sentry import PrimaryTaskFingerprintsMixin
 
 from jq import jq
 

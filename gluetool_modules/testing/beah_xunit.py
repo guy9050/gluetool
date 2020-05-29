@@ -43,7 +43,7 @@ class BeahXUnit(gluetool.Module):
         Given ``testsuite`` XML element, it will fill it with data corresponding to given result.
 
         :param element test_suite: ``<testsuite/>`` XML element.
-        :param libci.results.TestResult: Result to serialize into xUnit.
+        :param gluetool_modules.libs.results.TestResult: Result to serialize into xUnit.
         :param payload: if set, it is used instead of ``result.payload``. It is a workaround to avoid copy/paste
             of this code when used by ``test-schedule-report`` module.
         :returns: ``<testsuite/>`` element, originaly given as ``test_suite`` argument.

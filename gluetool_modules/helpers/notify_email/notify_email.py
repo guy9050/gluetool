@@ -57,7 +57,8 @@ All templates are rendered with access to following variables:
 Some templates are given special extra variables:
 
     * ``subject``, ``body-header``, ``body-footer``
-        * ``RESULT`` - an instance of :py:class:`libci.results.TestResult``, describing the current result
+        * ``RESULT`` - an instance of :py:class:`gluetool_modules.libs.results.TestResult``, describing
+          the current result.
 
     * ``body-header``
 
@@ -291,7 +292,7 @@ class Notify((gluetool.Module)):
         Gather unique connectable host from results. This list will then be used
         to provide user with reservation information in the notification e-mails.
 
-        :param libci.result.Result result: result to inspect. So far, only ``workflow-tomorrow`
+        :param gluetool_modules.libs.results.TestResult result: result to inspect. So far, only ``workflow-tomorrow`
           and ``restraint`` provide the summaries, other result types do not support this
           feature.
 
@@ -313,7 +314,7 @@ class Notify((gluetool.Module)):
         with '..' and other stuff. Most of the work is offloaded to :py:func:`gluetool.utils.treat_url`
         the rest - handling missing values - is done here.
 
-        :param libci.results.Result result: result providing URLs.
+        :param gluetool_modules.libs.results.TestResult result: result providing URLs.
         :param str key: key into `result`'s `url` field - denotes what URL caller wants.
         :param str default: default value returned when the URL is not present.
         """

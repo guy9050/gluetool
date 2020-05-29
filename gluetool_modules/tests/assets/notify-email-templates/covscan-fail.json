@@ -6,7 +6,7 @@
         },
         "overall_result": "FAILED",
         "payload": [],
-        "result_class": "libci.glue.static_analysis/covscan-covscan.CovscanTestResult",
+        "result_class": "gluetool.file_modules.static_analysis.covscan.covscan.CovscanTestResult",
         "test_type": "covscan",
         "urls": {
             "brew_url": "https://brewweb.engineering.redhat.com/brew/taskinfo?taskID=14148106",

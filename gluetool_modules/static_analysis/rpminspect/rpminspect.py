@@ -10,7 +10,7 @@ from gluetool import GlueError, GlueCommandError
 from gluetool.utils import Command, check_for_commands, load_json, normalize_multistring_option, new_xml_element
 from gluetool.log import format_blob, log_blob
 from gluetool_modules.libs.artifacts import artifacts_location
-from libci.results import TestResult, publish_result
+from gluetool_modules.libs.results import TestResult, publish_result
 
 # Type annotations
 from typing import cast, TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa
