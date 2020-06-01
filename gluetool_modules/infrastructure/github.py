@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, cast  # noqa
 
+import collections
 import requests
 
 from six.moves.urllib.parse import quote as urlquote
@@ -8,6 +9,14 @@ from six.moves.urllib.parse import urlencode
 import gluetool
 from gluetool.log import log_dict
 from gluetool.utils import cached_property
+
+
+#: Information about task architectures.
+#:
+#: :ivar bool complete: If ``True``, the task was not limited by its issuer to any particular set of architectures.
+#:     ``False`` signals the issuer requested task to build its artifact for specific list of architectures.
+#: :ivar list(str) arches: List of architectures.
+TaskArches = collections.namedtuple('TaskArches', ['complete', 'arches'])
 
 
 class GitHubAPI(object):
@@ -193,6 +202,8 @@ class GitHubPullRequest(object):
     def __init__(self, module, pull_request_id):
         # type: (GitHub, PullRequestID) -> None
 
+        self.has_artifacts = True
+
         self.pull_request_id = pull_request_id
         self.id = self.dispatch_id = str(pull_request_id)
 
@@ -255,6 +266,11 @@ class GitHubPullRequest(object):
                 'description': status['description'],
                 'updated_at': status['updated_at']
             }
+
+    @cached_property
+    def task_arches(self):
+        # type: () -> TaskArches
+        return TaskArches(True, [])
 
 
 class PullRequestID(object):
