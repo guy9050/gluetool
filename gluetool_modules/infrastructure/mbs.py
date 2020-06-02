@@ -7,10 +7,12 @@ from concurrent.futures import ThreadPoolExecutor, wait
 import requests
 
 from jq import jq
+import koji
 
 import gluetool
+from gluetool import GlueError
 from gluetool.action import Action
-from gluetool.utils import cached_property, normalize_multistring_option
+from gluetool.utils import cached_property, normalize_multistring_option, dict_update
 from gluetool.log import LoggerMixin, log_dict
 
 #: Information about task architectures.
@@ -346,6 +348,170 @@ class MBSTask(LoggerMixin, object):
     def dist_git_repository_name(self):
         return self.component
 
+    @cached_property
+    def baseline(self):
+        """
+        Return baseline task NVR if `baseline-method` specified, otherwise return None.
+
+        :rtype: str
+        """
+        if not self._module.option('baseline-method'):
+            return None
+
+        return self.baseline_task.nvr
+
+    @cached_property
+    def baseline_task(self):
+        """
+        Return baseline task. For documentation of the baseline methods see the module's help.
+
+        :rtype: MBSTask
+        :returns: Initialized task for the baseline build or None if baseline not found.
+        :raises gluetool.glue.GlueError: if specific build does not exist or no baseline-method specified.
+        """
+        method = self.module.option('baseline-method')
+
+        if not method:
+            raise GlueError("Cannot get baseline because no 'baseline-method' specified")
+
+        if method == 'previous-released-build':
+            previous_tags = self.previous_tags(tags=self.tags)
+            if not previous_tags:
+                return None
+
+            baseline_task = self.latest_released(tags=previous_tags)
+
+        elif method == 'previous-build':
+            baseline_task = self.latest_released(tags=self._tags_from_map)
+
+        elif method == 'specific-build':
+            nvr = self.module.option('baseline-nvr')
+            try:
+                baseline_task = self.module.tasks(nvrs=[nvr])[1]
+            except GlueError:
+                raise GlueError("Specific build with nvr '{}' not found".format(nvr))
+
+        else:
+            # this really should not happen ...
+            self.warn("Unknown baseline method '{}'".format(method), sentry=True)
+            return None
+
+        return baseline_task
+
+    def previous_tags(self, tags):
+        """
+        Return previous tags according to the inheritance tag hierarchy to the given tags.
+
+        :param str tags: Tags used for checking.
+        :rtype: list(str)
+        :returns: List of previous tags, empty list if previous tags not found.
+        :raises gluetool.glue.GlueError: In case previous tag search cannot be performed.
+        """
+
+        previous_tags = []
+
+        session = self.module.shared('koji_session')
+
+        for tag in tags:
+            if tag == '<no build target available>':
+                raise GlueError('Cannot check for previous tag as build target does not exist')
+
+            try:
+                previous_tags.append(session.getFullInheritance(tag)[0]['name'])
+            except (KeyError, IndexError, koji.GenericError):
+                self.warn("Failed to find inheritance tree for tag '{}'".format(tag), sentry=True)
+
+        return previous_tags
+
+    def latest_released(self, tags=None):
+        """
+        Returns task of the latest module build tagged with the same build target.
+
+        If no builds are found ``None`` is returned.
+
+        In case the build found is the same as this build, the previous build is returned.
+
+        The tags for checking can be overriden with the ``tags`` parameter. First match wins.
+
+        :param list(str) tags: Tags to use for searching.
+        :rtype: :py:class:`MBSTask`
+        """
+        tags = tags or [self.target]
+
+        session = self.module.shared('koji_session')
+
+        for tag in tags:
+            try:
+                builds = session.listTagged(tag, None, True, latest=2, package=self.component)
+            except koji.GenericError as error:
+                self.warn(
+                    "ignoring error while listing latest builds tagged to '{}': {}".format(tag, error),
+                    sentry=True
+                )
+                continue
+            if builds:
+                break
+        else:
+            log_dict(self.debug, "no latest builds found for package '{}' on tags".format(self.component), tags)
+            return None
+
+        # for scratch builds the latest released package is the latest tagged
+        if self.scratch:
+            build = builds[0]
+
+        # for non scratch we return the latest released package, in case it is the same, the previously
+        # released package
+        else:
+            if self.nvr != builds[0]['nvr']:
+                build = builds[0]
+            else:
+                build = builds[1] if len(builds) > 1 else None
+
+        return self.module.tasks(nvrs=[build['nvr']])[1] if build else None
+
+    @cached_property
+    def _tags_from_map(self):
+        """
+        Unfortunately tags used for looking up baseline builds need to be resolved from a rules
+        file due to their specifics.
+
+        Nice examples for this are:
+
+        * rhel-8 module builds, which have ``target`` set to el8.X.Y, i.e. module platform stream,
+        but we need to transform it to Brew module tag ``rhel-8.X.Y-modules-candidate`` for correct
+        lookup
+        """
+
+        self.module.require_shared('evaluate_instructions', 'evaluate_rules')
+
+        # use dictionary which can be altered in _tags_callback
+        map = {
+            'tags': []
+        }
+
+        def _tags_callback(instruction, command, argument, context):
+            map['tags'] = []
+
+            for arg in argument:
+                map['tags'].append(self.module.shared('evaluate_rules', arg, context=context))
+
+        context = dict_update(self.module.shared('eval_context'), {
+            'TASK': self
+        })
+
+        commands = {
+            'tags': _tags_callback,
+        }
+
+        self.module.shared(
+            'evaluate_instructions', self.module.baseline_tag_map,
+            commands=commands, context=context
+        )
+
+        log_dict(self.debug, 'Tags from baseline tag map', map['tags'])
+
+        return map['tags']
+
 
 class MBS(gluetool.Module):
     name = 'mbs'
@@ -380,6 +546,19 @@ class MBS(gluetool.Module):
                 'action': 'append',
                 'default': [],
             },
+        }),
+        ('Baseline options', {
+            'baseline-method': {
+                'help': 'Method for choosing the baseline package.',
+                'choices': ['previous-build', 'specific-build', 'previous-released-build'],
+                'metavar': 'METHOD',
+            },
+            'baseline-nvr': {
+                'help': "NVR of the build to use with 'specific-build' baseline method",
+            },
+            'baseline-tag-map': {
+                'help': 'Optional rules providing tags which are used for finding baseline package'
+            }
         })
     ]
 
@@ -507,6 +686,13 @@ class MBS(gluetool.Module):
     def _mbs_api(self):
         return MBSApi(self.option('mbs-api-url'), self.option('mbs-ui-url'), self)
 
+    @cached_property
+    def baseline_tag_map(self):
+        if not self.option('baseline-tag-map'):
+            return []
+
+        return gluetool.utils.load_yaml(self.option('baseline-tag-map'))
+
     def mbs_api(self):
         # type: () -> MBSApi
         """
@@ -534,3 +720,10 @@ class MBS(gluetool.Module):
 
         for task in self._tasks:
             self.info('Initialized with {}: {} ({})'.format(task.id, task.nsvc, task.url))
+
+            # init baseline build if requested
+            if self.option('baseline-method'):
+                if task.baseline_task:
+                    self.info('Baseline build: {} ({})'.format(task.baseline_task.nvr, task.baseline_task.url))
+                else:
+                    self.warn('Baseline build was not found')
