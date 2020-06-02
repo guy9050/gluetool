@@ -1,6 +1,5 @@
 import collections
 import errno
-import gzip
 import os
 import re
 import threading
@@ -484,14 +483,14 @@ class OpenstackGuest(NetworkedGuest):
 
         # save console log, if possible
         try:
-            filename = 'console-{}-{}.log.gz'.format(self.name, self.instance_id)
+            filename = 'console-{}-{}.log.txt'.format(self.name, self.instance_id)
 
             self.debug("storing console output in '{}'".format(filename))
 
             console = self._get_console_output()
 
             if console is not None:
-                with gzip.open(filename, 'wb') as f:
+                with open(filename, 'w') as f:
                     f.write(console)
                     f.flush()
 
@@ -699,7 +698,7 @@ class OpenstackGuest(NetworkedGuest):
 
         try:
 
-            filename = 'full-console-{}-{}.log.gz'.format(self.name, self.instance_id)
+            filename = 'full-console-{}-{}.log.txt'.format(self.name, self.instance_id)
 
         except AttributeError as error:
 
@@ -729,7 +728,7 @@ class OpenstackGuest(NetworkedGuest):
                 added = [line[1:] for line in lines if line[0] == '+']
                 removed = [line[1:] for line in lines if line[0] == '-']
 
-                with gzip.open(filename, 'ab') as f:
+                with open(filename, 'a') as f:
                     for line in added:
                         if line not in removed:
                             f.write(line + "\n")
