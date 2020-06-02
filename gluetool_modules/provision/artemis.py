@@ -24,7 +24,7 @@ DEFAULT_ECHO_TICK = 10
 DEFAULT_BOOT_TIMEOUT = 240
 DEFAULT_BOOT_TICK = 10
 DEFAULT_SSH_OPTIONS = ['UserKnownHostsFile=/dev/null', 'StrictHostKeyChecking=no']
-DEFAULT_SNAPSHOT_READY_TIMEOUT = 300
+DEFAULT_SNAPSHOT_READY_TIMEOUT = 600
 DEFAULT_SNAPSHOT_READY_TICK = 10
 
 #: Artemis provisioner capabilities.
@@ -214,19 +214,27 @@ class ArtemisAPI(object):
 
         return self.api_call('guests/{}'.format(guest_id), method='DELETE', expected_status_code=200)
 
-    def create_snapshot(self, guest_id):
-        # type: (str) -> Any
+    def create_snapshot(self, guest_id, start_again=True):
+        # type: (str, bool) -> Any
         '''
         Requests Aremis API to create a snapshot of a guest.
 
         :param str guest_id: Artemis guestname (or guest_id).
             See Artemis API docs for more.
 
+        :param bool start_again: If true artemis will start a guest after snapshot creating
+
         :rtype: dict
         :returns: Artemis API response serialized as dictionary or ``None`` in case of failure.
         '''
 
-        return self.api_call('guests/{}/snapshots'.format(guest_id), method='POST', expected_status_code=201).json()
+        data = {'start_again': start_again}
+
+        return self.api_call('guests/{}/snapshots'.format(guest_id),
+                             method='POST',
+                             data=data,
+                             expected_status_code=201
+                             ).json()
 
     def inspect_snapshot(self, guest_id, snapshot_id):
         # type: (str, str) -> Any
@@ -404,6 +412,15 @@ class ArtemisGuest(NetworkedGuest):
         except GlueError as exc:
             raise GlueError('Guest failed to become alive: {}'.format(exc))
 
+    @property
+    def supports_snapshots(self):
+        # type: () -> bool
+
+        # WARNING :this property is not always true. It depends on the pool: WARNING
+        # TODO: we need to teach Artemis to handle the guest request with explicit snapshot support
+
+        return True
+
     def setup(self, variables=None, **kwargs):
         # type: (Optional[Dict[str, Any]], **Any) -> Any
         """
@@ -429,7 +446,7 @@ class ArtemisGuest(NetworkedGuest):
         return super(ArtemisGuest, self).setup(variables=variables, **kwargs)
 
     def create_snapshot(self, start_again=True):
-        # type: (Optional[bool]) -> ArtemisSnapshot
+        # type: (bool) -> ArtemisSnapshot
         """
         Creates a snapshot from the current running image of the guest.
 
@@ -438,10 +455,7 @@ class ArtemisGuest(NetworkedGuest):
         :rtype: ArtemisSnapshot
         :returns: newly created snapshot.
         """
-        if not start_again:
-            raise GlueError("Disabling of guest starting is not implemented yet. Can't do it.")
-
-        response = cast(ArtemisProvisioner, self._module).api.create_snapshot(self.artemis_id)
+        response = cast(ArtemisProvisioner, self._module).api.create_snapshot(self.artemis_id, start_again)
 
         snapshot = ArtemisSnapshot(cast(ArtemisProvisioner, self._module), response.get('snapshotname'), self)
 
@@ -449,6 +463,8 @@ class ArtemisGuest(NetworkedGuest):
                                      self._module.option('snapshot-ready-tick'))
 
         self._snapshots.append(snapshot)
+
+        self.info("image snapshot '{}' created".format(snapshot.name))
 
         return snapshot
 
@@ -461,9 +477,14 @@ class ArtemisGuest(NetworkedGuest):
         :rtype: ArtemisGuest
         :returns: server instance rebuilt from given snapshot.
         """
+
+        self.info("rebuilding server with snapshot '{}'".format(snapshot.name))
+
         cast(ArtemisProvisioner, self._module).api.restore_snapshot(self.artemis_id, snapshot.name)
         snapshot.wait_snapshot_ready(self._module.option('snapshot-ready-timeout'),
                                      self._module.option('snapshot-ready-tick'))
+
+        self.info("image snapshot '{}' restored".format(snapshot.name))
 
         return self
 
