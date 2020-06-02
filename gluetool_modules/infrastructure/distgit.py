@@ -25,17 +25,15 @@ class DistGitRepository(gluetool_modules.libs.git.RemoteGitRepository):
     @cached_property
     def ci_config_url(self):
         """
-        URL of CI configuration entry point (``ci.fmf``).
+        To check for CI configuration we simply check if fmf metadata are present. We want to avoid
+        the need to clone the dist-git repository.
         """
 
-        # In the future, this must cover greater variety of options - FMF allows multiple
-        # ways how to specify "/ci" node.
-
         # NOTE: url for Pagure instances, move to config later ideally
-        # return '{}/raw/{}/f/ci.fmf'.format(self.web_url, self.ref if self.ref else self.branch)
+        # return '{}/raw/{}/f/.fmf/version'.format(self.web_url, self.ref if self.ref else self.branch)
 
         # NOTE: url for cgit instance
-        return '{}/plain/ci.fmf?id={}'.format(self.web_url, self.ref if self.ref else self.branch)
+        return '{}/plain/.fmf/version?id={}'.format(self.web_url, self.ref if self.ref else self.branch)
 
     @cached_property
     def sti_tests_url(self):
@@ -74,17 +72,14 @@ class DistGitRepository(gluetool_modules.libs.git.RemoteGitRepository):
         return None
 
     @cached_property
-    def ci_config(self):
+    def has_ci_config(self):
         """
-        CI configuration.
+        Indicates if CI configuration present in dist-git by checking for `.fmf/version` file.
 
-        .. note::
-
-           Limited to a single file, ``ci.fmf`` - FMF allows different ways how to write such configuration,
-           as of now there's a hard limit on simple ``ci.fmf`` or nothing.
+        :returns: ``True`` when dist-git repository contains CI configuration, ``False`` otherwise.
         """
 
-        return self._get_url(self.ci_config_url, 'contains CI configuration', 'does not contain CI configuration')
+        return bool(self._get_url(self.ci_config_url, 'contains CI configuration', 'does not contain CI configuration'))
 
     @cached_property
     def _sti_tests_folder(self):
@@ -107,14 +102,6 @@ class DistGitRepository(gluetool_modules.libs.git.RemoteGitRepository):
         self.info("dist-git repository has no gating.yaml '{}'".format(self.gating_config_url))
 
         return None
-
-    @cached_property
-    def has_ci_config(self):
-        """
-        :returns: ``True`` when dist-git repository contains CI configuration, ``False`` otherwise.
-        """
-
-        return bool(self.ci_config)
 
     @cached_property
     def has_sti_tests(self):

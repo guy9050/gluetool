@@ -202,7 +202,7 @@ def test_no_sti_tests(module, dummy_repository, monkeypatch, log):
 def test_ci_config(module, dummy_repository, monkeypatch, log):
     monkeypatch.setattr(gluetool.utils, 'requests', MockRequests)
 
-    assert dummy_repository.ci_config_url == 'some-web-url/plain/ci.fmf?id=some-branch'
+    assert dummy_repository.ci_config_url == 'some-web-url/plain/.fmf/version?id=some-branch'
     assert dummy_repository.has_ci_config
     assert log.match(message='contains CI configuration')
 
