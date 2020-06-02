@@ -84,11 +84,11 @@ class PipelineStateReporter(gluetool.Module):
        ---
 
        # If there is a failure, and it's an exception we want to pretend like nothing happened, set the state.
-       - rules: FAILURE and FAILURE.exc_info and FAILURE.exc_info[0].__name__ in ('ThisIsFineError',)
+       - rule: FAILURE and FAILURE.exc_info and FAILURE.exc_info[0].__name__ in ('ThisIsFineError',)
          state: complete
 
        # If there is a soft failure, pretend like nothing happened.
-       - rules: FAILURE and FAILURE.soft
+       - rule: FAILURE and FAILURE.soft
          state: complete
 
        # Final "catch the rest" instruction to set "complete" is not necessary
@@ -532,7 +532,7 @@ class PipelineStateReporter(gluetool.Module):
         for instr in self.final_state_map:
             log_dict(self.debug, 'final state instruction', instr)
 
-            if not self.shared('evaluate_rules', instr.get('rules', 'True'), context=context):
+            if not self.shared('evaluate_rules', instr.get('rule', 'True'), context=context):
                 self.debug('denied by rules')
                 continue
 
@@ -560,7 +560,7 @@ class PipelineStateReporter(gluetool.Module):
         for instr in self.test_docs_map:
             log_dict(self.debug, 'test docs instruction', instr)
 
-            if not self.shared('evaluate_rules', instr.get('rules', 'True'), context=context):
+            if not self.shared('evaluate_rules', instr.get('rule', 'True'), context=context):
                 self.debug('denied by rules')
                 continue
 
