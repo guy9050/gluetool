@@ -37,7 +37,6 @@ class ComposeUrl(gluetool.Module):
         })
     ]
 
-    required_options = ('hostname',)
     shared_functions = ['get_compose_url']
 
     @cached_property
@@ -118,6 +117,16 @@ class ComposeUrl(gluetool.Module):
         self.info('OSCI compose found: {}'.format(compose_url))
 
         return compose_url
+
+    def sanity(self):
+        hostname = self.option('hostname')
+        static_compose_url = self.option('static-compose-url')
+
+        if not (hostname or static_compose_url):
+            raise gluetool.GlueError('Either --hostname or --static-compose-url has to be specified.')
+
+        if hostname and static_compose_url:
+            self.warn('Both --hostname and --static-compose-url specified, --static-compose-url will be used.')
 
     def get_compose_url(self):
         static_compose_url = self.option('static-compose-url')
