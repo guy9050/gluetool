@@ -252,7 +252,7 @@ class GitHubPullRequest(object):
             self.comment_author = None
             self.comment_author_role = None
 
-        self.commit_author = commit['author']['login']
+        self.commit_author = commit['commit']['author']['name']
         self.commit_timestamp = commit['commit']['author']['date']
         self.commit_message = commit['commit']['message']
 
