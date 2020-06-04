@@ -109,12 +109,6 @@ class CoprBuilder(gluetool.Module):
 
     required_options = ('method', 'copr-url', 'copr-login', 'copr-username', 'copr-token')
 
-    def __init__(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        super(CoprBuilder, self).__init__(*args, **kwargs)
-        self.workdir = tempfile.mkdtemp(prefix=CoprBuilder.name, dir=os.getcwd())
-        self.info('Created working directory {}.'.format(self.workdir))
-
     def _log_and_raise(self, message, blob):
         # type: (str, Any) -> None
         """
@@ -133,6 +127,9 @@ class CoprBuilder(gluetool.Module):
         self.require_shared('primary_task')
         artifact = self.shared('primary_task')
 
+        workdir = tempfile.mkdtemp(prefix=CoprBuilder.name, dir=os.getcwd())
+        self.info('Created working directory {}.'.format(workdir))
+
         try:
             artifact_type = Artifact(artifact.ARTIFACT_NAMESPACE)
         except ValueError:
@@ -141,17 +138,17 @@ class CoprBuilder(gluetool.Module):
 
         if artifact_type is Artifact.GITHUB_ARTIFACT:
             self.require_shared('set_pr_status')
-            return self._copr_build_from_github(artifact)
+            return self._copr_build_from_github(workdir, artifact)
 
         _assert_never(artifact_type)
 
-    def _copr_build_from_github(self, pull_request):
-        # type: (github.GitHubPullRequest) -> str
+    def _copr_build_from_github(self, workdir, pull_request):
+        # type: (str, github.GitHubPullRequest) -> str
         """
         Trigger copr build on source fetched from GitHub and return url of the copr build.
         """
 
-        self._fetch_from_github(pull_request)
+        self._fetch_from_github(workdir, pull_request)
 
         try:
             method = CoprMethod(self.option('method'))
@@ -160,12 +157,12 @@ class CoprBuilder(gluetool.Module):
                 self.option('method'), CoprMethod.values()))
 
         if method is CoprMethod.MAKEFILE_METHOD:
-            return self._run_make_copr(pull_request)
+            return self._run_make_copr(workdir, pull_request)
 
         _assert_never(method)
 
-    def _fetch_from_github(self, pull_request):
-        # type: (github.GitHubPullRequest) -> None
+    def _fetch_from_github(self, workdir, pull_request):
+        # type: (str, github.GitHubPullRequest) -> None
         """
         Fetch source from GitHub.
         """
@@ -178,7 +175,7 @@ class CoprBuilder(gluetool.Module):
 
         clone_cmd = ['git',  'clone', clone_url, repo_name]
         try:
-            Command(clone_cmd).run(cwd=self.workdir)
+            Command(clone_cmd).run(cwd=workdir)
         except gluetool.GlueCommandError as exc:
             self._log_and_raise('Failed to clone {}'.format(clone_url), exc.output.stderr)
 
@@ -186,7 +183,7 @@ class CoprBuilder(gluetool.Module):
 
         fetch_cmd = ['git', 'fetch', 'origin', 'refs/pull/{}/head'.format(pull_number)]
         try:
-            Command(fetch_cmd).run(cwd=os.path.join(self.workdir, repo_name))
+            Command(fetch_cmd).run(cwd=os.path.join(workdir, repo_name))
         except gluetool.GlueCommandError as exc:
             self._log_and_raise('Failed to fetch pull request {}'.format(pull_number), exc.output.stderr)
 
@@ -194,14 +191,14 @@ class CoprBuilder(gluetool.Module):
 
         checkout_cmd = ['git', 'checkout', '-b', source_branch, commit_sha]
         try:
-            Command(checkout_cmd).run(cwd=os.path.join(self.workdir, repo_name))
+            Command(checkout_cmd).run(cwd=os.path.join(workdir, repo_name))
         except gluetool.GlueCommandError as exc:
             self._log_and_raise('Failed to checkout commit {}'.format(commit_sha), exc.output.stderr)
 
         self.info('Successfully checked out commit {}.'.format(commit_sha))
 
-    def _run_make_copr(self, pull_request):
-        # type: (github.GitHubPullRequest) -> str
+    def _run_make_copr(self, workdir, pull_request):
+        # type: (str, github.GitHubPullRequest) -> str
         """
         Trigger copr build by invoking Makefile and return url of the copr build.
         """
@@ -213,13 +210,13 @@ class CoprBuilder(gluetool.Module):
         self.shared('set_pr_status', 'pending', 'Copr build started.',
                     context=STATUS_CONTEXT, target_url=jenkins_build_url)
 
-        self._create_copr_config(pull_request)
+        self._create_copr_config(workdir, pull_request)
         copr_cmd = ['make', 'copr_build']
         copr_env = {'COPR_CONFIG': COPR_CONFIG, 'PR': pull_number}
         try:
             gluetool.log.log_dict(self.info, 'Starting copr build with environment variables', copr_env)
             env = dict(os.environ, **copr_env)
-            output = Command(copr_cmd).run(inspect=True, env=env, cwd=os.path.join(self.workdir, repo_name))
+            output = Command(copr_cmd).run(inspect=True, env=env, cwd=os.path.join(workdir, repo_name))
         except gluetool.GlueCommandError as exc:
             self.shared('set_pr_status', 'failure', 'Copr build failed.',
                         context=STATUS_CONTEXT, target_url=jenkins_build_url)
@@ -239,8 +236,8 @@ class CoprBuilder(gluetool.Module):
 
         return copr_build_url
 
-    def _create_copr_config(self, pull_request):
-        # type: (github.GitHubPullRequest) -> None
+    def _create_copr_config(self, workdir, pull_request):
+        # type: (str, github.GitHubPullRequest) -> None
         """
         Create copr config file.
         """
@@ -253,7 +250,7 @@ class CoprBuilder(gluetool.Module):
         copr_config.set('copr-cli', 'username', self.option('copr-username'))
         copr_config.set('copr-cli', 'token', self.option('copr-token'))
 
-        with open(os.path.join(self.workdir, pull_request.repo, COPR_CONFIG), 'w') as config_file:
+        with open(os.path.join(workdir, pull_request.repo, COPR_CONFIG), 'w') as config_file:
             config_file.write('# Copr config for {}\n'.format(pull_request.clone_url))
             copr_config.write(config_file)
 
