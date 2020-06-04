@@ -3,9 +3,9 @@ import sys
 import six
 import re
 import gluetool
-from gluetool.utils import normalize_multistring_option, normalize_path
+from gluetool.utils import normalize_multistring_option, normalize_path, Command
 from gluetool_modules.libs import run_and_log
-from gluetool_modules.libs.brew_build_fail import BrewBuildFailedError, executor, run_command
+from gluetool_modules.libs.brew_build_fail import BrewBuildFailedError, run_command
 from gluetool_modules.libs.results import TestResult, publish_result
 from gluetool_modules.libs.artifacts import artifacts_location
 
@@ -47,9 +47,12 @@ class BrewBuilder(gluetool.Module):
     def _make_brew_build(self):
         self.require_shared('src_rpm')
 
-        src_rpm_name = self.shared('src_rpm')
+        src_rpm_name, path_to_src_rpm = self.shared('src_rpm')
 
         self.info('Initializing brew scratch build')
+
+        def _executor(command):
+            return Command(command).run(cwd=path_to_src_rpm)
 
         command = [
             'rhpkg', 'scratch-build',
@@ -68,7 +71,7 @@ class BrewBuilder(gluetool.Module):
 
         command_failed, err_msg, output = run_and_log(command,
                                                       log_path,
-                                                      executor)
+                                                      _executor)
         if command_failed:
             six.reraise(*sys.exc_info())
 

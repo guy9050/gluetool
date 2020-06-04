@@ -160,8 +160,7 @@ def create_inspect_callback(logger):
 def run_and_log(command,  # type: List[str]
                 log_filepath,  # type: str
                 executor,  # type: Callable[[List[str]], gluetool.utils.ProcessOutput]
-                callback=None,  # type: Optional[Callable[[List[str], gluetool.utils.ProcessOutput], str]]
-                full_output=False  # type: bool
+                callback=None  # type: Optional[Callable[[List[str], gluetool.utils.ProcessOutput], str]]
                 ):  # noqa
     # type: (...) -> Tuple[bool, Optional[str], gluetool.utils.ProcessOutput]
 

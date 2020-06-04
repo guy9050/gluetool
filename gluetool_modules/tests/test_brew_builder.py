@@ -13,8 +13,6 @@ Created task: 123
 Task info: dummy_brew_url
 """
 
-LOG_PATH = './brew_builder.log'
-
 
 @pytest.fixture(name='module')
 def fixture_module():
@@ -36,7 +34,7 @@ def test_pass(tmp_path, module, monkeypatch):
     monkeypatch.setattr(brew_builder, 'run_command', run_command)
 
     patch_shared(monkeypatch, module, {
-        'src_rpm': MagicMock()
+        'src_rpm': (MagicMock(), MagicMock())
     })
 
     publish_result_mock = MagicMock()
@@ -61,7 +59,7 @@ def test_fail(tmp_path, module, monkeypatch):
     monkeypatch.setattr(brew_builder, 'run_command', run_command)
 
     patch_shared(monkeypatch, module, {
-        'src_rpm': MagicMock()
+        'src_rpm': (MagicMock(), MagicMock())
     })
 
     publish_result_mock = MagicMock()

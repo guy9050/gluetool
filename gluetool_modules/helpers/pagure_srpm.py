@@ -1,7 +1,7 @@
 import os
 import shlex
 import gluetool
-from gluetool.utils import normalize_path
+from gluetool.utils import normalize_path, Command
 from gluetool_modules.libs.brew_build_fail import run_command
 from gluetool_modules.libs.artifacts import artifacts_location
 
@@ -32,6 +32,17 @@ class PagureSRPM(gluetool.Module):
 
     shared_functions = ['src_rpm']
 
+    def _run_command(self, cmd, log_path, comment, cwd=None):
+        def _executor(command):
+            return Command(command).run(cwd=cwd) if cwd else Command(command).run()
+
+        return run_command(
+                    command=cmd,
+                    log_path=log_path,
+                    comment=comment,
+                    executor=_executor
+                )
+
     def src_rpm(self):
         self.require_shared('primary_task')
 
@@ -53,13 +64,11 @@ class PagureSRPM(gluetool.Module):
         if self.option('git-clone-options'):
             clone_cmd.extend(shlex.split(self.option('git-clone-options')))
 
-        run_command(
+        self._run_command(
             clone_cmd,
             log_path,
             'Clone git repository'
         )
-
-        os.chdir(pull_request.project.name)
 
         pr_id = pull_request.pull_request_id.repository_pr_id
 
@@ -68,10 +77,11 @@ class PagureSRPM(gluetool.Module):
         if self.option('git-fetch-options'):
             fetch_cmd.extend(shlex.split(self.option('git-fetch-options')))
 
-        run_command(
+        self._run_command(
             fetch_cmd,
             log_path,
-            'Fetch pull request changes'
+            'Fetch pull request changes',
+            pull_request.project.name
         )
 
         merge_cmd = ['git', 'merge', 'FETCH_HEAD', '-m', 'ci pr merge']
@@ -79,15 +89,16 @@ class PagureSRPM(gluetool.Module):
         if self.option('git-merge-options'):
             merge_cmd.extend(shlex.split(self.option('git-merge-options')))
 
-        run_command(
+        self._run_command(
             merge_cmd,
             log_path,
-            'Merge pull request changes'
+            'Merge pull request changes',
+            pull_request.project.name
         )
 
         last_comment_id = pull_request.comments[-1]['id'] if pull_request.comments else 0
 
-        spec_origin_name = '{}.spec'.format(pull_request.project.name)
+        spec_origin_name = '{0}/{0}.spec'.format(pull_request.project.name)
         spec_backup_name = '{}.backup'.format(spec_origin_name)
 
         os.rename(spec_origin_name, spec_backup_name)
@@ -98,12 +109,13 @@ class PagureSRPM(gluetool.Module):
                 outfile.writelines(line)
 
         rhpkg_cmd = ['rhpkg', 'srpm']
-        output = run_command(
+        output = self._run_command(
             rhpkg_cmd,
             log_path,
-            'Make srpm'
+            'Make srpm',
+            pull_request.project.name
         )
 
         src_rpm_name = output.stdout.split('/')[-1].strip()
 
-        return src_rpm_name
+        return src_rpm_name, pull_request.project.name

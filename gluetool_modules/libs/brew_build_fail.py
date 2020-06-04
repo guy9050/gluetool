@@ -3,7 +3,7 @@ from gluetool.utils import Command
 from gluetool_modules.libs import run_and_log
 
 # Type annotations
-from typing import TYPE_CHECKING, List  # noqa
+from typing import TYPE_CHECKING, List, Callable  # noqa
 
 if TYPE_CHECKING:
     import gluetool # noqa
@@ -23,11 +23,12 @@ def executor(command):
     return Command(command).run()
 
 
-def run_command(command, log_path, comment):
-    # type: (List[str], str, str) -> gluetool.utils.ProcessOutput
-    command_failed, err_msg, output = run_and_log(command,
-                                                  log_path,
-                                                  executor)
+def run_command(command, log_path, comment, executor=executor):
+    # type: (List[str], str, str, Callable[[List[str]], gluetool.utils.ProcessOutput]) -> gluetool.utils.ProcessOutput
+    command_failed, err_msg, output = run_and_log(command=command,
+                                                  log_filepath=log_path,
+                                                  executor=executor
+                                                  )
 
     if command_failed:
         raise BrewBuildFailedError('{} failed.'.format(comment), output)
