@@ -433,20 +433,24 @@ class OpenstackGuest(NetworkedGuest):
     def _get_console_output(self):
         # try to get console output
         try:
+            # Copy os_instance to a local variable - if we're called from console thread, it may happen that this
+            # handle is None because of snapshot restores. And we want a copy because it could change between
+            # our tests whether it's None, and the actual use in API call.
+            os_instance = self._os_instance
 
-            console = self._call_api('instance.get_console_output', self._os_instance.get_console_output)
+            if os_instance is None:
+                return None, None
+
+            console = self._call_api('instance.get_console_output', os_instance.get_console_output)
 
             if console:
-                console = console.encode('utf-8', 'replace')
-                return console
+                return console.encode('utf-8', 'replace'), None
 
             # Some servers may return empty console output. Observed with rhel-7.1-server-x86_64-released image
-            self.warn('empty console output')
-            return None
+            return None, None
 
         except Exception as exc:
-            self.warn('Failed to get console output: {}'.format(str(exc)), sentry=True)
-            return None
+            return None, exc
 
     def _release_snapshots(self):
         """
@@ -487,9 +491,15 @@ class OpenstackGuest(NetworkedGuest):
 
             self.debug("storing console output in '{}'".format(filename))
 
-            console = self._get_console_output()
+            console, exc = self._get_console_output()
 
-            if console is not None:
+            if exc:
+                self.warn('failed to get console output: {}'.format(exc), sentry=True)
+
+            elif console is None:
+                self.warn('empty console output')
+
+            else:
                 with open(filename, 'w') as f:
                     f.write(console)
                     f.flush()
@@ -709,9 +719,20 @@ class OpenstackGuest(NetworkedGuest):
         last_console = []
 
         while True:
+            console, exc = self._get_console_output()
 
-            console = self._get_console_output()
-            if console:
+            # When we fetch console when releasing the guest, the "no console" states are reported as warnings.
+            # There's nothing going on with the instance, so it should have a console and so on, while here,
+            # in this daemonized thread, we don't follow the flow of testing, e.g. restoring instance from
+            # snapshots - during restoration the instance does not have a console, apparently. Spamming log
+            # with warnings doesn't help - but let's store them, at least, just in case.
+            if exc:
+                self.debug('failed to get console output: {}'.format(exc))
+
+            elif console is None:
+                self.debug('empty console output')
+
+            else:
                 console = console.splitlines()
 
                 # We use difflib to compare lists of strings (last console output with the
@@ -753,6 +774,9 @@ class OpenstackGuest(NetworkedGuest):
         self._os_network_ip = None
         self._os_nics = []
         self._os_details = details or {}
+
+        # Handler for a console-fetching thread - we really want just one per instance.
+        self._console_thread = None
 
         # Initialize logging as early as possible, before we call anything else. Note that this would
         # yield "[<unknown guest>]" context in log messages, which wouldn't be much helpful. Try to
@@ -889,12 +913,17 @@ class OpenstackGuest(NetworkedGuest):
 
             current_action = Action.current_action()
 
-            console_thread = threading.Timer(DEFAULT_CONSOLE_COLLECT_START_DELAY,
-                                             self._collect_console,
-                                             args=(current_action,))
-            # we do not know how long will the instance be active so we use daemon thread
-            console_thread.setDaemon(True)
-            console_thread.start()
+            # We know there's only 1 thread calling _wait_alive, therefore it's safe to not use any locking,
+            # and every following access will be just reading anyway.
+            if self._console_thread is None:
+                self._console_thread = threading.Timer(
+                    DEFAULT_CONSOLE_COLLECT_START_DELAY,
+                    self._collect_console,
+                    args=(current_action,)
+                )
+                # we do not know how long will the instance be active so we use daemon thread
+                self._console_thread.setDaemon(True)
+                self._console_thread.start()
 
             # If the instance is in ACTIVE state, proceed with other checks
             return self.wait_alive(connect_timeout=self._module.option('activation-timeout'), connect_tick=1,
