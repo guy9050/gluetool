@@ -197,9 +197,9 @@ class CIRpminspect(gluetool.Module):
         if self.option('type') == 'comparison':
             if task.baseline_task is None:
                 raise GlueError('Not provided baseline for comparison')
-            command.append(task.baseline_task.nvr)
+            command.append(str(task.baseline_task.id) if task.baseline_task.scratch else task.baseline_task.nvr)
 
-        command.append(task.nvr)
+        command.append(str(task.id) if task.scratch else task.nvr)
 
         def _write_log(output):
             # type: (ProcessOutput) -> None

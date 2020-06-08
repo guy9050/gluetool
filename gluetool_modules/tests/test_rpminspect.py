@@ -329,6 +329,7 @@ def fixture_module(monkeypatch, tmpdir):
     mock_primary_task.nvr = 'dummy-nvr'
     mock_primary_task.baseline_task = MagicMock()
     mock_primary_task.baseline_task.nvr = 'dummy-latest'
+    mock_primary_task.baseline_task.scratch = False
     mock_primary_task.scratch = False
     mock_primary_task.id = 111111
     module.task = mock_primary_task
@@ -361,6 +362,7 @@ def test_run_rpminspect(module, monkeypatch):
     mock_primary_task.baseline_task = MagicMock()
     mock_primary_task.baseline_task.nvr = 'dummy-latest'
     mock_primary_task.scratch = False
+    mock_primary_task.baseline_task.scratch = False
     mock_primary_task.id = 111111
 
     monkeypatch.setattr(__builtin__, 'open', MagicMock())
@@ -374,6 +376,39 @@ def test_run_rpminspect(module, monkeypatch):
                                      '-F', 'json',
                                      '-T', 'ALL',
                                      'dummy-latest', 'dummy-nvr'])
+
+
+def test_run_rpminspect_scratch(module, monkeypatch):
+
+    mock_runinfo = MagicMock()
+    mock_runinfo.stdout = ''
+    mock_runinfo.stderr = ''
+    mock_command_run = MagicMock(return_value=mock_runinfo)
+
+    mock_command = MagicMock(return_value=MagicMock(run=mock_command_run))
+
+    monkeypatch.setattr(gluetool_modules.static_analysis.rpminspect.rpminspect, 'Command', mock_command)
+
+    mock_primary_task = MagicMock()
+    mock_primary_task.nvr = 'dummy-nvr'
+    mock_primary_task.baseline_task = MagicMock()
+    mock_primary_task.baseline_task.nvr = 'dummy-latest'
+    mock_primary_task.scratch = True
+    mock_primary_task.baseline_task.scratch = True
+    mock_primary_task.id = 111111
+    mock_primary_task.baseline_task.id = 222222
+
+    monkeypatch.setattr(__builtin__, 'open', MagicMock())
+
+    module._run_rpminspect(mock_primary_task, ['ALL'], 'workdir')
+
+    mock_command.assert_called_with(['rpminspect',
+                                     '-v',
+                                     '-w', 'workdir/artifacts',
+                                     '-o', 'workdir/results-file',
+                                     '-F', 'json',
+                                     '-T', 'ALL',
+                                     '222222', '111111'])
 
 
 def test_run_rpminspect_profile(module, monkeypatch):
@@ -394,6 +429,7 @@ def test_run_rpminspect_profile(module, monkeypatch):
     mock_primary_task.baseline_task = MagicMock()
     mock_primary_task.baseline_task.nvr = 'dummy-latest'
     mock_primary_task.scratch = False
+    mock_primary_task.baseline_task.scratch = False
     mock_primary_task.id = 111111
 
     monkeypatch.setattr(__builtin__, 'open', MagicMock())
