@@ -24,6 +24,11 @@ class RpminspectJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, 
     # DispatchJenkinsJobMixin.options contain hard defaults
     # pylint: disable=gluetool-option-no-default-in-help,gluetool-option-hard-default
     options = gluetool.utils.dict_update({}, gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin.options, {
+        'build-system': {
+            'help': 'Source of build to test: brew or mbs',
+            'choices': ('brew', 'mbs'),
+            'default': 'brew'
+        },
         'type': {
             'help': 'Test type: analysis or comparison',
             'choices': ('analysis', 'comparison')
@@ -55,4 +60,6 @@ class RpminspectJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, 
                 'brew_with_baseline_nvr': self.option('baseline-nvr')
             })
 
-        self.shared('jenkins').invoke_job('ci-test-brew-rpminspect_{}'.format(self.option('type')), self.build_params)
+        job = 'ci-test-{}-rpminspect_{}'.format(self.option('build-system'), self.option('type'))
+
+        self.shared('jenkins').invoke_job(job, self.build_params)
