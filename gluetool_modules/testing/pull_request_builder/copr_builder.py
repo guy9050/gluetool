@@ -11,7 +11,7 @@ from gluetool.utils import Command
 from gluetool_modules.libs.results import TestResult, publish_result
 
 # Type annotations
-from typing import Any, Iterator, List, NoReturn, TYPE_CHECKING  # noqa
+from typing import Any, Iterator, List, NoReturn, Optional, TYPE_CHECKING  # noqa
 
 if TYPE_CHECKING:
     from gluetool_modules.infrastructure import github  # noqa
@@ -53,9 +53,14 @@ def _assert_never(x):
 
 
 class CoprBuildBuildTestResult(TestResult):
-    def __init__(self, glue, overall_result, build_url, process_output, **kwargs):
-        # type: (gluetool.Glue, str, str, gluetool.utils.ProcessOutput, **Any) -> None
-        super(CoprBuildBuildTestResult, self).__init__(glue, 'copr-build', overall_result, **kwargs)
+    def __init__(self, glue, overall_result, build_url=None, process_output=None, **kwargs):
+        # type: (gluetool.Glue, str, Optional[str], Optional[gluetool.utils.ProcessOutput], **Any) -> None
+
+        urls = kwargs.pop('urls', {}) or {}
+        if build_url:
+            urls['copr_url'] = build_url
+
+        super(CoprBuildBuildTestResult, self).__init__(glue, 'copr-build', overall_result, urls=urls, **kwargs)
 
         self.build_url = build_url
         self.process_output = process_output
