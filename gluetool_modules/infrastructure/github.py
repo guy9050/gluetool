@@ -17,6 +17,7 @@ from gluetool.utils import cached_property
 #:     ``False`` signals the issuer requested task to build its artifact for specific list of architectures.
 #: :ivar list(str) arches: List of architectures.
 TaskArches = collections.namedtuple('TaskArches', ['complete', 'arches'])
+VALID_STATUSES = ('error', 'failure', 'pending', 'success')
 
 
 class GitHubAPI(object):
@@ -430,6 +431,20 @@ class GitHub(gluetool.Module):
 
         return [self._pull_request] if self._pull_request else []
 
+    def _get_github_status(self, status):
+        # type: (str) -> str
+        """
+        Translate overall pipeline result into GitHub status.
+        """
+        status_map = {
+            'info': 'success',
+            'passed': 'success',
+            'failed': 'failure',
+            'unknown': 'error'
+        }
+
+        return status_map.get(status, 'error')
+
     def set_pr_status(self, status, message, context=None, target_url=None):
         # type: (str, str, Optional[str], Optional[str]) -> None
         """
@@ -444,6 +459,9 @@ class GitHub(gluetool.Module):
         :param target_url: The target URL to associate with this status.
         :type target_url: str
         """
+
+        if status not in VALID_STATUSES:
+            status = self._get_github_status(status)
 
         status_data = {
             'state': status,
@@ -482,10 +500,9 @@ class GitHub(gluetool.Module):
             if len(status_option) < 2:
                 raise gluetool.GlueError('Check set-status option, invalid value provided.')
 
-            valid_states = ('error', 'failure', 'pending', 'success')
-            if status_option[0] not in valid_states:
+            if status_option[0] not in VALID_STATUSES:
                 raise gluetool.GlueError('Check set-status option, vaild values for state are:'
-                                         ' {}.'.format(valid_states))
+                                         ' {}.'.format(VALID_STATUSES))
 
     def execute(self):
         # type: () -> None

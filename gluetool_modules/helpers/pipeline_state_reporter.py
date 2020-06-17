@@ -117,6 +117,14 @@ class PipelineStateReporter(gluetool.Module):
                 'help': 'Team or CI system IRC channel.'
             }
         }),
+        ('PR options', {
+            'pr-label': {
+                'help': """
+                        Label identifying PR status. If specified, status will be reported using 'set_pr_status'
+                        shared function.
+                        """
+            }
+        }),
         ('Test options', {
             'test-category': {
                 'help': """
@@ -199,6 +207,10 @@ class PipelineStateReporter(gluetool.Module):
         'test-namespace')
 
     shared_functions = ('report_pipeline_state',)
+
+    def sanity(self):
+        if self.option('pr-label'):
+            self.require_shared('set_pr_status')
 
     @property
     def eval_context(self):
@@ -445,6 +457,10 @@ class PipelineStateReporter(gluetool.Module):
 
         self.info('reporting pipeline beginning')
 
+        if self.option('pr-label'):
+            self.shared('set_pr_status', 'pending', 'Test started', context=self.option('pr-label'),
+                        target_url=self.shared('eval_context').get('JENKINS_BUILD_URL'))
+
         self.report_pipeline_state(STATE_RUNNING)
 
     def _get_test_namespace(self):
@@ -587,10 +603,11 @@ class PipelineStateReporter(gluetool.Module):
         self.info('reporting pipeline final state')
 
         test_results = self.shared('results')
+        overall_result = self._get_final_overall_result(test_results, failure)
 
         kwargs = {
             'test_results': None,
-            'test_overall_result': self._get_final_overall_result(test_results, failure)
+            'test_overall_result': overall_result
         }
 
         # If the result is already an XML tree, therefore serialized, do nothing.
@@ -609,5 +626,9 @@ class PipelineStateReporter(gluetool.Module):
                 'error_message': str(failure.exc_info[1].message),
                 'error_url': failure.sentry_event_url
             })
+
+        if self.option('pr-label'):
+            self.shared('set_pr_status', overall_result, 'Test finished', context=self.option('pr-label'),
+                        target_url=self.shared('eval_context').get('JENKINS_BUILD_URL'))
 
         self.report_pipeline_state(self._get_final_state(failure), **kwargs)
