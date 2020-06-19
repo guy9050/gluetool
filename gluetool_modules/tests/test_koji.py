@@ -85,6 +85,19 @@ def fixture_koji_module(monkeypatch, rules_engine):
         'evaluate_rules': rules_engine.evaluate_rules
     })
 
+    # Every call to Koji's execute() tries to connect to real-life Koji server. Now that's not good, in unit tests.
+    # Patching _call_api to hijack this call, but letting others pass through because tests usually patch Koji
+    # session to provide mock data.
+    orig_call_api = gluetool_modules.infrastructure.koji_fedora._call_api
+
+    def _patch_call_api(*args, **kwargs):
+        if args[2] == 'getAPIVersion':
+            return 'dummy-koji-version'
+
+        return orig_call_api(*args, **kwargs)
+
+    monkeypatch.setattr(gluetool_modules.infrastructure.koji_fedora, '_call_api', _patch_call_api)
+
     #  make sure the module is loaded without a task specified
     mod.execute()
 
