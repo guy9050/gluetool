@@ -52,7 +52,7 @@ def _assert_never(x):
     assert False, "Unhandled {}: {}".format(type(x).__name__, x)
 
 
-class CoprBuildBuildTestResult(TestResult):
+class CoprBuildTestResult(TestResult):
     def __init__(self, glue, overall_result, build_url=None, process_output=None, **kwargs):
         # type: (gluetool.Glue, str, Optional[str], Optional[gluetool.utils.ProcessOutput], **Any) -> None
 
@@ -60,7 +60,7 @@ class CoprBuildBuildTestResult(TestResult):
         if build_url:
             urls['copr_url'] = build_url
 
-        super(CoprBuildBuildTestResult, self).__init__(glue, 'copr-build', overall_result, urls=urls, **kwargs)
+        super(CoprBuildTestResult, self).__init__(glue, 'copr-build', overall_result, urls=urls, **kwargs)
 
         self.build_url = build_url
         self.process_output = process_output
@@ -265,8 +265,8 @@ class CoprBuilder(gluetool.Module):
             copr_build_url = self._run_copr_build()
         except CoprBuildFailedError as exc:
             self.error('Result of testing: FAILED')
-            publish_result(self, CoprBuildBuildTestResult, 'FAILED', None, exc.output)
+            publish_result(self, CoprBuildTestResult, 'FAILED', None, exc.output)
             return
 
         self.info('Result of testing: PASSED')
-        publish_result(self, CoprBuildBuildTestResult, 'PASSED', copr_build_url)
+        publish_result(self, CoprBuildTestResult, 'PASSED', copr_build_url)
