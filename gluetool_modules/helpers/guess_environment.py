@@ -1,6 +1,5 @@
 import bs4
 import collections
-import logging
 import re
 import sys
 
@@ -9,10 +8,7 @@ from six import reraise
 import gluetool
 from gluetool import GlueError
 from gluetool.log import log_dict
-from gluetool.utils import fetch_url, PatternMap, IncompatibleOptionsError, render_template
-
-import gluetool_modules
-from gluetool_modules.libs.testing_environment import TestingEnvironment
+from gluetool.utils import fetch_url, PatternMap, IncompatibleOptionsError
 
 # Type annotations
 from typing import cast, Any, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa
@@ -25,7 +21,7 @@ SEPARATOR = ';'
 
 class GuessEnvironment(gluetool.Module):
     """
-    "Guess" compose/arch/distro/image/product/wow relevancy distro.
+    "Guess" arch/compose/distro/image/product/wow relevancy distro.
 
     Goal of this module is to at least partialy answer question about the testing environment
     for a given artifact - deduce what composes, architectures and other properties are
@@ -33,12 +29,11 @@ class GuessEnvironment(gluetool.Module):
 
     User can choose from different possible methods of "guessing":
 
-    * ``autodetect``: module will use artifact to deduce as many properties possible,
-      using mapping files (``--{distro,image,product,wow-relevancy-distro}-pattern-map``) and instruction
-      files (``--environment-map``).
+    * ``autodetect``: module will use artifact to deduce as many properties possible
+      using mapping files (``--{distro,compose, image,product,wow-relevancy-distro}-pattern-map``)
 
-    * ``force``: instead of autodetection, use specified properties. Use ``--environment``,
-      ``--distro``, ``--image``, ``--product`` and ``--wow-relevancy-distro`` options to set actual values.
+    * ``force``: instead of autodetection, use specified properties. Use ``--compose``, ``--distro``,
+      ``--image``, ``--product`` and ``--wow-relevancy-distro`` options to set actual values.
 
     * ``recent``: (Only for images) use ``--image`` option as a hint - a regular
       expression, with one matching group, that tells module what image names should be
@@ -57,55 +52,8 @@ class GuessEnvironment(gluetool.Module):
       ``RHEL-7.3-updates-20170405.0``.
 
     .. note::
-
-       Following information covers "testing environment"-focused work which should replace the current
-       "guess image/distro" based on build target. This module would prepare a list of testing environments,
-       and the actual image or distro would then be derived from the environment, not the build target - ``distros``
-       method would try to provide Beaker distro as close to a given "compose" as possible, to fullfill the request
-       represented by the testing environment constraint. Single Source Of Truth.
-
-       We are not that far yet, the code is present for testing purposes, there is no user of ``testing_environments``
-       shared function, but there will be and we'll be slowly moving toward that goal.
-
-    .. note::
        For guessing we use destination tag with a fallback to build target where applicable. Destination tag provides
        the most relevant information, build target is kept for backward compatibility.
-
-    **Compose map**
-
-    Set by ``--compose-map`` option. After ``testing_environments`` summarizes for what arches it needs to set up
-    testing environments, this map is consulted to fill in compose(s) for each environment. Instructions are checked for
-    each environment, with ``ENVIRONMENT`` variable representing the one currently examined.
-
-    .. code-block:: yaml
-
-       - rule: >
-           ENVIRONMENT.arch == 's390x'
-           and PRIMARY_TASK.component != "foo"
-         remove-environment: true
-         add-note:
-           level: warning
-           text: >
-             We're not testing on s390x.
-
-       # For foo, only x86_64 is supported in RHEL6
-       - rule: >
-           BUILD_TARGET.match('foo-\\d+(?:\\.\\d+)?-rhel-6-candidate')
-           and ENVIRONMENT.arch != 'x86_64'
-         remove-environment: true
-
-       # RHEL-8 Docker images - expected to be tested on both RHEL-8 *and* RHEL-7 guests.
-       # Thanks to the pattern for RHEL-8 below, we'd get RHEL-8 by default, but we want to
-       # add RHEL-7 (including ALT...) guests.
-       - rule: >
-           BUILD_TARGET.match(RHEL_8_0_0.containers.build_target.brew)
-
-         # This results in ENVIRONMENT.compose being set to RHEL_8_0_0.compose, and two new environments
-         # are added, for remaining composes, with their arch being ENVIRONMENT.arch.
-         set-compose:
-           - '{{ RHEL_8_0_0.compose }}'
-           - '{{ RHEL_7.LatestReleased.beaker.distro }}, BUC'
-           - '{{ RHEL_7_Alt.LatestReleased.beaker.distro }}, BUC'
     """
 
     name = 'guess-environment'
@@ -114,11 +62,10 @@ class GuessEnvironment(gluetool.Module):
 
     options = [
         ('Methods', {
-            'environment-method': {
-                'help': 'What method to use for environment "guessing" (default: %(default)s).',
-                'choices': ('autodetect', 'target-autodetection', 'force', 'nightly', 'buc'),
+            'compose-method': {
+                'help': 'What method to use for compose "guessing" (default: %(default)s).',
+                'choices': ('autodetect', 'target-autodetection', 'force'),
                 'default': 'autodetect'
-
             },
             'distro-method': {
                 'help': 'What method to use for distro "guessing" (default: %(default)s).',
@@ -142,10 +89,9 @@ class GuessEnvironment(gluetool.Module):
             }
         }),
         ('Specifications', {
-            'environment': {
-                'help': 'Testing environment to use. Accepted with ``--environment-method=force`` (default: none).',
+            'compose': {
+                'help': 'Compose specification, to help your method with guessing (default: none).',
                 'action': 'append',
-                'metavar': 'compose=...,arch=...,...',
                 'default': []
             },
             'distro': {
@@ -196,10 +142,9 @@ class GuessEnvironment(gluetool.Module):
                 'metavar': 'FILE',
                 'default': None
             },
-            'compose-map': {
-                'help': 'Test and path to a file with instructions for environment(s) mapping (default: none).',
+            'compose-pattern-map': {
+                'help': 'Mapping between build target and one or more composes (default: none).',
                 'metavar': '(destination_tag|build_target):PATH',
-                'action': 'append',
                 'default': []
             },
             'distro-pattern-map': {
@@ -229,7 +174,7 @@ class GuessEnvironment(gluetool.Module):
         })
     ]
 
-    shared_functions = ['testing_environments', 'distro', 'image', 'product', 'wow_relevancy_distro']
+    shared_functions = ['compose', 'distro', 'image', 'product', 'wow_relevancy_distro']
 
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
@@ -237,24 +182,21 @@ class GuessEnvironment(gluetool.Module):
         # type: (Any, Any) -> None
         super(GuessEnvironment, self).__init__(*args, **kwargs)
 
-        self._testing_environments = {}  # type: Dict[str, List[TestingEnvironment]]
         self._distro = {}  # type: Dict[str, Union[str, List[str]]]
         self._image = {}  # type: Dict[str, Union[str, List[str]]]
         self._product = {}  # type: Dict[str, Union[str, List[str]]]
         self._wow_relevancy_distro = {}  # type: Dict[str, Union[str, List[str]]]
 
-    def testing_environments(self):
-        # type: () -> List[TestingEnvironment]
+    def compose(self):
+        # type: () -> Union[str, List[str]]
         """
-        Return list of testing environments appropriate for the primary task.
+        Return guessed compose value
 
-        :rtype: list(TestingEnvironment)
+        :rtype: Union[str, List[str]]
         """
-
-        if self._testing_environments['result'] is None:
-            self.execute_method(self._testing_environments)
-
-        return self._testing_environments['result']
+        if self._compose['result'] is None:
+            self.execute_method(self._compose)
+        return self._compose['result']
 
     def distro(self):
         # type: () -> Union[str, List[str]]
@@ -324,15 +266,6 @@ class GuessEnvironment(gluetool.Module):
             return None
 
         return PatternMap(self.option('arch-completeness-map'), logger=self.logger)
-
-    @gluetool.utils.cached_property
-    def _compose_map(self):
-        # type: () -> Any
-
-        if not self.option('compose-map'):
-            return []
-
-        return gluetool.utils.load_yaml(gluetool.utils.normalize_path(self.option('compose-map')))
 
     def pattern_map(self, source, test):
         # type: (Dict[str, Union[str, List[str]]]) -> PatternMap
@@ -559,7 +492,7 @@ class GuessEnvironment(gluetool.Module):
                 self.warn("no map for test '{}'".format(test))
                 return False
 
-            source['result'] = pattern_map.match(tag, multiple=(source['type'] == 'distro'))
+            source['result'] = pattern_map.match(tag, multiple=(source['type'] in ['compose', 'distro']))
             return True
 
         except GlueError as exc:
@@ -569,256 +502,27 @@ class GuessEnvironment(gluetool.Module):
             # in case ther matching failed for some unexpected reason
             reraise(*sys.exc_info())
 
-    def _guess_autodetect_environments(self, source):
-        self.require_shared('evaluate_instructions', 'primary_task')
-
-        # We start with arches available in the artifact, and with arches supported by the provisioner.
-        # We match architectures present in the artifact with a list of architectures provisioner can provide,
-        # and we find out what architectures we need (or cannot get...). And, by the way, whether there's
-        # anything left to test.
-        #
-        # We need to account for architectures that are not supported but which may be compatible with a supported
-        # architecture as well.
-
-        source['result'] = []
-
-        # These are arches which we'd use to constraint the schedule - we're going to add to this list later - ...
-        constraint_arches = []  # type: List[str]
-
-        provisioner_capabilities = self.shared('provisioner_capabilities')
-        log_dict(self.debug, 'provisioner capabilities', provisioner_capabilities)
-
-        # ... these are arches available in the artifact...
-        artifact_arches = self.shared('primary_task').task_arches.arches
-        log_dict(self.debug, 'artifact arches', artifact_arches)
-
-        # ... these are *valid* artifact arches - those supported by the provisioner...
-        valid_arches = []  # type: List[str]
-
-        # ... and these are arches supported by the provisioner.
-        supported_arches = provisioner_capabilities.available_arches if provisioner_capabilities else []
-        log_dict(self.debug, 'supported arches', supported_arches)
-
-        # When provisioner's so bold that it supports *any* architecture, give him every architecture present
-        # in the artifact, and watch it burn :)
-        #
-        # Note that when the only artifact arch is `noarch`, it gets removed from constraints later, we have
-        # an extra step dealing with `noarch`. Because obviously we can't get `noarch` guest from provisioner.
-        if supported_arches is gluetool_modules.libs.ANY:
-            valid_arches = artifact_arches
-            constraint_arches = artifact_arches
-
-        else:
-            for arch in artifact_arches:
-                # artifact arch is supported directly
-                if arch in supported_arches:
-                    valid_arches.append(arch)
-                    constraint_arches.append(arch)
-                    continue
-
-                # It may be possible to find compatible architecture, e.g. it may be fine to test
-                # i686 artifacts on x86_64 boxes. Let's check the configuration.
-
-                # Start with a list of arches compatible with `arch`.
-                compatible_arches = self._arch_compatibility_map.get(arch, [])
-
-                # Find which of these are supported.
-                compatible_and_supported_arches = [
-                    compatible_arch for compatible_arch in compatible_arches if compatible_arch in supported_arches
-                ]
-
-                # If there are any compatible & supported, add the original arch to the list of valid arches,
-                # because we *can* test it, but use the compatible arches for constraints - we cannot ask
-                # provisioner (yet) to provide use the original arch, because it already explicitely said
-                # "not supported". We can test artifacts of this archtiecture, but using other arches as
-                # the environment.
-                if compatible_and_supported_arches:
-                    # Warning, because nothing else submits to Sentry, and Sentry because
-                    # problem of secondary arches doesn't fit well with nice progress of
-                    # testing environments, and I'd really like to observe the usage of
-                    # this feature, without grepping all existing logs :/ If it's being
-                    # used frequently, we can always silence the Sentry submission.
-
-                    self.warn("Artifact arch '{}' not supported but compatible with '{}'".format(
-                        arch, ', '.join(compatible_and_supported_arches)
-                    ), sentry=True)
-
-                    valid_arches.append(arch)
-                    constraint_arches += compatible_and_supported_arches
-
-        log_dict(self.debug, 'valid artifact arches', valid_arches)
-        log_dict(self.debug, 'constraint arches', constraint_arches)
-
-        if not valid_arches:
-            # Here we would raise an exception, but since we're running in "just testing, nothing to see here"
-            # mode, we're not going to interrupt the pipeline. Other modules will notice this problem for sure.
-
-            self.debug('testing environments: no valid arches, no environments')
-            return
-
-            # raise NoTestableArtifactsError(self.shared('primary_task'), supported_arches)
-
-        # `noarch` is supported naturally on all other arches, so, when we encounter an artifact with just
-        # the `noarch`, we "reset" the list of constraints to let scheduler plugin know we'd like to get all
-        # arches possible. But we have to be careful and take into account what provisioner told us about itself,
-        # because we could mislead the scheduler plugin into thinking that every architecture is valid - if
-        # provisioner doesn't support "ANY" arch, we have to prepare constraints just for the supported arches.
-        # We can use all of them, true, because it's `noarch`, but we have to limit the testing to just them.
-        if valid_arches == ['noarch']:
-            self.debug("'noarch' is the only valid arch")
-
-            # If provisioner boldly promised anything was possible, empty list of valid arches would result
-            # into us not placing any constraints on the environments, and we should get really everything.
-            #
-            # And since we don't know what the list of all arches valid for this artifact looks like, we need
-            # to take a peek into a configuration...
-            if supported_arches is gluetool_modules.libs.ANY:
-                if not self._arch_completeness_map:
-                    # Again, we're just an observer, it's not up to us to break the pipeline - yet.
-                    self.warn('Arch-completeness map not specified', sentry=True)
-
-                    self.debug('testing environments: no arch-completeness map, no environments')
-                    return
-
-                primary_task = self.shared('primary_task')
-
-                # primarly we use destination_tag for matching, with fallback to build target
-                try:
-                    constraint_arches = self._arch_completeness_map.match(primary_task.destination_tag, multiple=True)
-                except GlueError:
-                    constraint_arches = self._arch_completeness_map.match(primary_task.target, multiple=True)
-
-            # On the other hand, if provisioner can support just a limited set of arches, don't be greedy.
-            else:
-                constraint_arches = supported_arches
-
-        # When `noarch` is not the single valid arch, other arches dictate what constraints should we use.
-        # Imagine an arch-specific "main" RPM, with noarch plugins - we cannot just throw in other supported
-        # arches, because we'd not be able to test the "main" RPM, but thanks to "main" RPM, there should
-        # be - and obviously are - other arches in the list, not just noarch. So, we do nothing, but, out
-        # of curiosity, a warning would be nice to track this - it's a complicated topic, let's not get it
-        # unnoticed, the assumption above might be completely wrong.
-        elif 'noarch' in valid_arches:
-            self.warn(
-                "Artifact has 'noarch' bits side by side with regular bits ({})".format(', '.join(valid_arches)),
-                sentry=True
-            )
-
-        log_dict(self.debug, 'constraint arches (noarch pruned)', constraint_arches)
-
-        # Get rid of duplicities - when we found an unsupported arch, we added all its compatibles to the list.
-        # This would lead to us limiting scheduler to provide arches A, B, C, C, ... and so on, because usualy
-        # there's a primary arches A (supported), B (supported), D and E (both unsupported but compatible with C).
-        # leading to C being present multiple times, replacing D and E.
-        constraint_arches = list(set(constraint_arches))
-
-        log_dict(self.debug, 'constraint arches (duplicities pruned)', constraint_arches)
-
-        input_constraints = [
-            TestingEnvironment(arch=arch, compose=None) for arch in constraint_arches
-        ]
-
-        output_constraints = input_constraints[:]
-
-        # Helper function, add new environment & log it.
-        def _add_new_environment(arch, compose, context):
-            # type: (str, str, Dict[str, Any])
-
-            environment = TestingEnvironment(arch=arch, compose=render_template(compose, **context))
-
-            self.debug('adding environment: {}'.format(environment))
-
-            output_constraints.append(environment)
-
-        def _add_note(instruction, command, argument, context):
-            if 'text' not in argument:
-                raise GlueError('Note text is not set')
-
-            self.shared('add_note', argument['text'], level=argument.get('level', logging.INFO))
-
-        def _add_environment(instruction, command, argument, context):
-            if isinstance(argument, dict):
-                argument = [argument]
-
-            if not isinstance(argument, list):
-                raise GlueError("Cannot handle 'add-environment' argument of type {}".format(type(argument)))
-
-            for environment in argument:
-                if 'arch' not in environment or 'compose' not in environment:
-                    raise GlueError('Environment must specify both arch and compose')
-
-                _add_new_environment(environment['arch'], environment['compose'], context)
-
-        def _remove_environment(instruction, command, argument, context):
-            current_environment = context['ENVIRONMENT']
-
-            self.debug('removing environment: {}'.format(current_environment))
-
-            output_constraints.remove(current_environment)
-
-        def _set_compose(instruction, command, argument, context):
-            current_environment = context['ENVIRONMENT']
-
-            if isinstance(argument, str):
-                self.debug('updating environment: {}: compose={}'.format(current_environment, argument))
-
-                current_environment.compose = render_template(argument, **context)
-
-            elif isinstance(argument, list):
-                first_compose = argument[0]
-
-                self.debug('updating environment: {}: compose={}'.format(current_environment, first_compose))
-
-                current_environment.compose = render_template(first_compose, **context)
-
-                for compose in argument[1:]:
-                    _add_new_environment(current_environment.arch, compose, context)
-
-        for environment in input_constraints:
-            context = gluetool.utils.dict_update(
-                self.shared('eval_context'),
-                {
-                    'ENVIRONMENT': environment
-                }
-            )
-
-            self.shared('evaluate_instructions', self._compose_map, {
-                'add-note': _add_note,
-                'add-environment': _add_environment,
-                'remove-environment': _remove_environment,
-                'set-compose': _set_compose
-            }, context=context)
-
-        log_dict(self.debug, 'testing environments', output_constraints)
-
-        source['result'] = output_constraints
-
     def _guess_target_autodetect(self, source, *args):
         # type: (Dict[str, Union[str, List[str]]]) -> None
         self.require_shared('primary_task')
+        primary_task = self.shared('primary_task')
 
-        if source['type'] == 'environment':
-            self._guess_autodetect_environments(source)
+        result = None
+
+        # by default we match with destination_tag
+        if primary_task.destination_tag:
+            result = self._guess_autodetect(source, 'destination_tag', primary_task.destination_tag, *args)
 
         else:
-            primary_task = self.shared('primary_task')
+            self.warn('primary task does not have destination tag')
 
-            result = None
+        # we fallback to build target for legacy reasons
+        if not result:
+            result = self._guess_autodetect(source, 'build_target', primary_task.target, *args)
 
-            # by default we match with destination_tag
-            if primary_task.destination_tag:
-                result = self._guess_autodetect(source, 'destination_tag', primary_task.destination_tag, *args)
-
-            else:
-                self.warn('primary task does not have destination tag')
-
-            # we fallback to build target for legacy reasons
-            if not result:
-                result = self._guess_autodetect(source, 'build_target', primary_task.target, *args)
-
-            # raise and error if no match
-            if not result:
-                raise GlueError("Failed to autodetect '{}', no match found".format(source['type']))
+        # raise and error if no match
+        if not result:
+            raise GlueError("Failed to autodetect '{}', no match found".format(source['type']))
 
     _methods = {
         'autodetect': _guess_target_autodetect,
@@ -852,11 +556,11 @@ class GuessEnvironment(gluetool.Module):
 
             return maps
 
-        self._testing_environments = {
-            'type': 'environment',
-            'specification': self.option('environment'),
-            'method': self.option('environment-method'),
-            'pattern-map': _parse_pattern_map('compose-map'),
+        self._compose = {
+            'type': 'compose',
+            'specification': self.option('compose'),
+            'method': self.option('compose-method'),
+            'pattern-map': _parse_pattern_map('compose-pattern-map'),
             'result': None
         }
         self._distro = {
@@ -897,7 +601,7 @@ class GuessEnvironment(gluetool.Module):
         specification_required = ('force', 'recent', 'nightly', 'buc')
         specification_ignored = ('autodetect', 'target-autodetection',)
 
-        for source in [self._distro, self._image, self._product, self._wow_relevancy_distro]:
+        for source in [self._compose, self._distro, self._image, self._product, self._wow_relevancy_distro]:
 
             if source['method'] == 'target-autodetection' and not source['pattern-map']:
                 raise GlueError(
@@ -922,11 +626,3 @@ class GuessEnvironment(gluetool.Module):
         method(self, source, *args)
 
         log_dict(self.info, 'Using {}'.format(source['type']), source['result'])
-
-    def execute(self):
-        # Nobody uses this information, but we want to examine it from time to time, in logs.
-        # Also avoid running it every time the module is invoked - often this may happen in
-        # a pipeline without any artifact, and the module would simply die because of missing
-        # primary artifact.
-        if self.has_shared('primary_task'):
-            self.testing_environments()
