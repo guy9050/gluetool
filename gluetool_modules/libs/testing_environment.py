@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Union  # noqa
 
 ComposeType = Union[str, gluetool_modules.libs._UniqObject]
 ArchType = str
+SnapshotsType = bool
 
 
 class TestingEnvironment(object):
@@ -33,19 +34,21 @@ class TestingEnvironment(object):
         then deduce what guest configuration (arch & distro, arch & OpenStack image, and so on) would satisfy
         such request.
     :param str arch: Architecture that should be used for testing.
+    :param bool snapshots: Choose a pool with snapshots support
     """
 
     # Make special values available to templates, they are now reachable as class variables
     # of each instance.
     ANY = gluetool_modules.libs.ANY
 
-    _fields = ('arch', 'compose')
+    _fields = ('arch', 'compose', 'snapshots')
 
-    def __init__(self, arch=None, compose=None):
-        # type: (Optional[ArchType], Optional[ComposeType]) -> None
+    def __init__(self, arch=None, compose=None, snapshots=False):
+        # type: (Optional[ArchType], Optional[ComposeType], SnapshotsType) -> None
 
         self.arch = arch
         self.compose = compose
+        self.snapshots = snapshots
 
     def __str__(self):
         # type: () -> str
@@ -109,9 +112,12 @@ class TestingEnvironment(object):
             key.strip(): value.strip() for key, value in [
                 env_property.split('=') for env_property in normalized
             ]
-        }
+        }  # type: Dict[str, Any]
 
         cls._assert_env_properties(env_properties.keys())
+
+        if 'snapshots' in env_properties:
+            env_properties['snapshots'] = gluetool.utils.normalize_bool_option(env_properties['snapshots'])
 
         return TestingEnvironment(**env_properties)
 

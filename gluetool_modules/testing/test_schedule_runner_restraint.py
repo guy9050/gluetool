@@ -165,11 +165,6 @@ class RestraintRunner(gluetool.Module):
     description = 'Runs tests from a test schedule, prepared by a scheduler module, using ``restraint`` harness.'
 
     options = {
-        'use-snapshots': {
-            'help': 'Enable or disable use of snapshots (if supported by guests) (default: %(default)s)',
-            'default': 'no',
-            'metavar': 'yes|no'
-        },
         'on-error-snapshot': {
             'help': """
                     If set, on crash of restraint take a snapshot of the guest and download it (default: %(default)s).
@@ -181,7 +176,7 @@ class RestraintRunner(gluetool.Module):
             'help': """
                     If set, on crash of restraint continue with another test case (default: %(default)s).
 
-                    Be aware that you probably wish to use ``--use-snapshots`` as well, as crashed restraint might
+                    Be aware that you probably wish to use snapshots as well, as crashed restraint might
                     have left the SUT in a very bad state.
                     """,
             'default': 'no',
@@ -204,12 +199,6 @@ class RestraintRunner(gluetool.Module):
     }
 
     shared_functions = ['run_test_schedule_entry', 'serialize_test_schedule_entry_results']
-
-    @gluetool.utils.cached_property
-    def use_snapshots(self):
-        # type: () -> bool
-
-        return normalize_bool_option(self.option('use-snapshots'))
 
     @gluetool.utils.cached_property
     def on_error_snapshot(self):
@@ -616,6 +605,21 @@ class RestraintRunner(gluetool.Module):
         :rtype: TaskSetResults
         """
 
+        snapshots = False
+
+        if schedule_entry.testing_environment:
+            assert schedule_entry.testing_environment
+            snapshots = schedule_entry.testing_environment.snapshots
+
+        if self.option('results-directory-template') and snapshots:
+            raise GlueError('Cannot use --results-directory-template with snapshots.')
+
+        if snapshots:
+            self.info('Will run recipe set tasks serially, using snapshots')
+
+        else:
+            self.info('Will run recipe set tasks serially, without snapshots')
+
         if schedule_entry.runner_capability != 'restraint':
             self.overloaded_shared('run_test_schedule_entry', schedule_entry)
             return
@@ -632,7 +636,7 @@ class RestraintRunner(gluetool.Module):
         # to bear.
         assert len(schedule_entry.recipe_set.find_all('recipe')) == 1
 
-        if schedule_entry.guest.supports_snapshots is True and self.use_snapshots:
+        if schedule_entry.guest.supports_snapshots and snapshots:
             results = self._run_schedule_entry_isolated(schedule_entry)
 
         else:
@@ -665,15 +669,3 @@ class RestraintRunner(gluetool.Module):
         else:
             schedule_entry.warn("To serialize to xUnit format, 'beah_xunit_serialize' shared function is required",
                                 sentry=True)
-
-    def sanity(self):
-        # type: () -> None
-
-        if self.option('results-directory-template') and self.use_snapshots:
-            raise GlueError('Cannot use --results-directory-template with --use-snapshots.')
-
-        if self.use_snapshots:
-            self.info('Will run recipe set tasks serially, using snapshots')
-
-        else:
-            self.info('Will run recipe set tasks serially, without snapshots')

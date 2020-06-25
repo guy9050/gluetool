@@ -77,7 +77,12 @@ class TestScheduler(gluetool.Module):
                     """,
             'metavar': 'FILE',
             'default': None
-        }
+        },
+        'use-snapshots': {
+            'help': 'Enable or disable use of snapshots (if supported by guests) (default: %(default)s)',
+            'default': 'no',
+            'metavar': 'yes|no'
+        },
     }
 
     shared_functions = ['test_schedule']
@@ -95,6 +100,12 @@ class TestScheduler(gluetool.Module):
             Dict[str, List[str]],
             utils.load_yaml(self.option('arch-compatibility-map'), logger=self.logger)
         )
+
+    @gluetool.utils.cached_property
+    def use_snapshots(self):
+        # type: () -> bool
+
+        return utils.normalize_bool_option(self.option('use-snapshots'))
 
     def test_schedule(self):
         # type: () -> TestSchedule
@@ -253,7 +264,11 @@ class TestScheduler(gluetool.Module):
         # Call plugin to create the schedule
         with Action('creating test schedule', parent=Action.current_action(), logger=self.logger):
             schedule = self.shared('create_test_schedule', testing_environment_constraints=[
-                TestingEnvironment(arch=arch, compose=TestingEnvironment.ANY) for arch in constraint_arches
+                TestingEnvironment(
+                    arch=arch,
+                    compose=TestingEnvironment.ANY,
+                    snapshots=self.use_snapshots
+                ) for arch in constraint_arches
             ])
 
         if not schedule:

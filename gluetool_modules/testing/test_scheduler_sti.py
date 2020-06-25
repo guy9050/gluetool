@@ -184,7 +184,8 @@ class TestSchedulerSTI(gluetool.Module):
 
                     schedule_entry.testing_environment = TestingEnvironment(
                         compose=distro,
-                        arch=tec.arch
+                        arch=tec.arch,
+                        snapshots=tec.snapshots
                     )
 
                     schedule.append(schedule_entry)

@@ -150,12 +150,14 @@ class ArtemisAPI(object):
         '''
 
         compose = environment.compose
+        snapshots = environment.snapshots
 
         data = {
             'keyname': keyname,
             'environment': {
                 'arch': environment.arch,
-                'compose': {}
+                'compose': {},
+                'snapshots': snapshots
             },
             'priority_group': priority
         }  # type: Dict[str, Any]
@@ -415,11 +417,9 @@ class ArtemisGuest(NetworkedGuest):
     @property
     def supports_snapshots(self):
         # type: () -> bool
-
-        # WARNING :this property is not always true. It depends on the pool: WARNING
-        # TODO: we need to teach Artemis to handle the guest request with explicit snapshot support
-
-        return True
+        assert self.environment
+        # Cast needs to mypy stop complaints
+        return cast(bool, self.environment.snapshots)
 
     def setup(self, variables=None, **kwargs):
         # type: (Optional[Dict[str, Any]], **Any) -> Any
@@ -582,6 +582,10 @@ class ArtemisProvisioner(gluetool.Module):
             },
             'setup-provisioned': {
                 'help': "Setup guests after provisioning them. See 'guest-setup' module",
+                'action': 'store_true'
+            },
+            'snapshots': {
+                'help': 'Choose a pool with snapshot support',
                 'action': 'store_true'
             }
         }),
@@ -786,6 +790,9 @@ class ArtemisProvisioner(gluetool.Module):
         priority = self.option('priority-group')
         options = normalize_multistring_option(self.option('ssh-options'))
         compose_type = kwargs.pop('compose_type', None)
+
+        if self.option('snapshots'):
+            environment.snapshots = True
 
         guest = self.provision_guest(environment,
                                      key=key,

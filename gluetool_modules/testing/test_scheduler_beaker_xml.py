@@ -188,4 +188,13 @@ class TestSchedulerBeakerXML(gluetool.Module):
         if not job_xmls:
             raise gluetool_modules.libs.test_schedule.EmptyTestScheduleError(self.shared('primary_task'))
 
-        return self._create_jobs_schedule(job_xmls)
+        schedule = self._create_jobs_schedule(job_xmls)
+
+        # Adding snapshots from environment to each entry
+        # testing_environment_constraints has the same snapshot parameter in every item, so pick the first one
+        if testing_environment_constraints:
+            for entry in schedule:
+                assert entry.testing_environment
+                entry.testing_environment.snapshots = testing_environment_constraints[0].snapshots
+
+        return schedule
