@@ -7,7 +7,7 @@ from gluetool_modules.libs.testing_environment import TestingEnvironment
 from gluetool_modules.libs.test_schedule import TestSchedule, TestScheduleEntry as BaseTestScheduleEntry
 
 # Type annotations
-from typing import cast, Any, List, Optional  # noqa
+from typing import cast, Any, List, Optional, Tuple  # noqa
 import bs4  # noqa
 
 
@@ -57,20 +57,23 @@ class TestSchedulerBeakerXML(gluetool.Module):
 
     shared_functions = ['create_test_schedule']
 
-    def _get_job_xmls(self, testing_environment_constraints=None):
-        # type: (Optional[List[TestingEnvironment]]) -> List[bs4.element.Tag]
+    def _get_job_xmls_for_tec(self, tec):
+        # type: (TestingEnvironment) -> List[bs4.element.Tag]
         """
         Use ``beaker_job_xml`` shared function - probably running ``workflow-tomorrow`` behind the curtain - to get
-        XML descriptions of Beaker jobs, implementing the testing. Provides few basic options, necessary from "system"
-        point of view, the rest of the options is provided by the module behind ``beaker_job_xml``.
+        XML descriptions of Beaker jobs, implementing the testing for given testing environment. Provides few basic
+        options, necessary from "system" point of view, the rest of the options is provided by the module behind
+        ``beaker_job_xml``.
 
         :rtype: list(xml)
         :returns: A list of Beaker jobs in a form of their XML definitions.
         """
 
-        self.info('getting Beaker job descriptions')
+        self.info('getting Beaker job descriptions for {}'.format(tec))
 
-        log_dict(self.debug, 'given constraints', testing_environment_constraints)
+        if tec.compose == tec.ANY or tec.arch == tec.ANY:
+            self.warn('STI scheduler does not support open constraints', sentry=True)
+            return []
 
         options = [
             '--single',  # ignore multihost tests
@@ -85,14 +88,33 @@ class TestSchedulerBeakerXML(gluetool.Module):
             self.shared(
                 'beaker_job_xml',
                 options=options,
+                distros=[
+                    tec.compose
+                ],
                 extra_context={
-                    'TESTING_ENVIRONMENT_CONSTRAINTS': testing_environment_constraints or []
+                    'TESTING_ENVIRONMENT_CONSTRAINTS': [tec]
                 }
             )
         )
 
-    def _create_job_schedule(self, index, job):
-        # type: (int, bs4.element.Tag) -> TestSchedule
+    def _get_job_xmls(self, testing_environment_constraints):
+        # type: (List[TestingEnvironment]) -> List[Tuple[TestingEnvironment, bs4.element.Tag]]
+
+        self.info('getting Beaker job descriptions')
+
+        jobs = []  # type: List[Tuple[TestingEnvironment, bs4.element.Tag]]
+
+        for tec in testing_environment_constraints:
+            tec_jobs = self._get_job_xmls_for_tec(tec)
+
+            jobs += [
+                (tec, job) for job in tec_jobs
+            ]
+
+        return jobs
+
+    def _create_job_schedule(self, index, tec, job):
+        # type: (int, TestingEnvironment, bs4.element.Tag) -> TestSchedule
         """
         For a given job XML, extract recipe sets and their corresponding testing environments.
 
@@ -123,10 +145,26 @@ class TestSchedulerBeakerXML(gluetool.Module):
             if not distro_name_request or not distro_arch_request:
                 raise gluetool.GlueError('Failed to detect distro name and architecture from request')
 
-            compose = distro_name_request['value'].encode('ascii')
+            distro = distro_name_request['value'].encode('ascii')
             arch = distro_arch_request['value'].encode('ascii')
 
-            schedule_entry.testing_environment = TestingEnvironment(compose=compose, arch=arch)
+            # We're using workflow-tomorrow, i.e. beaker client, to prepare this XML. It talks in terms of *distros*,
+            # while we're trying to use *compose* as a single currency. Wow's XMLs contain distros then, and we blindly
+            # let them through to land in the schedule as *compose*.
+            #
+            # We know at least arch should be the same in our language and in wow's language, so we could at least
+            # try to find out whether distros match composes.
+            if distro != tec.compose:
+                self.warn('distro {} does not fully match given compose {}'.format(distro, tec.compose))
+
+            if arch != tec.arch:
+                self.warn('arch {} does not match given arch {}'.format(arch, tec.arch))
+
+            schedule_entry.testing_environment = TestingEnvironment(
+                compose=tec.compose,
+                arch=tec.arch,
+                snapshots=tec.snapshots
+            )
 
             log_xml(schedule_entry.debug, 'full recipe set', schedule_entry.recipe_set)
             log_dict(schedule_entry.debug, 'testing environment', schedule_entry.testing_environment)
@@ -147,7 +185,7 @@ class TestSchedulerBeakerXML(gluetool.Module):
         return schedule
 
     def _create_jobs_schedule(self, jobs):
-        # type: (List[bs4.element.Tag]) -> TestSchedule
+        # type: (List[Tuple[TestingEnvironment, bs4.element.Tag]]) -> TestSchedule
         """
         Create schedule for given set of jobs.
 
@@ -161,8 +199,8 @@ class TestSchedulerBeakerXML(gluetool.Module):
         schedule = TestSchedule()
 
         # for each job, create a schedule entries for its recipe sets, and put them all on one pile
-        for i, job in enumerate(jobs):
-            schedule.extend(self._create_job_schedule(i, job))
+        for i, (tec, job) in enumerate(jobs):
+            schedule += self._create_job_schedule(i, tec, job)
 
         schedule.log(self.debug, label='complete schedule')
 
@@ -183,18 +221,13 @@ class TestSchedulerBeakerXML(gluetool.Module):
 
         self.require_shared('beaker_job_xml')
 
-        job_xmls = self._get_job_xmls(testing_environment_constraints=testing_environment_constraints)
+        testing_environment_constraints = testing_environment_constraints or []
+
+        job_xmls = self._get_job_xmls(testing_environment_constraints)
 
         if not job_xmls:
             raise gluetool_modules.libs.test_schedule.EmptyTestScheduleError(self.shared('primary_task'))
 
         schedule = self._create_jobs_schedule(job_xmls)
-
-        # Adding snapshots from environment to each entry
-        # testing_environment_constraints has the same snapshot parameter in every item, so pick the first one
-        if testing_environment_constraints:
-            for entry in schedule:
-                assert entry.testing_environment
-                entry.testing_environment.snapshots = testing_environment_constraints[0].snapshots
 
         return schedule

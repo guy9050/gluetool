@@ -1,3 +1,5 @@
+import argparse
+
 import gluetool
 from gluetool import utils, GlueError, SoftGlueError
 from gluetool.action import Action
@@ -7,7 +9,7 @@ import gluetool_modules.libs.guest
 import gluetool_modules.libs.sentry
 
 import gluetool_modules.libs.artifacts
-from gluetool_modules.libs import ANY
+from gluetool_modules.libs import ANY, GlueEnum
 from gluetool_modules.libs.testing_environment import TestingEnvironment
 
 # Type annotations
@@ -16,6 +18,12 @@ from typing import TYPE_CHECKING, cast, Any, Dict, List  # noqa
 if TYPE_CHECKING:
     from gluetool_modules.libs.test_schedule import TestSchedule  # noqa
     from gluetool_modules.testing.test_scheduler_beaker_xml import TestScheduleEntry  # noqa
+
+
+class PatchAction(GlueEnum):
+    NOP = 'nop'
+    DROP = 'drop'
+    PATCH_ARCH = 'patch-arch'
 
 
 class NoTestableArtifactsError(gluetool_modules.libs.sentry.PrimaryTaskFingerprintsMixin, SoftGlueError):
@@ -64,6 +72,27 @@ class TestScheduler(gluetool.Module):
           environments in parallel);
         * each guest is set up by calling ``setup_guest`` shared function indirectly (processes all guests
           in parallel as well).
+
+    *Testing constraints patching*
+
+    Sometimes the list of constraints needs to be updated before creating a schedule. Use ``--tec-patch-map``
+    to do this. For each testing environment constraint, rules and actions are evaluated:
+
+    .. code-block:: yaml
+
+       ---
+
+       # We don't want ever to provision i686 when testing some artifact types.
+       - rule: >
+           EXISTS('PRIMARY_TASK')
+           and PRIMARY_TASK.ARTIFACT_NAMESPACE == 'foo'
+           and TEC.arch == 'i686'
+
+         # We can change the architecture to a more preferred one:
+         patch-arch: x86_64
+
+         # Or we can drop the constraint completely:
+         # drop: yes
     """
 
     name = 'test-scheduler'
@@ -75,6 +104,11 @@ class TestScheduler(gluetool.Module):
                     Mapping between artifact arches and the actual arches we can use to test them (e.g. i686
                     can be tested on both x86_64 and i686 boxes (default: %(default)s).
                     """,
+            'metavar': 'FILE',
+            'default': None
+        },
+        'tec-patch-map': {
+            'help': 'Testing environment constraints patch map (default: %(default)s).',
             'metavar': 'FILE',
             'default': None
         },
@@ -101,6 +135,18 @@ class TestScheduler(gluetool.Module):
             utils.load_yaml(self.option('arch-compatibility-map'), logger=self.logger)
         )
 
+    @utils.cached_property
+    def tec_patch_map(self):
+        # type: () -> Dict[str, List[str]]
+
+        if not self.option('tec-patch-map'):
+            return {}
+
+        return cast(
+            Dict[str, List[str]],
+            utils.load_yaml(self.option('tec-patch-map'), logger=self.logger)
+        )
+
     @gluetool.utils.cached_property
     def use_snapshots(self):
         # type: () -> bool
@@ -121,7 +167,7 @@ class TestScheduler(gluetool.Module):
     def execute(self):
         # type: () -> None
 
-        self.require_shared('create_test_schedule', 'provisioner_capabilities')
+        self.require_shared('create_test_schedule', 'provisioner_capabilities', 'compose', 'evaluate_instructions')
 
         # Check whether we have *any* artifacts at all, before we move on to more fine-grained checks.
         # If there's no task, just move on - we cannot check it, but it's allowed to run pipeline
@@ -261,15 +307,87 @@ class TestScheduler(gluetool.Module):
 
         log_dict(self.debug, 'constraint arches (duplicities pruned)', constraint_arches)
 
+        # Create constraints, for composes and arches
+        composes = self.shared('compose')
+        constraints = []  # type: List[TestingEnvironment]
+
+        for compose in composes:
+            for arch in constraint_arches:
+                constraints += [
+                    TestingEnvironment(
+                        arch=arch,
+                        compose=compose,
+                        snapshots=self.use_snapshots
+                    )
+                ]
+
+        log_dict(self.debug, 'testing environment constraints', constraints)
+
+        patched_constraints = []
+
+        for tec in constraints:
+            context = gluetool.utils.dict_update(
+                self.shared('eval_context'),
+                {
+                    'TEC': tec
+                }
+            )
+
+            # Our container for instructions' actions.
+            patch_action = argparse.Namespace(
+                action=PatchAction.NOP,
+                arch=None
+            )
+
+            # Callback for 'drop' command
+            def _drop_callback(instruction, command, argument, context):
+                # type: (Any, str, bool, Dict[str, Any]) -> None
+
+                if argument is True:
+                    patch_action.action = PatchAction.DROP
+
+            def _patch_arch_callback(instruction, command, argument, context):
+                # type: (Any, str, str, Dict[str, Any]) -> None
+
+                patch_action.action = PatchAction.PATCH_ARCH
+                patch_action.arch = argument
+
+            self.shared(
+                'evaluate_instructions',
+                self.tec_patch_map,
+                {
+                    'drop': _drop_callback,
+                    'patch-arch': _patch_arch_callback
+                },
+                context=context,
+                default_rule='False'
+            )
+
+            if patch_action.action == PatchAction.DROP:
+                self.debug('testing constraint {} dropped'.format(tec))
+
+            else:
+                patched_constraints.append(tec)
+
+                if patch_action.action == PatchAction.PATCH_ARCH:
+                    tec.arch = patch_action.arch
+
+                    self.debug('testing constraint {} arch patched with {}'.format(tec, patch_action.arch))
+
+        log_dict(self.debug, 'patched testing environment constraints', patched_constraints)
+
+        # Remove duplicities
+        duplicate_constraints = {
+            tec: None for tec in patched_constraints
+        }
+
+        final_constraints = duplicate_constraints.keys()
+
+        log_dict(self.debug, 'final testing environment constraints', final_constraints)
+
         # Call plugin to create the schedule
         with Action('creating test schedule', parent=Action.current_action(), logger=self.logger):
-            schedule = self.shared('create_test_schedule', testing_environment_constraints=[
-                TestingEnvironment(
-                    arch=arch,
-                    compose=TestingEnvironment.ANY,
-                    snapshots=self.use_snapshots
-                ) for arch in constraint_arches
-            ])
+            schedule = self.shared('create_test_schedule', testing_environment_constraints=final_constraints)
 
         if not schedule:
             raise GlueError('Test schedule is empty')

@@ -267,6 +267,10 @@ class TestScheduleTMT(Module):
         :returns: a test schedule consisting of :py:class:`TestScheduleEntry` instances.
         """
 
+        if not testing_environment_constraints:
+            self.warn('TMT scheduler does not support open constraints', sentry=True)
+            return TestSchedule()
+
         self.require_shared('dist_git_repository')
         repository = self.shared('dist_git_repository')
 
@@ -282,31 +286,21 @@ class TestScheduleTMT(Module):
         schedule = TestSchedule()
 
         # For each plan, architecture and compose, create a schedule entry
-
-        # There should be a generic "on what composes should I test this?" module - this is too
-        # beaker-ish. Future patch will clean this.
-        distros = self.shared('distro')
-
         for plan in plans:
-            for distro in distros:
-                if not testing_environment_constraints:
-                    # One day, we have to teach test-scheduler to expand this "ANY" to a list of arches.
+            for tec in testing_environment_constraints:
+                if tec.arch == tec.ANY:
                     self.warn('TMT scheduler does not support open constraints', sentry=True)
                     continue
 
-                for tec in testing_environment_constraints:
-                    schedule_entry = TestScheduleEntry(Logging.get_logger(), plan, repodir)
+                schedule_entry = TestScheduleEntry(Logging.get_logger(), plan, repodir)
 
-                    if tec.arch == tec.ANY:
-                        self.warn('TMT scheduler does not support open constraints', sentry=True)
-                        continue
+                schedule_entry.testing_environment = TestingEnvironment(
+                    compose=tec.compose,
+                    arch=tec.arch,
+                    snapshots=tec.snapshots
+                )
 
-                    schedule_entry.testing_environment = TestingEnvironment(
-                        compose=distro,
-                        arch=tec.arch
-                    )
-
-                    schedule.append(schedule_entry)
+                schedule.append(schedule_entry)
 
         schedule.log(self.debug, label='complete schedule')
 
@@ -464,11 +458,12 @@ class TestScheduleTMT(Module):
             # type: (Any, str, str) -> Any
             return new_xml_element('log', _parent=logs, name=name, href=href)
 
-        def _add_testing_environment(test_case, name, arch, compose):
-            # type: (Any, str, Any, Any) -> Any
+        def _add_testing_environment(test_case, name, arch, compose, snapshots):
+            # type: (Any, str, Any, Any, bool) -> Any
             parent_elem = new_xml_element('testing-environment', _parent=test_case, name=name)
             new_xml_element('property', _parent=parent_elem, name='arch', value=arch)
             new_xml_element('property', _parent=parent_elem, name='compose', value=compose)
+            new_xml_element('property', _parent=parent_elem, name='snapshots', value=str(snapshots))
 
         def _sort_children(parent, key_getter):
             # type: (Any, Optional[Callable[[Any], Any]]) -> None
@@ -516,10 +511,18 @@ class TestScheduleTMT(Module):
             _add_log(logs, name="log_dir", href=artifacts_dir_location_url)
 
             assert schedule_entry.testing_environment is not None
-            _add_testing_environment(test_case, 'requested', schedule_entry.testing_environment.arch,
-                                     schedule_entry.testing_environment.compose)
-            _add_testing_environment(test_case, 'provisioned', schedule_entry.guest.environment.arch,
-                                     schedule_entry.guest.environment.compose)
+            _add_testing_environment(
+                test_case, 'requested',
+                schedule_entry.testing_environment.arch,
+                schedule_entry.testing_environment.compose,
+                schedule_entry.testing_environment.snapshots
+            )
+            _add_testing_environment(
+                test_case, 'provisioned',
+                schedule_entry.guest.environment.arch,
+                schedule_entry.guest.environment.compose,
+                schedule_entry.guest.environment.snapshots
+            )
 
             # sorting
             _sort_children(properties, lambda child: child.attrs['name'])

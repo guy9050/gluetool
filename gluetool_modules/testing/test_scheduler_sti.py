@@ -121,6 +121,10 @@ class TestSchedulerSTI(gluetool.Module):
         :returns: a test schedule consisting of :py:class:`TestScheduleEntry` instances.
         """
 
+        if not testing_environment_constraints:
+            self.warn('STI scheduler does not support open constraints', sentry=True)
+            return TestSchedule()
+
         # get playbooks (tests) from command-line or dist-git
         if self.option('playbook'):
             playbooks = gluetool.utils.normalize_path_option(self.option('playbook'))
@@ -163,32 +167,21 @@ class TestSchedulerSTI(gluetool.Module):
         schedule = TestSchedule()
 
         # For each playbook, architecture and compose, create a schedule entry
-
-        # There should be a generic "on what composes should I test this?" module - this is too
-        # beaker-ish. Future patch will clean this.
-        distros = self.shared('distro')
-
         for playbook in playbooks:
-            for distro in distros:
-                if not testing_environment_constraints:
-                    # One day, we have to teach test-scheduler to expand this "ANY" to a list of arches.
+            for tec in testing_environment_constraints:
+                if tec.arch == tec.ANY:
                     self.warn('STI scheduler does not support open constraints', sentry=True)
                     continue
 
-                for tec in testing_environment_constraints:
-                    schedule_entry = TestScheduleEntry(gluetool.log.Logging.get_logger(), playbook, variables)
+                schedule_entry = TestScheduleEntry(gluetool.log.Logging.get_logger(), playbook, variables)
 
-                    if tec.arch == tec.ANY:
-                        self.warn('STI scheduler does not support open constraints', sentry=True)
-                        continue
+                schedule_entry.testing_environment = TestingEnvironment(
+                    compose=tec.compose,
+                    arch=tec.arch,
+                    snapshots=tec.snapshots
+                )
 
-                    schedule_entry.testing_environment = TestingEnvironment(
-                        compose=distro,
-                        arch=tec.arch,
-                        snapshots=tec.snapshots
-                    )
-
-                    schedule.append(schedule_entry)
+                schedule.append(schedule_entry)
 
         schedule.log(self.debug, label='complete schedule')
 

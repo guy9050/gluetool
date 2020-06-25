@@ -58,7 +58,20 @@ class TestingEnvironment(object):
     def __repr__(self):
         # type: () -> str
 
-        return str(self)
+        return '<TestingEnvironment({})>'.format(str(self))
+
+    def __eq__(self, other):
+        # type: (Any) -> bool
+
+        if not isinstance(other, TestingEnvironment):
+            return False
+
+        return all([getattr(self, field) == getattr(other, field) for field in self._fields])
+
+    def __hash__(self):
+        # type: () -> int
+
+        return hash(tuple([getattr(self, field) for field in self._fields]))
 
     def serialize_to_string(self):
         # type: () -> str

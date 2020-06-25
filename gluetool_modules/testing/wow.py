@@ -466,11 +466,15 @@ class WorkflowTomorrow(gluetool.Module):
                     ))
 
                 if 'No valid distro/variant/arch combination found' in exc.output.stderr:
-                    return _return_empty(
-                        'Not possible to test on {}, no valid distro/arch combination'.format(
-                            distro
-                        )
-                    )
+                    msg_template = 'Testing on {} is not possible or forbidden, no valid distro/arch combination found'
+                    tecs = (extra_context or {}).get('TESTING_ENVIRONMENT_CONSTRAINTS', [])
+
+                    if not tecs:
+                        return _return_empty(msg_template.format(distro))
+
+                    tec_descriptions = ['{}/{}'.format(tec.compose, tec.arch) for tec in tecs]
+
+                    return _return_empty(msg_template.format(', '.join(tec_descriptions)))
 
                 invalid_arch = re.search(r".*Invalid arch '(.*)'", exc.output.stderr, re.MULTILINE)
 
