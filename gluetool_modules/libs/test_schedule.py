@@ -33,23 +33,21 @@ def _env_to_str(testing_environment):
     if not testing_environment:
         return ''
 
-    # Use serialized form for quick access to fields and their values, omit keys
-    # and show values only - readable so far.
-    serialized = testing_environment.serialize_to_json()
-
-    return ', '.join([
-        str(serialized[field]) for field in sorted(serialized.iterkeys())
-    ])
+    return '{} {} {}'.format(
+        testing_environment.arch,
+        testing_environment.compose,
+        'S+' if testing_environment.snapshots else 'S-'
+    )
 
 
 # The same but for guests.
 def _guest_to_str(guest):
     # type: (Optional[gluetool_modules.libs.guest.NetworkedGuest]) -> str
 
-    if guest:
-        return '{}\n{}'.format(_env_to_str(guest.environment), guest.name)
+    if not guest:
+        return ''
 
-    return ''
+    return '{}\n{}'.format(_env_to_str(guest.environment), guest.name)
 
 
 class EmptyTestScheduleError(gluetool_modules.libs.sentry.PrimaryTaskFingerprintsMixin, gluetool.SoftGlueError):
