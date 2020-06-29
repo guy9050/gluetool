@@ -5,6 +5,7 @@ import tempfile
 
 import six
 
+import gluetool
 from gluetool import GlueError, GlueCommandError, Module
 from gluetool.action import Action
 from gluetool.log import Logging, format_blob, log_blob, log_dict
@@ -396,23 +397,37 @@ class TestScheduleTMT(Module):
             '--name', schedule_entry.plan
         ]
 
+        def _save_output(output):
+            # type: (gluetool.utils.ProcessOutput) -> None
+
+            with open(tmt_log_filepath, 'w') as f:
+                def _write(label, s):
+                    # type: (str, str) -> None
+                    f.write('{}\n{}\n\n'.format(label, s))
+
+                _write('# STDOUT:', format_blob(cast(str, output.stdout)))
+                _write('# STDERR:', format_blob(cast(str, output.stderr)))
+
+                f.flush()
+
         # run plan via tmt, note that the plan MUST be run in the artifact_dirpath
-        tmt_output = Command(command).run(
-            cwd=schedule_entry.repodir,
-            inspect=True,
-            inspect_callback=create_inspect_callback(schedule_entry.logger)
-        )
+        try:
+            tmt_output = Command(command).run(
+                cwd=schedule_entry.repodir,
+                inspect=True,
+                inspect_callback=create_inspect_callback(schedule_entry.logger)
+            )
 
-        # save the output to log file
-        with open(tmt_log_filepath, 'w') as f:
-            def _write(label, s):
-                # type: (str, str) -> None
-                f.write('{}\n{}\n\n'.format(label, s))
+        except GlueCommandError as exc:
+            tmt_output = exc.output
 
-            _write('# STDOUT:', format_blob(cast(str, tmt_output.stdout)))
-            _write('# STDERR:', format_blob(cast(str, tmt_output.stderr)))
+            log_blob(
+                schedule_entry.error,
+                'tmt execution failed with exit code {}'.format(tmt_output.exit_code),
+                tmt_output.stderr if tmt_output.stderr else ''
+            )
 
-            f.flush()
+        _save_output(tmt_output)
 
         # gather and return overall plan run result and test results
         return gather_plan_results(schedule_entry, work_dirpath)
