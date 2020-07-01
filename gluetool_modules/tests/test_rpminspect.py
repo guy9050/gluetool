@@ -324,6 +324,7 @@ def fixture_module(monkeypatch, tmpdir):
     module._config['results-file'] = 'results-file'
     module._config['artifacts-dir'] = 'artifacts'
     module._config['verbose-log-file'] = 'verbose'
+    module._config['command-name'] = 'rpminspect-redhat'
 
     mock_primary_task = MagicMock()
     mock_primary_task.nvr = 'dummy-nvr'
@@ -369,7 +370,7 @@ def test_run_rpminspect(module, monkeypatch):
 
     module._run_rpminspect(mock_primary_task, ['ALL'], 'workdir')
 
-    mock_command.assert_called_with(['rpminspect',
+    mock_command.assert_called_with(['rpminspect-redhat',
                                      '-v',
                                      '-w', 'workdir/artifacts',
                                      '-o', 'workdir/results-file',
@@ -402,7 +403,7 @@ def test_run_rpminspect_scratch(module, monkeypatch):
 
     module._run_rpminspect(mock_primary_task, ['ALL'], 'workdir')
 
-    mock_command.assert_called_with(['rpminspect',
+    mock_command.assert_called_with(['rpminspect-redhat',
                                      '-v',
                                      '-w', 'workdir/artifacts',
                                      '-o', 'workdir/results-file',
@@ -436,7 +437,7 @@ def test_run_rpminspect_profile(module, monkeypatch):
 
     module._run_rpminspect(mock_primary_task, ['ALL'], 'workdir')
 
-    mock_command.assert_called_with(['rpminspect',
+    mock_command.assert_called_with(['rpminspect-redhat',
                                      '-v',
                                      '-w', 'workdir/artifacts',
                                      '-o', 'workdir/results-file',
@@ -588,7 +589,7 @@ def test_sanity(module, monkeypatch):
                         'check_for_commands', mock_check_for_command)
 
     module.sanity()
-    mock_check_for_command.assert_called_once_with(['rpminspect'])
+    mock_check_for_command.assert_called_once_with(['rpminspect-redhat'])
 
 
 def test_test_result_type():

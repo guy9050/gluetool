@@ -32,9 +32,6 @@ RPMINSPECT_SCORE = {
     'BAD': 4
 }
 
-# required commands of module
-REQUIRED_CMDS = ['rpminspect']
-
 
 class RpminspectExitCodes(enum.IntEnum):
     RPMINSPECT_TESTS_SUCCESS = 0
@@ -116,6 +113,12 @@ class CIRpminspect(gluetool.Module):
 
     # pylint: disable=gluetool-option-hard-default
     options = {
+        'command-name': {
+            'help': 'Name of the rpminspect command to execute (default: %(default)s)',
+            'metavar': 'COMMAND',
+            'type': str,
+            'default': 'rpminspect-redhat'
+        },
         'type': {
             'help': 'Test type: analysis or comparison (default: %(default)s)',
             'metavar': 'TYPE',
@@ -162,13 +165,13 @@ class CIRpminspect(gluetool.Module):
     def sanity(self):
         # type: () -> None
 
-        check_for_commands(REQUIRED_CMDS)
+        check_for_commands([self.option('command-name')])
 
     def _rpminspect_cmd(self, tests, workdir):
         # type: (List[str], str) -> List[str]
 
         cmd = [
-            'rpminspect',
+            self.option('command-name'),
             '-v',
             # give a subfolder as a workdir to rpminspect for easy deleting it later
             '-w', os.path.join(workdir, self.option('artifacts-dir')),
