@@ -1072,7 +1072,6 @@ class BrewTask(KojiTask):
     brew instance details need to be passed via the instance dictionary with the following keys:
 
         ``automation_user_ids`` - list of user IDs that trigger resolving of user from dist git
-        ``dist_git_commit_urls`` - list of dist git commit urls used to resolve user from dist git
         ``session`` - a koji session initialized via the koji.ClientSession function
         ``url`` - a base URL for the koji instance
         ``pkgs_url`` - a base URL for the packages location
@@ -1093,7 +1092,7 @@ class BrewTask(KojiTask):
         Checks for required instance details for Brew.
         :raises: GlueError if instance is missing some of the required keys
         """
-        required_instance_keys = ('automation_user_ids', 'dist_git_commit_urls', 'session', 'url', 'pkgs_url')
+        required_instance_keys = ('automation_user_ids', 'session', 'url', 'pkgs_url')
 
         if not all(key in details for key in required_instance_keys):
             raise GlueError('instance details do not contain all required keys')
@@ -1105,7 +1104,6 @@ class BrewTask(KojiTask):
                                        build_id=build_id)
 
         self.automation_user_ids = details['automation_user_ids']
-        self.dist_git_commit_urls = details['dist_git_commit_urls']
 
         if self.is_build_container_task:
             # Try to assign build for container task only when there was no build ID specified.
@@ -1196,9 +1194,37 @@ class BrewTask(KojiTask):
         if not component or not git_hash:
             return None
 
+        context = dict_update(self._module.shared('eval_context'), {
+                'SOURCE_COMPONENT': component,
+                'SOURCE_COMMIT': git_hash
+            })
+
+        overall_urls = []
+
+        # Callback for 'url' command
+        def _url_callback(instruction, command, argument, context):
+            overall_urls[:] = [
+                render_template(arg, **context) for arg in argument
+            ]
+
+            self.debug("final dist git url set to '{}'".format(overall_urls))
+
+        commands = {
+            'url': _url_callback,
+        }
+
+        self._module.shared(
+            'evaluate_instructions', self._module.repo_url_map,
+            commands=commands, context=context
+        )
+
         # get git commit html
-        for url in self.dist_git_commit_urls:
-            url = url.format(component=component, commit=git_hash)
+        for url in overall_urls:
+            log_dict(self.debug, 'repo url', url)
+
+            if not self.shared('evaluate_rules', url.get('rules', 'True'), context=context):
+                self.debug('denied by rules')
+                continue
 
             # Using `wait` for retries would be much easier if we wouldn't be interested
             # in checking another URL - that splits errors into two sets, with different
@@ -1668,7 +1694,7 @@ class Koji(gluetool.Module):
                 'help': 'Wait timeout for task to become non-waiting and closed (default: %(default)s)',
                 'type': int,
                 'default': 60,
-            },
+            }
         }),
         ('Baseline options', {
             'baseline-method': {
@@ -2044,28 +2070,34 @@ class Brew(Koji, (gluetool.Module)):
             'automation-user-ids': {
                 'help': 'List of comma delimited user IDs that trigger resolving of issuer from dist git commit instead'
             },
-            'dist-git-commit-urls': {
-                'help': 'List of comma delimited dist git commit urls used for resolving of issuer from commit'
-            },
             'docker-image-url-template': {
                 'help': """
                         Template for constructing URL of a Docker image. It is given a task (``TASK``)
                         and an archive (``ARCHIVE``) describing the image, as returned by the Koji API.
                         """
+            },
+            'repo-url-map': {
+                'help': 'File with URLs of repositories.'
             }
         }),  # yes, the comma is correct - `)` closes inner tuple, `,` says it is part of the outer tuple
     )
 
     required_options = Koji.required_options + [
-        'automation-user-ids', 'dist-git-commit-urls', 'docker-image-url-template'
+        'automation-user-ids', 'docker-image-url-template'
     ]
+
+    @cached_property
+    def repo_url_map(self):
+        if not self.option('repo-url-map'):
+            return []
+
+        return gluetool.utils.load_yaml(self.option('repo-url-map'), logger=self.logger)
 
     def task_factory(self, task_initializer, wait_timeout=None, details=None, task_class=None):
         # options checker does not handle multiple modules in the same file correctly, therefore it
         # raises "false" negative for the following use of parent's class options
         details = dict_update({}, {
-            'automation_user_ids': [int(user.strip()) for user in self.option('automation-user-ids').split(',')],
-            'dist_git_commit_urls': [url.strip() for url in self.option('dist-git-commit-urls').split(',')]
+            'automation_user_ids': [int(user.strip()) for user in self.option('automation-user-ids').split(',')]
         }, details or {})
 
         return super(Brew, self).task_factory(task_initializer, details=details, task_class=BrewTask,
