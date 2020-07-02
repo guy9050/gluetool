@@ -1220,12 +1220,6 @@ class BrewTask(KojiTask):
 
         # get git commit html
         for url in overall_urls:
-            log_dict(self.debug, 'repo url', url)
-
-            if not self.shared('evaluate_rules', url.get('rules', 'True'), context=context):
-                self.debug('denied by rules')
-                continue
-
             # Using `wait` for retries would be much easier if we wouldn't be interested
             # in checking another URL - that splits errors into two sets, with different
             # solutions: the first one are "accepted" errors (e.g. URL is wrong), and we
