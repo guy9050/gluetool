@@ -208,10 +208,6 @@ class PipelineStateReporter(gluetool.Module):
 
     shared_functions = ('report_pipeline_state',)
 
-    def sanity(self):
-        if self.option('pr-label'):
-            self.require_shared('set_pr_status')
-
     @property
     def eval_context(self):
         __content__ = {  # noqa
@@ -450,6 +446,11 @@ class PipelineStateReporter(gluetool.Module):
 
         self.shared('publish_bus_messages', message, topic=topic)
 
+    def _set_pr_status(self, status, description):
+        self.require_shared('set_pr_status')
+        self.shared('set_pr_status', status, description, context=self.option('pr-label'),
+                    target_url=self.shared('eval_context').get('JENKINS_BUILD_URL'))
+
     def execute(self):
         if normalize_bool_option(self.option('dont-report-running')):
             self.info('not reporting the beginning of the pipeline')
@@ -458,8 +459,7 @@ class PipelineStateReporter(gluetool.Module):
         self.info('reporting pipeline beginning')
 
         if self.option('pr-label'):
-            self.shared('set_pr_status', 'pending', 'Test started', context=self.option('pr-label'),
-                        target_url=self.shared('eval_context').get('JENKINS_BUILD_URL'))
+            self._set_pr_status('pending', 'Test started')
 
         self.report_pipeline_state(STATE_RUNNING)
 
@@ -628,7 +628,6 @@ class PipelineStateReporter(gluetool.Module):
             })
 
         if self.option('pr-label'):
-            self.shared('set_pr_status', overall_result, 'Test finished', context=self.option('pr-label'),
-                        target_url=self.shared('eval_context').get('JENKINS_BUILD_URL'))
+            self._set_pr_status(overall_result, 'Test finished')
 
         self.report_pipeline_state(self._get_final_state(failure), **kwargs)
