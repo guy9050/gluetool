@@ -65,6 +65,9 @@ class OpenStackJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, g
         'pipeline-install-ancestors-options': {
             'help': 'Additional options for pipeline-install-ancestors module.'
         },
+        'github-options': {
+            'help': 'Additional options for github module.'
+        },
         'wow-options-separator': {
             'help': """
                     Due to technical limitations of Jenkins, when jobs want to pass multiple ``--wow-options``
@@ -120,5 +123,6 @@ class OpenStackJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, g
             'test_scheduler_sti_options': self.option('test-scheduler-sti-options'),
             'test_schedule_runner_options': self.option('test-schedule-runner-options'),
             'test_schedule_runner_restraint_options': self.option('test-schedule-runner-restraint-options'),
-            'pipeline_install_ancestors_options': self.option('pipeline-install-ancestors-options')
+            'pipeline_install_ancestors_options': self.option('pipeline-install-ancestors-options'),
+            'github_options': self.option('github-options')
         })
