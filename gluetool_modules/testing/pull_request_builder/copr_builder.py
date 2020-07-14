@@ -11,7 +11,7 @@ from gluetool.utils import Command
 from gluetool_modules.libs.results import TestResult, publish_result
 
 # Type annotations
-from typing import Any, Iterator, List, NoReturn, Optional, TYPE_CHECKING  # noqa
+from typing import Any, Iterator, List, NoReturn, Optional, TYPE_CHECKING, Dict  # noqa
 
 if TYPE_CHECKING:
     from gluetool_modules.infrastructure import github  # noqa
@@ -95,6 +95,14 @@ class CoprBuilder(gluetool.Module):
                 'help': 'Context for updating status in case GitHub pull request is used (default: %(default)s).',
                 'default': STATUS_CONTEXT
             },
+            'chroot-name': {
+                'help': """
+                        Chroot used for the build (default: %(default)s).
+                        This value is used only to provide info to eval_context;
+                        therefore, it has to be the same as the value used when triggering the copr build.
+                        """,
+                'default': 'rhel-7-x86_64'
+            },
         }),
         ('Copr options', {
             'copr-url': {
@@ -113,6 +121,20 @@ class CoprBuilder(gluetool.Module):
     ]
 
     required_options = ('method', 'copr-url', 'copr-login', 'copr-username', 'copr-token')
+    copr_id = None
+
+    @property
+    def eval_context(self):
+        # type: () -> Dict[str, Any]
+        __content__ = {  # noqa
+            'COPR_ID': """
+                       ID of the finished COPR build in format 'build-id:chroot-name'.
+                       """
+        }
+
+        return {
+            'COPR_ID': self.copr_id
+        }
 
     def _log_and_raise(self, message, blob):
         # type: (str, Any) -> None
@@ -235,6 +257,12 @@ class CoprBuilder(gluetool.Module):
             raise gluetool.GlueError('Unable to find copr build url.')
         copr_build_url = matches[-1].strip()  # type: str
         gluetool.log.log_blob(self.info, 'Build in copr was successful: {}'.format(copr_build_url), output.stdout)
+
+        match = re.search(r'[0-9]+', copr_build_url)
+        if not match:
+            raise gluetool.GlueError('Unable to get build ID.')
+        copr_build_no = match.group(0)
+        self.copr_id = '{}:{}'.format(copr_build_no, self.option('chroot-name'))
 
         self.shared('set_pr_status', 'success', 'Copr build succeeded.',
                     context=STATUS_CONTEXT, target_url=copr_build_url)
