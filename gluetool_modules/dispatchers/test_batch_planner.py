@@ -606,6 +606,7 @@ class TestBatchPlanner(gluetool.Module):
         self.require_shared('evaluate_filter')
 
         task = self.shared('primary_task')
+        context = self.shared('eval_context')
 
         if not self.configs:
             self.warn('Empty dispatcher configuration')
@@ -620,8 +621,15 @@ class TestBatchPlanner(gluetool.Module):
                 module = item['module']
                 args = item['args'] if item['args'] else []
 
-                # Add required artifact ID
-                args.insert(0, '--artifact-id={}'.format(task.dispatch_id))
+                # Render command arguments
+                args = [
+                    gluetool.utils.render_template(arg, logger=self.logger, **context)
+                    for arg in args
+                ]
+
+                # Add required artifact ID if it is not already defined
+                if not any([arg for arg in args if '--artifact-id' in arg]):
+                    args.insert(0, '--artifact-id={}'.format(task.dispatch_id))
 
                 self.info("module='{}', args='{}'".format(module, args))
                 final_commands.append((module, args))
