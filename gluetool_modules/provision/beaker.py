@@ -69,6 +69,8 @@ BOOT_TICK = 10
 DEFAULT_EXTENDTESTTIME_CHECK_TIMEOUT = 3600
 DEFAULT_EXTENDTESTTIME_CHECK_TICK = 30
 
+DEFAULT_USE_BY_GAP = 3600
+
 # 99 would be the most common value, however, we suspect Beaker checks for frequent extends of 99 hours,
 # silently "stealing" such machines back for its pool. Hence the slightly lower value, hopefuly avoiding
 # any suspicion from Beaker.
@@ -462,6 +464,12 @@ class BeakerProvisioner(gluetool.Module):
                 'type': int,
                 'default': DEFAULT_EXTENDTESTTIME_CHECK_TICK,
                 'metavar': 'SECONDS'
+            },
+            'use-by-gap': {
+                'help': 'Use only guests with at least SECONDS left till their use-by deadline (default: %(default)s).',
+                'type': int,
+                'default': DEFAULT_USE_BY_GAP,
+                'metavar': 'SECONDS'
             }
         })
     ]
@@ -716,10 +724,7 @@ class BeakerProvisioner(gluetool.Module):
 
                 return None
 
-            # We need some extra time to finish the provisioning, close the paperwork and so on,
-            # so let's pretend the first chance we get to extend guest reservation would happen
-            # an hour from now. Would the guest still be fine by that time?
-            not_actually_now = _time_from_now(hours=1)
+            not_actually_now = _time_from_now(seconds=self.option('use-by-gap'))
 
             self.debug('use-by {}, "now" {}'.format(use_by, not_actually_now))
 
@@ -733,12 +738,16 @@ class BeakerProvisioner(gluetool.Module):
         # Download the remaining info and create the guest instance.
         guest_info = cache.get(self._key('guests', fqdn, 'info'))
 
-        return BeakerGuest(self, guest_info['fqdn'].encode('ascii'),
-                           environment=environment, is_static=False,
-                           name=guest_info['fqdn'].encode('ascii'),
-                           username=guest_info['ssh_user'].encode('ascii'),
-                           key=guest_info['ssh_key'].encode('ascii'),
-                           options=[s.encode('ascii') for s in guest_info['ssh_options']])
+        guest = BeakerGuest(self, guest_info['fqdn'].encode('ascii'),
+                            environment=environment, is_static=False,
+                            name=guest_info['fqdn'].encode('ascii'),
+                            username=guest_info['ssh_user'].encode('ascii'),
+                            key=guest_info['ssh_key'].encode('ascii'),
+                            options=[s.encode('ascii') for s in guest_info['ssh_options']])
+
+        guest.debug('grabbed from the cache: {}, use-by {}'.format(environment, use_by))
+
+        return guest
 
     def _grab_guest_by_spec(self, cache, guest_spec, ignore_used=False, ignore_use_by=False):
         """
