@@ -128,8 +128,8 @@ class ArtemisAPI(object):
         if not isinstance(response.json(), list):
             raise error(response)
 
-    def create_guest(self, environment, keyname=None, priority=None, compose_type=None):
-        # type: (TestingEnvironment, Optional[str], Optional[str], Optional[str]) -> Any
+    def create_guest(self, environment, keyname=None, priority=None, compose_type=None, user_data=None):
+        # type: (TestingEnvironment, Optional[str], Optional[str], Optional[str], Optional[Dict[str,Any]]) -> Any
         '''
         Submits a guest request to Artemis API.
 
@@ -185,6 +185,8 @@ class ArtemisAPI(object):
                     'image': compose
                 }
             }
+
+        data['user_data'] = user_data
 
         return self.api_call('guests/', method='POST', expected_status_code=201, data=data).json()
 
@@ -534,6 +536,12 @@ class ArtemisProvisioner(gluetool.Module):
                 'metavar': 'PRIORITY_GROUP',
                 'type': str,
                 'default': DEFAULT_PRIORIY_GROUP
+            },
+            'user-data-vars': {
+                'help': 'Save some context vars as user-data field (default: none)',
+                'action': 'append',
+                'default': []
+
             }
         }),
         ('Common options', {
@@ -736,10 +744,14 @@ class ArtemisProvisioner(gluetool.Module):
         :returns: ArtemisGuest instance or ``None`` if it wasn't possible to grab the guest.
         '''
 
+        context = self.shared('eval_context')
+        user_data = {var: context.get(var) for var in normalize_multistring_option(self.option('user-data-vars'))}
+
         response = self.api.create_guest(environment,
                                          keyname=key,
                                          priority=priority,
-                                         compose_type=compose_type)
+                                         compose_type=compose_type,
+                                         user_data=user_data)
 
         guestname = response.get('guestname')
         guest = None
