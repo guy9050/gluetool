@@ -46,10 +46,13 @@ RESULT_OUTCOME = {
 }
 
 # Result weight to TestScheduleResult outcome
+# https://tmt.readthedocs.io/en/latest/overview.html#exit-codes
+# all tmt errors are connected to tests or config, so only higher return code than 3
+# is treated as error
 PLAN_OUTCOME = {
     0: TestScheduleResult.PASSED,
     1: TestScheduleResult.FAILED,
-    2: TestScheduleResult.ERROR
+    2: TestScheduleResult.FAILED,
 }
 
 # Tests YAML file, contains list of tests run, relative to plan workdir
