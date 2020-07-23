@@ -471,8 +471,8 @@ class GuessEnvironment(gluetool.Module):
 
     def _guess_force(self, source):
         # type: (Dict[str, Union[str, List[str]]]) -> None
-        if source['type'] == 'distro':
-            source['result'] = [s.strip() for s in source['specification']]
+        if source['type'] in ('compose', 'distro'):
+            source['result'] = gluetool.utils.normalize_multistring_option(source['specification'])
 
         else:
             source['result'] = source['specification']
