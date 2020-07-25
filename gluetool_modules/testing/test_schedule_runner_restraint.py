@@ -51,6 +51,7 @@ from typing import cast, Any, Dict, List, NamedTuple, Optional  # noqa
 # The exit status values come from restraint sources: https://github.com/p3ck/restraint/blob/master/src/errors.h
 # I failed to find any documentation on this...
 class RestraintExitCodes(enum.IntEnum):
+    RESTRAINT_ERROR = 1
     RESTRAINT_TASK_RUNNER_WATCHDOG_ERROR = 4
     RESTRAINT_TASK_RUNNER_RESULT_ERROR = 10
     RESTRAINT_SSH_ERROR = 14
@@ -415,7 +416,12 @@ class RestraintRunner(gluetool.Module):
 
         schedule_entry.debug('restraint exited with invalid exit code {}'.format(exit_code))
 
-        if exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_RESULT_ERROR:
+        if exit_code == RestraintExitCodes.RESTRAINT_TASK_RUNNER_RESULT_ERROR \
+           or (
+               exit_code == RestraintExitCodes.RESTRAINT_ERROR
+               and output.execution_output.stderr
+               and '[restraint-error-quark, 10]' in output.execution_output.stderr
+           ):
 
             if self.ignore_avc:
                 # In case no tasks that aren't AVC checks failed we don't want to report it as an error
