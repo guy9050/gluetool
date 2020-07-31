@@ -8,7 +8,7 @@ DEFAULT_WOW_OPTIONS_SEPARATOR = '#-#-#-#-#'
 
 class BeakerJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, gluetool.Module):
     """
-    Jenkins job module dispatching Beaker-based testing pipeline, as defined in ``ci-beaker.yaml`` file.
+    Jenkins job module dispatching Beaker-based testing pipeline, as defined in ``ci-test-brew-beaker-beaker.yaml`` job.
 
     .. note::
 
@@ -24,7 +24,7 @@ class BeakerJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, glue
     name = 'beaker-job'
     description = 'Job module dispatching Beaker-based testing pipeline.'
 
-    job_name = 'ci-beaker'
+    job_name = 'ci-test-brew-beaker-beaker'
 
     # pylint: disable=gluetool-option-no-default-in-help,gluetool-option-hard-default
     options = dict_update({}, gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin.options, {
