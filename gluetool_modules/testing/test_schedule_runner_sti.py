@@ -394,7 +394,8 @@ sut     ansible_host={} ansible_user=root {}
             _add_property(properties, 'connectable_host', schedule_entry.guest.hostname)
             _add_property(properties, 'distro', schedule_entry.guest.environment.compose)
             _add_property(properties, 'status', schedule_entry.stage.value.capitalize())
-            _add_property(properties, 'testcase.source.url', self.shared('dist_git_repository').web_url)
+            if self.has_shared('dist_git_repository'):
+                _add_property(properties, 'testcase.source.url', self.shared('dist_git_repository').web_url)
             _add_property(properties, 'variant', '')
 
             # logs
