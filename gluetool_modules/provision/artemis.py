@@ -36,6 +36,12 @@ DEFAULT_SNAPSHOT_READY_TICK = 10
 ProvisionerCapabilities = collections.namedtuple('ProvisionerCapabilities', ['available_arches'])
 
 
+class ArtemisResourceError(GlueError):
+    def __init__(self):
+        # type: () -> None
+        super(ArtemisResourceError, self).__init__("Artemis resource ended in 'error' state")
+
+
 class ArtemisAPIError(SoftGlueError):
     def __init__(self, response, error=None):
         # type: (Any, Optional[str]) -> None
@@ -355,8 +361,15 @@ class ArtemisSnapshot(LoggerMixin):
             snapshot_data = self._module.api.inspect_snapshot(self.guest.artemis_id, self.name)
 
             snapshot_state = snapshot_data['state']
+
             if snapshot_state == 'ready':
                 return Result.Ok(True)
+
+            if snapshot_state == 'error':
+                raise ArtemisResourceError()
+
+        except ArtemisResourceError as e:
+            six.reraise(*sys.exc_info())
 
         except Exception as e:
             self.warn('Exception raised: {}'.format(e))
@@ -418,6 +431,9 @@ class ArtemisGuest(NetworkedGuest):
                 if guest_address:
                     return Result.Ok(True)
 
+            if guest_state == 'error':
+                raise ArtemisResourceError()
+
             guest_events_list = cast(ArtemisProvisioner, self._module).api.inspect_guest_events(self.artemis_id)
             dump_events(guest_events_list, '{}-artemis-guest-log.yaml'.format(self.artemis_id))
 
@@ -429,6 +445,9 @@ class ArtemisGuest(NetworkedGuest):
                     last_error['details']['error']
                 )
                 self.debug(err_msg)
+
+        except ArtemisResourceError as e:
+            six.reraise(*sys.exc_info())
 
         except Exception as e:
             self.warn('Exception raised: {}'.format(e))
