@@ -53,6 +53,9 @@ class OpenStackJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, g
             'help': 'Additional options for ``brew-build-task-params`` module (default: %(default)s).',
             'default': ''
         },
+        'test-scheduler-options': {
+            'help': 'Additional options for test-scheduler module.'
+        },
         'test-scheduler-sti-options': {
             'help': 'Additional options for test-scheduler-sti module.'
         },
@@ -120,6 +123,7 @@ class OpenStackJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, g
             'wow_options': wow_options,
             'openstack_options': self.option('openstack-options'),
             'brew_build_task_params_options': brew_build_task_params_options,
+            'test_scheduler_options': self.option('test-scheduler-options'),
             'test_scheduler_sti_options': self.option('test-scheduler-sti-options'),
             'test_schedule_runner_options': self.option('test-schedule-runner-options'),
             'test_schedule_runner_restraint_options': self.option('test-schedule-runner-restraint-options'),
