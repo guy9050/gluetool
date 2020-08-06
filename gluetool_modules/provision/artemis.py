@@ -1,6 +1,10 @@
 import collections
 import re
+import six
+import sys
+
 import gluetool
+import requests
 
 from gluetool import GlueError, GlueCommandError, SoftGlueError
 from gluetool.log import log_dict, LoggerMixin
@@ -95,7 +99,17 @@ class ArtemisAPI(object):
                 if _request is None:
                     return Result.Error('Unknown HTTP method {}'.format(method))
 
-                response = _request('{}{}'.format(self.url, endpoint), json=data)
+                try:
+                    response = _request('{}{}'.format(self.url, endpoint), json=data)
+                except requests.exceptions.ConnectionError as error:
+                    error_string = str(error)
+                    # Artemis API can go down in the middle of the request sending, and that
+                    # might be unavoidable, we need to retry. In this case request
+                    # raises ConnectionError with 'Connection aborted' string in the message.
+                    # https://urllib3.readthedocs.io/en/latest/reference/#urllib3.exceptions.ProtocolError
+                    if 'Connection aborted' in error_string:
+                        return Result.Error('Connecton aborted: {}'.format(error_string))
+                    six.reraise(*sys.exc_info())
 
             if response.status_code == expected_status_code:
                 return Result.Ok(response)
