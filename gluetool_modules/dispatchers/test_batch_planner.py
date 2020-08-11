@@ -48,10 +48,11 @@ class TestBatchPlanner(gluetool.Module):
     Currently, these methods are provided:
 
     * ``static-config``: use a YAML file (set by ``--config`` option) to specify what jobs
-      are supposed to be run for artifacts.
+      are supposed to be run for artifacts. Config sections are processed sequentially and
+      only the first rule is triggered, therefore order of sections is important.
 
     * ``basic-static-config``: use a YAML file (set by ``--config`` option) to specify what jobs
-      are supposed to be run. Entries with True-ish rule are triggered.
+      are supposed to be run. All entries with True-ish rule are triggered.
 
     * ``sti``: check if test/test.yaml is present in component repository. Jenkins job name
       is found in mapping file (set by ``--sti-job-map`` option).
