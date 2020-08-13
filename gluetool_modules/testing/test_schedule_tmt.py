@@ -176,7 +176,7 @@ def gather_plan_results(schedule_entry, work_dir):
     max_weight = 0
     for name, result in zip(tests, runner_results):
         # note that test name starts with '/', which we need to remove so it is a relative path
-        test_workdir = os.path.join(work_dir, plan_path, 'execute', name[1:])
+        test_logdir = os.path.join(work_dir, plan_path, 'execute', 'logs', name[1:])
 
         # get result outcome
         try:
@@ -188,8 +188,8 @@ def gather_plan_results(schedule_entry, work_dir):
         results.append(TestResult(
             name,
             outcome,
-            os.path.join(test_workdir, 'out.log'),
-            test_workdir
+            os.path.join(test_logdir, 'out.log'),
+            test_logdir
         ))
 
     # count the maximum result weight encountered, i.e. the overall result
