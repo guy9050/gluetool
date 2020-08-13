@@ -167,7 +167,7 @@ class BeakerGuest(NetworkedGuest):
             self.debug('current decision: {}'.format(result['decision']))
             self.debug("matchig service '{}' with allow-any '{}'".format(service, argument))
 
-            if argument.lower() in ('yes', 'true'):
+            if argument:
                 self.debug("matched, service '{}' is allowed".format(service))
 
                 result['decision'] = True
