@@ -59,6 +59,9 @@ class OpenStackJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, g
         'test-scheduler-sti-options': {
             'help': 'Additional options for test-scheduler-sti module.'
         },
+        'test-scheduler-upgrades-options': {
+            'help': 'Additional options for test-scheduler-upgrades module.'
+        },
         'test-schedule-runner-options': {
             'help': 'Additional options for test-schedule-runner module.'
         },
@@ -125,6 +128,7 @@ class OpenStackJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, g
             'brew_build_task_params_options': brew_build_task_params_options,
             'test_scheduler_options': self.option('test-scheduler-options'),
             'test_scheduler_sti_options': self.option('test-scheduler-sti-options'),
+            'test_scheduler_upgrades_options': self.option('test-scheduler-upgrades-options'),
             'test_schedule_runner_options': self.option('test-schedule-runner-options'),
             'test_schedule_runner_restraint_options': self.option('test-schedule-runner-restraint-options'),
             'pipeline_install_ancestors_options': self.option('pipeline-install-ancestors-options'),
