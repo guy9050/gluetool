@@ -96,6 +96,10 @@ class TestBatchPlanner(gluetool.Module):
     supported_dryrun_level = gluetool.glue.DryRunLevels.DRY
 
     options = {
+        'default-job': {
+            'help': 'The default job to use for triggering (default: %(default)s)',
+            'default': 'openstack-job'
+        },
         'methods': {
             'help': 'Comma-separated list of methods (default: none).',
             'metavar': 'METHOD',
@@ -657,7 +661,7 @@ class TestBatchPlanner(gluetool.Module):
         if repository.has_sti_tests:
             # Note that we currently support only Openstack
             return [(
-                'openstack-job',
+                self.option('default-job'),
                 [
                     '--artifact-id={}'.format(task.dispatch_id),
                     '--job-name', job_name
@@ -680,7 +684,7 @@ class TestBatchPlanner(gluetool.Module):
         job_name = self.tmt_job_map.match(task.ARTIFACT_NAMESPACE)
 
         return [(
-            'openstack-job',
+            self.option('default-job'),
             [
                 '--artifact-id={}'.format(task.dispatch_id),
                 '--job-name', job_name
