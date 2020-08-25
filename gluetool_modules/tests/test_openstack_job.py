@@ -31,7 +31,8 @@ def create_openstack_build_params(mod, **kwargs):
         'brew_build_task_params_options': 'some brew-build options',
         'dist_git_options': 'some dist-git options',
         'pipeline_install_ancestors_options': 'some pipeline-install-ancestors options',
-        'github_options': 'some github options'
+        'github_options': 'some github options',
+        'compose_url_options': 'some compose-url options'
     }
 
     params.update(kwargs)

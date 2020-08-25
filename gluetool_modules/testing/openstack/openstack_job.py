@@ -74,6 +74,9 @@ class OpenStackJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, g
         'github-options': {
             'help': 'Additional options for github module.'
         },
+        'compose-url-options': {
+            'help': 'Additional options for compose-url module.'
+        },
         'wow-options-separator': {
             'help': """
                     Due to technical limitations of Jenkins, when jobs want to pass multiple ``--wow-options``
@@ -132,5 +135,6 @@ class OpenStackJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, g
             'test_schedule_runner_options': self.option('test-schedule-runner-options'),
             'test_schedule_runner_restraint_options': self.option('test-schedule-runner-restraint-options'),
             'pipeline_install_ancestors_options': self.option('pipeline-install-ancestors-options'),
-            'github_options': self.option('github-options')
+            'github_options': self.option('github-options'),
+            'compose_url_options': self.option('compose-url-options')
         })
