@@ -52,7 +52,7 @@ class RemoteGitRepository(gluetool.log.LoggerMixin):
 
         # initialize from given path if given
         if self.path:
-            self._instance = self.initialize_from_path(self.path)
+            self.initialize_from_path(self.path)
 
     @property
     def is_cloned(self):
@@ -89,6 +89,14 @@ class RemoteGitRepository(gluetool.log.LoggerMixin):
         :returns: path to the cloned repository. If `path` was given explicitly, it is returned as-is. Otherwise,
             function created a temporary directory and its path relative to CWD is returned.
         """
+
+        # repository already initialized - nothing to clone
+        if self._instance:
+            if path and self.path != path:
+                raise gluetool.GlueError('Clone path does not match initialized repository, misunderstood arguments?')
+
+            assert self.path
+            return self.path
 
         logger = logger or self.logger
 

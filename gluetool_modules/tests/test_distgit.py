@@ -7,6 +7,8 @@ import pytest
 from mock import MagicMock
 
 import gluetool
+from gluetool.log import Logging
+
 import gluetool_modules.infrastructure.distgit
 from gluetool_modules.infrastructure.distgit import DistGitRepository
 from . import assert_shared, create_module, patch_shared, testing_asset
@@ -22,6 +24,14 @@ def fixture_module():
 @pytest.fixture(name='dummy_repository')
 def fixture_dummy_repository(module):
     return DistGitRepository(module, 'some-package', clone_url='some-clone-url', web_url='some-web-url', branch='some-branch')
+
+
+@pytest.fixture(name='dummy_repository_path')
+def fixture_dummy_repository_path(module):
+    return DistGitRepository(
+        module, 'some-package',
+        clone_url='some-clone-url', web_url='some-web-url', branch='some-branch', path='some-path'
+    )
 
 
 @pytest.fixture(name='git_log', params=[
@@ -276,3 +286,13 @@ def test_bugs(module, dummy_repository, git_log, monkeypatch, method):
     monkeypatch.setattr(dummy_repository, 'clone', MagicMock())
 
     assert module.dist_git_bugs() == module._expected_bugs
+
+
+def test_repository_path(module, dummy_repository_path):
+    assert dummy_repository_path.path == 'some-path'
+
+    with pytest.raises(
+        gluetool.GlueError,
+        match=r"^Clone path does not match initialized repository, misunderstood arguments?"
+    ):
+        dummy_repository_path.clone(Logging.get_logger(), path='other-path')
