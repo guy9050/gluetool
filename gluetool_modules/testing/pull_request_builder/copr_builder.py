@@ -235,7 +235,7 @@ class CoprBuilder(gluetool.Module):
         jenkins_build_url = self.shared('eval_context').get('JENKINS_BUILD_URL')
 
         self.shared('set_pr_status', 'pending', 'Copr build started.',
-                    context=STATUS_CONTEXT, target_url=jenkins_build_url)
+                    context=self.option('status-context'), target_url=jenkins_build_url)
 
         self._create_copr_config(workdir, pull_request)
         copr_cmd = ['make', 'copr_build']
@@ -246,7 +246,7 @@ class CoprBuilder(gluetool.Module):
             output = Command(copr_cmd).run(inspect=True, env=env, cwd=os.path.join(workdir, repo_name))
         except gluetool.GlueCommandError as exc:
             self.shared('set_pr_status', 'failure', 'Copr build failed.',
-                        context=STATUS_CONTEXT, target_url=jenkins_build_url)
+                        context=self.option('status-context'), target_url=jenkins_build_url)
             raise CoprBuildFailedError('Copr build failed.', exc.output)
 
         if not output.stdout:
@@ -265,7 +265,7 @@ class CoprBuilder(gluetool.Module):
         self.copr_id = '{}:{}'.format(copr_build_no, self.option('chroot-name'))
 
         self.shared('set_pr_status', 'success', 'Copr build succeeded.',
-                    context=STATUS_CONTEXT, target_url=copr_build_url)
+                    context=self.option('status-context'), target_url=copr_build_url)
 
         return copr_build_url
 
