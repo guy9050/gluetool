@@ -29,6 +29,9 @@ class OpenStackJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, g
     # DispatchJenkinsJobMixin.options contain hard defaults
     # pylint: disable=gluetool-option-no-default-in-help,gluetool-option-hard-default
     options = dict_update({}, gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin.options, {
+        'ansible-options': {
+            'help': 'Additional options for ``ansible-options`` module.'
+        },
         'build-dependencies-options': {
             'help': 'Additional options for ``build-dependencies-options`` module.'
         },
@@ -122,6 +125,7 @@ class OpenStackJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, g
         wow_options = self.option('wow-options-separator').join(self.option('wow-options'))
 
         return dict_update(super(OpenStackJob, self).build_params, {
+            'ansible_options': self.option('ansible-options'),
             'build_dependencies_options': self.option('build-dependencies-options'),
             'dist_git_options': self.option('dist-git-options'),
             'install_mbs_build_options': self.option('install-mbs-build-options'),

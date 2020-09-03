@@ -15,6 +15,7 @@ def fixture_module():
 
 def create_openstack_build_params(mod, **kwargs):
     params = {
+        'ansible_options': 'some ansible options',
         'build_dependencies_options': 'some build-dependencies options',
         'install_mbs_build_options': 'some install mbs build options',
         'guess_environment_options': 'some guess-environment options',
