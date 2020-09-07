@@ -54,8 +54,7 @@ class InstallMBSBuild(gluetool.Module):
 
         command = [
             'odcs',
-            '--redhat', 'create',
-            'module', module_nsvc,
+            '--redhat', 'create-module', module_nsvc,
             '--sigkey', 'none'
         ]
 
