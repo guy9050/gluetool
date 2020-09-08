@@ -214,6 +214,8 @@ class GitHubPullRequest(object):
         self.commit_sha = self.pull_request_id.commit_sha  # type: str
         self.comment_id = self.pull_request_id.comment_id
 
+        self.component = self.repo
+
         github_api = module.github_api()
 
         pull_request = github_api.get_pull_request(self.owner, self.repo, self.pull_number)
