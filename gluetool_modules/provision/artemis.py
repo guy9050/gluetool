@@ -148,7 +148,7 @@ class ArtemisAPI(object):
         if not isinstance(response.json(), list):
             raise error(response)
 
-    def create_guest(self, environment, keyname=None, priority=None, compose_type=None, user_data=None):
+    def create_guest(self, environment, pool=None, keyname=None, priority=None, user_data=None):
         # type: (TestingEnvironment, Optional[str], Optional[str], Optional[str], Optional[Dict[str,Any]]) -> Any
         '''
         Submits a guest request to Artemis API.
@@ -156,13 +156,11 @@ class ArtemisAPI(object):
         :param tuple environment: description of the environment caller wants to provision.
             Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
 
+        :param str pool: name of the pool
+
         :param str keyname: name of key stored in Artemis configuration.
 
         :param str priority: Priority group of the guest request.
-            See Artemis API docs for more.
-
-        :param str compose_type: Desired guest request compose type (openstack, beaker, AWS, etc). If it's None, Artemis
-            will try to choose appropriate compose type by itself.
             See Artemis API docs for more.
 
         :rtype: dict
@@ -176,35 +174,16 @@ class ArtemisAPI(object):
             'keyname': keyname,
             'environment': {
                 'arch': environment.arch,
-                'compose': {},
+                'os': {},
                 'snapshots': snapshots
             },
             'priority_group': priority
         }  # type: Dict[str, Any]
 
-        if not compose_type or compose_type == 'id':
-            # probably this was called within provision(), called as a shared function from pipeline,
-            # not from artemis' execute method, which means we will let Artemis decide which compose type
-            # is going to be used
-            data['environment']['compose'] = {'id': compose}
-        elif compose_type == 'beaker':
-            data['environment']['compose'] = {
-                'beaker': {
-                    'distro': compose
-                }
-            }
-        elif compose_type == 'openstack':
-            data['environment']['compose'] = {
-                'openstack': {
-                    'image': compose
-                }
-            }
-        elif compose_type == 'aws':
-            data['environment']['compose'] = {
-                'aws': {
-                    'image': compose
-                }
-            }
+        if pool:
+            data['environment']['pool'] = pool
+
+        data['environment']['os']['compose'] = compose
 
         data['user_data'] = user_data
 
@@ -632,24 +611,14 @@ class ArtemisProvisioner(gluetool.Module):
             }
         }),
         ('Provisioning options', {
-            'compose-id': {
+            'compose': {
                 'help': 'Desired guest compose',
-                'metavar': 'ID',
+                'metavar': 'COMPOSE',
                 'type': str
             },
-            'distro': {
-                'help': 'Desired Beaker guest distro',
-                'metavar': 'DISTRO',
-                'type': str
-            },
-            'openstack-image': {
-                'help': 'Desired Openstack image',
-                'metavar': 'IMAGE',
-                'type': str
-            },
-            'aws-image': {
-                'help': 'Desired AWS image',
-                'metavar': 'IMAGE',
+            'pool': {
+                'help': 'Desired pool',
+                'metavar': 'POOL',
                 'type': str
             },
             'setup-provisioned': {
@@ -737,7 +706,7 @@ class ArtemisProvisioner(gluetool.Module):
         })
     ]
 
-    required_options = ('api-url', 'key', 'priority-group', 'ssh-key',)
+    required_options = ('api-url', 'key', 'priority-group', 'ssh-key')
 
     shared_functions = ['provision', 'provisioner_capabilities']
 
@@ -749,12 +718,6 @@ class ArtemisProvisioner(gluetool.Module):
 
         if not self.option('arch'):
             raise GlueError('Missing required option: --arch')
-
-        # provisioning options - it is required to have one of them
-        provisioning_opts = cast(Dict[str, Any], self.options[3][1]).keys()
-
-        if not any([self.option(option) for option in provisioning_opts]):
-            raise GlueError('At least one of those options is required: {}'.format(', '.join(provisioning_opts)))
 
     def __init__(self, *args, **kwargs):
         # type: (Any, Any) -> None
@@ -777,9 +740,9 @@ class ArtemisProvisioner(gluetool.Module):
 
     def provision_guest(self,
                         environment,  # type: TestingEnvironment
+                        pool=None,  # type: Optional[str]
                         key=None,  # type: Optional[str]
                         priority=None,  # type: Optional[str]
-                        compose_type=None,  # type: Optional[str]
                         ssh_key=None,  # type: Optional[str]
                         options=None  # type: Optional[List[str]]
                        ):  # noqa
@@ -790,13 +753,11 @@ class ArtemisProvisioner(gluetool.Module):
         :param tuple environment: description of the environment caller wants to provision.
             Follows :doc:`Testing Environment Protocol </protocols/testing-environment>`.
 
+        :param str pool: name of the pool
+
         :param str key: name of key stored in Artemis configuration.
 
         :param str priority: Priority group of the guest request.
-            See Artemis API docs for more.
-
-        :param str compose_type: Desired guest request compose type (openstack, beaker, AWS, etc). If it's None, Artemis
-            will try to choose appropriate compose type by itself.
             See Artemis API docs for more.
 
         :param str ssh_key: the path to public key, that should be used to securely connect to a provisioned machine.
@@ -812,9 +773,9 @@ class ArtemisProvisioner(gluetool.Module):
         user_data = {var: context.get(var) for var in normalize_multistring_option(self.option('user-data-vars'))}
 
         response = self.api.create_guest(environment,
+                                         pool=pool,
                                          keyname=key,
                                          priority=priority,
-                                         compose_type=compose_type,
                                          user_data=user_data)
 
         guestname = response.get('guestname')
@@ -861,19 +822,19 @@ class ArtemisProvisioner(gluetool.Module):
         :returns: List of ArtemisGuest instances or ``None`` if it wasn't possible to grab the guests.
         '''
 
+        pool = self.option('pool')
         key = self.option('key')
         ssh_key = self.option('ssh-key')
         priority = self.option('priority-group')
         options = normalize_multistring_option(self.option('ssh-options'))
-        compose_type = kwargs.pop('compose_type', None)
 
         if self.option('snapshots'):
             environment.snapshots = True
 
         guest = self.provision_guest(environment,
+                                     pool=pool,
                                      key=key,
                                      priority=priority,
-                                     compose_type=compose_type,
                                      ssh_key=ssh_key,
                                      options=options)
 
@@ -898,21 +859,7 @@ class ArtemisProvisioner(gluetool.Module):
 
         provision_count = self.option('provision')
         arch = self.option('arch')
-        compose_type = None
-        compose = None
-
-        if self.option('openstack-image'):
-            compose_type = 'openstack'
-            compose = self.option('openstack-image')
-        elif self.option('distro'):
-            compose_type = 'beaker'
-            compose = self.option('distro')
-        elif self.option('compose-id'):
-            compose_type = 'id'
-            compose = self.option('compose-id')
-        elif self.option('aws-image'):
-            compose_type = 'aws'
-            compose = self.option('aws-image')
+        compose = self.option('compose')
 
         environment = TestingEnvironment(arch=arch,
                                          compose=compose)
@@ -920,8 +867,7 @@ class ArtemisProvisioner(gluetool.Module):
         for num in range(provision_count):
             self.info("Trying to provision guest #{}".format(num+1))
             guest = self.provision(environment,
-                                   provision_count=provision_count,
-                                   compose_type=compose_type)[0]
+                                   provision_count=provision_count)[0]
             guest.info("Provisioned guest #{} {}".format(num+1, guest))
 
         if self.option('setup-provisioned'):
