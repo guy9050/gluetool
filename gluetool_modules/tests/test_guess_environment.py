@@ -11,6 +11,13 @@ from . import create_module, patch_shared, assert_shared, check_loadable
 @pytest.fixture(name='module')
 def fixture_module():
     module = create_module(gluetool_modules.helpers.guess_environment.GuessEnvironment)[1]
+    module._compose = {
+        'type': 'compose',
+        'specification': 'foo',
+        'method': 'foo',
+        'pattern-map': {},
+        'result': None
+    }
     module._distro = {
         'type': 'distro',
         'specification': 'foo',
@@ -458,3 +465,24 @@ def test_execute(module, log):
     assert log.records[-2].message == "Using image:\n\"dummy\""
     assert module._product['result'] == 'dummy'
     assert log.records[-1].message == "Using product:\n\"dummy\""
+
+
+def test_test_guessing(module, log):
+    def _guess_foo(self, source):
+        source['result'] = 'dummy'
+
+    guess_foo = MagicMock(side_effect=_guess_foo)
+
+    module._methods['foo'] = guess_foo
+    module._config['test-guessing'] = True
+
+    module.execute()
+
+    assert log.records[4].message.split('\n') == [
+        'Guessed environment:', '{',
+        '    "compose": "dummy",',
+        '    "distro": "dummy",',
+        '    "image": "dummy",',
+        '    "product": "dummy"',
+        '}'
+    ]

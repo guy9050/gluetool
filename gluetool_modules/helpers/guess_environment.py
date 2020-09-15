@@ -171,6 +171,12 @@ class GuessEnvironment(gluetool.Module):
                 'action': 'append',
                 'default': []
             }
+        }),
+        ('Testing', {
+            'test-guessing': {
+                'help': 'Print the guessed values, except `wow_relevancy_distro`, which needs additional data.',
+                'action': 'store_true'
+            }
         })
     ]
 
@@ -626,3 +632,13 @@ class GuessEnvironment(gluetool.Module):
         method(self, source, *args)
 
         log_dict(self.info, 'Using {}'.format(source['type']), source['result'])
+
+    def execute(self):
+
+        if self.option('test-guessing'):
+            log_dict(self.info, 'Guessed environment', {
+                'compose': self.compose(),
+                'distro': self.distro(),
+                'image': self.image(),
+                'product': self.product()
+            })
