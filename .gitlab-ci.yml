@@ -11,6 +11,11 @@ variables:
   # psssing this variable to its command... That should not work at all :/
   PYCURL_SSL_LIBRARY: nss
 
+  # See https://click.palletsprojects.com/en/7.x/python3/#python-3-surrogate-handling
+  # Export these for Python 3.6 - from 3.7 forward, Python is smarter when picking
+  # default locales.
+  LC_ALL: "en_US.utf8"
+  LANG: "en_US.utf8"
 
 # Use our custom image. See https://gitlab.cee.redhat.com/baseos-qe/ansible-baseos-ci/tree/master/gitlab-cicd
 image: "docker-registry.upshift.redhat.com/testing-farm/baseosci-gitlab-cicd-centos7"
