@@ -7,12 +7,8 @@ dependencies:
     - name: epel
       description: Extra Packages for Enterprise Linux 7
       baseurl: http://download.fedoraproject.org/pub/epel/7/$basearch
-    - name: standard-test-roles-internal
-      description: Internal Standard Test Roles, required to run STR on RHEL
-      baseurl: http://coprbe.devel.redhat.com/results/astepano/standard-test-roles-internal/epel-7-$basearch/
   yum:
     - standard-test-roles
-    - standard-test-roles-internal
   pip:
     - inotify==0.2.10
     - six==1.11.0
