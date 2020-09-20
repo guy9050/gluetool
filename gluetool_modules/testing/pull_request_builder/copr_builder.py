@@ -216,7 +216,8 @@ class CoprBuilder(gluetool.Module):
 
         self.info('Successfully fetched pull request {}.'.format(pull_number))
 
-        checkout_cmd = ['git', 'checkout', '-b', source_branch, commit_sha]
+        # branch to checkout to is prepended with part of commit_sha to avoid possible conflicts with existing branch
+        checkout_cmd = ['git', 'checkout', '-b', '{}-{}'.format(commit_sha[:8], source_branch), commit_sha]
         try:
             Command(checkout_cmd).run(cwd=os.path.join(workdir, repo_name))
         except gluetool.GlueCommandError as exc:
