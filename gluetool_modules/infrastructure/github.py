@@ -172,12 +172,6 @@ class GitHubAPI(object):
 
     def _set_commit_status(self, url, status_data):
         # type: (str, Dict[str, str]) -> Any
-
-        if 'target_url' in status_data:
-            # shortening the target url using shortener only available from
-            # internal network also helps, when `target_url` links to internal
-            # network that must not be posted to external network
-            status_data['target_url'] = self.module.shared('get_shortened_url', status_data['target_url'])
         return self._post(url, status_data).json()
 
     def set_commit_status(self, pull_request, status_data):
@@ -337,6 +331,10 @@ class GitHub(gluetool.Module):
                 'help': 'Token used for API authentication.',
                 'type': str
             },
+            'upload-full-url': {
+                'help': 'Upload full url instead of shortened one',
+                'action': 'store_true'
+            }
         }),
         ('Pull request initialization options', {
             'pull-request': {
@@ -462,6 +460,8 @@ class GitHub(gluetool.Module):
         :type target_url: str
         """
 
+        upload_full_url = gluetool.utils.normalize_bool_option(self.option('upload-full-url'))
+
         if status not in VALID_STATUSES:
             status = self._get_github_status(status)
 
@@ -473,8 +473,14 @@ class GitHub(gluetool.Module):
         if context:
             status_data['context'] = context
         if target_url:
-            self.require_shared('get_shortened_url')
-            status_data['target_url'] = target_url
+            if upload_full_url:
+                status_data['target_url'] = target_url
+            else:
+                self.require_shared('get_shortened_url')
+                # shortening the target url using shortener only available from
+                # internal network also helps, when `target_url` links to internal
+                # network that must not be posted to external network
+                status_data['target_url'] = self.shared('get_shortened_url', target_url)
 
         pull_request = self._pull_request
 
