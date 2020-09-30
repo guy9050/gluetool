@@ -4,12 +4,10 @@ name: test-schedule-tmt
 description: "Create and run TMT test schedule entries for ``test-scheduler`` and ``test-schedule-runner`` modules."
 
 dependencies:
-  repo:
-    - name: tmt
-      baseurl: https://copr-be.cloud.fedoraproject.org/results/psss/tmt/fedora-$releasever-$basearch/
-      enabled: 1
-      gpgkey: https://copr-be.cloud.fedoraproject.org/results/psss/tmt/pubkey.gpg
-      gpgcheck: 0
-
-  yum:
-    - tmt-all
+    repo:
+        - name: fedora-updates-testing
+          metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-testing-f$releasever&arch=$basearch
+          enabled: 1
+          includepkgs: tmt*
+    yum:
+        - tmt-all
