@@ -107,6 +107,7 @@ class RemoteGitRepository(gluetool.log.LoggerMixin):
         if not clone_url:
             raise gluetool.GlueError('No clone url specified, cannot continue')
 
+        path = path or self.path
         original_path = path  # save the original path for later
 
         if path:
@@ -117,6 +118,7 @@ class RemoteGitRepository(gluetool.log.LoggerMixin):
 
         else:
             actual_path = tempfile.mkdtemp(dir=os.getcwd())
+        self.path = actual_path
 
         logger.info('cloning repo {} (branch {}, ref {})'.format(
             clone_url,

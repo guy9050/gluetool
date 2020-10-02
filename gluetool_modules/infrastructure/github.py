@@ -36,15 +36,23 @@ class GitHubAPI(object):
             return '{}/{}'.format(self.api_url, urlquote(path))
         return '{}/{}?{}'.format(self.api_url, urlquote(path), urlencode(params))
 
-    def _check_status(self, response):
-        # type: (requests.models.Response) -> None
+    def _check_status(self, response, allow_statuses=None):
+        # type: (requests.models.Response, Optional[List[int]]) -> None
 
         if response.status_code < 200 or response.status_code > 299:
-            msg = 'Git API returned an error: {}\nURL: {}'.format(response.json()['message'], response.url)
-            raise gluetool.GlueError(msg)
+            allow_statuses = allow_statuses or []
+            if not allow_statuses or response.status_code not in allow_statuses:
+                if response.headers.get('content-type') == 'application/json':
+                    msg = 'Git API returned an error: {}\nURL: {}'.format(response.json()['message'], response.url)
+                else:
+                    msg = 'Git API returned an error: {}\nURL: {}'.format(response, response.url)
+                raise gluetool.GlueError(msg)
 
-    def _get(self, url):
-        # type: (str) -> requests.models.Response
+    def _get(self, url, allow_statuses=None):
+        # type: (str, Optional[List[int]]) -> requests.models.Response
+        # The user can specify a list of additional http status codes
+        # to allow.  This method will raise a GlueError if the http status
+        # code is not in the 2xx range and not in the allow_statuses list
 
         self.module.debug('[GitHub API] GET: {}'.format(url))
 
@@ -55,9 +63,12 @@ class GitHubAPI(object):
                 response = requests.get(url)
         except Exception:
             raise gluetool.GlueError('Unable to GET: {}'.format(url))
-        self._check_status(response)
+        self._check_status(response, allow_statuses)
 
-        log_dict(self.module.debug, '[GitHub API] output', response.json())
+        if response.headers.get('content-type') == 'application/json':
+            log_dict(self.module.debug, '[GitHub API] output', response.json())
+        else:
+            log_dict(self.module.debug, '[GitHub API] output', response)
 
         return response
 
@@ -170,6 +181,24 @@ class GitHubAPI(object):
         commit_data = self._get(commit_url).json()
         return commit_data[0] if len(commit_data) else None
 
+    def is_collaborator(self, owner, repo, username):
+        # type: (str, str, str) -> bool
+        """
+        Return true if the user with the given username is a collaborator in owner/repo
+
+        This is primarily used for authn purposes e.g. who can trigger CI on a PR
+
+        Refer to https://developer.github.com/v3/repos/collaborators/#check-if-a-user-is-a-repository-collaborator
+        for the API endpoint documentation.
+        """
+
+        collaborators_path = 'repos/{owner}/{repo}/collaborators/{username}'.format(
+            owner=owner, repo=repo, username=username
+        )
+        collaborators_url = self._compose_url(collaborators_path)
+        response = self._get(collaborators_url, allow_statuses=[404])
+        return (response.status_code == 204)
+
     def _set_commit_status(self, url, status_data):
         # type: (str, Dict[str, str]) -> Any
         return self._post(url, status_data).json()
@@ -229,6 +258,7 @@ class GitHubPullRequest(object):
         self.target_branch = pull_request['base']['ref']
 
         self.pull_author = pull_request['user']['login']
+        self.pull_head_branch_owner = pull_request['head']['user']['login']
 
         if self.comment_id:
             comment = github_api.get_comment(self.owner, self.repo, self.comment_id)
@@ -263,6 +293,17 @@ class GitHubPullRequest(object):
                 'description': status['description'],
                 'updated_at': status['updated_at']
             }
+
+        self.pull_author_is_collaborator = github_api.is_collaborator(self.owner, self.repo, self.pull_author)
+        self.comment_author_is_collaborator = github_api.is_collaborator(self.owner, self.repo, self.comment_author)
+        self.pull_head_branch_owner_is_collaborator = github_api.is_collaborator(
+            self.owner, self.repo, self.pull_head_branch_owner
+        )
+
+        if "labels" in pull_request:
+            self.labels = [item["name"] for item in pull_request["labels"]]
+        else:
+            self.labels = []
 
     @cached_property
     def task_arches(self):
