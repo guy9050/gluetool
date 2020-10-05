@@ -3,6 +3,7 @@ import stat
 import sys
 import tempfile
 
+import enum
 import six
 
 import gluetool
@@ -27,27 +28,39 @@ from typing import Any, Dict, List, NamedTuple, Optional  # noqa
 # TMT run log file
 TMT_LOG = 'tmt-run.log'
 
-# Name of the logfile which stores the TMT's runner output, relative to plan workdir
-RUNNER_LOGFILE = "execute/stdout.log"
-
 # Weight of a test result, used to count the overall result. Higher weight has precendence
-# when counting the overall result.
+# when counting the overall result. See https://tmt.readthedocs.io/en/latest/spec/steps.html#execute
 RESULT_WEIGHT = {
-    '.': 0,
-    'F': 1,
-    'E': 2,
+    'pass': 0,
+    'info': 0,
+    'fail': 1,
+    'warn': 1,
+    'error': 2,
 }
 
-# Map TMT runner's results to our results
+# Map tmt results to our expected results
+#
+# Note that we comply to
+#
+#     https://pagure.io/fedora-ci/messages/blob/master/f/schemas/test-complete.yaml
+#
+# TMT recognized `error` for a test, but we do not translate it to a TestScheduleResult
+# error, as this error is user facing, nothing we can do about it to fix it, it is his problem.
+#
+# For more context see: https://pagure.io/fedora-ci/messages/pull-request/86
 RESULT_OUTCOME = {
-    '.': 'passed',
-    'F': 'failed',
-    'E': 'error'
+    'pass': 'passed',
+    'info': 'info',
+    'fail': 'failed',
+    'warn': 'needs_inspection',
+    'error': 'error'
 }
 
 # Result weight to TestScheduleResult outcome
-# https://tmt.readthedocs.io/en/latest/overview.html#exit-codes
-# all tmt errors are connected to tests or config, so only higher return code than 3
+#
+#     https://tmt.readthedocs.io/en/latest/overview.html#exit-codes
+#
+# All tmt errors are connected to tests or config, so only higher return code than 3
 # is treated as error
 PLAN_OUTCOME = {
     0: TestScheduleResult.PASSED,
@@ -55,8 +68,8 @@ PLAN_OUTCOME = {
     2: TestScheduleResult.FAILED,
 }
 
-# Tests YAML file, contains list of tests run, relative to plan workdir
-TESTS_YAML = "discover/tests.yaml"
+# Results YAML file, contains list of test run results, relative to plan workdir
+RESULTS_YAML = "execute/results.yaml"
 
 #: Represents a test run result
 #:
@@ -70,6 +83,14 @@ TestResult = NamedTuple('TestResult', (
     ('log', str),
     ('artifacts_dir', str)
 ))
+
+
+# https://tmt.readthedocs.io/en/latest/overview.html#exit-codes
+class TMTExitCodes(enum.IntEnum):
+    TESTS_PASSED = 0
+    TESTS_FAILED = 1
+    TESTS_ERROR = 2
+    RESULTS_MISSING = 3
 
 
 class TestScheduleEntry(BaseTestScheduleEntry):
@@ -128,74 +149,56 @@ def gather_plan_results(schedule_entry, work_dir):
     :rtype: tuple
     :returns: A tuple with overall_result and results detected for the plan.
     """
-    results = []  # type: List[TestResult]
+    test_results = []  # type: List[TestResult]
 
     # TMT uses plan name as a relative directory to the working directory, but
     # plan start's with '/' character, strip it so we can use it with os.path.join
     plan_path = schedule_entry.plan[1:]
 
-    tests_yaml = os.path.join(work_dir, plan_path, TESTS_YAML)
-    runner_logfile = os.path.join(work_dir, plan_path, RUNNER_LOGFILE)
+    results_yaml = os.path.join(work_dir, plan_path, RESULTS_YAML)
 
-    for file in [tests_yaml, runner_logfile]:
-        if not os.path.exists(file):
-            schedule_entry.warn("Could not load required file '{}' for checking tmt results".format(file))
-            return TestScheduleResult.ERROR, results
+    if not os.path.exists(results_yaml):
+        schedule_entry.warn("Could not find results file '{}' containing tmt results".format(results_yaml), sentry=True)
+        return TestScheduleResult.ERROR, test_results
 
-    # load list of executed tests
+    # load test results from `results.yaml` which is created in tmt's execute step
+    # https://tmt.readthedocs.io/en/latest/spec/steps.html#execute
     try:
-        tests = load_yaml(tests_yaml)
-        log_dict(schedule_entry.debug, "loaded tests from '{}'".format(tests_yaml), tests)
+        results = load_yaml(results_yaml)
+        log_dict(schedule_entry.debug, "loaded results from '{}'".format(results_yaml), results)
 
     except GlueError as error:
-        schedule_entry.warn('Could not load tests.yaml file: {}'.format(error))
-        return TestScheduleResult.ERROR, results
-
-    # Runner log is a simple one line text file where each character is one test result according to this map:
-    #   . - PASSED
-    #   F - FAILED
-    #   E - ERROR
-    # The line is ended with 'D' character which denotes the successful end of the execution.
-    with open(runner_logfile, 'r') as runner_handle:
-        runner_log = runner_handle.readline().rstrip()
-        log_blob(schedule_entry.debug, "loaded runner log from '{}'".format(runner_logfile), runner_log)
-
-    # strip away the end of execution character
-    runner_results = runner_log[:-1]
-
-    # check the count of results from runner log with count of tests
-    if len(runner_results) != len(tests):
-        schedule_entry.warn('Number of results, does not match number of tests', sentry=True)
-
-    # check if run successfully finished
-    if runner_log[-1] != 'D':
-        schedule_entry.warn('tmt did not succesfully finish the execution of tests, skipping results evaluation')
+        schedule_entry.warn('Could not load results.yaml file: {}'.format(error))
         return TestScheduleResult.ERROR, results
 
     # iterate through all the test results and create TestResult for each
-    max_weight = 0
-    for name, result in zip(tests, runner_results):
-        # note that test name starts with '/', which we need to remove so it is a relative path
-        test_logdir = os.path.join(work_dir, plan_path, 'execute', 'logs', name[1:])
+    for name, data in results.iteritems():
 
-        # get result outcome
+        # translate result outcome
         try:
-            outcome = RESULT_OUTCOME[result]
+            outcome = RESULT_OUTCOME[data['result']]
         except KeyError:
-            schedule_entry.warn("Encountered invalid result '{}' in runner results".format(result))
+            schedule_entry.warn("Encountered invalid result '{}' in runner results".format(data['result']))
             return TestScheduleResult.ERROR, results
 
-        results.append(TestResult(
+        # log can be a string or a list, in case it is a list, the main log is the first one
+        log = data['log'][0] if isinstance(data['log'], list) else data['log']
+
+        # get the relative path to the log file
+        test_log_path = os.path.join(work_dir, plan_path, 'execute', log)
+
+        # NOTE: directory of log file is used as artifacts log, in case the tests produced more log files
+        test_results.append(TestResult(
             name,
             outcome,
-            os.path.join(test_logdir, 'out.log'),
-            test_logdir
+            test_log_path,
+            os.path.split(test_log_path)[0]
         ))
 
     # count the maximum result weight encountered, i.e. the overall result
-    max_weight = max(RESULT_WEIGHT[result] for result in runner_results)
+    max_weight = max(RESULT_WEIGHT[data['result']] for _, data in results.iteritems())
 
-    return PLAN_OUTCOME[max_weight], results
+    return PLAN_OUTCOME[max_weight], test_results
 
 
 class TestScheduleTMT(Module):
@@ -413,6 +416,8 @@ class TestScheduleTMT(Module):
 
                 f.flush()
 
+        tmt_output = None
+
         # run plan via tmt, note that the plan MUST be run in the artifact_dirpath
         try:
             tmt_output = Command(command).run(
@@ -424,13 +429,23 @@ class TestScheduleTMT(Module):
         except GlueCommandError as exc:
             tmt_output = exc.output
 
-            log_blob(
-                schedule_entry.error,
-                'tmt execution failed with exit code {}'.format(tmt_output.exit_code),
-                tmt_output.stderr if tmt_output.stderr else ''
-            )
+            # check if tmt failed to produce results
+            if tmt_output.exit_code == TMTExitCodes.RESULTS_MISSING:
+                schedule_entry.warn('tmt did not produce results, skipping results evaluation')
 
-        _save_output(tmt_output)
+                log_blob(
+                    schedule_entry.error,
+                    'tmt execution failed with exit code {}'.format(tmt_output.exit_code),
+                    tmt_output.stderr if tmt_output.stderr else ''
+                )
+
+                return TestScheduleResult.ERROR, []
+
+            self.info('tmt produced results with exit code {}'.format(tmt_output.exit_code))
+
+        finally:
+            if tmt_output:
+                _save_output(tmt_output)
 
         # gather and return overall plan run result and test results
         return gather_plan_results(schedule_entry, work_dirpath)
