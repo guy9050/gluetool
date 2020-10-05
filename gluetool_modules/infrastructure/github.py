@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, cast  # noqa
 
 import collections
+import re
 import requests
 
 from six.moves.urllib.parse import quote as urlquote
@@ -18,6 +19,13 @@ from gluetool.utils import cached_property
 #: :ivar list(str) arches: List of architectures.
 TaskArches = collections.namedtuple('TaskArches', ['complete', 'arches'])
 VALID_STATUSES = ('error', 'failure', 'pending', 'success')
+
+
+def is_json_response(response):
+    # type: (requests.models.Response) -> bool
+
+    content_type_list = re.split('[ ;]+', response.headers.get('content-type', ''))
+    return 'application/json' in content_type_list
 
 
 class GitHubAPI(object):
@@ -42,10 +50,10 @@ class GitHubAPI(object):
         if response.status_code < 200 or response.status_code > 299:
             allow_statuses = allow_statuses or []
             if not allow_statuses or response.status_code not in allow_statuses:
-                if response.headers.get('content-type') == 'application/json':
+                if is_json_response(response):
                     msg = 'Git API returned an error: {}\nURL: {}'.format(response.json()['message'], response.url)
                 else:
-                    msg = 'Git API returned an error: {}\nURL: {}'.format(response, response.url)
+                    msg = 'Git API returned an error: {}\nURL: {}'.format(response.status_code, response.url)
                 raise gluetool.GlueError(msg)
 
     def _get(self, url, allow_statuses=None):
@@ -65,10 +73,10 @@ class GitHubAPI(object):
             raise gluetool.GlueError('Unable to GET: {}'.format(url))
         self._check_status(response, allow_statuses)
 
-        if response.headers.get('content-type') == 'application/json':
+        if is_json_response(response):
             log_dict(self.module.debug, '[GitHub API] output', response.json())
         else:
-            log_dict(self.module.debug, '[GitHub API] output', response)
+            log_dict(self.module.debug, '[GitHub API] output', response.status_code)
 
         return response
 
@@ -196,7 +204,7 @@ class GitHubAPI(object):
             owner=owner, repo=repo, username=username
         )
         collaborators_url = self._compose_url(collaborators_path)
-        response = self._get(collaborators_url, allow_statuses=[404])
+        response = self._get(collaborators_url, allow_statuses=[401, 403, 404])
         return (response.status_code == 204)
 
     def _set_commit_status(self, url, status_data):
