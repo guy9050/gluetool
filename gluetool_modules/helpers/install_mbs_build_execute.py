@@ -12,10 +12,17 @@ from gluetool_modules.libs.guest_setup import guest_setup_log_dirpath, GuestSetu
 from gluetool_modules.libs.sut_installation import SUTInstallation
 
 
+DEFAULT_ODCS_OPTIONS_SEPARATOR = '#-#-#-#-#'
+
+
 class InstallMBSBuild(gluetool.Module):
     """
     Installs packages from specified rhel module on given guest. Calls given ansible playbook
     which downloads repofile and installs module.
+
+    Options to ODCS can be extended using the `--odcs-options` option. If you need to specify
+    more parameters, you can use as separator of the options `#-#-#-#-#`, this is useful for
+    example with Jenkins.
     """
 
     name = 'install-mbs-build-execute'
@@ -46,6 +53,17 @@ class InstallMBSBuild(gluetool.Module):
         'odcs-options': {
             'help': 'Addditional options passed to ODCS command, value is treated as a template.',
             'type': str
+        },
+        'odcs-options-separator': {
+            'help': """
+                    Due to technical limitations of Jenkins, when jobs want to pass multiple via ``--odcs-options``
+                    instances to this module, it is necessary to separate them in a single string. To tell them
+                    apart, this SEPARATOR string is used (default: %(default)s).
+                    """,
+            'metavar': 'SEPARATOR',
+            'type': str,
+            'action': 'store',
+            'default': DEFAULT_ODCS_OPTIONS_SEPARATOR
         }
     }
 
@@ -64,12 +82,15 @@ class InstallMBSBuild(gluetool.Module):
         ]
 
         if self.option('odcs-options'):
+            separator = self.option('odcs-options-separator')
+
             odcs_options = render_template(
                 self.option('odcs-options'),
                 logger=guest.logger,
                 **self.shared('eval_context')
             )
-            command += normalize_shell_option(odcs_options)
+
+            command += normalize_shell_option(odcs_options.replace(separator, ' '))
 
         with Action(
             'creating ODCS repository',
