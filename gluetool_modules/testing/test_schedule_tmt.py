@@ -255,7 +255,19 @@ class TestScheduleTMT(Module):
             six.reraise(*sys.exc_info())
 
         assert tmt_output.stdout
-        plans = tmt_output.stdout.split()
+
+        output_lines = [line.strip() for line in tmt_output.stdout.splitlines()]
+
+        # TMT emits warnings to stdout, spoiling the actual output, and we have to remove them before we consume
+        # what's left. And it could be helpful to display them. When TMT gets wiser, we can remove this workaround.
+        tmt_warnings = [line for line in output_lines if line.startswith('warning:')]
+
+        plans = [line for line in output_lines if line not in tmt_warnings]
+
+        if tmt_warnings:
+            log_dict(self.warn, 'tmt emitted following warnings', tmt_warnings)
+
+        log_dict(self.debug, 'tmt plans', plans)
 
         if not plans:
             raise GlueError('No plans found, cowardly refusing to continue.')
