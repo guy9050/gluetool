@@ -1,6 +1,7 @@
 import os
 import re
 import stat
+import subprocess
 import tempfile
 
 import gluetool
@@ -87,6 +88,17 @@ class Ansible(gluetool.Module):
             'metavar': 'PATH,',
             'default': [],
             'action': 'append'
+        },
+        'ansible-playbook-filepath': {
+            'help': """
+                    Path to ansible-playbook executable file.
+                    If not specified, the default executable is used (default: %(default)s).
+                    """,
+            'metavar': 'PATH',
+            'default': subprocess.check_output(
+                'command -v ansible-playbook 2> /dev/null || /bin/true',
+                shell=True
+            ).strip() or '/usr/bin/ansible-playbook'
         }
     }
 
@@ -235,7 +247,8 @@ class Ansible(gluetool.Module):
                      logger=None,  # type: Optional[gluetool.log.ContextAdapter]
                      log_filepath=None,  # type: Optional[str]
                      extra_vars_filename_prefix=EXTRA_VARS_FILENAME_PREFIX,  # type: str
-                     extra_vars_filename_suffix=EXTRA_VARS_FILENAME_SUFFIX  # type: str
+                     extra_vars_filename_suffix=EXTRA_VARS_FILENAME_SUFFIX,  # type: str
+                     ansible_playbook_filepath=None  # type: Optional[str]
                     ):  # noqa
         # type: (...) -> AnsibleOutput
         """
@@ -274,8 +287,10 @@ class Ansible(gluetool.Module):
 
         log_filepath = log_filepath or os.path.join(os.getcwd(), ANSIBLE_OUTPUT)
 
+        ansible_playbook_filepath = ansible_playbook_filepath or self.option('ansible-playbook-filepath')
+
         cmd = [
-            'ansible-playbook',
+            ansible_playbook_filepath,
             '-i', inventory,
             '--private-key', guest.key
         ]

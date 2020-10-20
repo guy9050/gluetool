@@ -18,6 +18,7 @@ from . import create_module, check_loadable
 def fixture_module():
     module = create_module(gluetool_modules.helpers.ansible.Ansible)[1]
     module._config['ansible-playbook-options'] = []
+    module._config['ansible-playbook-filepath'] = '/usr/bin/ansible-playbook'
     return module
 
 
@@ -69,7 +70,7 @@ def test_run_playbook_json(module, local_guest, monkeypatch, assert_output):
     assert output.json_output == json_output
 
     mock_command_init.assert_called_once_with([
-        'ansible-playbook',
+        '/usr/bin/ansible-playbook',
         '-i', '127.0.0.1,',
         '--private-key', local_guest.key,
         os.path.abspath('dummy playbook file')
@@ -96,7 +97,7 @@ def test_run_playbook_plaintext(module, local_guest, monkeypatch, assert_output)
     assert output.json_output is None
 
     mock_command_init.assert_called_once_with([
-        'ansible-playbook',
+        '/usr/bin/ansible-playbook',
         '-i', '127.0.0.1,',
         '--private-key', local_guest.key,
         '-v',
@@ -124,7 +125,72 @@ def test_run_playbooks(module, local_guest, monkeypatch, assert_output):
     assert output.json_output is None
 
     mock_command_init.assert_called_once_with([
-        'ansible-playbook',
+        '/usr/bin/ansible-playbook',
+        '-i', '127.0.0.1,',
+        '--private-key', local_guest.key,
+        '-v',
+        os.path.abspath('playbook1'),
+        os.path.abspath('playbook2')
+    ], logger=local_guest.logger)
+
+    env_variables = os.environ.copy()
+    env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'debug'})
+
+    mock_command_run.assert_called_once_with(cwd=None, env=env_variables)
+
+
+def test_change_ansible_playbook_filepath_option(module, local_guest, monkeypatch, assert_output):
+    module._config['ansible-playbook-filepath'] = '/foo/bar/ansible-playbook'
+
+    mock_output = MagicMock(exit_code=0, stdout='', stderr='')
+
+    mock_command_init = MagicMock(return_value=None)
+    mock_command_run = MagicMock(return_value=mock_output)
+
+    monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
+    monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
+
+    output = module.run_playbook(['playbook1', 'playbook2'], local_guest, json_output=False)
+
+    assert output.execution_output is mock_output
+    assert output.json_output is None
+
+    mock_command_init.assert_called_once_with([
+        '/foo/bar/ansible-playbook',
+        '-i', '127.0.0.1,',
+        '--private-key', local_guest.key,
+        '-v',
+        os.path.abspath('playbook1'),
+        os.path.abspath('playbook2')
+    ], logger=local_guest.logger)
+
+    env_variables = os.environ.copy()
+    env_variables.update({'ANSIBLE_STDOUT_CALLBACK': 'debug'})
+
+    mock_command_run.assert_called_once_with(cwd=None, env=env_variables)
+
+
+def test_change_ansible_playbook_filepath_argument(module, local_guest, monkeypatch, assert_output):
+
+    mock_output = MagicMock(exit_code=0, stdout='', stderr='')
+
+    mock_command_init = MagicMock(return_value=None)
+    mock_command_run = MagicMock(return_value=mock_output)
+
+    monkeypatch.setattr(gluetool.utils.Command, '__init__', mock_command_init)
+    monkeypatch.setattr(gluetool.utils.Command, 'run', mock_command_run)
+
+    output = module.run_playbook(
+        ['playbook1', 'playbook2'],
+        local_guest, json_output=False,
+        ansible_playbook_filepath='/foo/bar/ansible-playbook'
+    )
+
+    assert output.execution_output is mock_output
+    assert output.json_output is None
+
+    mock_command_init.assert_called_once_with([
+        '/foo/bar/ansible-playbook',
         '-i', '127.0.0.1,',
         '--private-key', local_guest.key,
         '-v',
@@ -174,7 +240,7 @@ def test_extra_vars(module, local_guest, monkeypatch, assert_output):
     }, cwd='foo')
 
     mock_command_init.assert_called_once_with([
-        'ansible-playbook',
+        '/usr/bin/ansible-playbook',
         '-i', '127.0.0.1,',
         '--private-key', local_guest.key,
         '--extra-vars', 'FOO="bar"',
@@ -202,7 +268,7 @@ def test_dryrun(module, local_guest, monkeypatch, assert_output):
     module.run_playbook('dummy playbook path', local_guest)
 
     mock_command_init.assert_called_once_with([
-        'ansible-playbook',
+        '/usr/bin/ansible-playbook',
         '-i', '127.0.0.1,',
         '--private-key', local_guest.key,
         '-C',
@@ -231,7 +297,7 @@ def test_additonal_options(module, local_guest, monkeypatch, assert_output):
     })
 
     mock_command_init.assert_called_once_with([
-        'ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key,
+        '/usr/bin/ansible-playbook', '-i', '127.0.0.1,', '--private-key', local_guest.key,
         '--extra-vars', 'FOO="bar"',
         '-vvv',
         '-d',
