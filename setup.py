@@ -18,7 +18,7 @@ DESCRIPTION = 'Gluetool & Citool modules'
 INSTALL_REQUIRES = [
     # required by all...
     'typing==3.7.4',
-    'typing-extensions==3.7.4',
+    'typing-extensions>=3.7.4.1',
 
     # required to enable tracing - not included in gluetool, it's optional
     "jaeger-client==4.0.0",
