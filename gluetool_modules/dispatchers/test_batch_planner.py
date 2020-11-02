@@ -447,7 +447,7 @@ class TestBatchPlanner(gluetool.Module):
             self.debug("component: '{}', pattern: '{}'".format(component, pattern))
 
             try:
-                match = re.match(pattern, component)
+                match = re.match('^(?:{})$'.format(pattern), component)
 
                 if match is None:
                     continue
