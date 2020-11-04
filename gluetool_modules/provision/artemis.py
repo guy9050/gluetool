@@ -148,8 +148,15 @@ class ArtemisAPI(object):
         if not isinstance(response.json(), list):
             raise error(response)
 
-    def create_guest(self, environment, pool=None, keyname=None, priority=None, user_data=None):
-        # type: (TestingEnvironment, Optional[str], Optional[str], Optional[str], Optional[Dict[str,Any]]) -> Any
+    def create_guest(self,
+                     environment,  # type: TestingEnvironment
+                     pool=None,   # type: Optional[str]
+                     keyname=None,  # type: Optional[str]
+                     priority=None,  # type: Optional[str]
+                     user_data=None,  # type: Optional[Dict[str,Any]]
+                     post_install_script=None  # type: Optional[str]
+                     ):
+        # type: (...) -> Any
         '''
         Submits a guest request to Artemis API.
 
@@ -170,6 +177,11 @@ class ArtemisAPI(object):
         compose = environment.compose
         snapshots = environment.snapshots
 
+        post_install_script_contents = None
+        if post_install_script:
+            with open(post_install_script) as f:
+                post_install_script_contents = f.read()
+
         data = {
             'keyname': keyname,
             'environment': {
@@ -177,7 +189,8 @@ class ArtemisAPI(object):
                 'os': {},
                 'snapshots': snapshots
             },
-            'priority_group': priority
+            'priority_group': priority,
+            'post_install_script': post_install_script_contents
         }  # type: Dict[str, Any]
 
         if pool:
@@ -628,6 +641,12 @@ class ArtemisProvisioner(gluetool.Module):
             'snapshots': {
                 'help': 'Choose a pool with snapshot support',
                 'action': 'store_true'
+            },
+            'post-install-script': {
+                'help': 'A post install script to run after vm becomes ready (default: %(default)s)',
+                'metavar': 'POST_INSTALL_SCRIPT',
+                'type': str,
+                'default': ''
             }
         }),
         ('Timeout options', {
@@ -744,7 +763,8 @@ class ArtemisProvisioner(gluetool.Module):
                         key=None,  # type: Optional[str]
                         priority=None,  # type: Optional[str]
                         ssh_key=None,  # type: Optional[str]
-                        options=None  # type: Optional[List[str]]
+                        options=None,  # type: Optional[List[str]]
+                        post_install_script=None,  # type: Optional[str]
                        ):  # noqa
         # type: (...) -> ArtemisGuest
         '''
@@ -776,7 +796,8 @@ class ArtemisProvisioner(gluetool.Module):
                                          pool=pool,
                                          keyname=key,
                                          priority=priority,
-                                         user_data=user_data)
+                                         user_data=user_data,
+                                         post_install_script=post_install_script)
 
         guestname = response.get('guestname')
         guest = None
@@ -827,6 +848,7 @@ class ArtemisProvisioner(gluetool.Module):
         ssh_key = self.option('ssh-key')
         priority = self.option('priority-group')
         options = normalize_multistring_option(self.option('ssh-options'))
+        post_install_script = self.option('post-install-script')
 
         if self.option('snapshots'):
             environment.snapshots = True
@@ -836,7 +858,8 @@ class ArtemisProvisioner(gluetool.Module):
                                      key=key,
                                      priority=priority,
                                      ssh_key=ssh_key,
-                                     options=options)
+                                     options=options,
+                                     post_install_script=post_install_script)
 
         guest.info('Guest provisioned')
         self.guests.append(guest)
