@@ -121,6 +121,11 @@ class TestResult(object):
 
             new_xml_element('property', _parent=test_suite_properties, name='baseosci.{}'.format(name), value=value)
 
+        primary_task = self.glue.shared('primary_task')
+        if primary_task:
+            _add_property('artifact-id', str(primary_task.id))
+            _add_property('artifact-namespace', primary_task.ARTIFACT_NAMESPACE)
+
         _add_property('test-type', self.test_type)
         _add_property('result-class', self.result_class)
         _add_property('overall-result', self.overall_result)

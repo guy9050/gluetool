@@ -196,6 +196,18 @@ class TestScheduleReport(gluetool.Module):
 
         testsuites_properties = gluetool.utils.new_xml_element('properties', _parent=test_suites)
 
+        primary_task = self.shared('primary_task')
+        if primary_task:
+            gluetool.utils.new_xml_element(
+                'property', _parent=testsuites_properties,
+                name='baseosci.artifact-id', value=str(primary_task.id)
+            )
+
+            gluetool.utils.new_xml_element(
+                'property', _parent=testsuites_properties,
+                name='baseosci.artifact-namespace', value=primary_task.ARTIFACT_NAMESPACE
+            )
+
         if self.option('enable-polarion'):
             # we use custom lookup method with Test Case ID as test id in Polarion
             gluetool.utils.new_xml_element(
