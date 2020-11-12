@@ -520,6 +520,10 @@ class ArtemisGuest(NetworkedGuest):
         snapshot.wait_snapshot_ready(self._module.option('snapshot-ready-timeout'),
                                      self._module.option('snapshot-ready-tick'))
 
+        # The snapshot is ready, but the guest hasn't started yet
+        self._wait_ready(self._module.option('ready-timeout'),
+                         self._module.option('ready-tick'))
+
         self._snapshots.append(snapshot)
 
         self.info("image snapshot '{}' created".format(snapshot.name))
