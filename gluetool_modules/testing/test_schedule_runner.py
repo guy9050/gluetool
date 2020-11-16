@@ -104,7 +104,7 @@ class TestScheduleRunner(gluetool.Module):
     def sanity(self):
         # type: () -> None
 
-        if self.parallelize:
+        if normalize_bool_option(self.option('parallelize')):
             self.info('Will run schedule entries in parallel')
 
         else:
@@ -211,6 +211,20 @@ class TestScheduleRunner(gluetool.Module):
         ):
             _run_setup(GuestSetupStage.POST_ARTIFACT_INSTALLATION)
 
+    def _destroy_guest(self, schedule_entry):
+        # type: (TestScheduleEntry) -> None
+
+        assert schedule_entry.guest is not None
+
+        schedule_entry.info('starting destroying guest')
+
+        with Action(
+            'destroying guest',
+            parent=schedule_entry.action,
+            logger=schedule_entry.logger
+        ):
+            schedule_entry.guest.destroy()
+
     def _run_tests(self, schedule_entry):
         # type: (TestScheduleEntry) -> None
 
@@ -221,6 +235,8 @@ class TestScheduleRunner(gluetool.Module):
 
     def _run_schedule(self, schedule):
         # type: (TestSchedule) -> None
+
+        schedule_queue = schedule[:] if not self.parallelize else None
 
         def _job(schedule_entry, name, target):
             # type: (TestScheduleEntry, str, Callable[[TestScheduleEntry], Any]) -> Job
@@ -246,6 +262,22 @@ class TestScheduleRunner(gluetool.Module):
             schedule_entry.debug('shifted: {} => {}, {} => {}'.format(
                 old_stage, new_stage, old_state, new_state
             ))
+
+        def _set_action(schedule_entry):
+            # type: (TestScheduleEntry) -> None
+
+            assert schedule_entry.testing_environment is not None
+
+            schedule_entry.action = Action(
+                'processing schedule entry',
+                parent=schedule.action,
+                logger=schedule_entry.logger,
+                tags={
+                    'entry-id': schedule_entry.id,
+                    'runner-capability': schedule_entry.runner_capability,
+                    'testing-environment': schedule_entry.testing_environment.serialize_to_json()
+                }
+            )
 
         def _finish_action(schedule_entry):
             # type: (TestScheduleEntry) -> None
@@ -355,6 +387,13 @@ class TestScheduleRunner(gluetool.Module):
 
                 _finish_action(schedule_entry)
 
+                # If parallelization is off, destroy guest and enqueue new entry
+                if schedule_queue:
+                    self._destroy_guest(schedule_entry)
+                    schedule_queue_entry = schedule_queue.pop(0)
+                    _set_action(schedule_queue_entry)
+                    engine.enqueue_jobs(_job(schedule_queue_entry, 'get entry ready', self._get_entry_ready))
+
         def _on_job_error(exc_info, schedule_entry):
             # type: (Any, TestScheduleEntry) -> None
 
@@ -374,6 +413,12 @@ class TestScheduleRunner(gluetool.Module):
             _shift(schedule_entry, TestScheduleEntryStage.COMPLETE, new_state=TestScheduleEntryState.ERROR)
 
             _finish_action(schedule_entry)
+
+            if schedule_queue:
+                self._destroy_guest(schedule_entry)
+                schedule_queue_entry = schedule_queue.pop(0)
+                _set_action(schedule_queue_entry)
+                engine.enqueue_jobs(_job(schedule_queue_entry, 'get entry ready', self._get_entry_ready))
 
         def _on_job_done(remaining_count, schedule_entry):
             # type: (int, TestScheduleEntry) -> None
@@ -397,29 +442,30 @@ class TestScheduleRunner(gluetool.Module):
             on_job_start=_on_job_start,
             on_job_complete=_on_job_complete,
             on_job_error=_on_job_error,
-            on_job_done=_on_job_done
+            on_job_done=_on_job_done,
         )
 
-        for schedule_entry in schedule:
-            # We spawn new action for each schedule entry - we don't enter its context anywhere though!
-            # It serves only as a link between "schedule" action and "doing X to move entry forward" subactions,
-            # capturing lifetime of the schedule entry. It is then closed when we switch the entry to COMPLETE
-            # stage.
+        if self.parallelize:
+            for schedule_entry in schedule:
+                # We spawn new action for each schedule entry - we don't enter its context anywhere though!
+                # It serves only as a link between "schedule" action and "doing X to move entry forward" subactions,
+                # capturing lifetime of the schedule entry. It is then closed when we switch the entry to COMPLETE
+                # stage.
 
-            assert schedule_entry.testing_environment is not None
+                _set_action(schedule_entry)
 
-            schedule_entry.action = Action(
-                'processing schedule entry',
-                parent=schedule.action,
-                logger=schedule_entry.logger,
-                tags={
-                    'entry-id': schedule_entry.id,
-                    'runner-capability': schedule_entry.runner_capability,
-                    'testing-environment': schedule_entry.testing_environment.serialize_to_json()
-                }
-            )
+                engine.enqueue_jobs(_job(schedule_entry, 'get entry ready', self._get_entry_ready))
+        else:
 
-            engine.enqueue_jobs(_job(schedule_entry, 'get entry ready', self._get_entry_ready))
+            assert schedule_queue is not None
+
+            schedule_queue_entry = schedule_queue.pop(0)
+
+            assert schedule_queue_entry.testing_environment is not None
+
+            _set_action(schedule_queue_entry)
+
+            engine.enqueue_jobs(_job(schedule_queue_entry, 'get entry ready', self._get_entry_ready))
 
         engine.run()
 
