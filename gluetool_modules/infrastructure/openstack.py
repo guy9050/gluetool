@@ -1003,6 +1003,7 @@ class OpenstackGuest(NetworkedGuest):
         self._release_floating_ip()
         self._release_instance()
         self._release_snapshots()
+        self._module.remove_from_list(self)
 
     def create_snapshot(self, start_again=True):
         """
@@ -1788,6 +1789,14 @@ class CIOpenstack(gluetool.Module):
                 self.option('arch')
             ]
         )
+
+    def remove_from_list(self, instance):
+
+        if instance not in self._all:
+            self.error('{} is not found in instance list')
+            return
+
+        self._all.remove(instance)
 
     def destroy(self, failure=None):
         if not self._all:
