@@ -2,7 +2,6 @@
 
 stages:
   - test
-  - build-rpm
   - build-docker
   - deploy
 
@@ -128,27 +127,6 @@ generate-docs:
 #
 # BUILD steps
 #
-
-# Trigger RPM build
-build-rpm-packages:
-  stage: build-rpm
-  extends: .locale
-  only:
-    - master@baseos-qe/gluetool-modules
-  script:
-    - tower-cli job launch --monitor -J "[BaseOS CI] [build] [rpm] citool-modules-full"
-  tags:
-    - shared
-
-build-rpm-packages-devel:
-  stage: build-rpm
-  extends: .locale
-  only:
-    - devel@baseos-qe/gluetool-modules
-  script:
-    - tower-cli job launch --monitor -J "[BaseOS CI] [build] [rpm] citool-modules-full-devel"
-  tags:
-    - shared
 
 # Trigger Docker build
 build-docker-images:
