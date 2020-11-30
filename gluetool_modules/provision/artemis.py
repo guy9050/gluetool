@@ -9,7 +9,7 @@ import requests
 from gluetool import GlueError, GlueCommandError, SoftGlueError
 from gluetool.log import log_dict, LoggerMixin
 from gluetool.result import Result
-from gluetool.utils import Command, dump_yaml, treat_url, normalize_multistring_option, wait
+from gluetool.utils import Command, dump_yaml, treat_url, normalize_multistring_option, wait, normalize_path
 from gluetool_modules.libs.guest import NetworkedGuest
 
 from gluetool_modules.libs.testing_environment import TestingEnvironment
@@ -179,7 +179,7 @@ class ArtemisAPI(object):
 
         post_install_script_contents = None
         if post_install_script:
-            with open(post_install_script) as f:
+            with open(normalize_path(post_install_script)) as f:
                 post_install_script_contents = f.read()
 
         data = {
