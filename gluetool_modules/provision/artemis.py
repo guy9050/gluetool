@@ -568,6 +568,7 @@ class ArtemisGuest(NetworkedGuest):
         # type: () -> None
         self._release_snapshots()
         self._release_instance()
+        cast(ArtemisProvisioner, self._module).remove_from_list(self)
 
 
 class ArtemisProvisioner(gluetool.Module):
@@ -900,6 +901,14 @@ class ArtemisProvisioner(gluetool.Module):
         if self.option('setup-provisioned'):
             for guest in self.guests:
                 guest.setup()
+
+    def remove_from_list(self, guest):
+        # type: (ArtemisGuest) -> None
+        if guest not in self.guests:
+            self.error('{} is not found in guests list')
+            return
+
+        self.guests.remove(guest)
 
     def destroy(self, failure=None):
         # type: (Optional[Any]) -> None
