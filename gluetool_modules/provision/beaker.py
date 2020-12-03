@@ -312,6 +312,7 @@ class BeakerGuest(NetworkedGuest):
             return
 
         self._module._release_dynamic_guest(self)
+        self._module.remove_from_list(self)
 
 
 class BeakerProvisioner(gluetool.Module):
@@ -1225,6 +1226,15 @@ class BeakerProvisioner(gluetool.Module):
             self._cache_ping_guest()
 
             _show_cache()
+
+    def remove_from_list(self, guest):
+        # type: (BeakerGuest) -> None
+
+        if guest not in self._dynamic_guests:
+            self.error('{} is not found in guests list')
+            return
+
+        self._dynamic_guests.remove(guest)
 
     def destroy(self, failure=None):
         if not self._dynamic_guests:
