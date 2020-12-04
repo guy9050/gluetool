@@ -63,6 +63,19 @@ class EmptyTestScheduleError(gluetool_modules.libs.sentry.PrimaryTaskFingerprint
         return False
 
 
+class InvalidTmtReferenceError(gluetool_modules.libs.sentry.PrimaryTaskFingerprintsMixin, gluetool.SoftGlueError):
+    def __init__(self, task, tmt_reference):
+        # type: (Any, str) -> None
+        self.tmt_reference = tmt_reference
+        super(InvalidTmtReferenceError, self).__init__(task, 'Incorrect TMT reference: {}'.format(tmt_reference))
+
+    @property
+    def submit_to_sentry(self):
+        # type: () -> bool
+
+        return False
+
+
 class TestScheduleEntryStage(GlueEnum):
     """
     Enumerates different stages of a test schedule entry.

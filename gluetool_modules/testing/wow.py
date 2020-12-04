@@ -468,6 +468,14 @@ class WorkflowTomorrow(gluetool.Module):
                         formatted_upstream_options
                     ))
 
+                if 'Problem with fmf reference' in exc.output.stderr:
+                    invalid_test = re.search(r"Problem with fmf reference: (.*)", exc.output.stderr)
+                    if invalid_test:
+                        tmt_reference = invalid_test.group(1)
+                    else:
+                        tmt_reference = '<failed to detect>'
+                    raise gluetool_modules.libs.test_schedule.InvalidTmtReferenceError(primary_task, tmt_reference)
+
                 if 'No recipe generated (no relevant tasks?)' in exc.output.stderr:
                     return _return_empty('No relevant tasks found for {} and options {}'.format(
                         distro,
