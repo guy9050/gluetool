@@ -440,7 +440,7 @@ gitdb2 = ">=2,<3"
 
 [[package]]
 name = "gluetool"
-version = "1.24"
+version = "1.25"
 description = "Python framework for constructing command-line pipelines"
 category = "main"
 optional = false
@@ -2368,8 +2368,8 @@ gitpython = [
     {file = "GitPython-2.1.15.tar.gz", hash = "sha256:838c38d882a97b2fd146dbd4eb9baaf857cb65ebaa64e4c06fca48aaa491e1c6"},
 ]
 gluetool = [
-    {file = "gluetool-1.24-py2-none-any.whl", hash = "sha256:e47bdbf9db63438cb533634bcac6e103136b0b4d675f8463f95d61c94b5af776"},
-    {file = "gluetool-1.24.tar.gz", hash = "sha256:d3b39abff5c5e45c09597054a1cc83a432f0a97fee9b0ece74c733398d92a610"},
+    {file = "gluetool-1.25-py3-none-any.whl", hash = "sha256:6f3b527164cce8f9b311d480249324a26ec42f22dddeea75bfeb5487bde94fb5"},
+    {file = "gluetool-1.25.tar.gz", hash = "sha256:107c7861a4c44deb3c110341ccf2f0c3845417599650a970fe1074d4f256b93f"},
 ]
 gssapi = [
     {file = "gssapi-1.6.2-cp36-cp36m-win_amd64.whl", hash = "sha256:334e1d4af47773afa99b1128c3ab598f007ff0533059259fef3cf1824e618726"},
