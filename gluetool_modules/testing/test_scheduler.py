@@ -378,10 +378,10 @@ class TestScheduler(gluetool.Module):
 
         # Remove duplicities
         duplicate_constraints = {
-            tec: None for tec in patched_constraints
+            str(tec): tec for tec in patched_constraints
         }
 
-        final_constraints = duplicate_constraints.keys()
+        final_constraints = duplicate_constraints.values()
 
         log_dict(self.debug, 'final testing environment constraints', final_constraints)
 
