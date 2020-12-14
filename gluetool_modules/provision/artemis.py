@@ -914,7 +914,7 @@ class ArtemisProvisioner(gluetool.Module):
         if self.option('keep'):
             return
 
-        for guest in self.guests:
+        for guest in self.guests[:]:
             guest.info('Canceling guest')
             guest.destroy()
             guest.info('Successfully removed guest')

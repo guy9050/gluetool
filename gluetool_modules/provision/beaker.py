@@ -1240,7 +1240,7 @@ class BeakerProvisioner(gluetool.Module):
         if not self._dynamic_guests:
             return
 
-        for guest in self._dynamic_guests:
+        for guest in self._dynamic_guests[:]:
             guest.stop_reservation_refresh()
             guest.destroy()
 

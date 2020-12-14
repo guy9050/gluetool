@@ -1810,7 +1810,7 @@ class CIOpenstack(gluetool.Module):
             self.info("keeping guests reserved, expecting regular cleanup via '--cleanup' option")
             return
 
-        for instance in self._all:
+        for instance in self._all[:]:
             instance.destroy()
         self._all = []
 
