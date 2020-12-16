@@ -167,6 +167,20 @@ class GitHubAPI(object):
         commit_data = self._get(commit_url).json()
         return commit_data
 
+    def get_pr_commits(self, owner, repo, pr):
+        # type: (str, str, str) -> Any
+        """
+        Return a list of commits for a specified pr.
+
+        Refer to https://developer.github.com/v3/pulls/#list-commits-on-a-pull-request
+        for the API endpoint documentation.
+        """
+
+        commits_path = 'repos/{owner}/{repo}/pulls/{pull_number}/commits'.format(
+                owner=owner, repo=repo, pull_number=pr)
+        commits_url = self._compose_url(commits_path)
+        return self._get(commits_url).json()
+
     def get_commit_by_timestamp(self, owner, repo, base_sha, timestamp):
         # type: (str, str, str, str) -> Any
         """
@@ -244,6 +258,7 @@ class GitHubPullRequest(object):
         self.pull_number = self.pull_request_id.pull_number
         self.commit_sha = self.pull_request_id.commit_sha  # type: str
         self.comment_id = self.pull_request_id.comment_id
+        self.depends_on = []  # type: List[str]
 
         self.component = self.repo
 
@@ -312,6 +327,23 @@ class GitHubPullRequest(object):
             self.labels = [item["name"] for item in pull_request["labels"]]
         else:
             self.labels = []
+
+        commits = github_api.get_pr_commits(self.owner, self.repo, self.pull_number)
+        depends_on_regex = re.compile(r'\s*Depends-On:\s*(.*/pull/|#)(\d+)', flags=re.IGNORECASE)
+        depends_on = []  # type: List[str]
+        for commit_message in [c['commit']['message'] for c in reversed(commits)]:
+            match = depends_on_regex.search(commit_message)
+            if match:
+                try:
+                    project = self.repo if match.group(1) == "#" else match.group(1).rsplit('/')[-3]
+                except IndexError:
+                    # NOTE(ivasilev) As the expected regex will have at least '/pull/' part there should always be at
+                    # least 3 elements in the list after rsplit('/'), but let's be paranoid.
+                    continue
+                pr = match.group(2)
+                depends_on.append("{}/PR{}".format(project, pr))
+        # Remove duplicates while keeping order
+        self.depends_on = list(collections.OrderedDict.fromkeys(depends_on))
 
     @cached_property
     def task_arches(self):
@@ -429,7 +461,10 @@ class GitHub(gluetool.Module):
                             """,
             'TASKS': """
                      List of all pull requests known to this module instance.
-                     """
+                     """,
+            'PR_DEPENDS_ON': """
+                             List all pull requests this pr depends on in the module/PRXXX format.
+                             """
         }
 
         primary_task = self.primary_task()
@@ -442,7 +477,8 @@ class GitHub(gluetool.Module):
             # common for all artifact providers
             'ARTIFACT_TYPE': primary_task.ARTIFACT_NAMESPACE,
             'PRIMARY_TASK': primary_task,
-            'TASKS': self.tasks()
+            'TASKS': self.tasks(),
+            'PR_DEPENDS_ON': primary_task.depends_on
         }
 
     @cached_property
