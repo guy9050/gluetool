@@ -1,9 +1,12 @@
 import gluetool_modules.libs.guest
 import gluetool
 from gluetool.action import Action
-from gluetool.utils import normalize_bool_option, load_yaml, dict_update, GlueError
+from gluetool.utils import normalize_bool_option, normalize_multistring_option, load_yaml, dict_update, GlueError
 from gluetool.log import log_blob
-from gluetool_modules.libs.guest_setup import GuestSetupStage, SetupGuestReturnType
+from gluetool_modules.libs.guest_setup import (
+    GuestSetupStage, SetupGuestReturnType,
+    STAGES_ORDERED as GUEST_SETUP_STAGES_ORDERED
+)
 from gluetool_modules.libs.jobs import JobEngine, Job, handle_job_errors
 from gluetool_modules.libs.test_schedule import TestScheduleEntryStage, TestScheduleEntryState, TestScheduleResult
 
@@ -17,6 +20,9 @@ STRING_TO_ENUM = {
     'state': TestScheduleEntryState,
     'result': TestScheduleResult
 }
+
+# Get enum values of guest setup stages, containing the guest setup stage names
+GUEST_SETUP_STAGES = [stage.value for stage in GUEST_SETUP_STAGES_ORDERED]
 
 
 class TestScheduleRunner(gluetool.Module):
@@ -64,6 +70,14 @@ class TestScheduleRunner(gluetool.Module):
             'metavar': 'FILE',
             'type': str,
             'default': ''
+        },
+        'skip-guest-setup-stages': {
+            'help': """
+                    Skip given guest setup stages. Possible choices are {}.
+                    """.format(', '.join(GUEST_SETUP_STAGES)),
+            'choices': GUEST_SETUP_STAGES,
+            'action': 'append',
+            'metavar': 'STAGE'
         }
     }
 
@@ -81,6 +95,11 @@ class TestScheduleRunner(gluetool.Module):
             return []
 
         return load_yaml(self.option('schedule-entry-attribute-map'), logger=self.logger)
+
+    @gluetool.utils.cached_property
+    def skip_guest_setup_stages(self):
+        # type: () -> List[str]
+        return normalize_multistring_option(self.option('skip-guest-setup-stages'))
 
     def sanity(self):
         # type: () -> None
@@ -126,6 +145,10 @@ class TestScheduleRunner(gluetool.Module):
             # type: (GuestSetupStage) -> None
 
             assert schedule_entry.guest is not None
+
+            if stage.value in self.skip_guest_setup_stages:
+                schedule_entry.warn("skip stage '{}' on user request".format(stage.value))
+                return
 
             r_result = cast(
                 SetupGuestReturnType,
