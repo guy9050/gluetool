@@ -11,7 +11,7 @@ import gluetool
 from gluetool import GlueError
 from gluetool.action import Action
 from gluetool.log import log_blob, log_dict
-from gluetool.utils import dict_update, new_xml_element, normalize_path
+from gluetool.utils import dict_update, new_xml_element
 
 from gluetool_modules.libs.artifacts import artifacts_location
 from gluetool_modules.libs.test_schedule import TestScheduleResult
@@ -99,15 +99,6 @@ class STIRunner(gluetool.Module):
             'metavar': 'SECONDS',
             'type': int,
             'default': DEFAULT_WATCH_TIMEOUT
-        },
-        'ansible-playbook-filepath': {
-            'help': """
-                    Provide different ansible-playbook executable to the call
-                    of a `run_playbook` shared function. (default: %(default)s)
-                    """,
-            'metavar': 'PATH',
-            'type': str,
-            'default': ''
         }
     }
 
@@ -245,12 +236,6 @@ sut     ansible_host={} ansible_user=root {}
                 schedule_entry.variables
             )
 
-            ansible_playbook_filepath = (
-                schedule_entry.ansible_playbook_filepath
-                or normalize_path(self.option('ansible-playbook-filepath'))
-                or None
-            )
-
             # `run_playbook` and log the output to the working directory
             self.shared(
                 'run_playbook',
@@ -260,8 +245,7 @@ sut     ansible_host={} ansible_user=root {}
                 cwd=artifact_dirpath,
                 json_output=False,
                 log_filepath=os.path.join(work_dirpath, STI_ANSIBLE_LOG_FILENAME),
-                variables=variables,
-                ansible_playbook_filepath=ansible_playbook_filepath
+                variables=variables
             )
 
         # monitor artifact directory

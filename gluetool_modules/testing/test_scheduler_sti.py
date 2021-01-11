@@ -38,7 +38,6 @@ class TestScheduleEntry(BaseTestScheduleEntry):
         self.artifact_dirpath = None  # type: Optional[str]
         self.inventory_filepath = None  # type: Optional[str]
         self.results = None  # type: Any
-        self.ansible_playbook_filepath = None  # type: Optional[str]
 
     def log_entry(self, log_fn=None):
         # type: (Optional[gluetool.log.LoggingFunctionType]) -> None
