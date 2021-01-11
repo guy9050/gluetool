@@ -245,11 +245,12 @@ sut     ansible_host={} ansible_user=root {}
                 schedule_entry.variables
             )
 
-            ansible_playbook_filepath = (
-                schedule_entry.ansible_playbook_filepath
-                or normalize_path(self.option('ansible-playbook-filepath'))
-                or None
-            )
+            if schedule_entry.ansible_playbook_filepath:
+                ansible_playbook_filepath = schedule_entry.ansible_playbook_filepath  # type: Optional[str]
+            elif self.option('ansible-playbook-filepath'):
+                ansible_playbook_filepath = normalize_path(self.option('ansible-playbook-filepath'))
+            else:
+                ansible_playbook_filepath = None
 
             # `run_playbook` and log the output to the working directory
             self.shared(
