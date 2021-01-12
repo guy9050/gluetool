@@ -60,6 +60,9 @@ class RpminspectJob(gluetool_modules.libs.dispatch_job.DispatchJenkinsJobMixin, 
                 'brew_with_baseline_nvr': self.option('baseline-nvr')
             })
 
-        job = 'ci-test-{}-rpminspect_{}'.format(self.option('build-system'), self.option('type'))
+        if self.option('job-name'):
+            job = self.option('job-name')
+        else:
+            job = 'ci-test-{}-rpminspect_{}'.format(self.option('build-system'), self.option('type'))
 
         self.shared('jenkins').invoke_job(job, self.build_params)
