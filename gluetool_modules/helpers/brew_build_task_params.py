@@ -34,6 +34,11 @@ class BrewBuildOptions(gluetool.Module):
             'help': 'Yum method to use for installation (default: %(default)s).',
             'type': str,
             'default': 'multi'
+        },
+        'brew-build-repo-priority': {
+            'help': 'Set priority of brew build repository (default: %(default)s).',
+            'type': int,
+            'default': 50  # The priority should be higher (lower number) than the default one (99)
         }
     }
 
@@ -70,7 +75,8 @@ class BrewBuildOptions(gluetool.Module):
         options = {
             'METHOD': self.option('install-method'),
             'SERVER': self.shared('primary_task').ARTIFACT_NAMESPACE,
-            'RPM_BLACKLIST': self.option('install-rpms-blacklist')
+            'RPM_BLACKLIST': self.option('install-rpms-blacklist'),
+            'PRIORITY': self.option('brew-build-repo-priority')
         }
 
         if tasks:
