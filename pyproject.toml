@@ -187,7 +187,7 @@ docutils = "0.14"
 future = "0.16.0"
 jinja2 = "2.10"
 sphinx = "1.5.2"
-gluetool = "^1.21"
+gluetool = "^1.25"
 koji = "^1.21.0"
 backports-abc = "^0.5"
 
