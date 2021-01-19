@@ -133,7 +133,11 @@
 
     - name: "Reinstall pycurl with correct backend"
       shell: |
-        pycurl=$(pip freeze | grep pycurl)
+        # Plain pip freeze does not show versions, but cached files.
+        # We got hit by this after poetry 1.1.0 and later, which introduced caching.
+        # https://stackoverflow.com/questions/64194634/why-pip-freeze-returns-some-gibberish-instead-of-package-version
+        # https://github.com/pypa/pip/issues/8176
+        pycurl=$(pip list --format=freeze | grep pycurl)
         pip uninstall -y pycurl
         PYCURL_SSL_LIBRARY={{ pycurl_ssl_library }} pip install --no-cache-dir $pycurl
 
