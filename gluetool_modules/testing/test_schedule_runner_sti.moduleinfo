@@ -3,10 +3,6 @@
 name: test-schedule-runner-sti
 description: Run Standard Test Interface tests on the provisioned guests
 dependencies:
-  repo:
-    - name: epel
-      description: Extra Packages for Enterprise Linux 7
-      baseurl: http://download.fedoraproject.org/pub/epel/7/$basearch
   yum:
     - standard-test-roles
   pip:
