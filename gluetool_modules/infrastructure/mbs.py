@@ -205,6 +205,7 @@ class MBSTask(LoggerMixin, object):
         self.issuer = build_info['owner']
         self.scratch = build_info['scratch']
         self.nsvc = '{}:{}:{}:{}'.format(self.name, self.stream, self.version, self.context)
+        self.tags = []
 
         # `nvr` is:
         # - often used as unique id of artifact (e.g. in mail notifications)
@@ -222,8 +223,9 @@ class MBSTask(LoggerMixin, object):
             self.name, self.stream.replace('-', '_'), self.version, self.context
         )
 
-        # build tags from brew
-        self.tags = [tag['name'] for tag in self.module.shared('koji_session').listTags(self.nvr)]
+        # build tags from brew, only applicable to non-scratch modules, scratch modules do not have metadata in Brew
+        if not self.scratch:
+            self.tags = [tag['name'] for tag in self.module.shared('koji_session').listTags(self.nvr)]
 
         # this string identifies component in static config file
         self.component_id = '{}:{}'.format(self.name, self.stream)
